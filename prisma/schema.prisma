@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  empire Empire?
+}
+
+model GameSeason {
+  id        String   @id @default(cuid())
+  name      String
+  startsAt  DateTime
+  endsAt    DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empires Empire[]
+}
+
+model Empire {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  seasonId            String?
+  name                String   @unique
+  level               Int      @default(1)
+  gold                Float    @default(2000)
+  wood                Float    @default(1500)
+  iron                Float    @default(1000)
+  stone               Float    @default(1000)
+  diamonds            Float    @default(10)
+  citizens            Int      @default(50)
+  turns               Int      @default(0)
+  lastRegularUpdateAt DateTime @default(now())
+  lastDailyUpdateAt   DateTime @default(now())
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  season        GameSeason?          @relation(fields: [seasonId], references: [id], onDelete: SetNull)
+  buildings     Building[]
+  army          Army?
+  storages      ResourceStorage[]
+  upgrades      EmpireUpgrade[]
+  bankAccount   BankAccount?
+  weapons       EmpireWeapon[]
+  weaponUnlocks EmpireWeaponUnlock[]
+
+  spyReportsSent     SpyReport[]    @relation("SpyAttacker")
+  spyReportsReceived SpyReport[]    @relation("SpyDefender")
+  battlesAttacked    BattleReport[] @relation("BattleAttacker")
+  battlesDefended    BattleReport[] @relation("BattleDefender")
+}
+
+enum BuildingType {
+  GOLD_MINE
+  WOOD_CAMP
+  IRON_MINE
+  STONE_QUARRY
+  BARRACKS
+  SPY_CENTER
+}
+
+model Building {
+  id             String       @id @default(cuid())
+  empireId       String
+  type           BuildingType
+  level          Int          @default(1)
+  slavesAssigned Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, type])
+}
+
+model Army {
+  id         String   @id @default(cuid())
+  empireId   String   @unique
+  soldiers   Int      @default(0)
+  spies      Int      @default(0)
+  mineSlaves Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+}
+
+enum ResourceStorageType {
+  GOLD
+  WOOD
+  IRON
+  STONE
+}
+
+model ResourceStorage {
+  id           String              @id @default(cuid())
+  empireId     String
+  resourceType ResourceStorageType
+  level        Int                 @default(1)
+  storedAmount Float               @default(0)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, resourceType])
+}
+
+enum EmpireUpgradeType {
+  CITIZEN_GROWTH
+  INTELLIGENCE
+  BANK_DEPOSIT_COUNT
+  BANK_DAILY_INTEREST
+  TURNS_PER_REGULAR_UPDATE
+}
+
+model EmpireUpgrade {
+  id        String            @id @default(cuid())
+  empireId  String
+  type      EmpireUpgradeType
+  level     Int               @default(1)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, type])
+}
+
+enum WeaponCategory {
+  ATTACK
+  DEFENSE
+  SPY
+}
+
+model EmpireWeapon {
+  id        String   @id @default(cuid())
+  empireId  String
+  weaponKey String
+  quantity  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, weaponKey])
+}
+
+model EmpireWeaponUnlock {
+  id           String         @id @default(cuid())
+  empireId     String
+  category     WeaponCategory
+  unlockedTier Int            @default(2)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, category])
+}
+
+model BankAccount {
+  id                          String   @id @default(cuid())
+  empireId                    String   @unique
+  goldBalance                 Float    @default(0)
+  depositsUsedInCurrentPeriod Int      @default(0)
+  depositPeriodStartedAt      DateTime @default(now())
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+
+  empire       Empire            @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  transactions BankTransaction[]
+}
+
+enum BankTransactionType {
+  DEPOSIT
+  WITHDRAW
+  INTEREST
+}
+
+model BankTransaction {
+  id            String              @id @default(cuid())
+  bankAccountId String
+  empireId      String
+  type          BankTransactionType
+  amount        Float
+  balanceAfter  Float
+  createdAt     DateTime            @default(now())
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+
+  @@index([empireId, createdAt])
+}
+
+model SpyReport {
+  id                 String   @id @default(cuid())
+  attackerEmpireId   String
+  defenderEmpireId   String
+  success            Boolean
+  revealedGold       Float?
+  revealedWood       Float?
+  revealedIron       Float?
+  revealedStone      Float?
+  revealedSoldiers   Int?
+  revealedSpies      Int?
+  revealedMineSlaves Int?
+  finalChance        Float?
+  weaponsBonus       Float?
+  turnsSpent         Int      @default(5)
+  createdAt          DateTime @default(now())
+
+  attackerEmpire Empire @relation("SpyAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
+  defenderEmpire Empire @relation("SpyDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)
+}
+
+model BattleReport {
+  id                   String   @id @default(cuid())
+  attackerEmpireId     String
+  defenderEmpireId     String
+  attackerPower        Float
+  defenderPower        Float
+  attackerSoldiersPower Float?
+  attackerWeaponsPower  Float?
+  defenderSoldiersPower Float?
+  defenderWeaponsPower  Float?
+  winnerEmpireId       String
+  attackerSoldiersLost Int
+  defenderSoldiersLost Int
+  stolenGold           Float
+  stolenWood           Float
+  stolenIron           Float
+  stolenStone          Float
+  turnsSpent           Int      @default(10)
+  createdAt            DateTime @default(now())
+
+  attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
+  defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)
+}
