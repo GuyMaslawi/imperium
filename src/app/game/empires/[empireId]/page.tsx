@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { Card, CardTitle } from "@/components/ui/Card";
-import { armyPower } from "@/lib/game/power";
+import {
+  getEmpireAttackPower,
+  getEmpireDefensePower,
+  getEmpireSpyPower,
+  getEmpireGeneralPower,
+} from "@/lib/game/power";
 import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
@@ -45,20 +50,28 @@ export default async function EmpireProfilePage({
         orderBy: { createdAt: "desc" },
       });
 
-  const attackWeaponsPower = weaponsPower(empire.weapons, "ATTACK");
-  const defenseWeaponsPower = weaponsPower(empire.weapons, "DEFENSE");
-  const spyWeaponsPower = weaponsPower(empire.weapons, "SPY");
-  const power = armyPower(empire.army) + attackWeaponsPower + defenseWeaponsPower;
+  // Detailed powers are shown for your own empire, or once a recent
+  // successful spy report exists. General power is always public.
+  const showDetails = isMe || spyReport !== null;
+  const generalPower = getEmpireGeneralPower(empire.army, empire.weapons);
+
+  const powerRows = [
+    { icon: "⚔️", label: "כוח התקפה", value: getEmpireAttackPower(empire.army, empire.weapons) },
+    { icon: "🛡️", label: "כוח הגנה", value: getEmpireDefensePower(empire.army, empire.weapons) },
+    { icon: "🕵️", label: "כוח מודיעין", value: getEmpireSpyPower(empire.army, empire.weapons) },
+    { icon: "👑", label: "כוח כללי", value: generalPower },
+  ];
 
   return (
     <div className="space-y-6">
+      {/* -------- header + action bar -------- */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-zinc-100">
             👑 {empire.name}
             {isMe && (
               <span className="mr-3 rounded-full bg-gold/15 px-2.5 py-1 align-middle text-xs font-bold text-gold">
-                האימפריה שלך
+                זו האימפריה שלך
               </span>
             )}
           </h1>
@@ -67,11 +80,25 @@ export default async function EmpireProfilePage({
           </p>
         </div>
         {!isMe && (
-          <RankActions targetEmpireId={empire.id} currentTurns={myEmpire.turns} />
+          <div className="flex flex-wrap items-start gap-2">
+            <RankActions
+              targetEmpireId={empire.id}
+              currentTurns={myEmpire.turns}
+            />
+            <button
+              type="button"
+              disabled
+              title="מערכת הודעות בין שחקנים תתווסף בהמשך."
+              className="cursor-not-allowed rounded-lg border border-gold-dim px-4 py-2 text-sm text-gold opacity-50"
+            >
+              ✉️ שליחת הודעה · בקרוב
+            </button>
+          </div>
         )}
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        {/* -------- basic info -------- */}
         <Card>
           <CardTitle icon="📊">נתונים כלליים</CardTitle>
           <dl className="space-y-2.5 text-sm">
@@ -80,8 +107,8 @@ export default async function EmpireProfilePage({
               <dd className="font-bold text-zinc-100">{empire.level}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">עוצמה צבאית</dt>
-              <dd className="font-bold text-gold">⚡ {formatNumber(power)}</dd>
+              <dt className="text-zinc-400">כוח כללי</dt>
+              <dd className="font-bold text-gold">⚡ {formatNumber(generalPower)}</dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-zinc-400">אזרחים</dt>
@@ -104,13 +131,50 @@ export default async function EmpireProfilePage({
           </dl>
         </Card>
 
+        {/* -------- power summary -------- */}
+        <Card>
+          <CardTitle icon="⚡">כוח האימפריה</CardTitle>
+          {showDetails ? (
+            <>
+              {spyReport && (
+                <p className="mb-3 text-xs text-zinc-500">
+                  מבוסס על דוח ריגול מ־{formatDate(spyReport.createdAt)}
+                </p>
+              )}
+              <dl className="space-y-2.5 text-sm">
+                {powerRows.map((row) => (
+                  <div key={row.label} className="flex justify-between">
+                    <dt className="text-zinc-400">
+                      {row.icon} {row.label}
+                    </dt>
+                    <dd className="font-bold tabular-nums text-gold">
+                      {formatNumber(row.value)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              {isMe && (
+                <Link
+                  href="/game/weapons"
+                  className="mt-4 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
+                >
+                  ניהול נשקים ←
+                </Link>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-zinc-400">
+              בצע ריגול כדי לחשוף מידע נוסף על האימפריה.
+            </p>
+          )}
+        </Card>
+      </div>
+
+      {/* -------- intelligence: revealed enemy details -------- */}
+      {!isMe && (
         <Card>
           <CardTitle icon="🕵️">מידע מודיעיני</CardTitle>
-          {isMe ? (
-            <p className="text-sm text-zinc-400">
-              זו האימפריה שלך — כל המידע זמין בעמוד הבסיס.
-            </p>
-          ) : spyReport ? (
+          {spyReport ? (
             <>
               <p className="mb-3 text-xs text-zinc-500">
                 מבוסס על דוח ריגול מ־{formatDate(spyReport.createdAt)}
@@ -123,6 +187,8 @@ export default async function EmpireProfilePage({
                 <span>🪖 חיילים: {formatNumber(spyReport.revealedSoldiers ?? 0)}</span>
                 <span>🕵️ מרגלים: {formatNumber(spyReport.revealedSpies ?? 0)}</span>
                 <span>⛏️ עבדי מכרות: {formatNumber(spyReport.revealedMineSlaves ?? 0)}</span>
+                <span>⚔️ נשקי התקפה: {formatNumber(weaponsPower(empire.weapons, "ATTACK"))}</span>
+                <span>🛡️ נשקי הגנה: {formatNumber(weaponsPower(empire.weapons, "DEFENSE"))}</span>
               </div>
             </>
           ) : (
@@ -131,56 +197,26 @@ export default async function EmpireProfilePage({
             </p>
           )}
         </Card>
-      </div>
+      )}
 
-      <Card>
-        <CardTitle icon="🗡️">נשקים</CardTitle>
-        {isMe ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300 sm:grid-cols-3">
-              <span>⚔️ כוח התקפה מנשקים: {formatNumber(attackWeaponsPower)}</span>
-              <span>🛡️ כוח הגנה מנשקים: {formatNumber(defenseWeaponsPower)}</span>
-              <span>🕵️ כוח ריגול מנשקים: {formatNumber(spyWeaponsPower)}</span>
-            </div>
-            <Link
-              href="/game/weapons"
-              className="inline-block rounded-lg border border-gold-dim px-4 py-2 text-sm font-bold text-gold transition-colors hover:bg-gold/10"
-            >
-              ניהול נשקים
-            </Link>
-          </div>
-        ) : spyReport ? (
-          <>
-            <p className="mb-3 text-xs text-zinc-500">
-              מבוסס על דוח ריגול מ־{formatDate(spyReport.createdAt)}
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-sm text-zinc-300 sm:grid-cols-3">
-              <span>⚔️ כוח התקפה מנשקים: {formatNumber(attackWeaponsPower)}</span>
-              <span>🛡️ כוח הגנה מנשקים: {formatNumber(defenseWeaponsPower)}</span>
-              <span>🕵️ כוח ריגול מנשקים: {formatNumber(spyWeaponsPower)}</span>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-zinc-400">
-            בצע ריגול כדי לחשוף מידע על נשקי היריב.
-          </p>
-        )}
-      </Card>
-
-      {/* Future systems */}
+      {/* -------- future systems (compact placeholders) -------- */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card>
-          <CardTitle icon="🦸">גיבור</CardTitle>
-          <p className="text-sm text-zinc-400">מערכת הגיבור תיפתח בהמשך.</p>
-        </Card>
-        <Card>
-          <CardTitle icon="🗡️">ציוד גיבור</CardTitle>
+        <Card className="!p-4">
+          <CardTitle icon="🦸" className="!mb-2 !text-base">גיבור</CardTitle>
           <p className="text-sm text-zinc-400">
-            ציוד היריב יוצג כאן כאשר מערכת הגיבורים תתווסף.
+            {isMe ? "מערכת הגיבור תיפתח בהמשך." : "כאן יוצג הגיבור של היריב."}
           </p>
         </Card>
-        <Card>
-          <CardTitle icon="🤝">ברית</CardTitle>
+        <Card className="!p-4">
+          <CardTitle icon="🗡️" className="!mb-2 !text-base">חפצי גיבור</CardTitle>
+          <p className="text-sm text-zinc-400">
+            {isMe
+              ? "כאן יוצגו חפצי הגיבור שלך בהמשך."
+              : "כאן יוצגו חפצי הגיבור של היריב לאחר שמערכת הגיבורים תתווסף."}
+          </p>
+        </Card>
+        <Card className="!p-4">
+          <CardTitle icon="🤝" className="!mb-2 !text-base">ברית</CardTitle>
           <p className="text-sm text-zinc-400">מערכת הבריתות תיפתח בהמשך.</p>
         </Card>
       </div>

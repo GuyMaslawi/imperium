@@ -19,8 +19,21 @@ const TAB_POWER_LABELS = {
   SPY: "כוח ריגול כולל מנשקים",
 } as const;
 
-export default async function WeaponsPage() {
+const TAB_PARAM_TO_CATEGORY: Record<string, "ATTACK" | "DEFENSE" | "SPY"> = {
+  attack: "ATTACK",
+  defense: "DEFENSE",
+  spy: "SPY",
+};
+
+export default async function WeaponsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const empire = await requireEmpire();
+  const { tab } = await searchParams;
+  const initialCategory =
+    typeof tab === "string" ? TAB_PARAM_TO_CATEGORY[tab] : undefined;
 
   const ownedByKey = new Map(
     empire.weapons.map((w) => [w.weaponKey, w.quantity])
@@ -79,7 +92,7 @@ export default async function WeaponsPage() {
         ))}
       </div>
 
-      <WeaponsTabs tabs={tabs} available={available} />
+      <WeaponsTabs tabs={tabs} available={available} initialCategory={initialCategory} />
     </div>
   );
 }

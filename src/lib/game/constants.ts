@@ -180,6 +180,12 @@ export const UNIT_KEYS = Object.keys(UNIT_META) as UnitKey[];
 /** Only soldiers contribute to military power. */
 export const SOLDIER_POWER = UNIT_META.soldiers.power;
 
+/**
+ * Intelligence rating per spy. A readable player stat only — spy mission
+ * success is still driven by the intelligence upgrade + spy weapons.
+ */
+export const SPY_POWER = 10;
+
 /* ------------------------------ resource storages ------------------------------ */
 
 export interface StorageMeta {

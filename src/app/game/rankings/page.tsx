@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
-import { armyPower } from "@/lib/game/power";
-import { weaponsPower } from "@/lib/game/weapons";
+import { getEmpireMilitaryPower } from "@/lib/game/power";
 import { formatCompact, formatNumber } from "@/lib/game/format";
-import { RankActions } from "@/components/game/RankActions";
 import { Card } from "@/components/ui/Card";
 
 export const metadata = { title: "דירוג | אימפריום" };
@@ -16,14 +14,10 @@ export default async function RankingsPage() {
     include: { army: true, weapons: true },
   });
 
-  // Military power: soldiers plus attack and defense weapons.
   const ranked = empires
     .map((e) => ({
       ...e,
-      power:
-        armyPower(e.army) +
-        weaponsPower(e.weapons, "ATTACK") +
-        weaponsPower(e.weapons, "DEFENSE"),
+      power: getEmpireMilitaryPower(e.army, e.weapons),
     }))
     .sort((a, b) => b.power - a.power || b.level - a.level);
 
@@ -32,13 +26,15 @@ export default async function RankingsPage() {
       <div>
         <h1 className="text-2xl font-black text-zinc-100">דירוג האימפריות 🏆</h1>
         <p className="mt-1 text-sm text-zinc-400">
-          כל האימפריות במשחק, מדורגות לפי עוצמה צבאית. לחץ על שם אימפריה לצפייה
-          בפרופיל שלה.
+          כל האימפריות במשחק, מדורגות לפי עוצמה צבאית.
+        </p>
+        <p className="mt-1 text-sm font-medium text-gold">
+          כדי לבצע ריגול או תקיפה, היכנסו לפרופיל האימפריה.
         </p>
       </div>
 
       <Card className="!p-0 overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-right text-xs text-zinc-400">
               <th className="px-4 py-3 font-semibold">#</th>
@@ -46,7 +42,6 @@ export default async function RankingsPage() {
               <th className="px-4 py-3 font-semibold">רמה</th>
               <th className="px-4 py-3 font-semibold">עוצמה צבאית</th>
               <th className="px-4 py-3 font-semibold">אזרחים</th>
-              <th className="px-4 py-3 font-semibold">פעולות</th>
             </tr>
           </thead>
           <tbody>
@@ -81,16 +76,6 @@ export default async function RankingsPage() {
                   </td>
                   <td className="px-4 py-3 tabular-nums text-zinc-300">
                     {formatNumber(empire.citizens)}
-                  </td>
-                  <td className="px-4 py-3">
-                    {isMe ? (
-                      <span className="text-xs text-zinc-500">—</span>
-                    ) : (
-                      <RankActions
-                        targetEmpireId={empire.id}
-                        currentTurns={myEmpire.turns}
-                      />
-                    )}
                   </td>
                 </tr>
               );

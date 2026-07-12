@@ -24,11 +24,15 @@ export interface WeaponsTabData {
 export function WeaponsTabs({
   tabs,
   available,
+  initialCategory,
 }: {
   tabs: WeaponsTabData[];
   available: AvailableResources;
+  initialCategory?: WeaponsTabData["category"];
 }) {
-  const [activeCategory, setActiveCategory] = useState(tabs[0]?.category);
+  const [activeCategory, setActiveCategory] = useState(
+    initialCategory ?? tabs[0]?.category
+  );
   const active = tabs.find((tab) => tab.category === activeCategory) ?? tabs[0];
 
   // Progression path: every unlocked weapon, then only the next locked one
