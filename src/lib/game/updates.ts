@@ -4,12 +4,14 @@ import {
   BUILDING_META,
   bankInterestRate,
   citizensPerDailyUpdate,
+  diamondsPerDailyUpdate,
   mineProductionPerTick,
-  REGULAR_TICK_MS,
   type StorableResource,
 } from "./constants";
-import { dailyUpdatesBetween, elapsedRegularTicks } from "./time";
+import { dailyUpdatesBetween, elapsedRegularTicks, lastTickBoundary } from "./time";
 import { turnsGainFromUpgrades } from "./turns";
+import { bonusMultiplier, heroBonuses } from "./hero";
+import { getActiveGuildBuffPct } from "./guildBuffs";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -19,6 +21,7 @@ const FULL_EMPIRE_INCLUDE = {
   bankAccount: true,
   weapons: true,
   weaponUnlocks: true,
+  hero: { include: { items: true } },
 } satisfies Prisma.EmpireInclude;
 
 export type FullEmpire = Prisma.EmpireGetPayload<{
@@ -39,30 +42,64 @@ export async function applyPendingUpdates(
     include: FULL_EMPIRE_INCLUDE,
   });
 
+  // Empires created before the hero system get their hero lazily.
+  if (!empire.hero) {
+    empire.hero = {
+      ...(await tx.hero.create({ data: { empireId } })),
+      items: [],
+    };
+  }
+
   const now = new Date();
+
+  // Hero bonuses (points + equipped items): resources boosts mine production,
+  // turns boosts the regular-update gain, diamonds/citizens boost the dailies.
+  const heroBonus = heroBonuses(empire.hero).total;
 
   /* ---- regular ticks: mine-slave production + turns ---- */
   const ticks = elapsedRegularTicks(empire.lastRegularUpdateAt, now);
   const gained: Record<StorableResource, number> = { gold: 0, wood: 0, iron: 0, stone: 0 };
   let turnsGained = 0;
   if (ticks > 0) {
+    // An active guild resources spell multiplies mine production on top of
+    // the hero bonus for the ticks being settled now.
+    const guildResourcesPct = await getActiveGuildBuffPct(empire.id, "RESOURCES", tx, now);
+    const productionMultiplier =
+      bonusMultiplier(heroBonus.resources) * bonusMultiplier(guildResourcesPct);
     for (const building of empire.buildings) {
       const meta = BUILDING_META[building.type];
       if (!meta.producedResource) continue;
       gained[meta.producedResource] +=
-        mineProductionPerTick(building.level, building.slavesAssigned) * ticks;
+        mineProductionPerTick(building.level, building.slavesAssigned) *
+        ticks *
+        productionMultiplier;
     }
     // Full ticks only — no partial-tick turns, no cap for now.
-    turnsGained = ticks * turnsGainFromUpgrades(empire.upgrades);
+    turnsGained = Math.round(
+      ticks * turnsGainFromUpgrades(empire.upgrades) * bonusMultiplier(heroBonus.turns)
+    );
   }
 
-  /* ---- daily updates: citizens + bank interest + deposit-period reset ---- */
+  /* ---- daily updates: citizens + diamonds + bank interest + deposit-period reset ---- */
   const missedDailies = dailyUpdatesBetween(empire.lastDailyUpdateAt, now);
   let citizensGained = 0;
+  let diamondsGained = 0;
   if (missedDailies.length > 0) {
     const growthLevel =
       empire.upgrades.find((u) => u.type === "CITIZEN_GROWTH")?.level ?? 1;
-    citizensGained = citizensPerDailyUpdate(growthLevel) * missedDailies.length;
+    citizensGained = Math.round(
+      citizensPerDailyUpdate(growthLevel) *
+        missedDailies.length *
+        bonusMultiplier(heroBonus.citizens)
+    );
+
+    const diamondLevel =
+      empire.upgrades.find((u) => u.type === "DIAMOND_YIELD")?.level ?? 1;
+    diamondsGained = Math.round(
+      diamondsPerDailyUpdate(diamondLevel) *
+        missedDailies.length *
+        bonusMultiplier(heroBonus.diamonds)
+    );
   }
 
   if (ticks === 0 && missedDailies.length === 0) return empire;
@@ -112,11 +149,12 @@ export async function applyPendingUpdates(
       wood: { increment: gained.wood },
       iron: { increment: gained.iron },
       stone: { increment: gained.stone },
+      diamonds: { increment: diamondsGained },
       citizens: { increment: citizensGained },
       turns: { increment: turnsGained },
-      lastRegularUpdateAt: new Date(
-        empire.lastRegularUpdateAt.getTime() + ticks * REGULAR_TICK_MS
-      ),
+      // Snap to the global boundary that was just settled, so every empire
+      // ticks together on round wall-clock times (XX:00, XX:05, …).
+      ...(ticks > 0 ? { lastRegularUpdateAt: lastTickBoundary(now) } : {}),
       ...(missedDailies.length > 0
         ? { lastDailyUpdateAt: missedDailies[missedDailies.length - 1] }
         : {}),

@@ -51,10 +51,16 @@ export function newEmpireData(
     diamonds: STARTING.diamonds,
     citizens: STARTING.citizens,
     turns: STARTING.turns,
+    // Written explicitly (client-side UTC) rather than relying on the DB's
+    // CURRENT_TIMESTAMP default, which follows the server timezone and can
+    // land "in the future" relative to Prisma-written UTC timestamps.
+    reportsSeenAt: new Date(),
     buildings: {
       create: BUILDING_TYPES.map((type) => ({
         type,
-        level: 1,
+        // Mines start unupgraded (level 0 → 0 yield) until the player upgrades
+        // them; non-production buildings start built at level 1.
+        level: isProductionBuilding(type) ? 0 : 1,
         slavesAssigned: isProductionBuilding(type) ? STARTING.slavesPerMine : 0,
       })),
     },
@@ -72,11 +78,22 @@ export function newEmpireData(
       create: EMPIRE_UPGRADE_TYPES.map((type) => ({ type, level: 1 })),
     },
     bankAccount: { create: { goldBalance: 0 } },
+    hero: { create: {} },
     weaponUnlocks: {
       create: WEAPON_CATEGORIES.map((category) => ({
         category,
         unlockedTier: INITIAL_WEAPON_UNLOCKED_TIER,
       })),
+    },
+    messages: {
+      create: [
+        {
+          kind: "SYSTEM",
+          title: "📣 ברוך הבא לאימפריום!",
+          body: "האימפריה שלך נוסדה. אמן חיילים, שדרג מכרות ופתח במלחמה — הכל מתחיל בבסיס.",
+          href: "/game/base",
+        },
+      ],
     },
   };
 }

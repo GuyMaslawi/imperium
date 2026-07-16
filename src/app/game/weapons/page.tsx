@@ -1,5 +1,5 @@
 import { requireEmpire } from "@/lib/auth";
-import { Card } from "@/components/ui/Card";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import { WeaponsTabs, type WeaponsTabData } from "@/components/game/WeaponsTabs";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
@@ -69,26 +69,27 @@ export default async function WeaponsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-zinc-100">נשקים 🗡️</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          קנה נשקים, שדרג גישה לנשקים מתקדמים וחזק את האימפריה שלך.
-        </p>
-      </div>
+      <SectionHeading title="חנות נשקים" subtitle="SHOP" ornament="🛍️" />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {tabs.map((tab) => (
-          <Card key={tab.category} className="flex items-center gap-3 !p-4">
+          <div
+            key={tab.category}
+            className="panel rounded-xl p-4 flex items-center gap-3"
+          >
             <span aria-hidden className="text-3xl">{tab.icon}</span>
             <div>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-gold-dim">
                 {WEAPON_CATEGORY_META[tab.category].powerLabel}
               </p>
-              <p className="text-lg font-black text-gold">
-                ⚡ {tab.totalPower.toLocaleString("he-IL")}
+              <p className="text-lg font-black text-gold-bright">
+                ⚡{" "}
+                <span className="nums" dir="ltr">
+                  {tab.totalPower.toLocaleString("he-IL")}
+                </span>
               </p>
             </div>
-          </Card>
+          </div>
         ))}
       </div>
 

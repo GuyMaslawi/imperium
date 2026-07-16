@@ -11,7 +11,7 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
-import { Card, CardTitle } from "@/components/ui/Card";
+import { Card } from "@/components/ui/Card";
 
 export interface BankActionsProps {
   /** Whole gold available outside the warehouse. */
@@ -96,26 +96,22 @@ export function BankActions({
 
   return (
     <Card className="flex flex-col gap-4">
-      <CardTitle icon="🏦" className="mb-0">
-        הפקדה ומשיכה
-      </CardTitle>
-
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
         <span>
           זהב זמין:{" "}
-          <span className="font-bold tabular-nums text-zinc-100">
+          <span className="nums font-bold text-gold-bright" dir="ltr">
             {formatAmount(availableGold)}
           </span>
         </span>
         <span>
           זהב בבנק:{" "}
-          <span className="font-bold tabular-nums text-zinc-100">
+          <span className="nums font-bold text-gold-bright" dir="ltr">
             {formatAmount(bankGold)}
           </span>
         </span>
       </div>
 
-      <form className="space-y-2">
+      <form className="space-y-4">
         <Input
           type="number"
           name="amount"
@@ -128,39 +124,58 @@ export function BankActions({
           onChange={(event) => setAmount(event.target.value)}
           aria-invalid={clientError ? true : undefined}
         />
-        <div className="grid grid-cols-2 gap-2">
-          <SubmitButton
-            formAction={depositAction}
-            onClick={handleTransfer("deposit")}
-            disabled={depositsExhausted}
-            pendingText="מפקיד..."
-          >
-            הפקד
-          </SubmitButton>
-          <SubmitButton
-            formAction={withdrawAction}
-            onClick={handleTransfer("withdraw")}
-            pendingText="מושך..."
-          >
-            משוך
-          </SubmitButton>
-          <SubmitButton
-            variant="secondary"
-            formAction={depositAllAction}
-            onClick={handleQuickAction("depositAll")}
-            disabled={depositsExhausted}
-            pendingText="מפקיד..."
-          >
-            הפקד הכל
-          </SubmitButton>
-          <SubmitButton
-            variant="secondary"
-            formAction={withdrawAllAction}
-            onClick={handleQuickAction("withdrawAll")}
-            pendingText="מושך..."
-          >
-            משוך הכל
-          </SubmitButton>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {/* -------- deposit column -------- */}
+          <div className="panel-inset flex flex-col gap-2 rounded-lg p-3">
+            <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-400">
+              <span aria-hidden>⬇️</span>
+              הפקדה
+            </p>
+            <SubmitButton
+              variant="secondary"
+              className="btn btn-ghost w-full"
+              formAction={depositAllAction}
+              onClick={handleQuickAction("depositAll")}
+              disabled={depositsExhausted}
+              pendingText="מפקיד..."
+            >
+              הפקד הכל
+            </SubmitButton>
+            <SubmitButton
+              className="btn btn-dark w-full"
+              formAction={depositAction}
+              onClick={handleTransfer("deposit")}
+              disabled={depositsExhausted}
+              pendingText="מפקיד..."
+            >
+              הפקד לחיסכון
+            </SubmitButton>
+          </div>
+
+          {/* -------- withdraw column -------- */}
+          <div className="panel-inset flex flex-col gap-2 rounded-lg p-3">
+            <p className="flex items-center gap-1.5 text-sm font-bold text-red-400">
+              <span aria-hidden>⬆️</span>
+              משיכה
+            </p>
+            <SubmitButton
+              variant="secondary"
+              className="btn btn-ghost w-full"
+              formAction={withdrawAllAction}
+              onClick={handleQuickAction("withdrawAll")}
+              pendingText="מושך..."
+            >
+              משוך הכל
+            </SubmitButton>
+            <SubmitButton
+              className="btn btn-dark w-full"
+              formAction={withdrawAction}
+              onClick={handleTransfer("withdraw")}
+              pendingText="מושך..."
+            >
+              משוך כספים
+            </SubmitButton>
+          </div>
         </div>
       </form>
 
@@ -175,7 +190,7 @@ export function BankActions({
         success={clientError ? undefined : actionState.success}
       />
 
-      <ul className="space-y-1 text-xs text-zinc-500">
+      <ul className="space-y-1 text-xs text-gold-dim">
         <li>הפקדות מוגבלות לפי שדרוג כמות הפקדות בבנק.</li>
         <li>משיכות אינן מוגבלות.</li>
         <li>הריבית מחושבת על הזהב שנמצא בבנק בלבד.</li>

@@ -45,6 +45,8 @@ model Empire {
   turns               Int      @default(0)
   lastRegularUpdateAt DateTime @default(now())
   lastDailyUpdateAt   DateTime @default(now())
+  /// Last time the player opened the reports page — drives the "new reports" badge.
+  reportsSeenAt       DateTime @default(now())
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -57,11 +59,186 @@ model Empire {
   bankAccount   BankAccount?
   weapons       EmpireWeapon[]
   weaponUnlocks EmpireWeaponUnlock[]
+  hero          Hero?
 
   spyReportsSent     SpyReport[]    @relation("SpyAttacker")
   spyReportsReceived SpyReport[]    @relation("SpyDefender")
   battlesAttacked    BattleReport[] @relation("BattleAttacker")
   battlesDefended    BattleReport[] @relation("BattleDefender")
+  messages           Message[]
+  guildMembership    GuildMember?
+  guildBuffs         GuildSpellBuff[]
+}
+
+/* ------------------------------ guilds ------------------------------ */
+
+enum GuildRole {
+  LEADER
+  DEPUTY
+  MEMBER
+}
+
+/// The four guild spells sold in the guild shop. Each has a per-guild level
+/// (level = bonus %, starts at 1, capped at 20) that members upgrade with
+/// diamonds; casting one grants the caster a 24h personal buff.
+enum GuildSpellType {
+  ATTACK
+  DEFENSE
+  SPY
+  RESOURCES
+}
+
+model Guild {
+  id            String   @id @default(cuid())
+  name          String   @unique
+  /// Shared gold treasury — members deposit and withdraw freely.
+  goldBalance   Float    @default(0)
+  /// Member capacity = 1 + level, so a fresh guild (level 1) holds 2 members.
+  capacityLevel Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  members      GuildMember[]
+  spells       GuildSpell[]
+  transactions GuildBankTransaction[]
+}
+
+model GuildMember {
+  id        String    @id @default(cuid())
+  guildId   String
+  empireId  String    @unique
+  role      GuildRole @default(MEMBER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  guild  Guild  @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+}
+
+model GuildSpell {
+  id        String         @id @default(cuid())
+  guildId   String
+  type      GuildSpellType
+  level     Int            @default(1)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@unique([guildId, type])
+}
+
+/// An active (or expired, until cleaned up) 24h spell buff on an empire.
+/// The bonus % is snapshotted at cast time.
+model GuildSpellBuff {
+  id        String         @id @default(cuid())
+  empireId  String
+  type      GuildSpellType
+  bonusPct  Float
+  expiresAt DateTime
+  createdAt DateTime       @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@index([empireId, expiresAt])
+}
+
+enum GuildBankTransactionType {
+  DEPOSIT
+  WITHDRAW
+}
+
+model GuildBankTransaction {
+  id           String                   @id @default(cuid())
+  guildId      String
+  empireId     String
+  /// Denormalized so the ledger stays readable if the member leaves.
+  empireName   String
+  type         GuildBankTransactionType
+  amount       Float
+  balanceAfter Float
+  createdAt    DateTime                 @default(now())
+
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  @@index([guildId, createdAt])
+}
+
+enum MessageKind {
+  SYSTEM
+  BATTLE
+  SPY
+}
+
+/// Inbox message for an empire — system announcements and combat alerts
+/// ("you were attacked", "a spy was caught in your territory").
+model Message {
+  id        String      @id @default(cuid())
+  empireId  String
+  kind      MessageKind @default(SYSTEM)
+  title     String
+  body      String
+  /// Optional in-game link, e.g. the full battle report page.
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime    @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@index([empireId, readAt])
+  @@index([empireId, createdAt])
+}
+
+enum HeroRarity {
+  COMMON
+  RARE
+  EPIC
+  LEGENDARY
+}
+
+enum HeroItemSlot {
+  SWORD
+  GAUNTLETS
+  WINGS
+  HELMET
+  ARMOR
+  SHIELD
+  PANTS
+  BOOTS
+  RELIC
+}
+
+model Hero {
+  id             String   @id @default(cuid())
+  empireId       String   @unique
+  level          Int      @default(1)
+  xp             Int      @default(0)
+  unspentPoints  Int      @default(0)
+  attackPoints   Int      @default(0)
+  defensePoints  Int      @default(0)
+  resourcePoints Int      @default(0)
+  resets         Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  empire Empire     @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  items  HeroItem[]
+}
+
+model HeroItem {
+  id        String       @id @default(cuid())
+  heroId    String
+  slot      HeroItemSlot
+  level     Int
+  rarity    HeroRarity
+  equipped  Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  hero Hero @relation(fields: [heroId], references: [id], onDelete: Cascade)
+
+  @@index([heroId])
 }
 
 enum BuildingType {
@@ -122,6 +299,7 @@ model ResourceStorage {
 
 enum EmpireUpgradeType {
   CITIZEN_GROWTH
+  DIAMOND_YIELD
   INTELLIGENCE
   BANK_DEPOSIT_COUNT
   BANK_DAILY_INTEREST
@@ -220,6 +398,8 @@ model SpyReport {
   revealedMineSlaves Int?
   finalChance        Float?
   weaponsBonus       Float?
+  /// Percentage points the attacker's guild spy buff added to the chance.
+  guildBonus         Float?
   turnsSpent         Int      @default(5)
   createdAt          DateTime @default(now())
 
@@ -240,12 +420,31 @@ model BattleReport {
   winnerEmpireId       String
   attackerSoldiersLost Int
   defenderSoldiersLost Int
+  // Defender soldiers captured by a winning attacker — they join the
+  // attacker's free mine-slave pool.
+  enslavedSoldiers     Int      @default(0)
   stolenGold           Float
   stolenWood           Float
   stolenIron           Float
   stolenStone          Float
   turnsSpent           Int      @default(10)
   createdAt            DateTime @default(now())
+
+  // Hero: battle XP awarded to each side and the % power bonus each hero added.
+  attackerHeroBonusPct Float?
+  defenderHeroBonusPct Float?
+
+  // Guild spells: % power bonus each side's active buff added (attack buff
+  // for the attacker, defense buff for the defender).
+  attackerGuildBonusPct Float?
+  defenderGuildBonusPct Float?
+  attackerHeroXp       Int      @default(0)
+  defenderHeroXp       Int      @default(0)
+
+  // Hero item captured by the attacker on a win (denormalized snapshot).
+  droppedItemSlot   HeroItemSlot?
+  droppedItemLevel  Int?
+  droppedItemRarity HeroRarity?
 
   attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)

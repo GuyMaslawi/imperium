@@ -4,6 +4,8 @@ import {
   ResourceStorageType,
   EmpireUpgradeType,
   WeaponCategory,
+  HeroItemSlot,
+  HeroRarity,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import {
@@ -34,6 +36,7 @@ const STORAGE_TYPES: ResourceStorageType[] = ["GOLD", "WOOD", "IRON", "STONE"];
 
 const UPGRADE_TYPES: EmpireUpgradeType[] = [
   "CITIZEN_GROWTH",
+  "DIAMOND_YIELD",
   "INTELLIGENCE",
   "BANK_DEPOSIT_COUNT",
   "BANK_DAILY_INTEREST",
@@ -145,6 +148,42 @@ function demoWeapons(soldiers: number, unlockedTier: number) {
   }));
 }
 
+/** Snap a level to the item catalog tiers (1, 5, 10, … 100). */
+function itemTier(level: number): number {
+  return Math.max(1, Math.min(100, Math.round(level / 5) * 5));
+}
+
+/**
+ * Demo hero: level scales with the empire, points mostly allocated, a few
+ * equipped items plus bag items — so battles show hero bonuses, tooltips
+ * have data, and item capture has victims worth looting.
+ */
+function demoHero(empireLevel: number) {
+  const heroLevel = Math.min(100, empireLevel * 8);
+  const totalPoints = heroLevel - 1;
+  const attackPoints = Math.floor(totalPoints * 0.4);
+  const defensePoints = Math.floor(totalPoints * 0.4);
+  const resourcePoints = Math.max(0, totalPoints - attackPoints - defensePoints - 2);
+  const items: { slot: HeroItemSlot; level: number; rarity: HeroRarity; equipped: boolean }[] = [
+    { slot: "SWORD", level: itemTier(heroLevel), rarity: "RARE", equipped: true },
+    { slot: "HELMET", level: itemTier(heroLevel - 5), rarity: "COMMON", equipped: true },
+    { slot: "ARMOR", level: itemTier(heroLevel - 10), rarity: "EPIC", equipped: true },
+    { slot: "RELIC", level: itemTier(heroLevel - 5), rarity: "COMMON", equipped: true },
+    { slot: "BOOTS", level: itemTier(heroLevel + 10), rarity: "RARE", equipped: false },
+    { slot: "GAUNTLETS", level: itemTier(heroLevel - 15), rarity: "LEGENDARY", equipped: false },
+    { slot: "WINGS", level: itemTier(heroLevel + 20), rarity: "EPIC", equipped: false },
+  ];
+  return {
+    level: heroLevel,
+    xp: Math.floor(heroLevel * 7),
+    unspentPoints: 2,
+    attackPoints,
+    defensePoints,
+    resourcePoints,
+    items,
+  };
+}
+
 async function main() {
   /* ---- active season ---- */
   let season = await prisma.gameSeason.findFirst({ where: { isActive: true } });
@@ -250,6 +289,43 @@ async function main() {
           create: { empireId, goldBalance: Math.floor(demo.gold / 5) },
           update: {},
         });
+
+        // Hero backfill: level/points for pre-hero-system demo empires, and
+        // starter items when the hero has none (idempotent).
+        const heroData = demoHero(demo.level);
+        const hero = await prisma.hero.upsert({
+          where: { empireId },
+          create: {
+            empireId,
+            level: heroData.level,
+            xp: heroData.xp,
+            unspentPoints: heroData.unspentPoints,
+            attackPoints: heroData.attackPoints,
+            defensePoints: heroData.defensePoints,
+            resourcePoints: heroData.resourcePoints,
+          },
+          update: {},
+          include: { items: true },
+        });
+        if (hero.items.length === 0) {
+          // A migration-backfilled hero is level 1 with no points — give it
+          // the demo progression so battles show hero bonuses.
+          await prisma.hero.update({
+            where: { id: hero.id },
+            data: {
+              level: Math.max(hero.level, heroData.level),
+              xp: hero.level > 1 ? hero.xp : heroData.xp,
+              unspentPoints: Math.max(hero.unspentPoints, heroData.unspentPoints),
+              attackPoints: Math.max(hero.attackPoints, heroData.attackPoints),
+              defensePoints: Math.max(hero.defensePoints, heroData.defensePoints),
+              resourcePoints: Math.max(hero.resourcePoints, heroData.resourcePoints),
+            },
+          });
+          await prisma.heroItem.createMany({
+            data: heroData.items.map((item) => ({ heroId: hero.id, ...item })),
+          });
+          console.log(`Equipped demo hero for: ${demo.empireName}`);
+        }
       }
       console.log(`Refreshed existing: ${demo.empireName}`);
       continue;
@@ -337,6 +413,20 @@ async function main() {
               })),
             },
             weapons: { create: demoWeapons(demo.soldiers, unlockedTier) },
+            hero: (() => {
+              const heroData = demoHero(demo.level);
+              return {
+                create: {
+                  level: heroData.level,
+                  xp: heroData.xp,
+                  unspentPoints: heroData.unspentPoints,
+                  attackPoints: heroData.attackPoints,
+                  defensePoints: heroData.defensePoints,
+                  resourcePoints: heroData.resourcePoints,
+                  items: { create: heroData.items },
+                },
+              };
+            })(),
           },
         },
       },

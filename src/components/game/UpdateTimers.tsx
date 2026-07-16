@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Tip } from "@/components/ui/Tip";
 
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -11,70 +12,79 @@ function formatCountdown(ms: number): string {
 }
 
 /**
- * Live countdown to the next regular tick + the next daily update time.
- * When a deadline passes, refresh the page once so the server applies the tick.
+ * Inline countdown chips shown in the frame header: the daily update wall time
+ * ("עדכון יומי") and a live countdown to the next ranking/production tick
+ * ("עדכון דירוג"). When the tick passes, the page refreshes so the server
+ * applies it.
  */
 export function UpdateTimers({
   serverNow,
   nextRegularAt,
-  nextDailyAt,
   nextDailyLabel,
 }: {
-  /** Epoch ms of the server render time — keeps the first client render identical to the SSR HTML. */
   serverNow: number;
-  /** Epoch ms of the next regular (5-minute) update. */
   nextRegularAt: number;
-  /** Epoch ms of the next daily update. */
   nextDailyAt: number;
-  /** Pre-formatted Jerusalem wall time of the next daily update (HH:MM). */
   nextDailyLabel: string;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(serverNow);
+  // Count down in SERVER time: client clocks can be skewed, so measure the
+  // offset against the freshest server timestamp and tick with it.
+  const skewRef = useRef(0);
 
   useEffect(() => {
-    // Snap from the SSR timestamp to the client clock on the next macrotask
-    // (a synchronous setState here would force a cascading render).
-    const initial = setTimeout(() => setNow(Date.now()), 0);
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => {
-      clearTimeout(initial);
-      clearInterval(interval);
-    };
+    skewRef.current = serverNow - Date.now();
+  }, [serverNow]);
+
+  useEffect(() => {
+    const tick = () => setNow(Date.now() + skewRef.current);
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const regularRemaining = nextRegularAt - now;
-  const dailyRemaining = nextDailyAt - now;
   const expired = regularRemaining <= 0;
 
+  // The countdown hit 00:00 — refresh so the server applies the tick, and
+  // keep retrying until a fresh nextRegularAt arrives (network hiccups,
+  // slight clock drift).
   useEffect(() => {
     if (!expired) return;
-    const timeout = setTimeout(() => router.refresh(), 2000);
-    return () => clearTimeout(timeout);
+    const timeout = setTimeout(() => router.refresh(), 1000);
+    const retry = setInterval(() => router.refresh(), 4000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(retry);
+    };
   }, [expired, router]);
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto border-b border-border-subtle bg-surface/60 px-4 py-1.5 text-xs">
-      <span className="flex shrink-0 items-center gap-1.5 text-zinc-400">
-        <span aria-hidden>⏱️</span>
-        עדכון רגיל הבא:
-        <span className="font-bold tabular-nums text-gold" dir="ltr">
-          {regularRemaining <= 0 ? "מתעדכן..." : formatCountdown(regularRemaining)}
-        </span>
-      </span>
-      <span aria-hidden className="text-zinc-700">|</span>
-      <span className="flex shrink-0 items-center gap-1.5 text-zinc-400">
-        <span aria-hidden>🌅</span>
-        עדכון יומי הבא:
-        <span className="font-bold tabular-nums text-gold" dir="ltr">
-          {nextDailyLabel}
-        </span>
-        {dailyRemaining > 0 && (
-          <span className="hidden text-zinc-500 sm:inline">
-            (בעוד {formatCountdown(dailyRemaining)})
+    <div className="flex items-center gap-3 text-xs">
+      <Tip
+        side="bottom"
+        tip="פעמיים ביום (07:30 / 19:30) מגיעים אזרחים חדשים, יהלומים וריבית בבנק, ונפתחות הפקדות חדשות."
+      >
+        <span className="flex cursor-help items-center gap-1.5 text-zinc-400">
+          עדכון יומי:
+          <span className="font-bold tabular-nums text-gold-bright" dir="ltr">
+            {nextDailyLabel}
           </span>
-        )}
-      </span>
+        </span>
+      </Tip>
+      <span aria-hidden className="h-4 w-px bg-border-subtle" />
+      <Tip
+        side="bottom"
+        tip="כל 5 דקות: המכרות מייצרים משאבים (לפי עבדי המכרות המוצבים) ומתקבלות תורות."
+      >
+        <span className="flex cursor-help items-center gap-1.5 text-zinc-400">
+          עדכון דירוג:
+          <span className="font-bold tabular-nums text-gold-bright" dir="ltr">
+            {expired ? "מתעדכן…" : formatCountdown(regularRemaining)}
+          </span>
+        </span>
+      </Tip>
     </div>
   );
 }

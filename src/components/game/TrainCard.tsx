@@ -4,7 +4,6 @@ import { useActionState } from "react";
 import { trainUnits, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Card } from "@/components/ui/Card";
 
 export interface TrainCardProps {
   unit: "soldiers" | "spies" | "mineSlaves";
@@ -28,20 +27,27 @@ export function TrainCard({
   const [state, action] = useActionState<ActionState, FormData>(trainUnits, {});
 
   return (
-    <Card className="flex flex-col gap-4">
+    <div className="panel-inset rounded-xl p-4 flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <span aria-hidden className="text-3xl">{icon}</span>
           <div>
-            <h3 className="font-bold text-zinc-100">{label}</h3>
-            <p className="text-xs text-zinc-400">
-              ברשותך: <span className="font-bold text-gold">{owned.toLocaleString("he-IL")}</span>
+            <h3 className="font-bold text-gold-bright">{label}</h3>
+            <p className="text-xs text-gold-dim">
+              ברשותך:{" "}
+              <span className="nums font-bold text-gold-bright" dir="ltr">
+                {owned.toLocaleString("he-IL")}
+              </span>
             </p>
           </div>
         </div>
         {power > 0 && (
-          <span className="rounded-full bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold">
-            ⚡ {power} עוצמה
+          <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
+            ⚡{" "}
+            <span className="nums" dir="ltr">
+              {power}
+            </span>{" "}
+            עוצמה
           </span>
         )}
       </div>
@@ -49,14 +55,18 @@ export function TrainCard({
       <p className="text-sm text-zinc-400">{description}</p>
 
       <p className="text-xs text-zinc-400">
-        <span className="font-semibold text-zinc-300">עלות:</span> אזרח אחד
+        <span className="font-semibold text-gold-dim">עלות:</span> אזרח אחד
       </p>
 
-      <form action={action} className="mt-auto flex items-end gap-2">
+      <form action={action} className="mt-auto space-y-2">
         <input type="hidden" name="unit" value={unit} />
-        <label className="flex-1 space-y-1">
-          <span className="text-xs text-zinc-400">
-            כמות לאימון (אזרחים פנויים: {availableCitizens.toLocaleString("he-IL")})
+        <label className="block space-y-1">
+          <span className="text-xs text-gold-dim">
+            כמות לאימון (אזרחים פנויים:{" "}
+            <span className="nums" dir="ltr">
+              {availableCitizens.toLocaleString("he-IL")}
+            </span>
+            )
           </span>
           <input
             type="number"
@@ -65,13 +75,15 @@ export function TrainCard({
             max={availableCitizens}
             defaultValue={1}
             required
-            className="w-full rounded-lg border border-border-subtle bg-surface-raised px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
+            className="nums w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
           />
         </label>
-        <SubmitButton pendingText="מאמן...">אמן</SubmitButton>
+        <SubmitButton className="btn btn-dark w-full" pendingText="מאמן...">
+          ביצוע אימון
+        </SubmitButton>
       </form>
 
       <FormMessage error={state.error} success={state.success} />
-    </Card>
+    </div>
   );
 }

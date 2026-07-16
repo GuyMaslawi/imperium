@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { BuildingType, Prisma, ResourceStorageType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import {
   ATTACK_TURN_COST,
+  ENSLAVE_MIN_SOLDIERS,
+  ENSLAVE_RATE,
   BUILDING_META,
   DEFENSE_BONUS,
   EMPIRE_UPGRADE_META,
@@ -27,7 +30,18 @@ import {
   type UnitKey,
 } from "@/lib/game/constants";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
+import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { armyPower } from "@/lib/game/power";
+import {
+  HERO_BAG_CAPACITY,
+  applyHeroXp,
+  attackWinXp,
+  bonusMultiplier,
+  defenseLossXp,
+  defenseWinXp,
+  heroBonuses,
+  rollItemDrop,
+} from "@/lib/game/hero";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   MAX_WEAPON_TIER,
@@ -397,13 +411,14 @@ export async function spyOnEmpire(
   if (!parsed.success) return { error: "יעד לא תקין" };
   const { targetEmpireId } = parsed.data;
 
+  let outcome: { error: string } | { reportId: string };
   try {
     const empireId = await requireOwnEmpireId();
     if (empireId === targetEmpireId) {
       return { error: "לא ניתן לרגל אחרי האימפריה שלך" };
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    outcome = await prisma.$transaction(async (tx) => {
       const attacker = await applyPendingUpdates(empireId, tx);
       if (!attacker.army || attacker.army.spies < 1) {
         return { error: "נדרש לפחות מרגל אחד למשימת ריגול" };
@@ -426,18 +441,25 @@ export async function spyOnEmpire(
       const intelligenceLevel =
         attacker.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
       // Spy weapons add up to +15 percentage points on top of intelligence,
-      // capped at a 95% final chance.
+      // capped at a 95% final chance. An active guild spy spell adds its
+      // percentage points on top, under the same cap.
       const spyPower = weaponsPower(attacker.weapons, "SPY");
-      const chance = finalSpyChance(spySuccessChance(intelligenceLevel), spyPower);
+      const guildSpyBonusPct = await getActiveGuildBuffPct(empireId, "SPY", tx);
+      const chance = Math.min(
+        0.95,
+        finalSpyChance(spySuccessChance(intelligenceLevel), spyPower) +
+          guildSpyBonusPct / 100
+      );
       const success = Math.random() < chance;
 
-      await tx.spyReport.create({
+      const report = await tx.spyReport.create({
         data: {
           attackerEmpireId: empireId,
           defenderEmpireId: targetEmpireId,
           success,
           finalChance: chance,
           weaponsBonus: spyWeaponsBonusPercent(spyPower),
+          guildBonus: guildSpyBonusPct,
           turnsSpent: SPY_TURN_COST,
           ...(success
             ? {
@@ -460,17 +482,30 @@ export async function spyOnEmpire(
           where: { empireId, spies: { gte: 1 } },
           data: { spies: { decrement: 1 } },
         });
-        return { error: "המרגל נתפס! המשימה נכשלה והמרגל אבד" };
+        // A caught spy blows the operation — the defender gets an alert.
+        await tx.message.create({
+          data: {
+            empireId: targetEmpireId,
+            kind: "SPY",
+            title: "🕵️ מרגל נתפס בשטחך!",
+            body: `כוחות הביטחון שלך תפסו מרגל של ${attacker.name} לפני שהספיק לאסוף מידע.`,
+          },
+        });
       }
 
-      return { success: "משימת הריגול הצליחה! הדוח זמין בעמוד הדוחות" };
+      // The mission ran — go to the full result page whether it succeeded
+      // or the spy was caught.
+      return { reportId: report.id };
     });
 
     revalidateGame();
-    return result;
   } catch {
     return { error: "אירעה שגיאה, נסה שוב" };
   }
+
+  if ("error" in outcome) return outcome;
+  // redirect() throws NEXT_REDIRECT — must run outside the try/catch above.
+  redirect(`/game/spy/${outcome.reportId}`);
 }
 
 /* ------------------------------ attack ------------------------------ */
@@ -485,13 +520,14 @@ export async function attackEmpire(
   if (!parsed.success) return { error: "יעד לא תקין" };
   const { targetEmpireId } = parsed.data;
 
+  let outcome: { error: string } | { reportId: string };
   try {
     const empireId = await requireOwnEmpireId();
     if (empireId === targetEmpireId) {
       return { error: "לא ניתן לתקוף את האימפריה שלך" };
     }
 
-    const result = await prisma.$transaction(async (tx) => {
+    outcome = await prisma.$transaction(async (tx) => {
       const attacker = await applyPendingUpdates(empireId, tx);
       if (attacker.turns < ATTACK_TURN_COST) {
         return { error: "אין לך מספיק תורות לביצוע תקיפה." };
@@ -517,26 +553,51 @@ export async function attackEmpire(
 
       // Soldiers plus weapons fight: attack weapons boost the attacker,
       // defense weapons boost the defender, and the defender still gets
-      // +20% on top of everything.
+      // +20% on top of everything. Each hero then multiplies its side by
+      // its attack/defense bonus (1 point / item % = +1%), and an active
+      // guild spell (attack for the attacker, defense for the defender)
+      // multiplies it once more.
+      const attackerHero = attacker.hero;
+      const defenderHero = defender.hero;
+      const attackerHeroBonusPct = heroBonuses(attackerHero).total.attack;
+      const defenderHeroBonusPct = heroBonuses(defenderHero).total.defense;
+      const attackerGuildBonusPct = await getActiveGuildBuffPct(
+        empireId,
+        "ATTACK",
+        tx
+      );
+      const defenderGuildBonusPct = await getActiveGuildBuffPct(
+        targetEmpireId,
+        "DEFENSE",
+        tx
+      );
       const attackerSoldiersPower = armyPower(attackerArmy);
       const attackerWeaponsPower = weaponsPower(attacker.weapons, "ATTACK");
       const defenderSoldiersPower = armyPower(defenderArmy);
       const defenderWeaponsPower = weaponsPower(defender.weapons, "DEFENSE");
-      const attackerPower = attackerSoldiersPower + attackerWeaponsPower;
+      const attackerPower =
+        (attackerSoldiersPower + attackerWeaponsPower) *
+        bonusMultiplier(attackerHeroBonusPct) *
+        bonusMultiplier(attackerGuildBonusPct);
       const defenderPower =
-        (defenderSoldiersPower + defenderWeaponsPower) * DEFENSE_BONUS;
+        (defenderSoldiersPower + defenderWeaponsPower) *
+        DEFENSE_BONUS *
+        bonusMultiplier(defenderHeroBonusPct) *
+        bonusMultiplier(defenderGuildBonusPct);
       const attackerWins = attackerPower > defenderPower;
       const winnerEmpireId = attackerWins ? attacker.id : defender.id;
 
-      // Proportional losses: the winner loses a share scaled by how close the
-      // fight was; the loser loses a larger fixed share.
+      // Proportional losses: a winning attacker loses a share scaled by how
+      // close the fight was; a losing attacker loses a larger fixed share.
+      // A defender who repels the attack loses nothing — soldiers and
+      // resources stay untouched.
       const total = attackerPower + defenderPower;
       const closeness = total > 0 ? Math.min(attackerPower, defenderPower) / total : 0;
       const winnerLossRate = 0.1 * closeness * 2; // 0..0.1
       const loserLossRate = 0.3;
 
       const attackerLossRate = attackerWins ? winnerLossRate : loserLossRate;
-      const defenderLossRate = attackerWins ? loserLossRate : winnerLossRate;
+      const defenderLossRate = attackerWins ? loserLossRate : 0;
 
       const attackerSoldiersLost = Math.min(
         attackerArmy.soldiers,
@@ -548,6 +609,23 @@ export async function attackEmpire(
             Math.round(defenderArmy.soldiers * defenderLossRate)
           )
         : 0;
+
+      // Enslavement: a winning attack against a defender fielding 20+
+      // soldiers captures a share of them. The haul scales with the
+      // defender's army size and joins the attacker's free mine-slave pool
+      // (not citizens).
+      const defenderSoldiersRemaining = defenderArmy
+        ? defenderArmy.soldiers - defenderSoldiersLost
+        : 0;
+      const enslavedSoldiers =
+        attackerWins &&
+        defenderArmy &&
+        defenderArmy.soldiers >= ENSLAVE_MIN_SOLDIERS
+          ? Math.min(
+              defenderSoldiersRemaining,
+              Math.max(1, Math.floor(defenderArmy.soldiers * ENSLAVE_RATE))
+            )
+          : 0;
 
       // Plunder touches only the defender's available balances — resources
       // deposited in warehouses (storedAmount) are protected from attacks.
@@ -562,12 +640,20 @@ export async function attackEmpire(
 
       await tx.army.update({
         where: { empireId },
-        data: { soldiers: { decrement: attackerSoldiersLost } },
+        data: {
+          soldiers: { decrement: attackerSoldiersLost },
+          // Captured defenders arrive as unassigned mine slaves.
+          ...(enslavedSoldiers > 0
+            ? { mineSlaves: { increment: enslavedSoldiers } }
+            : {}),
+        },
       });
       if (defenderArmy) {
         await tx.army.update({
           where: { empireId: targetEmpireId },
-          data: { soldiers: { decrement: defenderSoldiersLost } },
+          data: {
+            soldiers: { decrement: defenderSoldiersLost + enslavedSoldiers },
+          },
         });
       }
 
@@ -592,7 +678,55 @@ export async function attackEmpire(
         });
       }
 
-      await tx.battleReport.create({
+      /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
+      // A failed attack earns the attacker nothing.
+      const attackerHeroXp = attackerWins
+        ? attackWinXp(defenderHero?.level ?? 1)
+        : 0;
+      const defenderHeroXp = attackerWins
+        ? defenseLossXp()
+        : defenseWinXp(attackerHero?.level ?? 1);
+
+      if (attackerHero && attackerHeroXp > 0) {
+        const next = applyHeroXp(attackerHero, attackerHeroXp);
+        await tx.hero.update({
+          where: { id: attackerHero.id },
+          data: {
+            level: next.level,
+            xp: next.xp,
+            unspentPoints: { increment: next.pointsGained },
+          },
+        });
+      }
+      if (defenderHero) {
+        const next = applyHeroXp(defenderHero, defenderHeroXp);
+        await tx.hero.update({
+          where: { id: defenderHero.id },
+          data: {
+            level: next.level,
+            xp: next.xp,
+            unspentPoints: { increment: next.pointsGained },
+          },
+        });
+      }
+
+      /* ---- item capture: winning attacks can loot a hero item ---- */
+      let droppedItem: ReturnType<typeof rollItemDrop> = null;
+      if (attackerWins && attackerHero) {
+        const bagCount = attackerHero.items.filter((i) => !i.equipped).length;
+        if (bagCount < HERO_BAG_CAPACITY) {
+          // Loot rolls near the attacker's hero level — usable soon, not
+          // trivially high/low because of who the target happened to be.
+          droppedItem = rollItemDrop(attackerHero.level);
+          if (droppedItem) {
+            await tx.heroItem.create({
+              data: { heroId: attackerHero.id, ...droppedItem },
+            });
+          }
+        }
+      }
+
+      const report = await tx.battleReport.create({
         data: {
           attackerEmpireId: empireId,
           defenderEmpireId: targetEmpireId,
@@ -605,24 +739,59 @@ export async function attackEmpire(
           winnerEmpireId,
           attackerSoldiersLost,
           defenderSoldiersLost,
+          enslavedSoldiers,
           stolenGold: stolen.gold,
           stolenWood: stolen.wood,
           stolenIron: stolen.iron,
           stolenStone: stolen.stone,
           turnsSpent: ATTACK_TURN_COST,
+          attackerHeroBonusPct,
+          defenderHeroBonusPct,
+          attackerGuildBonusPct,
+          defenderGuildBonusPct,
+          attackerHeroXp,
+          defenderHeroXp,
+          ...(droppedItem
+            ? {
+                droppedItemSlot: droppedItem.slot,
+                droppedItemLevel: droppedItem.level,
+                droppedItemRarity: droppedItem.rarity,
+              }
+            : {}),
         },
       });
 
-      return attackerWins
-        ? { success: `ניצחון! בזזת ${stolen.gold} זהב. הדוח המלא בעמוד הדוחות` }
-        : { error: "התקיפה נהדפה! ספגת אבדות. הדוח המלא בעמוד הדוחות" };
+      // The defender wasn't in the room — drop the battle alert in their inbox.
+      await tx.message.create({
+        data: {
+          empireId: targetEmpireId,
+          kind: "BATTLE",
+          title: attackerWins
+            ? `⚔️ הותקפת על ידי ${attacker.name} — ההגנה נפרצה`
+            : `🛡️ הדפת התקפה של ${attacker.name}!`,
+          body: attackerWins
+            ? `איבדת ${defenderSoldiersLost} חיילים${
+                enslavedSoldiers > 0
+                  ? `, ${enslavedSoldiers} חיילים נלקחו לעבדות`
+                  : ""
+              } ונבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן.`
+            : `צבאך עמד איתן מול ההתקפה — לא איבדת חיילים או משאבים.`,
+          href: `/game/battle/${report.id}`,
+        },
+      });
+
+      // The battle resolved — go to the full WIN/LOSE result page either way.
+      return { reportId: report.id };
     });
 
     revalidateGame();
-    return result;
   } catch {
     return { error: "אירעה שגיאה, נסה שוב" };
   }
+
+  if ("error" in outcome) return outcome;
+  // redirect() throws NEXT_REDIRECT — must run outside the try/catch above.
+  redirect(`/game/battle/${outcome.reportId}`);
 }
 
 /* ------------------------------ upgrade storage ------------------------------ */
@@ -882,6 +1051,7 @@ export async function withdrawAllFromStorage(
 
 const empireUpgradeTypeSchema = z.enum([
   "CITIZEN_GROWTH",
+  "DIAMOND_YIELD",
   "INTELLIGENCE",
   "BANK_DEPOSIT_COUNT",
   "BANK_DAILY_INTEREST",

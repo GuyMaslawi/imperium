@@ -25,7 +25,7 @@ export function NextWeaponCard({
   );
 
   return (
-    <div className="relative flex flex-col gap-3 overflow-hidden rounded-xl border border-gold/50 bg-black/50 p-5 shadow-lg shadow-gold/15 ring-1 ring-inset ring-gold/10 backdrop-blur-sm">
+    <div className="panel-gold relative flex flex-col gap-3 overflow-hidden rounded-xl p-4">
       {/* soft gold glow behind the content */}
       <div
         aria-hidden
@@ -43,27 +43,34 @@ export function NextWeaponCard({
           <p className="mb-1 text-[11px] font-bold tracking-wide text-gold-bright">
             ← הנשק הבא
           </p>
-          <h3 className="font-bold text-zinc-100">{weapon.name}</h3>
-          <p className="text-xs font-semibold text-gold">רמה {weapon.tier}</p>
+          <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
+          <p className="text-xs font-semibold text-gold-dim">
+            רמה{" "}
+            <span className="nums" dir="ltr">
+              {weapon.tier}
+            </span>
+          </p>
         </div>
-        <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold">
+        <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
           🔒 נעול
         </span>
       </div>
 
       <p className="relative text-sm text-zinc-400/90">{weapon.description}</p>
 
-      <div className="relative grid grid-cols-2 gap-2 rounded-lg bg-surface-raised/40 p-3 text-xs opacity-90">
+      <div className="relative grid grid-cols-2 gap-2 panel-inset rounded-lg p-3 text-xs">
         <span className="text-zinc-400">
           עוצמה ליחידה:{" "}
-          <span className="font-bold text-gold">⚡ {weapon.power}</span>
+          <span className="nums font-bold text-gold-bright" dir="ltr">
+            ⚡ {weapon.power}
+          </span>
         </span>
         <span className="col-span-2 flex flex-wrap gap-x-3 gap-y-1 text-zinc-400">
-          <span className="font-semibold text-zinc-300">עלות ליחידה:</span>
-          {weapon.cost.gold > 0 && <span>🪙 {weapon.cost.gold.toLocaleString("he-IL")}</span>}
-          {weapon.cost.wood > 0 && <span>🪵 {weapon.cost.wood.toLocaleString("he-IL")}</span>}
-          {weapon.cost.iron > 0 && <span>⚙️ {weapon.cost.iron.toLocaleString("he-IL")}</span>}
-          {weapon.cost.stone > 0 && <span>🪨 {weapon.cost.stone.toLocaleString("he-IL")}</span>}
+          <span className="font-semibold text-gold-dim">עלות ליחידה:</span>
+          {weapon.cost.gold > 0 && <span className="nums" dir="ltr">🪙 {weapon.cost.gold.toLocaleString("he-IL")}</span>}
+          {weapon.cost.wood > 0 && <span className="nums" dir="ltr">🪵 {weapon.cost.wood.toLocaleString("he-IL")}</span>}
+          {weapon.cost.iron > 0 && <span className="nums" dir="ltr">⚙️ {weapon.cost.iron.toLocaleString("he-IL")}</span>}
+          {weapon.cost.stone > 0 && <span className="nums" dir="ltr">🪨 {weapon.cost.stone.toLocaleString("he-IL")}</span>}
         </span>
       </div>
 
@@ -74,13 +81,13 @@ export function NextWeaponCard({
       <form action={action} className="relative mt-auto space-y-2">
         <input type="hidden" name="category" value={category} />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-          <span className="font-semibold text-zinc-300">עלות פתיחה:</span>
-          <span>🪙 {unlockCost.gold.toLocaleString("he-IL")}</span>
-          <span>🪵 {unlockCost.wood.toLocaleString("he-IL")}</span>
-          <span>⚙️ {unlockCost.iron.toLocaleString("he-IL")}</span>
-          <span>🪨 {unlockCost.stone.toLocaleString("he-IL")}</span>
+          <span className="font-semibold text-gold-dim">עלות פתיחה:</span>
+          <span className="nums" dir="ltr">🪙 {unlockCost.gold.toLocaleString("he-IL")}</span>
+          <span className="nums" dir="ltr">🪵 {unlockCost.wood.toLocaleString("he-IL")}</span>
+          <span className="nums" dir="ltr">⚙️ {unlockCost.iron.toLocaleString("he-IL")}</span>
+          <span className="nums" dir="ltr">🪨 {unlockCost.stone.toLocaleString("he-IL")}</span>
         </div>
-        <SubmitButton className="w-full" pendingText="פותח...">
+        <SubmitButton className="btn btn-gold w-full" pendingText="פותח...">
           🔓 פתח נשק הבא
         </SubmitButton>
       </form>

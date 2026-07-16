@@ -103,17 +103,41 @@ export function nextDailyUpdate(after: Date): Date {
   return new Date(after.getTime() + 86_400_000);
 }
 
-/** The next regular tick boundary after `lastRegularUpdateAt`. */
-export function nextRegularUpdate(lastRegularUpdateAt: Date): Date {
-  return new Date(lastRegularUpdateAt.getTime() + REGULAR_TICK_MS);
+/**
+ * Regular ticks are GLOBAL: they fire on round 5-minute wall-clock boundaries
+ * (XX:00, XX:05, XX:10, …) shared by every empire, so the whole game — the
+ * rankings included — updates at the same instant.
+ */
+
+/** The most recent global tick boundary at or before `date`. */
+export function lastTickBoundary(date: Date): Date {
+  return new Date(Math.floor(date.getTime() / REGULAR_TICK_MS) * REGULAR_TICK_MS);
 }
 
-/** Full 5-minute ticks elapsed between the last update and now. */
+/** The next global tick boundary strictly after `date` (XX:00, XX:05, …). */
+export function nextRegularUpdate(date: Date): Date {
+  return new Date(lastTickBoundary(date).getTime() + REGULAR_TICK_MS);
+}
+
+/** Global 5-minute boundaries crossed between the last update and now. */
 export function elapsedRegularTicks(lastRegularUpdateAt: Date, now: Date): number {
   return Math.max(
     0,
-    Math.floor((now.getTime() - lastRegularUpdateAt.getTime()) / REGULAR_TICK_MS)
+    Math.floor(now.getTime() / REGULAR_TICK_MS) -
+      Math.floor(lastRegularUpdateAt.getTime() / REGULAR_TICK_MS)
   );
+}
+
+/** The most recent daily-update instant at or before `date`. */
+export function lastDailyUpdate(date: Date): Date {
+  for (let offset = 0; offset >= -2; offset--) {
+    const instants = dailyInstantsForDay(date, offset).filter(
+      (instant) => instant.getTime() <= date.getTime()
+    );
+    if (instants.length > 0) return instants[instants.length - 1];
+  }
+  // Unreachable: within 2 days back there is always an update.
+  return new Date(date.getTime() - 86_400_000);
 }
 
 /** Format an instant as Jerusalem wall time (HH:MM). */

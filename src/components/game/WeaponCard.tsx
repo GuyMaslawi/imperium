@@ -4,7 +4,6 @@ import { useActionState, useState } from "react";
 import { buyWeapon, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Card } from "@/components/ui/Card";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
 
 export interface AvailableResources {
@@ -52,37 +51,51 @@ export function WeaponCard({
   const maxQuantity = maxAffordableQuantity(weapon.cost, available);
 
   return (
-    <Card className="flex flex-col gap-3">
+    <div className="panel rounded-xl p-3 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <h3 className="font-bold text-zinc-100">{weapon.name}</h3>
-          <p className="text-xs font-semibold text-gold">רמה {weapon.tier}</p>
+          <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
+          <p className="text-xs font-semibold text-gold-dim">
+            רמה{" "}
+            <span className="nums" dir="ltr">
+              {weapon.tier}
+            </span>
+          </p>
         </div>
-        <span className="shrink-0 rounded-full bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold">
-          ⚡ {weapon.power} עוצמה
+        <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
+          ⚡{" "}
+          <span className="nums" dir="ltr">
+            {weapon.power}
+          </span>{" "}
+          עוצמה
         </span>
       </div>
 
       <p className="text-sm text-zinc-400">{weapon.description}</p>
 
-      <div className="grid grid-cols-2 gap-2 rounded-lg bg-surface-raised/60 p-3 text-xs">
+      <div className="grid grid-cols-2 gap-2 panel-inset rounded-lg p-3 text-xs">
         <span className="text-zinc-400">
           ברשותך:{" "}
-          <span className="font-bold text-zinc-100">{owned.toLocaleString("he-IL")}</span>
+          <span className="nums font-bold text-zinc-100" dir="ltr">
+            {owned.toLocaleString("he-IL")}
+          </span>
         </span>
         <span className="text-zinc-400">
-          עוצמה ליחידה: <span className="font-bold text-zinc-100">{weapon.power}</span>
+          עוצמה ליחידה:{" "}
+          <span className="nums font-bold text-zinc-100" dir="ltr">
+            {weapon.power}
+          </span>
         </span>
         <span className="col-span-2 text-zinc-400">
           עוצמה כוללת מנשק זה:{" "}
-          <span className="font-bold text-gold">
+          <span className="nums font-bold text-gold-bright" dir="ltr">
             {(owned * weapon.power).toLocaleString("he-IL")}
           </span>
         </span>
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-        <span className="font-semibold text-zinc-300">עלות ליחידה:</span>
+        <span className="font-semibold text-gold-dim">עלות ליחידה:</span>
         {COST_RESOURCES.map(({ key, icon }) => {
           if (weapon.cost[key] <= 0) return null;
           const missing = available[key] < weapon.cost[key];
@@ -92,7 +105,10 @@ export function WeaponCard({
               className={missing ? "font-semibold text-red-400" : undefined}
               title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
             >
-              {icon} {weapon.cost[key].toLocaleString("he-IL")}
+              {icon}{" "}
+              <span className="nums" dir="ltr">
+                {weapon.cost[key].toLocaleString("he-IL")}
+              </span>
             </span>
           );
         })}
@@ -111,7 +127,7 @@ export function WeaponCard({
               setQuantity(e.target.value);
               setShowMaxError(false);
             }}
-            className="w-full min-w-0 flex-1 rounded-lg border border-border-subtle bg-surface-raised px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
+            className="nums w-full min-w-0 flex-1 rounded-lg border border-border-subtle bg-panel-inset px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
           />
           <button
             type="button"
@@ -123,11 +139,11 @@ export function WeaponCard({
                 setShowMaxError(true);
               }
             }}
-            className="shrink-0 cursor-pointer rounded-lg border border-gold-dim px-3 py-1.5 text-sm text-gold transition-colors hover:bg-gold/10"
+            className="btn btn-ghost shrink-0 px-3 py-1.5 text-sm"
           >
-            מקסימום
+            MAX
           </button>
-          <SubmitButton pendingText="קונה..." className="shrink-0">
+          <SubmitButton pendingText="קונה..." className="btn btn-gold shrink-0">
             קנה
           </SubmitButton>
         </div>
@@ -137,6 +153,6 @@ export function WeaponCard({
       </form>
 
       <FormMessage error={state.error} success={state.success} />
-    </Card>
+    </div>
   );
 }

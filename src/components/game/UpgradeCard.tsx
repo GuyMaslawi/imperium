@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/Card";
 export interface UpgradeCardProps {
   upgradeType:
     | "CITIZEN_GROWTH"
+    | "DIAMOND_YIELD"
     | "INTELLIGENCE"
     | "BANK_DEPOSIT_COUNT"
     | "BANK_DAILY_INTEREST"
@@ -42,18 +43,28 @@ export function UpgradeCard({
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <span aria-hidden className="text-3xl">{icon}</span>
+        <span
+          aria-hidden
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-panel-inset text-2xl"
+        >
+          {icon}
+        </span>
         <div>
-          <h3 className="font-bold text-zinc-100">{label}</h3>
-          <p className="text-xs font-semibold text-gold">רמה {level}</p>
+          <h3 className="font-bold text-gold-bright">{label}</h3>
+          <p className="text-xs font-semibold text-gold">
+            רמה{" "}
+            <span className="nums" dir="ltr">
+              {level}
+            </span>
+          </p>
         </div>
       </div>
 
       <p className="text-sm text-zinc-400">{description}</p>
 
-      <div className="space-y-1 rounded-lg bg-surface-raised/60 p-3 text-xs">
+      <div className="panel-inset space-y-1 rounded-lg p-3 text-xs">
         <p className="text-zinc-300">
-          <span className="font-semibold">כעת:</span> {currentEffect}
+          <span className="font-semibold text-gold-dim">כעת:</span> {currentEffect}
         </p>
         {!isMaxLevel && (
           <p className="text-emerald-400">
@@ -66,14 +77,18 @@ export function UpgradeCard({
         <input type="hidden" name="upgradeType" value={upgradeType} />
         {!isMaxLevel && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-            <span className="font-semibold text-zinc-300">עלות שדרוג:</span>
-            <span>🪙 {upgradeCost.gold.toLocaleString("he-IL")}</span>
-            <span>🪵 {upgradeCost.wood.toLocaleString("he-IL")}</span>
-            <span>⚙️ {upgradeCost.iron.toLocaleString("he-IL")}</span>
-            <span>🪨 {upgradeCost.stone.toLocaleString("he-IL")}</span>
+            <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
+            <span className="nums" dir="ltr">🪙 {upgradeCost.gold.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr">🪵 {upgradeCost.wood.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr">⚙️ {upgradeCost.iron.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr">🪨 {upgradeCost.stone.toLocaleString("he-IL")}</span>
           </div>
         )}
-        <SubmitButton className="w-full" pendingText="משדרג..." disabled={isMaxLevel}>
+        <SubmitButton
+          className={`w-full ${isMaxLevel ? "" : "btn btn-gold"}`}
+          pendingText="משדרג..."
+          disabled={isMaxLevel}
+        >
           {isMaxLevel ? "רמה מקסימלית" : `שדרג לרמה ${level + 1}`}
         </SubmitButton>
       </form>

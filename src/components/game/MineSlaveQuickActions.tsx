@@ -9,7 +9,6 @@ import {
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Card } from "@/components/ui/Card";
 
 const ALL_TO_RESOURCE: Array<{
   resource: "gold" | "wood" | "iron" | "stone";
@@ -36,24 +35,27 @@ export function MineSlaveQuickActions() {
   );
 
   return (
-    <Card className="space-y-3">
-      <h2 className="text-sm font-bold text-zinc-100">פעולות מהירות ⚡</h2>
+    <div className="panel rounded-xl p-4 space-y-3">
+      <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
+        <span aria-hidden>⚡</span>
+        פעולות מהירות
+      </h2>
       <div className="flex flex-wrap gap-2">
         {ALL_TO_RESOURCE.map(({ resource, label }) => (
           <form key={resource} action={allAction}>
             <input type="hidden" name="resource" value={resource} />
-            <SubmitButton variant="secondary" pendingText="מציב...">
+            <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מציב...">
               {label}
             </SubmitButton>
           </form>
         ))}
         <form action={splitAction}>
-          <SubmitButton variant="secondary" pendingText="מחלק...">
+          <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מחלק...">
             חלק שווה בין המשאבים
           </SubmitButton>
         </form>
         <form action={clearAction}>
-          <SubmitButton variant="secondary" pendingText="מנקה...">
+          <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מנקה...">
             נקה חלוקה
           </SubmitButton>
         </form>
@@ -62,6 +64,6 @@ export function MineSlaveQuickActions() {
         error={allState.error ?? splitState.error ?? clearState.error}
         success={allState.success ?? splitState.success ?? clearState.success}
       />
-    </Card>
+    </div>
   );
 }

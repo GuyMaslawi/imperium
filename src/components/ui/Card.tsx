@@ -1,18 +1,24 @@
 import type { ReactNode } from "react";
 
+/**
+ * Standard inner panel. `variant` picks the surface treatment:
+ *  - "default": neutral dark panel
+ *  - "gold": warm gold-tinted panel (for highlighted sections)
+ *  - "inset": recessed near-black panel (for nested rows / fields)
+ */
 export function Card({
   children,
   className = "",
+  variant = "default",
 }: {
   children: ReactNode;
   className?: string;
+  variant?: "default" | "gold" | "inset";
 }) {
+  const surface =
+    variant === "gold" ? "panel-gold" : variant === "inset" ? "panel-inset" : "panel";
   return (
-    <div
-      className={`rounded-xl border border-border-subtle bg-surface p-5 shadow-lg shadow-black/30 ${className}`}
-    >
-      {children}
-    </div>
+    <div className={`${surface} rounded-xl p-5 ${className}`}>{children}</div>
   );
 }
 
@@ -26,7 +32,9 @@ export function CardTitle({
   className?: string;
 }) {
   return (
-    <h2 className={`mb-4 flex items-center gap-2 text-lg font-bold text-gold ${className}`}>
+    <h2
+      className={`mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright ${className}`}
+    >
       {icon && <span aria-hidden>{icon}</span>}
       {children}
     </h2>

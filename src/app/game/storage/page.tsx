@@ -5,7 +5,9 @@ import {
   storageCapacityForLevel,
   storageUpgradeCost,
 } from "@/lib/game/constants";
+import { formatNumber } from "@/lib/game/format";
 import { StorageCard } from "@/components/game/StorageCard";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 
 export const metadata = { title: "מחסנים | אימפריום" };
 
@@ -19,21 +21,58 @@ export default async function StoragePage() {
     stone: empire.stone,
   } as const;
 
+  const totalStored = empire.storages.reduce(
+    (sum, s) => sum + s.storedAmount,
+    0
+  );
+  const totalCapacity = STORAGE_TYPES.reduce((sum, type) => {
+    const level =
+      empire.storages.find((s) => s.resourceType === type)?.level ?? 1;
+    return sum + storageCapacityForLevel(level);
+  }, 0);
+  const totalFillPct =
+    totalCapacity > 0
+      ? Math.round(Math.min(1, totalStored / totalCapacity) * 100)
+      : 0;
+
+  const summaryTotals = [
+    { label: "משאבים מאוחסנים", value: formatNumber(Math.floor(totalStored)) },
+    { label: "קיבולת כוללת", value: formatNumber(totalCapacity) },
+    { label: "ניצול כולל", value: `${totalFillPct}%` },
+  ];
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-zinc-100">מחסנים 🏛️</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          אחסן משאבים, משוך אותם בעת הצורך ושדרג את קיבולת המחסנים שלך.
-        </p>
+      <SectionHeading title="מחסנים" subtitle="STORAGE" ornament="🏛️" />
+
+      {/* -------- warehouse network summary -------- */}
+      <div className="panel-gold rounded-xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <span aria-hidden>🏗️</span>
+            מערך המחסנים
+          </h2>
+          <div className="grid flex-1 grid-cols-3 gap-3 sm:max-w-md">
+            {summaryTotals.map((total) => (
+              <div key={total.label} className="text-center">
+                <p className="nums text-lg font-black text-gold-bright" dir="ltr">
+                  {total.value}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-snug text-gold-dim">
+                  {total.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <p className="rounded-xl border border-border-subtle bg-surface p-4 text-sm text-zinc-400">
+      <p className="panel-inset rounded-xl p-4 text-sm text-zinc-400">
         🛡️ המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים
         ויכולים להיגנב בתקיפה.
       </p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STORAGE_TYPES.map((type) => {
           const meta = STORAGE_META[type];
           const storage = empire.storages.find((s) => s.resourceType === type);

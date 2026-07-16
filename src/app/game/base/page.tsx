@@ -2,27 +2,20 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { Card, CardTitle } from "@/components/ui/Card";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 import {
   BUILDING_META,
-  RESOURCE_META,
-  UNIT_META,
   STORAGE_TYPES,
   storageCapacityForLevel,
-  allowedDepositsPerDailyPeriod,
-  bankInterestRate,
   type StorableResource,
 } from "@/lib/game/constants";
 import { productionPerTick } from "@/lib/game/resources";
 import { PowerSummary } from "@/components/game/PowerSummary";
-import { getTurnsGainPerRegularUpdate } from "@/lib/game/turns";
-import {
-  nextRegularUpdate,
-  nextDailyUpdate,
-  formatGameTime,
-} from "@/lib/game/time";
-import { formatNumber, formatDate } from "@/lib/game/format";
+import { WheelCard } from "@/components/game/WheelCard";
+import { seasonDay } from "@/lib/game/wheel";
+import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
 
-export const metadata = { title: "בסיס | אימפריום" };
+export const metadata = { title: "בסיס | WARZONE" };
 
 export default async function BasePage() {
   const empire = await requireEmpire();
@@ -53,12 +46,7 @@ export default async function BasePage() {
         : null,
     ]);
 
-  const turnsPerUpdate = await getTurnsGainPerRegularUpdate(empire.id);
-  const now = new Date();
-  const nextRegularAt = nextRegularUpdate(empire.lastRegularUpdateAt);
-  const nextDailyAt = nextDailyUpdate(now);
-
-  /* ---- production: total per regular update, grouped by resource ---- */
+  /* ---- production per regular update, grouped by resource ---- */
   const productionByResource = new Map<StorableResource, number>();
   for (const building of empire.buildings) {
     const produced = BUILDING_META[building.type].producedResource;
@@ -68,35 +56,12 @@ export default async function BasePage() {
       (productionByResource.get(produced) ?? 0) + productionPerTick(building)
     );
   }
-  const productionRows = [...productionByResource.entries()].filter(
-    ([, amount]) => amount > 0
-  );
 
-  const mineSlaves = empire.army?.mineSlaves ?? 0;
-  const assignedSlaves = empire.buildings.reduce(
-    (sum, b) => sum + b.slavesAssigned,
-    0
-  );
-
-  /* ---- bank ---- */
   const bankGold = Math.floor(empire.bankAccount?.goldBalance ?? 0);
-  const interestLevel =
-    empire.upgrades.find((u) => u.type === "BANK_DAILY_INTEREST")?.level ?? 1;
-  const depositLevel =
-    empire.upgrades.find((u) => u.type === "BANK_DEPOSIT_COUNT")?.level ?? 1;
-  const nextInterest = Math.floor(bankGold * bankInterestRate(interestLevel));
-  const allowedDeposits = allowedDepositsPerDailyPeriod(depositLevel);
-  const usedDeposits = empire.bankAccount?.depositsUsedInCurrentPeriod ?? 0;
-  const remainingDeposits = Math.max(0, allowedDeposits - usedDeposits);
 
-  /* ---- storage ---- */
-  const totalStored = empire.storages.reduce(
-    (sum, s) => sum + s.storedAmount,
-    0
-  );
+  const totalStored = empire.storages.reduce((sum, s) => sum + s.storedAmount, 0);
   const totalCapacity = STORAGE_TYPES.reduce((sum, type) => {
-    const level =
-      empire.storages.find((s) => s.resourceType === type)?.level ?? 1;
+    const level = empire.storages.find((s) => s.resourceType === type)?.level ?? 1;
     return sum + storageCapacityForLevel(level);
   }, 0);
 
@@ -105,266 +70,216 @@ export default async function BasePage() {
     recentSpies.length > 0 ||
     recentBankTransactions.length > 0;
 
-  const statusStats: { label: string; value: string; hint?: string }[] = [
-    { label: "רמת אימפריה", value: formatNumber(empire.level) },
-    ...(season ? [{ label: "עונה", value: season.name }] : []),
-    {
-      label: "תורות זמינות",
-      value: formatNumber(empire.turns),
-      hint: `+${turnsPerUpdate} בעדכון הרגיל הבא`,
-    },
-    {
-      label: "עדכון רגיל הבא",
-      value: formatGameTime(nextRegularAt),
-      hint: "ייצור מכרות ותורות",
-    },
-    {
-      label: "עדכון יומי הבא",
-      value: formatGameTime(nextDailyAt),
-      hint: "אזרחים וריבית בנק",
-    },
+  /* ---- season milestones (presentational, gated on empire progress) ---- */
+  const milestones = [
+    { icon: "🏭", title: "מכונות רמה 100", need: 5 },
+    { icon: "🗡️", title: "כל הנשק", need: 6 },
+    { icon: "👥", title: "אוכלוסייה 500", need: 7 },
+    { icon: "🛡️", title: "גיבור רמה 100", need: 8 },
+    { icon: "🏰", title: "עיר 10", need: 10 },
+  ].map((m) => ({ ...m, done: empire.level >= m.need }));
+
+  const resourceTiles = [
+    { icon: "🎖️", label: "תורות", value: empire.turns, tone: "text-emerald-400" },
+    { icon: "⚙️", label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
+    { icon: "🪵", label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
+    { icon: "🪙", label: "זהב", value: empire.gold, tone: "text-gold-bright" },
+    { icon: "🏦", label: "בבנק", value: bankGold, tone: "text-gold" },
+    { icon: "💎", label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
+    { icon: "🪨", label: "אבן", value: empire.stone, tone: "text-zinc-200" },
+    { icon: "👥", label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
   ];
+
+  // Server component renders once per request, so reading the clock here is safe.
+  // eslint-disable-next-line react-hooks/purity
+  const nowMs = Date.now();
+  const daysOnServer = Math.max(
+    1,
+    Math.ceil((nowMs - new Date(empire.createdAt).getTime()) / 86_400_000)
+  );
+  // Wheel prizes grow with the season — day 1 pays base amounts, each day adds more.
+  const wheelSeasonDay = seasonDay(season, nowMs);
 
   return (
     <div className="space-y-6">
-      {/* -------- 1. empire status -------- */}
-      <div>
-        <h1 className="text-2xl font-black text-zinc-100">
-          ברוך הבא, שליט {empire.name} 👑
-        </h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          מרכז הפיקוד של האימפריה שלך — כאן רואים הכול במבט אחד.
-        </p>
+      <SectionHeading title="מרכז הפיקוד" subtitle="COMMAND CENTER" ornament="🏰" />
+
+      {/* announcement */}
+      <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
+        <span className="absolute inset-y-0 right-0 w-1 bg-gold" />
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <p className="flex items-center gap-2 text-sm">
+            <span aria-hidden>📣</span>
+            <span className="font-bold text-gold-bright">
+              {season ? `${season.name} התחילה!` : "העונה פעילה"}
+            </span>
+            <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! ⚔️</span>
+          </p>
+          {season && (
+            <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+              <span aria-hidden>⏳</span>
+              סיום עונה:
+              <span className="font-bold text-gold nums" dir="ltr">
+                {formatDate(season.endsAt)}
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
-      <Card className="!p-4">
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-          {statusStats.map((stat) => (
-            <div key={stat.label}>
-              <p className="text-xs text-zinc-400">{stat.label}</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums text-gold">
-                {stat.value}
-              </p>
-              {stat.hint && (
-                <p className="text-[11px] leading-snug text-zinc-500">
-                  {stat.hint}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      </Card>
+      {/* wheel + season events */}
+      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+        <WheelCard spinsAvailable={4} seasonDay={wheelSeasonDay} />
 
-      {/* -------- 2. power summary -------- */}
+        <Card>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <CardTitle className="mb-0" icon="🌍">התקדמות עולם המשחק</CardTitle>
+              <p className="text-xs text-zinc-500">אירועי העונה</p>
+            </div>
+            <div className="text-center">
+              <p className="text-2xl font-black text-gold nums" dir="ltr">{daysOnServer}</p>
+              <p className="text-[10px] text-zinc-500">ימי שרת</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1 overflow-x-auto pb-2">
+            {milestones.map((m, i) => (
+              <div key={m.title} className="flex items-center gap-1">
+                <div className="flex w-24 shrink-0 flex-col items-center gap-1.5 text-center">
+                  <span
+                    className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 text-xl ${
+                      m.done
+                        ? "border-gold bg-gold/15"
+                        : "border-border-subtle bg-panel-inset opacity-60"
+                    }`}
+                  >
+                    {m.icon}
+                    {m.done && (
+                      <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-white">
+                        ✓
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[11px] font-semibold text-zinc-300">{m.title}</span>
+                </div>
+                {i < milestones.length - 1 && (
+                  <span className={`h-0.5 w-6 ${m.done ? "bg-gold/60" : "bg-border-subtle"}`} />
+                )}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+
+      {/* empire power */}
       <PowerSummary army={empire.army} weapons={empire.weapons} />
 
-      {/* -------- 3. main / secondary columns -------- */}
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        {/* main column: production + army */}
-        <div className="space-y-4 lg:col-span-2">
-          <Card>
-            <CardTitle icon="⚒️">ייצור</CardTitle>
-            {productionRows.length === 0 ? (
-              <p className="text-sm text-zinc-400">
-                אין ייצור פעיל — הצב עבדי מכרות במכרות כדי להתחיל להפיק
-                משאבים.
-              </p>
-            ) : (
-              <ul className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-4">
-                {productionRows.map(([resource, amount]) => (
-                  <li key={resource} className="flex flex-col">
-                    <span className="text-zinc-400">
-                      {RESOURCE_META[resource].icon} {RESOURCE_META[resource].label}
-                    </span>
-                    <span className="font-bold tabular-nums text-emerald-400">
-                      +{formatNumber(Math.floor(amount))} לעדכון רגיל
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-3 text-sm">
-              <span className="text-zinc-400">
-                ⛏️ עבדים מוצבים במכרות:{" "}
-                <span className="font-bold tabular-nums text-zinc-100">
-                  {formatNumber(assignedSlaves)} מתוך {formatNumber(mineSlaves)}
-                </span>
-              </span>
-              <Link
-                href="/game/production"
-                className="font-semibold text-gold hover:text-gold-bright"
-              >
-                ניהול ייצור ←
-              </Link>
+      {/* base details + resources */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle icon="🏰">פרטי בסיס</CardTitle>
+          <dl className="space-y-3 text-sm">
+            <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+              <dt className="text-zinc-400">דירוג עולמי</dt>
+              <dd className="text-lg font-black text-zinc-100 nums" dir="ltr">{empire.level}</dd>
             </div>
-          </Card>
-
-          <Card>
-            <CardTitle icon="⚔️">הצבא שלך</CardTitle>
-            <ul className="grid grid-cols-3 gap-3 text-sm">
-              <li className="flex flex-col">
-                <span className="text-zinc-400">
-                  {UNIT_META.soldiers.icon} חיילים
-                </span>
-                <span className="text-lg font-bold tabular-nums text-zinc-100">
-                  {formatNumber(empire.army?.soldiers ?? 0)}
-                </span>
-              </li>
-              <li className="flex flex-col">
-                <span className="text-zinc-400">
-                  {UNIT_META.spies.icon} מרגלים
-                </span>
-                <span className="text-lg font-bold tabular-nums text-zinc-100">
-                  {formatNumber(empire.army?.spies ?? 0)}
-                </span>
-              </li>
-              <li className="flex flex-col">
-                <span className="text-zinc-400">
-                  {UNIT_META.mineSlaves.icon} עבדי מכרות
-                </span>
-                <span className="text-lg font-bold tabular-nums text-zinc-100">
-                  {formatNumber(mineSlaves)}
-                </span>
-              </li>
-            </ul>
-            <Link
-              href="/game/army"
-              className="mt-4 block text-sm font-semibold text-gold hover:text-gold-bright"
-            >
-              אימון צבא ←
-            </Link>
-          </Card>
-        </div>
-
-        {/* secondary column: bank + storage + recent activity */}
-        <div className="space-y-4">
-          <Card>
-            <CardTitle icon="🏦">בנק</CardTitle>
-            <dl className="space-y-2.5 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-zinc-400">זהב בבנק</dt>
-                <dd className="font-bold tabular-nums text-gold">
-                  {formatNumber(bankGold)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-zinc-400">ריבית בעדכון הקרוב</dt>
-                <dd className="font-bold tabular-nums text-emerald-400">
-                  +{formatNumber(nextInterest)}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-zinc-400">הפקדות שנותרו</dt>
-                <dd className="font-bold tabular-nums text-zinc-100">
-                  {formatNumber(remainingDeposits)} מתוך{" "}
-                  {formatNumber(allowedDeposits)}
-                </dd>
-              </div>
-            </dl>
-            <Link
-              href="/game/bank"
-              className="mt-4 block text-sm font-semibold text-gold hover:text-gold-bright"
-            >
-              לבנק ←
-            </Link>
-          </Card>
-
-          <Card>
-            <CardTitle icon="🏛️">מחסנים</CardTitle>
-            <div className="flex justify-between text-sm">
-              <span className="text-zinc-400">משאבים מאוחסנים</span>
-              <span className="font-bold tabular-nums text-zinc-100">
-                {formatNumber(Math.floor(totalStored))} מתוך{" "}
-                {formatNumber(totalCapacity)}
-              </span>
+            <div className="flex items-center justify-between border-b border-border-subtle pb-2">
+              <dt className="text-zinc-400">עונה</dt>
+              <dd className="font-bold text-gold">{season?.name ?? "—"}</dd>
             </div>
-            <p className="mt-2 text-xs text-zinc-500">
-              משאבים במחסן מוגנים מפני שוד בתקיפה.
-            </p>
-            <Link
-              href="/game/storage"
-              className="mt-4 block text-sm font-semibold text-gold hover:text-gold-bright"
-            >
-              למחסנים ←
-            </Link>
-          </Card>
+            <div className="flex items-center justify-between">
+              <dt className="text-zinc-400">ברית</dt>
+              <dd className="font-bold text-red-400">ללא</dd>
+            </div>
+          </dl>
+          <Link href="/game/guild" className="btn btn-ghost mt-4 w-full py-2 text-sm">
+            🤝 הצטרף לברית
+          </Link>
+        </Card>
 
-          <Card>
-            <CardTitle icon="📜">פעילות אחרונה</CardTitle>
-            {!hasActivity ? (
-              <p className="text-sm text-zinc-400">
-                אין דיווחים עדיין. היכנס לפרופיל אימפריה מעמוד הדירוג כדי לרגל
-                או לתקוף.
-              </p>
-            ) : (
-              <ul className="space-y-2.5 text-sm">
-                {recentBattles.map((r) => {
-                  const isAttacker = r.attackerEmpireId === empire.id;
-                  const won = r.winnerEmpireId === empire.id;
-                  const rival = isAttacker
-                    ? r.defenderEmpire.name
-                    : r.attackerEmpire.name;
-                  return (
-                    <li key={r.id} className="flex flex-col gap-0.5">
-                      <span className="text-zinc-300">
-                        {isAttacker ? "⚔️ תקפת את" : "🛡️ הותקפת על ידי"}{" "}
-                        <span className="font-semibold">{rival}</span> —{" "}
-                        <span className={won ? "text-emerald-400" : "text-red-400"}>
-                          {won ? "ניצחון" : "הפסד"}
-                        </span>
-                      </span>
-                      <span className="text-xs text-zinc-500">
-                        {formatDate(r.createdAt)}
-                      </span>
-                    </li>
-                  );
-                })}
-                {recentSpies.map((r) => (
-                  <li key={r.id} className="flex flex-col gap-0.5">
-                    <span className="text-zinc-300">
-                      🕵️ ריגלת אחרי{" "}
-                      <span className="font-semibold">{r.defenderEmpire.name}</span>{" "}
-                      —{" "}
-                      <span className={r.success ? "text-emerald-400" : "text-red-400"}>
-                        {r.success ? "הצלחה" : "כישלון"}
-                      </span>
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      {formatDate(r.createdAt)}
-                    </span>
-                  </li>
-                ))}
-                {recentBankTransactions.map((t) => (
-                  <li key={t.id} className="flex flex-col gap-0.5">
-                    <span className="text-zinc-300">
-                      🏦{" "}
-                      {t.type === "DEPOSIT"
-                        ? "הפקדה לבנק"
-                        : t.type === "WITHDRAW"
-                          ? "משיכה מהבנק"
-                          : "ריבית מהבנק"}{" "}
-                      —{" "}
-                      <span className="font-semibold tabular-nums" dir="ltr">
-                        {t.type === "WITHDRAW" ? "-" : "+"}
-                        {formatNumber(t.amount)}
-                      </span>
-                    </span>
-                    <span className="text-xs text-zinc-500">
-                      {formatDate(t.createdAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Link
-              href="/game/reports"
-              className="mt-4 block text-sm font-semibold text-gold hover:text-gold-bright"
-            >
-              לכל הדוחות ←
-            </Link>
-          </Card>
-        </div>
+        <Card variant="gold">
+          <div className="mb-4 flex items-center justify-between">
+            <CardTitle className="mb-0" icon="💰">משאבים</CardTitle>
+            <span className="text-xs text-zinc-400">
+              מאוחסן:{" "}
+              <span className="font-bold text-zinc-200 nums" dir="ltr">
+                {formatCompact(totalStored)}/{formatCompact(totalCapacity)}
+              </span>
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {resourceTiles.map((t) => (
+              <div key={t.label} className="panel-inset rounded-lg px-3 py-2.5 text-center">
+                <p className="flex items-center justify-center gap-1 text-[11px] text-zinc-400">
+                  <span aria-hidden>{t.icon}</span>
+                  {t.label}
+                </p>
+                <p className={`mt-0.5 text-sm font-black nums ${t.tone}`} dir="ltr">
+                  {formatCompact(t.value)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
+
+      {/* recent activity */}
+      <Card>
+        <CardTitle icon="📜">פעילות אחרונה</CardTitle>
+        {!hasActivity ? (
+          <p className="text-sm text-zinc-400">
+            אין דיווחים עדיין. היכנס לפרופיל אימפריה מעמוד הדירוג כדי לרגל או לתקוף.
+          </p>
+        ) : (
+          <ul className="space-y-2.5 text-sm">
+            {recentBattles.map((r) => {
+              const isAttacker = r.attackerEmpireId === empire.id;
+              const won = r.winnerEmpireId === empire.id;
+              const rival = isAttacker ? r.defenderEmpire.name : r.attackerEmpire.name;
+              return (
+                <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
+                  <span className="text-zinc-300">
+                    {isAttacker ? "⚔️ תקפת את" : "🛡️ הותקפת על ידי"}{" "}
+                    <span className="font-semibold">{rival}</span> —{" "}
+                    <span className={won ? "text-emerald-400" : "text-red-400"}>
+                      {won ? "ניצחון" : "הפסד"}
+                    </span>
+                  </span>
+                  <span className="text-xs text-zinc-500">{formatDate(r.createdAt)}</span>
+                </li>
+              );
+            })}
+            {recentSpies.map((r) => (
+              <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
+                <span className="text-zinc-300">
+                  🕵️ ריגלת אחרי <span className="font-semibold">{r.defenderEmpire.name}</span> —{" "}
+                  <span className={r.success ? "text-emerald-400" : "text-red-400"}>
+                    {r.success ? "הצלחה" : "כישלון"}
+                  </span>
+                </span>
+                <span className="text-xs text-zinc-500">{formatDate(r.createdAt)}</span>
+              </li>
+            ))}
+            {recentBankTransactions.map((t) => (
+              <li key={t.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
+                <span className="text-zinc-300">
+                  🏦{" "}
+                  {t.type === "DEPOSIT" ? "הפקדה לבנק" : t.type === "WITHDRAW" ? "משיכה מהבנק" : "ריבית מהבנק"}{" "}
+                  —{" "}
+                  <span className="font-semibold nums" dir="ltr">
+                    {t.type === "WITHDRAW" ? "-" : "+"}
+                    {formatNumber(t.amount)}
+                  </span>
+                </span>
+                <span className="text-xs text-zinc-500">{formatDate(t.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <Link href="/game/reports" className="btn btn-ghost mt-4 w-full py-2 text-sm">
+          לכל הדוחות ←
+        </Link>
+      </Card>
     </div>
   );
 }

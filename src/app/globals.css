@@ -1,36 +1,510 @@
 @import "tailwindcss";
 
+/* =========================================================================
+   IMPERIUM — war-room design system
+   A dark, ornate strategy-game aesthetic: warscape background, gold-framed
+   panels with corner brackets, parchment-tan CTAs, faction color accents.
+   ========================================================================= */
+
 :root {
-  --background: #09090b;
-  --foreground: #f4f4f5;
+  /* base surfaces — warm near-black */
+  --background: #0a0705;
+  --foreground: #f3ede1;
+
+  --panel: #141110;
+  --panel-raised: #1b1714;
+  --panel-inset: #0f0c0a;
+
+  /* gold family */
   --gold: #d4a843;
-  --gold-bright: #f0c866;
+  --gold-bright: #f0cd78;
   --gold-dim: #8a6d2b;
-  --surface: #141417;
-  --surface-raised: #1c1c21;
-  --border-subtle: #27272d;
+  --gold-deep: #5c4718;
+
+  /* parchment tan (primary CTA fill) */
+  --tan: #d8b463;
+  --tan-bright: #ecca7e;
+
+  /* borders */
+  --border-subtle: #2a2420;
+  --border-gold: rgba(212, 168, 67, 0.28);
+  --border-gold-strong: rgba(212, 168, 67, 0.55);
+
+  /* faction / status accents */
+  --accent-green: #34d399;
+  --accent-green-deep: #1f8f66;
+  --accent-red: #ef5350;
+  --accent-blue: #58a6e0;
+  --accent-purple: #8a6bd4;
+
+  --ring-health: #ef4444;
+  --ring-xp: #d4a843;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-panel: var(--panel);
+  --color-panel-raised: var(--panel-raised);
+  --color-panel-inset: var(--panel-inset);
+
   --color-gold: var(--gold);
   --color-gold-bright: var(--gold-bright);
   --color-gold-dim: var(--gold-dim);
-  --color-surface: var(--surface);
-  --color-surface-raised: var(--surface-raised);
+  --color-gold-deep: var(--gold-deep);
+
+  --color-tan: var(--tan);
+  --color-tan-bright: var(--tan-bright);
+
   --color-border-subtle: var(--border-subtle);
+
+  --color-accent-green: var(--accent-green);
+  --color-accent-red: var(--accent-red);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-purple: var(--accent-purple);
+
+  /* legacy aliases kept so existing screens keep compiling */
+  --color-surface: var(--panel);
+  --color-surface-raised: var(--panel-raised);
+
   --font-sans: var(--font-heebo), system-ui, sans-serif;
 }
 
+/* -------------------------------------------------------------------------
+   Global background — an atmospheric warscape rendered in pure CSS.
+   Drop a painted background in later by setting --bg-art on <body>.
+   ------------------------------------------------------------------------- */
+html {
+  overflow-x: hidden;
+}
 body {
-  background: var(--background);
   color: var(--foreground);
   font-family: var(--font-heebo), system-ui, sans-serif;
+  overflow-x: hidden;
+  max-width: 100vw;
+  background-color: #0a0705;
+  background-image:
+    /* warm top glow */
+    radial-gradient(120% 90% at 50% -10%, rgba(150, 76, 30, 0.42), transparent 55%),
+    /* dusty orange horizon on the sides */
+    radial-gradient(70% 60% at 12% 42%, rgba(96, 48, 24, 0.5), transparent 60%),
+    radial-gradient(70% 60% at 88% 42%, rgba(96, 48, 24, 0.5), transparent 60%),
+    /* ember flicker low */
+    radial-gradient(80% 50% at 50% 108%, rgba(120, 44, 18, 0.35), transparent 60%),
+    /* left/right vignette */
+    linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, transparent 20%, transparent 80%, rgba(0, 0, 0, 0.5) 100%),
+    /* base vertical warmth */
+    linear-gradient(180deg, #221208 0%, #150c07 45%, #0b0705 100%);
+  background-attachment: fixed;
+  background-size: cover;
 }
 
 /* Thin dark scrollbars fitting the war-room look */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #3f3f46 transparent;
+  scrollbar-color: #4a3f30 transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #3a3226;
+  border-radius: 8px;
+}
+
+/* =========================================================================
+   Component classes
+   ========================================================================= */
+
+/* --- The main ornate frame (central content shell) --- */
+.ornate-shell {
+  position: relative;
+  border: 1px solid var(--border-gold-strong);
+  background:
+    linear-gradient(180deg, rgba(26, 21, 16, 0.96), rgba(13, 10, 8, 0.97));
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.7),
+    0 0 0 4px rgba(212, 168, 67, 0.04),
+    0 30px 90px -20px rgba(0, 0, 0, 0.9),
+    inset 0 1px 0 rgba(240, 205, 120, 0.1),
+    inset 0 0 60px -30px rgba(212, 168, 67, 0.15);
+}
+/* subtle inner gold hairline for the framed panels */
+.ornate-shell::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(212, 168, 67, 0.14);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* --- A standard inner panel --- */
+.panel {
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, var(--panel-raised), var(--panel));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+}
+.panel-gold {
+  border: 1px solid var(--border-gold);
+  background: linear-gradient(180deg, rgba(30, 24, 16, 0.6), rgba(16, 13, 10, 0.75));
+  box-shadow: inset 0 1px 0 rgba(240, 205, 120, 0.05), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+}
+.panel-inset {
+  border: 1px solid var(--border-subtle);
+  background: var(--panel-inset);
+}
+
+/* --- Buttons --- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  border-radius: 0.5rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* Parchment-tan primary CTA */
+.btn-gold {
+  background: linear-gradient(180deg, var(--tan-bright), var(--tan));
+  color: #241701;
+  border: 1px solid #b8923f;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.btn-gold:not(:disabled):hover {
+  background: linear-gradient(180deg, #f5d98e, #dcb968);
+  transform: translateY(-1px);
+}
+/* Black w/ gold border (ghost / secondary) */
+.btn-ghost {
+  background: linear-gradient(180deg, rgba(28, 23, 18, 0.9), rgba(14, 11, 9, 0.95));
+  color: var(--gold-bright);
+  border: 1px solid var(--border-gold-strong);
+  box-shadow: inset 0 1px 0 rgba(240, 205, 120, 0.06);
+}
+.btn-ghost:not(:disabled):hover {
+  border-color: var(--gold);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(40, 32, 22, 0.95), rgba(20, 16, 12, 0.98));
+}
+/* Solid dark primary (big action) */
+.btn-dark {
+  background: linear-gradient(180deg, #17130f, #0c0a08);
+  color: var(--gold-bright);
+  border: 1px solid var(--border-gold-strong);
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(240, 205, 120, 0.08);
+}
+.btn-dark:not(:disabled):hover {
+  border-color: var(--gold);
+  color: #fff;
+}
+
+/* --- Section heading (centered gold title + english subtitle + rule) --- */
+.section-heading {
+  text-align: center;
+  margin-inline: auto;
+}
+.section-heading .st-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  color: var(--gold-bright);
+  font-size: 1.6rem;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.7);
+}
+.section-heading .st-sub {
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  color: var(--gold-dim);
+}
+.rule-gold {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim), transparent);
+}
+
+/* --- Progress / meter bars --- */
+.meter {
+  position: relative;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+.meter > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+}
+.meter-xp > span {
+  background: linear-gradient(90deg, var(--gold-dim), var(--gold-bright));
+}
+.meter-health > span {
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
+}
+
+/* --- Resource pill (top bar) --- */
+.res-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(26, 21, 16, 0.9), rgba(12, 10, 8, 0.95));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* small utility: tabular numerals everywhere numbers matter */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Season Pass premium unlock animation --- */
+@keyframes sp-unlock {
+  0% {
+    transform: scale(0.9) rotateY(90deg);
+    filter: grayscale(1) brightness(0.5);
+    opacity: 0.3;
+  }
+  45% {
+    transform: scale(1.12) rotateY(0deg);
+    filter: grayscale(0) brightness(1.5);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.97);
+  }
+  100% {
+    transform: scale(1);
+    filter: grayscale(0) brightness(1);
+    opacity: 1;
+  }
+}
+.sp-unlocking {
+  animation: sp-unlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes sp-lockbreak {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1.4) rotate(-12deg);
+  }
+  100% {
+    transform: scale(2.2) rotate(20deg) translateY(-8px);
+    opacity: 0;
+  }
+}
+.sp-lockbreak {
+  animation: sp-lockbreak 0.45s ease-in both;
+}
+
+@keyframes sp-flash {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  40% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.4);
+  }
+}
+.sp-flash {
+  animation: sp-flash 0.7s ease-out both;
+}
+
+@keyframes sp-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-7px); }
+  40%, 80% { transform: translateX(7px); }
+}
+.sp-shake {
+  animation: sp-shake 0.4s ease-in-out both;
+}
+
+/* --- Unspent hero points — slow gold pulse so the player can't miss it --- */
+@keyframes points-pulse {
+  0%,
+  100% {
+    border-color: var(--border-gold-strong);
+    box-shadow: 0 0 0 0 rgba(212, 168, 67, 0);
+  }
+  50% {
+    border-color: var(--gold-bright);
+    box-shadow: 0 0 16px 1px rgba(240, 205, 120, 0.45);
+  }
+}
+.points-pulse {
+  animation: points-pulse 1.6s ease-in-out infinite;
+}
+
+/* --- Wheel of Fortune spin effects --- */
+/* pulsing gold halo on the rim while the wheel spins */
+@keyframes wheel-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 40px -8px rgba(0, 0, 0, 0.9),
+      0 0 26px -4px rgba(212, 168, 67, 0.35),
+      inset 0 0 20px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 40px -8px rgba(0, 0, 0, 0.9),
+      0 0 60px 0 rgba(240, 205, 120, 0.7),
+      inset 0 0 20px rgba(0, 0, 0, 0.6);
+  }
+}
+.wheel-glow {
+  animation: wheel-glow 0.8s ease-in-out infinite;
+}
+
+/* carnival bulbs around the rim — alternate blink while spinning */
+.wheel-bulb {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #ffe9b0, #caa24a 70%);
+  box-shadow: 0 0 4px rgba(240, 205, 120, 0.5);
+}
+@keyframes wheel-bulb-blink {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px 2px rgba(240, 205, 120, 0.9); }
+  50% { opacity: 0.25; box-shadow: none; }
+}
+.wheel-bulb-on {
+  animation: wheel-bulb-blink 0.4s ease-in-out infinite;
+}
+
+/* pointer flaps fast against the pegs while spinning */
+@keyframes wheel-pointer-tick {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-16deg); }
+  70% { transform: rotate(7deg); }
+}
+.wheel-pointer-tick {
+  transform-origin: 50% 0;
+  animation: wheel-pointer-tick 0.22s ease-in-out infinite;
+}
+
+/* winning wedge flashes white when the wheel stops */
+@keyframes wheel-win-flash {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.wheel-win-flash {
+  animation: wheel-win-flash 0.7s ease-out 3 both;
+}
+
+/* result banner pops in with an overshoot */
+@keyframes wheel-pop {
+  0% { transform: scale(0.5); opacity: 0; }
+  60% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.wheel-pop {
+  animation: wheel-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* confetti particles bursting out of the wheel hub */
+@keyframes wheel-confetti {
+  0% { transform: translate(0, 0) scale(0.6) rotate(0deg); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(1.15) rotate(var(--rot)); opacity: 0; }
+}
+.wheel-confetti {
+  animation: wheel-confetti 1.1s cubic-bezier(0.1, 0.7, 0.4, 1) both;
+}
+
+/* ===== war alerts — live attack/spy/message toasts (WarAlerts.tsx) ===== */
+
+/* toast shell: dark panel with a pulsing glow tinted by --alert-accent */
+.war-alert {
+  --alert-accent: 240 205 120;
+  border: 1px solid rgb(var(--alert-accent) / 0.55);
+  background:
+    linear-gradient(to bottom, rgb(var(--alert-accent) / 0.1), transparent 40%),
+    linear-gradient(to bottom, #1a1526, #0e0b16);
+  animation: war-alert-glow 1.6s ease-in-out infinite;
+}
+@keyframes war-alert-glow {
+  0%, 100% {
+    box-shadow:
+      0 8px 30px rgb(0 0 0 / 0.6),
+      0 0 14px rgb(var(--alert-accent) / 0.35);
+  }
+  50% {
+    box-shadow:
+      0 8px 30px rgb(0 0 0 / 0.6),
+      0 0 26px 4px rgb(var(--alert-accent) / 0.55);
+  }
+}
+
+/* entrance: drops in from above with an overshoot */
+@keyframes war-alert-in {
+  0% { transform: translateY(-130%) scale(0.92); opacity: 0; }
+  60% { transform: translateY(6%) scale(1.02); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.war-alert-in {
+  animation:
+    war-alert-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    war-alert-glow 1.6s ease-in-out 0.45s infinite;
+}
+
+/* battle alerts rattle after landing */
+@keyframes war-alert-shake {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -5px 0; }
+  40% { translate: 4px 0; }
+  60% { translate: -3px 0; }
+  80% { translate: 2px 0; }
+}
+.war-alert-shake {
+  animation:
+    war-alert-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+    war-alert-shake 0.35s ease-out 0.45s 2,
+    war-alert-glow 1.6s ease-in-out 0.45s infinite;
+}
+
+/* auto-dismiss countdown bar — shrinks toward the left (RTL) */
+.war-alert-timer {
+  background: rgb(var(--alert-accent) / 0.7);
+  transform-origin: 100% 50%;
+  animation: war-alert-timer linear both;
+}
+@keyframes war-alert-timer {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* full-screen red vignette: three alarm pulses when an attack lands */
+.war-vignette {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgb(220 38 38 / 0.35) 100%
+  );
+  animation: war-vignette 0.8s ease-in-out 3 both;
+}
+@keyframes war-vignette {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
 }

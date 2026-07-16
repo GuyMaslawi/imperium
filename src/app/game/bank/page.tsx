@@ -10,7 +10,8 @@ import {
 import { formatGameTime, nextDailyUpdate } from "@/lib/game/time";
 import { formatDate, formatNumber } from "@/lib/game/format";
 import { BankActions } from "@/components/game/BankActions";
-import { Card, CardTitle } from "@/components/ui/Card";
+import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Card } from "@/components/ui/Card";
 
 export const metadata = { title: "בנק | אימפריום" };
 
@@ -53,153 +54,159 @@ export default async function BankPage() {
     take: 10,
   });
 
-  const summaryCards = [
-    { label: "זהב זמין", icon: "🪙", value: formatNumber(availableGold) },
-    { label: "זהב בבנק", icon: "🏦", value: formatNumber(bankGold) },
-    { label: "ריבית נוכחית", icon: "📈", value: ratePercent },
-    { label: "ריבית בעדכון הקרוב", icon: "💰", value: formatNumber(nextInterest) },
-    {
-      label: "הפקדות זמינות",
-      icon: "📥",
-      value: `${remainingDeposits.toLocaleString("he-IL")} מתוך ${allowedDeposits.toLocaleString("he-IL")}`,
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-zinc-100">בנק 🏦</h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          הפקד זהב, צבור ריבית ומשוך את הזהב שלך בזמן הנכון.
-        </p>
-      </div>
+      <SectionHeading title="בנק" subtitle="BANK" ornament="🏦" />
 
-      {/* -------- summary cards -------- */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        {summaryCards.map((card) => (
-          <Card key={card.label} className="p-4">
-            <p className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <span aria-hidden>{card.icon}</span>
-              {card.label}
-            </p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-zinc-100">
-              {card.value}
-            </p>
-          </Card>
-        ))}
-      </div>
-
-      {/* -------- interest forecast -------- */}
-      <Card className="space-y-1 text-sm">
-        {bankGold > 0 ? (
-          <>
-            <p className="text-zinc-300">
-              ריבית נוכחית:{" "}
-              <span className="font-bold text-gold">{ratePercent}</span>
-            </p>
-            <p className="text-zinc-300">
-              תקבל בעדכון היומי הקרוב:{" "}
-              <span className="font-bold tabular-nums text-gold">
-                {formatNumber(nextInterest)} זהב
-              </span>
-            </p>
-          </>
-        ) : (
-          <p className="text-zinc-400">
-            אין זהב בבנק — לא תתקבל ריבית בעדכון הקרוב.
-          </p>
-        )}
-        <p className="text-zinc-300">
-          הפקדות זמינות:{" "}
-          <span className="font-bold tabular-nums text-zinc-100">
-            {remainingDeposits.toLocaleString("he-IL")} מתוך{" "}
-            {allowedDeposits.toLocaleString("he-IL")}
-          </span>
-        </p>
-        <p className="text-zinc-300">
-          העדכון היומי הבא:{" "}
-          <span className="font-bold tabular-nums text-gold" dir="ltr">
-            {nextDailyLabel}
-          </span>
-        </p>
-      </Card>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* -------- deposit / withdraw -------- */}
-        <BankActions
-          availableGold={availableGold}
-          bankGold={bankGold}
-          storedGold={storedGold}
-          remainingDeposits={remainingDeposits}
-        />
-
-        <div className="flex flex-col gap-4">
-          {/* -------- bank upgrades summary -------- */}
-          <Card>
-            <CardTitle icon="📈">שדרוגי בנק</CardTitle>
-            <ul className="space-y-3 text-sm">
-              <li className="flex flex-col gap-0.5">
-                <span className="font-semibold text-zinc-100">
-                  {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.icon}{" "}
-                  {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.label} — רמה {depositLevel}
+      {/* -------- central bank card -------- */}
+      <div className="panel-gold rounded-xl p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span aria-hidden className="text-3xl">🏦</span>
+            <div>
+              <h2 className="text-xl font-black text-gold-bright">הבנק המרכזי</h2>
+              <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
+                <span aria-hidden>●</span>
+                פעיל · דרגה{" "}
+                <span className="nums" dir="ltr">
+                  {interestLevel}
                 </span>
-                <span className="text-xs text-zinc-400">
-                  {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.effectLabel(depositLevel)}
-                </span>
-              </li>
-              <li className="flex flex-col gap-0.5">
-                <span className="font-semibold text-zinc-100">
-                  {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.icon}{" "}
-                  {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.label} — רמה {interestLevel}
-                </span>
-                <span className="text-xs text-zinc-400">
-                  {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.effectLabel(interestLevel)}
-                </span>
-              </li>
-            </ul>
-            <Link
-              href="/game/upgrades"
-              className="mt-4 inline-block rounded-lg border border-gold-dim px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
-            >
-              עבור לשדרוגים
-            </Link>
-          </Card>
-
-          {/* -------- transaction history -------- */}
-          <Card>
-            <CardTitle icon="📜">תנועות אחרונות</CardTitle>
-            {transactions.length === 0 ? (
-              <p className="text-sm text-zinc-500">אין עדיין תנועות בבנק.</p>
-            ) : (
-              <ul className="divide-y divide-border-subtle text-sm">
-                {transactions.map((transaction) => {
-                  const meta = TRANSACTION_META[transaction.type];
-                  return (
-                    <li
-                      key={transaction.id}
-                      className="flex items-center justify-between gap-3 py-2"
-                    >
-                      <span className="flex items-center gap-2 text-zinc-300">
-                        <span aria-hidden>{meta.icon}</span>
-                        {meta.label}
-                      </span>
-                      <span className="flex flex-col items-end">
-                        <span className={`font-bold tabular-nums ${meta.color}`} dir="ltr">
-                          {meta.sign}
-                          {formatNumber(transaction.amount)}
-                        </span>
-                        <span className="text-xs text-zinc-500">
-                          {formatDate(transaction.createdAt)} · יתרה:{" "}
-                          {formatNumber(transaction.balanceAfter)}
-                        </span>
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </Card>
+              </p>
+            </div>
+          </div>
+          <div className="text-left">
+            <p className="text-xs uppercase tracking-widest text-gold-dim">
+              יתרה בבנק
+            </p>
+            <p className="nums mt-0.5 text-3xl font-black text-gold-bright" dir="ltr">
+              {formatNumber(bankGold)}
+            </p>
+          </div>
         </div>
+      </div>
+
+      {/* -------- deposit / withdraw + daily stats -------- */}
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <BankActions
+            availableGold={availableGold}
+            bankGold={bankGold}
+            storedGold={storedGold}
+            remainingDeposits={remainingDeposits}
+          />
+        </div>
+
+        <Card variant="gold" className="space-y-3">
+          <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
+            <span aria-hidden>📈</span>
+            תשואה יומית
+          </h3>
+          <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
+            +{formatNumber(nextInterest)}
+            <span className="mr-1 text-sm font-semibold text-emerald-400/70">
+              זהב/יום
+            </span>
+          </p>
+          <div className="rule-gold" />
+          <p className="text-sm text-zinc-300">
+            ריבית נוכחית:{" "}
+            <span className="nums font-bold text-gold" dir="ltr">
+              {ratePercent}
+            </span>
+          </p>
+          <p className="text-sm text-zinc-300">
+            הפקדות זמינות להיום:{" "}
+            <span className="nums font-bold text-gold-bright" dir="ltr">
+              {remainingDeposits.toLocaleString("he-IL")} /{" "}
+              {allowedDeposits.toLocaleString("he-IL")}
+            </span>
+          </p>
+          <p className="text-sm text-zinc-300">
+            העדכון היומי הבא:{" "}
+            <span className="nums font-bold text-gold-bright" dir="ltr">
+              {nextDailyLabel}
+            </span>
+          </p>
+        </Card>
+      </div>
+
+      {/* -------- bank upgrades summary + transaction history -------- */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Card>
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <span aria-hidden>📈</span>
+            שדרוגי בנק
+          </h3>
+          <ul className="space-y-3 text-sm">
+            <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
+              <span className="font-semibold text-zinc-100">
+                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.icon}{" "}
+                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.label} — רמה{" "}
+                <span className="nums" dir="ltr">
+                  {depositLevel}
+                </span>
+              </span>
+              <span className="text-xs text-gold-dim">
+                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.effectLabel(depositLevel)}
+              </span>
+            </li>
+            <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
+              <span className="font-semibold text-zinc-100">
+                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.icon}{" "}
+                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.label} — רמה{" "}
+                <span className="nums" dir="ltr">
+                  {interestLevel}
+                </span>
+              </span>
+              <span className="text-xs text-gold-dim">
+                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.effectLabel(interestLevel)}
+              </span>
+            </li>
+          </ul>
+          <Link
+            href="/game/upgrades"
+            className="btn btn-ghost mt-4 px-4 py-2 text-sm"
+          >
+            עבור לשדרוגים
+          </Link>
+        </Card>
+
+        <Card>
+          <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <span aria-hidden>📜</span>
+            תנועות אחרונות
+          </h3>
+          {transactions.length === 0 ? (
+            <p className="text-sm text-zinc-500">אין עדיין תנועות בבנק.</p>
+          ) : (
+            <ul className="divide-y divide-border-subtle text-sm">
+              {transactions.map((transaction) => {
+                const meta = TRANSACTION_META[transaction.type];
+                return (
+                  <li
+                    key={transaction.id}
+                    className="flex items-center justify-between gap-3 py-2"
+                  >
+                    <span className="flex items-center gap-2 text-zinc-300">
+                      <span aria-hidden>{meta.icon}</span>
+                      {meta.label}
+                    </span>
+                    <span className="flex flex-col items-end">
+                      <span className={`nums font-bold ${meta.color}`} dir="ltr">
+                        {meta.sign}
+                        {formatNumber(transaction.amount)}
+                      </span>
+                      <span className="nums text-xs text-zinc-500" dir="ltr">
+                        {formatDate(transaction.createdAt)} · יתרה:{" "}
+                        {formatNumber(transaction.balanceAfter)}
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Card>
       </div>
     </div>
   );

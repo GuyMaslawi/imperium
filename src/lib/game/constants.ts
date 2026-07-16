@@ -114,11 +114,19 @@ export const RESOURCE_TO_MINE: Record<StorableResource, ProductionBuildingType> 
 
 /* ------------------------------ mines ------------------------------ */
 
-export const MINE_MAX_LEVEL = 500;
+/**
+ * Highest mine level. Yield per slave runs 0, 2, 4, … up to 500, so the top
+ * level is 250 (level × 2 = 500).
+ */
+export const MINE_MAX_LEVEL = 250;
 
-/** Production per assigned mine slave per regular update. Each level adds +5. */
+/**
+ * Production per assigned mine slave per regular update. The yield runs
+ * 0, 2, 4, … up to 500 (level × 2) — an unupgraded mine (level 0) produces
+ * nothing until it is upgraded.
+ */
 export function mineProductionValue(level: number): number {
-  return 5 + level * 5;
+  return level * 2;
 }
 
 /** Production per regular update = assigned mine slaves * production value. */
@@ -126,12 +134,17 @@ export function mineProductionPerTick(level: number, assignedSlaves: number): nu
   return assignedSlaves * mineProductionValue(level);
 }
 
+/**
+ * Cost to upgrade a mine from `level` to `level + 1`. Priced by the next
+ * tier so the first upgrade (level 0 → 1) is never free.
+ */
 export function mineUpgradeCost(level: number) {
+  const tier = level + 1;
   return {
-    gold: Math.round(500 * level * 1.5),
-    wood: Math.round(300 * level * 1.4),
-    iron: Math.round(300 * level * 1.4),
-    stone: Math.round(250 * level * 1.4),
+    gold: Math.round(500 * tier * 1.5),
+    wood: Math.round(300 * tier * 1.4),
+    iron: Math.round(300 * tier * 1.4),
+    stone: Math.round(250 * tier * 1.4),
   };
 }
 
@@ -236,6 +249,11 @@ export function citizensPerDailyUpdate(citizenGrowthLevel: number): number {
   return 20 + citizenGrowthLevel * 5;
 }
 
+/** Diamonds received on each daily update. */
+export function diamondsPerDailyUpdate(diamondYieldLevel: number): number {
+  return diamondYieldLevel;
+}
+
 /** Spy mission success chance, capped at 90%. */
 export function spySuccessChance(intelligenceLevel: number): number {
   return Math.min(0.9, 0.6 + intelligenceLevel * 0.03);
@@ -272,6 +290,12 @@ export const EMPIRE_UPGRADE_META: Record<EmpireUpgradeType, EmpireUpgradeMeta> =
     icon: "👥",
     description: "מגדיל את כמות האזרחים שמתקבלת בכל עדכון יומי.",
     effectLabel: (level) => `${citizensPerDailyUpdate(level)} אזרחים בכל עדכון יומי`,
+  },
+  DIAMOND_YIELD: {
+    label: "מכרה יהלומים",
+    icon: "💎",
+    description: "מגדיל את כמות היהלומים שמתקבלת בכל עדכון יומי.",
+    effectLabel: (level) => `${diamondsPerDailyUpdate(level)} יהלומים בכל עדכון יומי`,
   },
   INTELLIGENCE: {
     label: "מודיעין",
@@ -338,3 +362,11 @@ export const DEFENSE_BONUS = 1.2;
 
 /** Winner steals up to 10% of defender resources. */
 export const PLUNDER_RATE = 0.1;
+
+/**
+ * Enslavement: a winning attack enslaves part of the defender's soldiers when
+ * the defender has more than 19 of them. The haul scales with the defender's
+ * army size and lands in the attacker's free mine-slave pool (not citizens).
+ */
+export const ENSLAVE_MIN_SOLDIERS = 20;
+export const ENSLAVE_RATE = 0.1;

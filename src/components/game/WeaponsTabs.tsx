@@ -46,16 +46,14 @@ export function WeaponsTabs({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 rounded-xl border border-border-subtle bg-surface p-1">
+      <div className="flex flex-wrap justify-center gap-2">
         {tabs.map((tab) => (
           <button
             key={tab.category}
             type="button"
             onClick={() => setActiveCategory(tab.category)}
-            className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold transition-colors ${
-              tab.category === active.category
-                ? "bg-gold/15 text-gold"
-                : "text-zinc-400 hover:bg-surface-raised hover:text-zinc-100"
+            className={`btn px-4 py-2 text-sm ${
+              tab.category === active.category ? "btn-dark" : "btn-ghost"
             }`}
           >
             <span aria-hidden>{tab.icon}</span>
@@ -64,14 +62,23 @@ export function WeaponsTabs({
         ))}
       </div>
 
+      {!next && (
+        <div className="panel-gold rounded-xl p-4 text-center text-sm font-bold text-gold-bright">
+          🎉 המפעל במקסימום! כל הנשקים בקטגוריה פתוחים.
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-sm font-semibold text-zinc-300">
+        <p className="text-sm font-semibold text-gold-dim">
           {active.totalPowerLabel}:{" "}
-          <span className="font-bold text-gold">
-            ⚡ {active.totalPower.toLocaleString("he-IL")}
+          <span className="font-bold text-gold-bright">
+            ⚡{" "}
+            <span className="nums" dir="ltr">
+              {active.totalPower.toLocaleString("he-IL")}
+            </span>
           </span>
         </p>
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
+        <div className="flex items-center gap-2 text-xs text-gold-dim">
           <span>מסלול התקדמות:</span>
           <div className="flex items-center gap-1.5" aria-hidden>
             {Array.from({ length: active.maxTier }, (_, i) => (
@@ -87,13 +94,13 @@ export function WeaponsTabs({
               />
             ))}
           </div>
-          <span className="font-bold text-gold">
+          <span className="nums font-bold text-gold-bright" dir="ltr">
             {active.unlockedTier}/{active.maxTier}
           </span>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {unlocked.map(({ weapon, owned }) => (
           <WeaponCard
             key={weapon.key}
@@ -111,12 +118,6 @@ export function WeaponsTabs({
           />
         )}
       </div>
-
-      {!next && (
-        <p className="rounded-xl border border-gold/30 bg-gold/5 p-4 text-center text-sm font-bold text-gold">
-          🏆 כל הנשקים בקטגוריה פתוחים.
-        </p>
-      )}
     </div>
   );
 }

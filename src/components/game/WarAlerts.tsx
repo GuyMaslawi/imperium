@@ -1,0 +1,261 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { getUnreadAlerts, type LiveAlert } from "@/server/actions/messages";
+
+const POLL_MS = 20_000;
+const TOAST_MS = 12_000;
+const MAX_VISIBLE = 4;
+const SEEN_KEY = "warzone-alerts-seen";
+const SEEN_CAP = 200;
+
+type KindStyle = {
+  icon: string;
+  tag: string;
+  /** rgb triplet for the pulsing glow + accent, e.g. "239 68 68" */
+  accent: string;
+  tagClass: string;
+};
+
+const KIND_STYLE: Record<LiveAlert["kind"], KindStyle> = {
+  BATTLE: {
+    icon: "⚔️",
+    tag: "התקפה",
+    accent: "239 68 68",
+    tagClass: "bg-red-600 text-white",
+  },
+  SPY: {
+    icon: "🕵️",
+    tag: "ריגול",
+    accent: "168 85 247",
+    tagClass: "bg-purple-600 text-white",
+  },
+  SYSTEM: {
+    icon: "✉️",
+    tag: "הודעה",
+    accent: "240 205 120",
+    tagClass: "bg-amber-500 text-black",
+  },
+};
+
+function loadSeen(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeen(seen: Set<string>) {
+  try {
+    localStorage.setItem(
+      SEEN_KEY,
+      JSON.stringify([...seen].slice(-SEEN_CAP)),
+    );
+  } catch {
+    // localStorage unavailable — alerts may repeat on reload, harmless.
+  }
+}
+
+/** Short synthesized war-horn — no audio asset needed. Best-effort: the
+ *  browser blocks audio until the user has interacted with the page. */
+function playHorn(kind: LiveAlert["kind"]) {
+  try {
+    const ctx = new AudioContext();
+    if (ctx.state === "suspended") {
+      void ctx.close();
+      return;
+    }
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const base = kind === "BATTLE" ? 110 : kind === "SPY" ? 196 : 330;
+    osc.type = kind === "BATTLE" ? "sawtooth" : "triangle";
+    osc.frequency.setValueAtTime(base, t);
+    osc.frequency.exponentialRampToValueAtTime(base * 1.5, t + 0.18);
+    osc.frequency.exponentialRampToValueAtTime(base * 0.85, t + 0.7);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(0.14, t + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 1.05);
+    osc.onended = () => void ctx.close();
+  } catch {
+    // No audio — the visual alert still fires.
+  }
+}
+
+/**
+ * Live war-room notifications: polls the inbox and pops a dramatic toast the
+ * moment the player is attacked, spied on, or receives a message. A BATTLE
+ * alert also flashes a red vignette across the whole screen so it can't be
+ * missed. Dismissing a toast does NOT mark the message read — the inbox badge
+ * stays until the player actually opens the messages page.
+ */
+export function WarAlerts() {
+  const router = useRouter();
+  const [toasts, setToasts] = useState<LiveAlert[]>([]);
+  const [vignetteKey, setVignetteKey] = useState(0);
+  const seenRef = useRef<Set<string> | null>(null);
+  const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+
+  const dismiss = useCallback((id: string) => {
+    const timer = timersRef.current.get(id);
+    if (timer) clearTimeout(timer);
+    timersRef.current.delete(id);
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  useEffect(() => {
+    seenRef.current ??= loadSeen();
+    let cancelled = false;
+
+    const poll = async (initial: boolean) => {
+      const alerts = await getUnreadAlerts();
+      const seen = seenRef.current;
+      if (cancelled || !seen) return;
+      const fresh = alerts.filter((alert) => !seen.has(alert.id));
+      if (fresh.length === 0) return;
+
+      fresh.forEach((alert) => seen.add(alert.id));
+      saveSeen(seen);
+
+      setToasts((prev) => {
+        const next = [...prev, ...fresh];
+        // Overflowing toasts: drop the oldest, their timers included.
+        const dropped = next.slice(0, Math.max(0, next.length - MAX_VISIBLE));
+        dropped.forEach((toast) => {
+          const timer = timersRef.current.get(toast.id);
+          if (timer) clearTimeout(timer);
+          timersRef.current.delete(toast.id);
+        });
+        return next.slice(-MAX_VISIBLE);
+      });
+      fresh.forEach((alert) => {
+        timersRef.current.set(
+          alert.id,
+          setTimeout(() => dismiss(alert.id), TOAST_MS),
+        );
+      });
+
+      if (fresh.some((alert) => alert.kind === "BATTLE")) {
+        setVignetteKey((key) => key + 1);
+      }
+      if (!initial) {
+        playHorn(
+          fresh.find((alert) => alert.kind === "BATTLE")?.kind ??
+            fresh[fresh.length - 1].kind,
+        );
+        // New messages arrived mid-session — refresh the sidebar badges too.
+        router.refresh();
+      }
+    };
+
+    void poll(true);
+    const interval = setInterval(() => void poll(false), POLL_MS);
+    const onFocus = () => void poll(false);
+    window.addEventListener("focus", onFocus);
+    const timers = timersRef.current;
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, [dismiss, router]);
+
+  return (
+    <>
+      {/* full-screen red flash when an attack lands */}
+      {vignetteKey > 0 && (
+        <div
+          key={vignetteKey}
+          aria-hidden
+          className="war-vignette pointer-events-none fixed inset-0 z-[90]"
+        />
+      )}
+
+      <div
+        dir="rtl"
+        aria-live="assertive"
+        className="fixed left-1/2 top-3 z-[100] flex w-[min(92vw,26rem)] -translate-x-1/2 flex-col gap-2"
+      >
+        {toasts.map((toast) => {
+          const style = KIND_STYLE[toast.kind];
+          const inner = (
+            <div className="flex items-start gap-3 p-3">
+              <span
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border text-xl"
+                style={{
+                  borderColor: `rgb(${style.accent} / 0.5)`,
+                  background: `linear-gradient(to bottom, rgb(${style.accent} / 0.18), rgb(0 0 0 / 0.4))`,
+                }}
+              >
+                {style.icon}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded px-1.5 py-px text-[10px] font-black uppercase tracking-wider ${style.tagClass}`}
+                  >
+                    {style.tag}
+                  </span>
+                  <span className="truncate text-sm font-black text-gold-bright">
+                    {toast.title}
+                  </span>
+                </div>
+                <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-zinc-300">
+                  {toast.body}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="סגירה"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  dismiss(toast.id);
+                }}
+                className="-m-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
+              >
+                ✕
+              </button>
+            </div>
+          );
+
+          return (
+            <div
+              key={toast.id}
+              className={`war-alert war-alert-in overflow-hidden rounded-lg ${
+                toast.kind === "BATTLE" ? "war-alert-shake" : ""
+              }`}
+              style={{ "--alert-accent": style.accent } as React.CSSProperties}
+            >
+              {toast.href ? (
+                <Link
+                  href={toast.href}
+                  onClick={() => dismiss(toast.id)}
+                  className="block transition-colors hover:bg-white/5"
+                >
+                  {inner}
+                </Link>
+              ) : (
+                inner
+              )}
+              {/* auto-dismiss countdown */}
+              <div
+                className="war-alert-timer h-0.5"
+                style={{ animationDuration: `${TOAST_MS}ms` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
