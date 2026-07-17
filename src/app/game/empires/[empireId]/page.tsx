@@ -13,6 +13,9 @@ import {
 import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
+import { ItemTile } from "@/components/game/ItemTile";
+import { itemDetails, uiRarity } from "@/components/game/heroItemView";
+import { SLOT_META, SLOT_ORDER } from "@/lib/game/hero";
 
 export const metadata = { title: "פרופיל אימפריה | אימפריום" };
 
@@ -22,16 +25,6 @@ const SPY_REPORT_TTL_MS = 24 * 60 * 60 * 1000;
 function recentSpyCutoff(): Date {
   return new Date(Date.now() - SPY_REPORT_TTL_MS);
 }
-
-/** Decorative active-equipment slots (visual flavor only). */
-const EQUIPMENT: { icon: string; name: string }[] = [
-  { icon: "🪖", name: "קסדה" },
-  { icon: "🛡️", name: "שריון" },
-  { icon: "🗡️", name: "נשק" },
-  { icon: "🔰", name: "מגן" },
-  { icon: "🥾", name: "נעליים" },
-  { icon: "🧤", name: "כפפות" },
-];
 
 export default async function EmpireProfilePage({
   params,
@@ -43,9 +36,20 @@ export default async function EmpireProfilePage({
 
   const empire = await prisma.empire.findUnique({
     where: { id: empireId },
-    include: { army: true, user: true, season: true, weapons: true },
+    include: {
+      army: true,
+      user: true,
+      season: true,
+      weapons: true,
+      hero: { include: { items: { where: { equipped: true } } } },
+    },
   });
   if (!empire) notFound();
+
+  const hero = empire.hero;
+  const heroLevel = hero?.level ?? 1;
+  const heroResets = hero?.resets ?? 0;
+  const equippedBySlot = new Map((hero?.items ?? []).map((item) => [item.slot, item]));
 
   const isMe = empire.id === myEmpire.id;
 
@@ -153,6 +157,20 @@ export default async function EmpireProfilePage({
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">
                   ⚡ {formatNumber(generalPower)}
+                </span>
+                <span
+                  className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
+                  title="רמת הגיבור"
+                >
+                  ⚔ גיבור{" "}
+                  <span className="nums" dir="ltr">
+                    {heroLevel}
+                  </span>
+                  {heroResets > 0 && (
+                    <span className="nums text-purple-300" dir="ltr" title={`הגיבור אופס ${heroResets} פעמים ברמה 100`}>
+                      ↻×{heroResets}
+                    </span>
+                  )}
                 </span>
                 <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
                   100 ❤️
@@ -310,27 +328,69 @@ export default async function EmpireProfilePage({
         )}
       </div>
 
-      {/* -------- active equipment (decorative) -------- */}
+      {/* -------- hero equipment (live) -------- */}
       <div className="panel rounded-xl p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>🗡️</span>
-          ציוד פעיל
-        </h3>
-        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6">
-          {EQUIPMENT.map((slot, i) => (
-            <div key={i} className="flex flex-col items-center gap-1">
-              <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-border-subtle bg-panel-inset text-2xl">
-                <span aria-hidden>{slot.icon}</span>
-              </div>
-              <span className="text-[11px] text-zinc-500">{slot.name}</span>
-            </div>
-          ))}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <span aria-hidden>🗡️</span>
+            ציוד הגיבור
+          </h3>
+          <span className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
+            ⚔ גיבור רמה{" "}
+            <span className="nums" dir="ltr">
+              {heroLevel}
+            </span>
+            {heroResets > 0 && (
+              <span className="nums text-purple-300" dir="ltr">
+                ↻×{heroResets}
+              </span>
+            )}
+          </span>
         </div>
-        <p className="mt-3 text-xs text-zinc-600">
-          {isMe
-            ? "מערכת חפצי הגיבור תיפתח בהמשך."
-            : "ציוד הגיבור של היריב ייחשף כשמערכת הגיבורים תתווסף."}
-        </p>
+        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-9">
+          {SLOT_ORDER.map((slot) => {
+            const meta = SLOT_META[slot];
+            const item = equippedBySlot.get(slot);
+            if (!item) {
+              return (
+                <div key={slot} className="flex flex-col items-center gap-1">
+                  <div className="panel-inset flex aspect-square w-full items-center justify-center rounded-xl">
+                    <span aria-hidden className="text-3xl opacity-25 grayscale">
+                      {meta.icon}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-zinc-600">{meta.label}</span>
+                </div>
+              );
+            }
+            return (
+              <ItemTile
+                key={slot}
+                slug={meta.slug}
+                icon={meta.icon}
+                level={item.level}
+                name={meta.label}
+                rarity={uiRarity(item.rarity)}
+                details={itemDetails(item, heroLevel, { equipped: true })}
+              />
+            );
+          })}
+        </div>
+        {equippedBySlot.size === 0 && (
+          <p className="mt-3 text-xs text-zinc-600">
+            {isMe
+              ? "הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד הגיבור."
+              : "הגיבור של היריב אינו לובש ציוד כרגע."}
+          </p>
+        )}
+        {isMe && equippedBySlot.size > 0 && (
+          <Link
+            href="/game/hero"
+            className="mt-3 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
+          >
+            ניהול הגיבור ←
+          </Link>
+        )}
       </div>
 
       {/* -------- player description -------- */}

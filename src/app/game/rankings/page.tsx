@@ -32,7 +32,7 @@ export default async function RankingsPage() {
   );
 
   const empires = await prisma.empire.findMany({
-    include: { army: true, weapons: true },
+    include: { army: true, weapons: true, hero: true },
   });
 
   const ranked = empires
@@ -152,7 +152,23 @@ export default async function RankingsPage() {
                           </span>
                         )}
                         <div className="mt-0.5 flex items-center gap-2">
-                          <span className="text-[11px] text-zinc-500">קשת</span>
+                          <span className="text-[11px] text-zinc-500">גיבור</span>
+                          <span
+                            className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[10px] font-bold text-gold-bright"
+                            dir="ltr"
+                            title={`רמת הגיבור: ${empire.hero?.level ?? 1}`}
+                          >
+                            ⚔ {empire.hero?.level ?? 1}
+                          </span>
+                          {(empire.hero?.resets ?? 0) > 0 && (
+                            <span
+                              className="nums rounded-full border border-purple-400/50 bg-purple-950/60 px-1.5 text-[10px] font-black text-purple-300"
+                              dir="ltr"
+                              title={`הגיבור אופס ${empire.hero!.resets} פעמים ברמה 100`}
+                            >
+                              ↻×{empire.hero!.resets}
+                            </span>
+                          )}
                           <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
                             100 ❤️
                           </span>
