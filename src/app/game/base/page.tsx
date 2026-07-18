@@ -129,7 +129,7 @@ export default async function BasePage() {
 
       {/* wheel + season events */}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <WheelCard spinsAvailable={4} seasonDay={wheelSeasonDay} />
+        <WheelCard spinsAvailable={empire.wheelSpins} seasonDay={wheelSeasonDay} />
 
         <Card>
           <div className="mb-4 flex items-center justify-between">

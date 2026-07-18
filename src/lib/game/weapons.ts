@@ -38,147 +38,172 @@ export interface WeaponDefinition {
   cost: WeaponCost;
 }
 
-/** Static weapon definitions — not stored as editable DB rows yet. */
-export const WEAPONS: readonly WeaponDefinition[] = [
-  /* ---- attack ---- */
-  {
-    key: "IRON_SWORDS",
-    category: "ATTACK",
-    name: "חרבות ברזל",
-    description: "חרבות בסיסיות ואמינות לחיילי החזית.",
-    tier: 1,
-    power: 5,
-    cost: { gold: 100, wood: 0, iron: 80, stone: 0 },
-  },
-  {
-    key: "BATTLE_BOWS",
-    category: "ATTACK",
-    name: "קשתות קרב",
-    description: "קשתות ארוכות טווח שפוגעות באויב עוד לפני ההתנגשות.",
-    tier: 2,
-    power: 9,
-    cost: { gold: 160, wood: 80, iron: 120, stone: 0 },
-  },
-  {
-    key: "BALLISTAS",
-    category: "ATTACK",
-    name: "בליסטראות",
-    description: "מכונות ירי כבדות שמרסקות שורות שלמות של אויבים.",
-    tier: 3,
-    power: 20,
-    cost: { gold: 450, wood: 250, iron: 300, stone: 120 },
-  },
-  {
-    key: "SIEGE_CANNONS",
-    category: "ATTACK",
-    name: "תותחי מצור",
-    description: "תותחים אדירים שמפילים חומות ומבצרים.",
-    tier: 4,
-    power: 45,
-    cost: { gold: 1200, wood: 400, iron: 900, stone: 600 },
-  },
-  {
-    key: "FLAME_BLADES",
-    category: "ATTACK",
-    name: "להבי אש",
-    description: "להבים אגדיים עטופי אש — נשק העילית של האימפריה.",
-    tier: 5,
-    power: 90,
-    cost: { gold: 3000, wood: 800, iron: 1800, stone: 1000 },
-  },
-  /* ---- defense ---- */
-  {
-    key: "WOODEN_SHIELDS",
-    category: "DEFENSE",
-    name: "מגני עץ",
-    description: "מגנים פשוטים שבולמים את המכות הראשונות.",
-    tier: 1,
-    power: 5,
-    cost: { gold: 80, wood: 120, iron: 40, stone: 0 },
-  },
-  {
-    key: "IRON_ARMOR",
-    category: "DEFENSE",
-    name: "שריון ברזל",
-    description: "שריון כבד שמגן על החיילים בקרב פנים אל פנים.",
-    tier: 2,
-    power: 10,
-    cost: { gold: 170, wood: 80, iron: 160, stone: 0 },
-  },
-  {
-    key: "SPEAR_WALLS",
-    category: "DEFENSE",
-    name: "חומות חניתות",
-    description: "שורות חניתות דחוסות שעוצרות כל הסתערות.",
-    tier: 3,
-    power: 22,
-    cost: { gold: 500, wood: 250, iron: 350, stone: 250 },
-  },
-  {
-    key: "WATCH_TOWERS",
-    category: "DEFENSE",
-    name: "מגדלי שמירה",
-    description: "מגדלים מבוצרים שמזהים את האויב מרחוק ויורים בו מלמעלה.",
-    tier: 4,
-    power: 48,
-    cost: { gold: 1300, wood: 500, iron: 900, stone: 900 },
-  },
-  {
-    key: "IMPERIUM_WALL",
-    category: "DEFENSE",
-    name: "חומת אימפריום",
-    description: "החומה האולטימטיבית — הגנה שאין דומה לה בממלכות.",
-    tier: 5,
-    power: 95,
-    cost: { gold: 3500, wood: 1000, iron: 2000, stone: 1800 },
-  },
-  /* ---- spy ---- */
-  {
-    key: "CAMOUFLAGE_CLOAKS",
-    category: "SPY",
-    name: "גלימות הסוואה",
-    description: "גלימות שמסתירות את המרגלים מעיני השומרים.",
-    tier: 1,
-    power: 4,
-    cost: { gold: 120, wood: 100, iron: 40, stone: 0 },
-  },
-  {
-    key: "SHADOW_DAGGERS",
-    category: "SPY",
-    name: "סכיני צללים",
-    description: "סכינים שקטים למשימות חשאיות במיוחד.",
-    tier: 2,
-    power: 8,
-    cost: { gold: 220, wood: 120, iron: 120, stone: 0 },
-  },
-  {
-    key: "INTEL_RAVENS",
-    category: "SPY",
-    name: "עורבי מודיעין",
-    description: "עורבים מאולפים שמעבירים מסרים ומידע מעבר לקווי האויב.",
-    tier: 3,
-    power: 18,
-    cost: { gold: 650, wood: 400, iron: 250, stone: 200 },
-  },
-  {
-    key: "DISGUISE_RINGS",
-    category: "SPY",
-    name: "טבעות התחזות",
-    description: "טבעות קסומות שמאפשרות למרגל להתחזות לכל אדם.",
-    tier: 4,
-    power: 40,
-    cost: { gold: 1600, wood: 700, iron: 700, stone: 500 },
-  },
-  {
-    key: "SPY_NETWORK",
-    category: "SPY",
-    name: "רשת מרגלים",
-    description: "רשת סוכנים חובקת ממלכות — עיניים ואוזניים בכל מקום.",
-    tier: 5,
-    power: 85,
-    cost: { gold: 4000, wood: 1200, iron: 1500, stone: 1000 },
-  },
+/** Number of weapon tiers per category — 30 per category, 90 in total. */
+export const TIERS_PER_CATEGORY = 30;
+
+/**
+ * Cost & power both double every tier.
+ * Cost rule: gold is always double every other resource, and tier 1 starts at
+ * 50 gold / 25 of each other resource — so tier `t` costs
+ * gold = 50·2^(t-1), wood/iron/stone = 25·2^(t-1).
+ */
+const BASE_GOLD_COST = 50;
+const BASE_OTHER_COST = 25;
+const BASE_POWER: Record<WeaponCategory, number> = {
+  ATTACK: 5,
+  DEFENSE: 5,
+  SPY: 4,
+};
+
+function weaponCostForTier(tier: number): WeaponCost {
+  const mult = 2 ** (tier - 1);
+  return {
+    gold: BASE_GOLD_COST * mult,
+    wood: BASE_OTHER_COST * mult,
+    iron: BASE_OTHER_COST * mult,
+    stone: BASE_OTHER_COST * mult,
+  };
+}
+
+function weaponPowerForTier(category: WeaponCategory, tier: number): number {
+  return BASE_POWER[category] * 2 ** (tier - 1);
+}
+
+/**
+ * Per-tier flavor (name + description), tier 1 → tier 30, ordered from the most
+ * basic weapon up to the ultimate one. Cost and power come from the formulas
+ * above; only the flavor lives here.
+ */
+type WeaponFlavor = readonly [name: string, description: string];
+
+const ATTACK_FLAVOR: readonly WeaponFlavor[] = [
+  ["חרבות ברזל", "חרבות בסיסיות ואמינות לחיילי החזית."],
+  ["קשתות קרב", "קשתות ארוכות טווח שפוגעות באויב עוד לפני ההתנגשות."],
+  ["גרזני מלחמה", "גרזנים כבדים ששוברים מגן ועצם כאחד."],
+  ["רמחי פרשים", "רמחים ארוכים להסתערות פרשים מוחצת."],
+  ["בליסטראות", "מכונות ירי כבדות שמרסקות שורות שלמות של אויבים."],
+  ["איילי ניגוח", "קורות ברזל שמפרקות שערים וחומות."],
+  ["מנגנוני קטפולט", "אבני ענק עפות מעל החומות אל לב האויב."],
+  ["תותחי מצור", "תותחים אדירים שמפילים חומות ומבצרים."],
+  ["רובי אבק שריפה", "נשק חם ראשון ששובר את מערכות הקרב הישנות."],
+  ["להבי אש", "להבים אגדיים עטופי אש — נשק העילית של האימפריה."],
+  ["מטילי להביור", "מכונות שיורות סילוני אש על שדה הקרב."],
+  ["תותחי רעם", "תותחים שקולם לבדו מפיל אימה על האויב."],
+  ["מרגמות ברק", "פגזים שמתפוצצים בברק כחול על הכוחות."],
+  ["רובאי צלפים", "יחידת עילית שפוגעת במפקדי האויב מרחוק."],
+  ["מכונות ירי מהיר", "מטר כדורים בלתי פוסק שמכסה את כל החזית."],
+  ["טנקי פלדה", "מפלצות משוריינות שדורסות כל התנגדות."],
+  ["תותחי ענק", "לוע ברזל שמוחק ביצורים בפגז אחד."],
+  ["משגרי טילים", "טילים מונחים שרודפים את האויב עד חיסולו."],
+  ["מפציצי אש", "מכונות מעופפות שממטירות אש מהשמיים."],
+  ["קרני לייזר", "אלומות אנרגיה שחותכות שריון כמו חמאה."],
+  ["תותחי פלזמה", "כדורי פלזמה בוערים ששורפים כל דבר בדרכם."],
+  ["רובי חלקיקים", "נשק שמפרק את האויב לרמת האטום."],
+  ["משגרי אלקטרומגנט", "פגזים במהירות על-קולית שמנקבים כל מבצר."],
+  ["רחפני נחיל", "נחיל מכונות זעירות שתוקף מכל כיוון בו-זמנית."],
+  ["תותחי חורבן", "נשק כבד שמשאיר מכתשים בשדה הקרב."],
+  ["מחוללי הדף", "גלי הלם שמוחקים גדודים שלמים בבת אחת."],
+  ["להבי אנרגיה טהורה", "חרבות אור שחותכות דרך כל הגנה."],
+  ["תותחי סינגולריות", "נשק שיוצר חור שחור זעיר בלב האויב."],
+  ["משמידי ממדים", "נשק שמוחק את האויב מהמציאות עצמה."],
+  ["יד האימפריום", "הנשק האולטימטיבי — כוח שאין לו אח ורע ביקום."],
 ];
+
+const DEFENSE_FLAVOR: readonly WeaponFlavor[] = [
+  ["מגני עץ", "מגנים פשוטים שבולמים את המכות הראשונות."],
+  ["שריון ברזל", "שריון כבד שמגן על החיילים בקרב פנים אל פנים."],
+  ["קסדות פלדה", "קסדות שמגנות על הלוחמים מפגיעות ראש."],
+  ["שריון קשקשים", "שריון גמיש שסופג מכות ומאפשר תנועה חופשית."],
+  ["חומות חניתות", "שורות חניתות דחוסות שעוצרות כל הסתערות."],
+  ["תעלות הגנה", "תעלות עמוקות שמאטות את הסתערות האויב."],
+  ["סוללות עפר", "סוללות מבוצרות שמגנות על המחנה."],
+  ["מגדלי שמירה", "מגדלים מבוצרים שיורים באויב מלמעלה."],
+  ["חומות אבן", "חומות עבות שעומדות בפני כל מצור."],
+  ["חומת אימפריום", "החומה האיתנה שסביבה נבנתה הממלכה."],
+  ["שערי ברזל", "שערים כבדים שאף איל ניגוח לא שובר."],
+  ["מבצרי פלדה", "מצודות ממתכת שאין דרך לחדור אליהן."],
+  ["מגיני מצור", "מערך הגנה שסופג פגזי קטפולט ותותח."],
+  ["שריון מרוכב", "שכבות מתכת מרובות שסופגות כל פגיעה."],
+  ["כיפת מגן", "מערך שמיירט קליעים לפני שהם פוגעים."],
+  ["בונקרים מבוצרים", "מקלטים תת-קרקעיים שאי אפשר לפצח."],
+  ["חומות ריאקטיביות", "שריון שמתפוצץ החוצה ומנטרל פגזים."],
+  ["מגני אנרגיה", "שדות כוח שבולמים את אש האויב."],
+  ["כיפת ברזל", "מערך יירוט שמפיל כל טיל באוויר."],
+  ["מגן פלזמה", "קיר פלזמה בוער ששורף כל מתקרב."],
+  ["שדות כוח", "מחסום אנרגיה בלתי חדיר סביב המבצר."],
+  ["שריון ננו", "שריון שמתקן את עצמו תוך שניות."],
+  ["מגני עקיפה", "טכנולוגיה שמסיטה קליעים מהמסלול."],
+  ["מבצר מרחף", "מצודה מעופפת שאי אפשר להגיע אליה."],
+  ["חומות קוונטיות", "הגנה שקיימת בכמה ממדים בו-זמנית."],
+  ["מגן סינגולריות", "שדה שבולע כל התקפה לתוך עצמו."],
+  ["שריון על-ממדי", "הגנה שהאויב פשוט לא מסוגל לגעת בה."],
+  ["כיפת נצח", "מגן שלא נפרץ מעולם בכל ההיסטוריה."],
+  ["חומת המציאות", "מחסום ששובר את חוקי הפיזיקה עצמם."],
+  ["מבצר האימפריום", "ההגנה האולטימטיבית — בלתי חדירה לחלוטין."],
+];
+
+const SPY_FLAVOR: readonly WeaponFlavor[] = [
+  ["גלימות הסוואה", "גלימות שמסתירות את המרגלים מעיני השומרים."],
+  ["סכיני צללים", "סכינים שקטים למשימות חשאיות במיוחד."],
+  ["כלי פריצה", "ערכות לפתיחת מנעולים ושערים סמויים."],
+  ["תחפושות סוחרים", "מסווה שמאפשר להיכנס לכל עיר בלי חשד."],
+  ["עורבי מודיעין", "עורבים מאולפים שמעבירים מסרים מעבר לקווי האויב."],
+  ["רשת מודיעים", "עיניים ואוזניים בכל פונדק ושוק."],
+  ["סמים מרדימים", "שיקויים שמפילים שומרים בשקט."],
+  ["אבקת היעלמות", "אבקה שמעלימה את המרגל בענן עשן."],
+  ["מפות סתר", "מפות מדויקות של כל ביצורי האויב."],
+  ["טבעות התחזות", "טבעות קסומות שמאפשרות למרגל להתחזות לכל אדם."],
+  ["יוני דואר", "מסרים מוצפנים שעפים מעל קווי האויב."],
+  ["משקפות ליל", "עדשות שרואות בחשכה מוחלטת."],
+  ["מכשירי האזנה", "מכשירים שקולטים כל לחישה בארמון."],
+  ["סוכני עומק", "מרגלים ששתולים שנים בלב האויב."],
+  ["צפני סתרים", "שפה סודית שאיש אינו יכול לפצח."],
+  ["רחפני ריגול", "עיניים מעופפות מעל מחנה האויב."],
+  ["מצלמות זעירות", "עדשות נסתרות שמתעדות כל מסמך."],
+  ["וירוסי מידע", "קוד שגונב תוכניות מארכיוני האויב."],
+  ["רשת לוויינים", "עיניים בשמיים שרואות הכול מלמעלה."],
+  ["פורצי הצפנה", "מכונות ששוברות כל קוד סתרים."],
+  ["שתלי מוח", "טכנולוגיה שקוראת מחשבות של שבויים."],
+  ["מרגלי כפילים", "עותקים מושלמים של מפקדי האויב."],
+  ["רשת עצבים", "רשת שחודרת לכל מערכת מידע של האויב."],
+  ["עיני צל", "חיישנים בלתי נראים בכל פינה בממלכה."],
+  ["פורצי קוונטים", "מחשבים ששוברים כל הצפנה בשבריר שנייה."],
+  ["רוחות רפאים", "סוכנים שאיש לא יודע שהם קיימים."],
+  ["עין כול-רואה", "מערך שרואה כל תנועה בכל הממלכות."],
+  ["תודעת רשת", "בינה שיודעת הכול עוד לפני שזה קורה."],
+  ["עין המציאות", "ריגול שחודר את מסך הזמן עצמו."],
+  ["עין האימפריום", "הריגול האולטימטיבי — שום סוד לא נסתר ממנה."],
+];
+
+const CATEGORY_FLAVOR: Record<WeaponCategory, readonly WeaponFlavor[]> = {
+  ATTACK: ATTACK_FLAVOR,
+  DEFENSE: DEFENSE_FLAVOR,
+  SPY: SPY_FLAVOR,
+};
+
+/** Static weapon definitions, generated from per-tier flavor + cost/power formulas. */
+function buildWeapons(): WeaponDefinition[] {
+  const out: WeaponDefinition[] = [];
+  for (const category of WEAPON_CATEGORIES) {
+    CATEGORY_FLAVOR[category].slice(0, TIERS_PER_CATEGORY).forEach(
+      ([name, description], i) => {
+        const tier = i + 1;
+        out.push({
+          key: `${category}_T${tier}`,
+          category,
+          name,
+          description,
+          tier,
+          power: weaponPowerForTier(category, tier),
+          cost: weaponCostForTier(tier),
+        });
+      }
+    );
+  }
+  return out;
+}
+
+export const WEAPONS: readonly WeaponDefinition[] = buildWeapons();
 
 export function weaponsOfCategory(category: WeaponCategory): WeaponDefinition[] {
   return WEAPONS.filter((w) => w.category === category).sort(
@@ -197,7 +222,7 @@ export function weaponByKey(key: string): WeaponDefinition | undefined {
 /** Every category starts with the first two weapon tiers unlocked. */
 export const INITIAL_WEAPON_UNLOCKED_TIER = 2;
 
-export const MAX_WEAPON_TIER = 5;
+export const MAX_WEAPON_TIER = TIERS_PER_CATEGORY;
 
 /** Cost to unlock tier `currentUnlockedTier + 1` in a category. */
 export function weaponTierUnlockCost(currentUnlockedTier: number): WeaponCost {

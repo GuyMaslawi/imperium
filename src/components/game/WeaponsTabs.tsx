@@ -35,11 +35,12 @@ export function WeaponsTabs({
   );
   const active = tabs.find((tab) => tab.category === activeCategory) ?? tabs[0];
 
-  // Progression path: every unlocked weapon, then only the next locked one
-  // (which can be unlocked). Deeper locked tiers stay hidden.
-  const unlocked = active.weapons.filter(
-    ({ weapon }) => weapon.tier <= active.unlockedTier
-  );
+  // Progression path: the next locked weapon (which can be unlocked) sits at
+  // the top as the most advanced one, followed by every unlocked weapon from
+  // the highest tier down. Deeper locked tiers stay hidden.
+  const unlocked = active.weapons
+    .filter(({ weapon }) => weapon.tier <= active.unlockedTier)
+    .sort((a, b) => b.weapon.tier - a.weapon.tier);
   const next = active.weapons.find(
     ({ weapon }) => weapon.tier === active.unlockedTier + 1
   );
@@ -101,14 +102,6 @@ export function WeaponsTabs({
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {unlocked.map(({ weapon, owned }) => (
-          <WeaponCard
-            key={weapon.key}
-            weapon={weapon}
-            owned={owned}
-            available={available}
-          />
-        ))}
         {next && (
           <NextWeaponCard
             key={next.weapon.key}
@@ -117,6 +110,14 @@ export function WeaponsTabs({
             unlockCost={active.unlockCost}
           />
         )}
+        {unlocked.map(({ weapon, owned }) => (
+          <WeaponCard
+            key={weapon.key}
+            weapon={weapon}
+            owned={owned}
+            available={available}
+          />
+        ))}
       </div>
     </div>
   );

@@ -71,8 +71,8 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           heroLevel={heroLevel}
           heroResets={hero?.resets ?? 0}
           heroPoints={hero?.unspentPoints ?? 0}
-          heroAttackPct={bonuses.total.attack}
-          heroDefensePct={bonuses.total.defense}
+          heroAttackPct={bonuses.totalPct.attack}
+          heroDefensePct={bonuses.totalPct.defense}
           heroHealthPct={100}
           heroXp={heroXp}
           heroXpMax={heroXpMax}

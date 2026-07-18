@@ -5,16 +5,15 @@ import { Tip } from "@/components/ui/Tip";
 import { HeroBag } from "@/components/game/HeroBag";
 import { HeroEquipment } from "@/components/game/HeroEquipment";
 import { HeroStatsCards } from "@/components/game/HeroStatsCards";
+import { HeroPowerSummary } from "@/components/game/HeroPowerSummary";
 import { HeroResetButton } from "@/components/game/HeroResetButton";
 import type { HeroItemView } from "@/components/game/heroItemView";
-import type { StatBreakdown } from "@/components/game/HeroStatsCards";
 import { formatNumber } from "@/lib/game/format";
 import {
   HERO_MAX_LEVEL,
-  HERO_STATS,
   heroBonuses,
+  tierForLevel,
   xpToNextLevel,
-  type HeroStat,
 } from "@/lib/game/hero";
 
 export const metadata = { title: "גיבור | WARZONE" };
@@ -29,8 +28,10 @@ export default async function HeroPage() {
   const xpPct = atCap ? 100 : Math.round((hero.xp / xpMax) * 100);
 
   const bonuses = heroBonuses(hero);
+  // The tier ("rarity") is always derived from level, so two items of the same
+  // slot+level look and perform identically regardless of what's stored.
   const toView = (items: typeof hero.items): HeroItemView[] =>
-    items.map(({ id, slot, level, rarity }) => ({ id, slot, level, rarity }));
+    items.map(({ id, slot, level }) => ({ id, slot, level, rarity: tierForLevel(level) }));
   const bagItems = toView(hero.items.filter((i) => !i.equipped));
   const equippedItems = toView(hero.items.filter((i) => i.equipped));
 
@@ -46,7 +47,7 @@ export default async function HeroPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {/* -------- inventory (right in RTL) -------- */}
-        <HeroBag items={bagItems} heroLevel={hero.level} />
+        <HeroBag items={bagItems} heroLevel={hero.level} gold={empire.gold} />
 
         {/* -------- hero (left in RTL) -------- */}
         <div className="panel rounded-xl p-4">
@@ -129,23 +130,19 @@ export default async function HeroPage() {
 
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             {/* active equipment */}
-            <HeroEquipment equipped={equippedItems} heroLevel={hero.level} />
-
-            {/* stat cards + point allocation */}
-            <HeroStatsCards
-              bonuses={Object.fromEntries(
-                HERO_STATS.map((stat) => [
-                  stat,
-                  {
-                    points: bonuses.points[stat],
-                    items: bonuses.items[stat],
-                    total: bonuses.total[stat],
-                  },
-                ])
-              ) as Record<HeroStat, StatBreakdown>}
-              unspentPoints={hero.unspentPoints}
+            <HeroEquipment
+              equipped={equippedItems}
+              heroLevel={hero.level}
+              gold={empire.gold}
             />
+
+            {/* stat cards + point allocation (points only — items excluded) */}
+            <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
           </div>
+
+          {/* combined yield from points + items together */}
+          <div className="rule-gold my-4" />
+          <HeroPowerSummary bonuses={bonuses} />
         </div>
       </div>
     </div>

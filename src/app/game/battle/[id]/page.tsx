@@ -6,8 +6,8 @@ import { formatNumber, formatDate } from "@/lib/game/format";
 import { ItemTile } from "@/components/game/ItemTile";
 import { AttackAgainButton } from "@/components/game/AttackAgainButton";
 import { Tip } from "@/components/ui/Tip";
-import { itemDetails } from "@/components/game/heroItemView";
-import { RARITY_META, SLOT_META, itemDisplayName } from "@/lib/game/hero";
+import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
+import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 
 export const metadata = { title: "תוצאת קרב | WARZONE" };
 
@@ -254,14 +254,14 @@ export default async function BattleResultPage({
                     slug={SLOT_META[capturedItem.slot].slug}
                     icon={SLOT_META[capturedItem.slot].icon}
                     level={capturedItem.level}
-                    rarity={RARITY_META[capturedItem.rarity].ui}
+                    rarity={uiRarityForLevel(capturedItem.level)}
                     details={itemDetails(capturedItem, me.hero?.level ?? 1)}
                     tooltipBelow
                   />
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
-                    🎁 נלכד חפץ: {itemDisplayName(capturedItem.slot, capturedItem.rarity)}
+                    🎁 נלכד חפץ: {itemDisplayName(capturedItem.slot, capturedItem.level)}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     רמת פריט{" "}

@@ -1,4 +1,5 @@
 import type { Hero, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
+import { RESOURCE_META, type StorableResource } from "./constants";
 
 /* ------------------------------ hero progression ------------------------------ */
 
@@ -57,11 +58,24 @@ export function applyHeroXp(
 
 /* ------------------------------ stats ------------------------------ */
 
-/** Stats that hero points can be allocated to. */
+/** Stats that hero points can be allocated to (each point = +1%). */
 export type HeroPointStat = "attack" | "defense" | "resources";
 
-/** All stats items can boost: combat + economy (turns/diamonds/citizens are item-only). */
-export type HeroStat = HeroPointStat | "turns" | "diamonds" | "citizens";
+/**
+ * Stats whose item bonus is a **percentage** (multiplies the relevant power).
+ * attack/defense stack on top of allocated points; spy is item-only.
+ */
+export type HeroPercentStat = "attack" | "defense" | "spy";
+
+/**
+ * Stats whose item bonus is a **flat count**, not a percentage — an item that
+ * grants turns/diamonds/citizens gives whole units, and a resources item adds
+ * a flat amount to each mined resource.
+ */
+export type HeroFlatStat = "resources" | "turns" | "diamonds" | "citizens";
+
+/** Every stat the hero surfaces: the percentage stats + the flat-count stats. */
+export type HeroStat = HeroPercentStat | HeroFlatStat;
 
 export interface HeroStatMeta {
   label: string;
@@ -92,25 +106,32 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
     icon: "⛏️",
     tone: "text-emerald-400",
     pointsField: "resourcePoints",
-    description: "כל אחוז מגדיל את תפוקת המכרות בכל עדכון.",
+    // Points give a %; items give flat resources (see HeroPowerSummary).
+    description: "כל אחוז נקודות מגדיל את תפוקת המכרות; חפצים מוסיפים משאבים בכמות קבועה.",
+  },
+  spy: {
+    label: "ריגול",
+    icon: "🕵️",
+    tone: "text-fuchsia-300",
+    description: "כל אחוז מחפצים מגדיל את סיכוי הצלחת משימת הריגול שלך.",
   },
   turns: {
     label: "תורות",
     icon: "⏳",
     tone: "text-amber-300",
-    description: "כל אחוז מגדיל את כמות התורות המתקבלת בכל עדכון רגיל.",
+    description: "חפצים מוסיפים תורות בכמות קבועה בכל עדכון רגיל (לא באחוזים).",
   },
   diamonds: {
     label: "יהלומים",
     icon: "💎",
     tone: "text-cyan-300",
-    description: "כל אחוז מגדיל את כמות היהלומים המתקבלת בכל עדכון יומי.",
+    description: "חפצים מוסיפים יהלומים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
   citizens: {
     label: "אזרחים",
     icon: "👥",
     tone: "text-lime-300",
-    description: "כל אחוז מגדיל את כמות האזרחים המצטרפת בכל עדכון יומי.",
+    description: "חפצים מוסיפים אזרחים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
 };
 
@@ -119,30 +140,87 @@ export const HERO_STATS = Object.keys(HERO_STAT_META) as HeroStat[];
 /** The three point-allocatable stats, in display order. */
 export const HERO_POINT_STATS: HeroPointStat[] = ["attack", "defense", "resources"];
 
-/* ------------------------------ rarities ------------------------------ */
+/** Stats whose item bonus is a percentage (attack/defense stack with points). */
+export const HERO_PERCENT_STATS: HeroPercentStat[] = ["attack", "defense", "spy"];
 
-/** UI rarity key used by ItemTile (lowercase) for each DB rarity. */
+/** Stats whose item bonus is a flat count of whole units. */
+export const HERO_FLAT_STATS: HeroFlatStat[] = ["resources", "turns", "diamonds", "citizens"];
+
+/** Whether a stat's item bonus is a flat count (true) or a percentage (false). */
+export function statIsFlat(stat: HeroStat): stat is HeroFlatStat {
+  return (HERO_FLAT_STATS as HeroStat[]).includes(stat);
+}
+
+/* ------------------------------ tiers (derived from level) ------------------------------ */
+
+/**
+ * An item's tier (its "rarity") is derived purely from its level — two items
+ * of the same slot and level are always identical. The named series repeats
+ * every 10 levels: within each decade, offsets 1-2 are פשוט, 3-7 מתקדם,
+ * 8-9 אליט, 10 אגדי; then the pattern begins again one decade higher.
+ */
+
+/** UI rarity key used by ItemTile (lowercase) for each tier. */
 export type UiRarity = "common" | "rare" | "epic" | "legendary";
 
 export interface RarityMeta {
   label: string;
   ui: UiRarity;
-  /** Item bonus % per item level. */
-  multiplier: number;
-  /** Relative drop weight — rarer items are harder to capture. */
-  dropWeight: number;
   tone: string;
 }
 
-/** Ordered common → legendary. */
+/** Ordered lowest → highest tier within a series. */
 export const RARITY_ORDER: HeroRarity[] = ["COMMON", "RARE", "EPIC", "LEGENDARY"];
 
 export const RARITY_META: Record<HeroRarity, RarityMeta> = {
-  COMMON: { label: "רגיל", ui: "common", multiplier: 0.05, dropWeight: 60, tone: "text-emerald-300" },
-  RARE: { label: "נדיר", ui: "rare", multiplier: 0.1, dropWeight: 25, tone: "text-sky-300" },
-  EPIC: { label: "מיוחד", ui: "epic", multiplier: 0.16, dropWeight: 11, tone: "text-purple-300" },
-  LEGENDARY: { label: "אגדי", ui: "legendary", multiplier: 0.25, dropWeight: 4, tone: "text-gold-bright" },
+  COMMON: { label: "פשוט", ui: "common", tone: "text-emerald-300" },
+  RARE: { label: "מתקדם", ui: "rare", tone: "text-sky-300" },
+  EPIC: { label: "אליט", ui: "epic", tone: "text-purple-300" },
+  LEGENDARY: { label: "אגדי", ui: "legendary", tone: "text-gold-bright" },
 };
+
+/** The tier an item of the given level belongs to (repeats every 10 levels). */
+export function tierForLevel(level: number): HeroRarity {
+  const offset = ((Math.max(1, level) - 1) % 10) + 1; // 1..10 within the decade
+  if (offset <= 2) return "COMMON";
+  if (offset <= 7) return "RARE";
+  if (offset <= 9) return "EPIC";
+  return "LEGENDARY";
+}
+
+/* ------------------------------ item upgrades ------------------------------ */
+
+/**
+ * The level where each tier band begins, within a decade: פשוט at +1,
+ * מתקדם at +3, אליט at +8, אגדי at +10. Upgrading an item jumps its level to
+ * the next of these — i.e. up to the start of the next tier.
+ */
+const BAND_START_OFFSETS = [1, 3, 8, 10];
+
+/** Every level an item can be upgraded *to*, ascending: 1,3,8,10,11,13,…,100. */
+export const UPGRADE_LEVELS: number[] = Array.from(
+  { length: HERO_MAX_LEVEL / 10 },
+  (_, decade) => decade * 10
+).flatMap((base) => BAND_START_OFFSETS.map((o) => base + o));
+
+/** The level an item reaches when upgraded, or null if already maxed (100). */
+export function nextTierLevel(level: number): number | null {
+  for (const v of UPGRADE_LEVELS) if (v > level) return v;
+  return null;
+}
+
+/** Gold per target level — a higher-level upgrade costs proportionally more. */
+export const UPGRADE_GOLD_PER_LEVEL = 120;
+
+/**
+ * Gold needed to upgrade one item to the next tier level, or null when it is
+ * already at the maximum level (nothing higher to upgrade to).
+ */
+export function itemUpgradeCost(level: number): number | null {
+  const target = nextTierLevel(level);
+  if (target === null) return null;
+  return Math.round(target * UPGRADE_GOLD_PER_LEVEL);
+}
 
 /* ------------------------------ item slots ------------------------------ */
 
@@ -171,16 +249,17 @@ export const SLOT_ORDER: HeroItemSlot[] = [
 
 /**
  * Slot → stat distribution:
- * - Combat gear splits between offense (weapons) and protection (armor).
- * - Each economy stat lives in exactly one thematic slot — the relic's magic
- *   yields resources, wings grant speed (turns), pants have deep pockets
+ * - Offense (swords/gauntlets) and protection (armor/shield) give percentages.
+ * - The helmet's visor scouts the field — it grants the spy percentage.
+ * - Each flat-count stat lives in exactly one thematic slot — the relic's magic
+ *   conjures resources, wings grant speed (turns), pants have deep pockets
  *   (diamonds), and boots march among the people (citizens) — so those
  *   single slots carry a double bonus.
  */
 export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
   SWORD: { label: "חרב", icon: "🗡️", slug: "sword", stat: "attack", statMultiplier: 1 },
   GAUNTLETS: { label: "כפפות", icon: "🧤", slug: "gauntlet", stat: "attack", statMultiplier: 1 },
-  HELMET: { label: "קסדה", icon: "🪖", slug: "helmet", stat: "defense", statMultiplier: 1 },
+  HELMET: { label: "קסדה", icon: "🪖", slug: "helmet", stat: "spy", statMultiplier: 1 },
   ARMOR: { label: "שריון", icon: "🛡️", slug: "armor", stat: "defense", statMultiplier: 1 },
   SHIELD: { label: "מגן", icon: "🔰", slug: "buckler", stat: "defense", statMultiplier: 1 },
   RELIC: { label: "פרי שטן", icon: "😈", slug: "demon-fruit", stat: "resources", statMultiplier: 2 },
@@ -192,18 +271,102 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
 /* ------------------------------ item catalog ------------------------------ */
 
 /**
- * Items exist at these level tiers (1, 5, 10, … 100) in every slot and every
- * rarity — the full catalog is slot × tier × rarity.
+ * The catalog shows one representative item per tier-band start level, per
+ * slot — 1,3,8,10,11,… (the same levels an item can be upgraded to).
  */
-export const ITEM_LEVELS: number[] = [
-  1,
-  ...Array.from({ length: 20 }, (_, i) => (i + 1) * 5),
-];
+export const ITEM_LEVELS: number[] = UPGRADE_LEVELS;
 
-/** The % bonus a specific item grants to its slot's stat. */
-export function itemBonusPct(slot: HeroItemSlot, level: number, rarity: HeroRarity): number {
-  const raw = level * RARITY_META[rarity].multiplier * SLOT_META[slot].statMultiplier;
-  return Math.round(raw * 10) / 10;
+/** Bonus % per item level (before the slot's multiplier), for percentage stats. */
+export const BONUS_PER_LEVEL = 0.25;
+
+/**
+ * Flat units granted per item level (before the slot's multiplier), for the
+ * flat-count stats. Units differ wildly (a turn is not a citizen), so each
+ * flat stat scales at its own rate. Tune these to taste — they are the item
+ * side of the economy.
+ */
+export const FLAT_PER_LEVEL: Record<HeroFlatStat, number> = {
+  resources: 1, // added to each resource the item covers, per regular tick
+  turns: 0.2, // extra turns per regular tick
+  diamonds: 0.15, // extra diamonds per daily update
+  citizens: 3, // extra citizens per daily update
+};
+
+/**
+ * Which storable resources a resource-item (the relic slot) produces grows
+ * with its tier: a פשוט relic conjures a single specific resource, and each
+ * tier up adds another, until an אגדי relic yields all four. So some resource
+ * items bring several resources and some only a specific one — by their tier.
+ */
+export const RESOURCE_ITEM_COVERAGE: Record<HeroRarity, StorableResource[]> = {
+  COMMON: ["gold"],
+  RARE: ["gold", "wood"],
+  EPIC: ["gold", "wood", "iron"],
+  LEGENDARY: ["gold", "wood", "iron", "stone"],
+};
+
+/** The resources a resource-item of the given level produces (by its tier). */
+export function resourceItemResources(level: number): StorableResource[] {
+  return RESOURCE_ITEM_COVERAGE[tierForLevel(level)];
+}
+
+/**
+ * The % bonus an item grants to its (percentage) slot's stat — a pure function
+ * of slot and level, so every item of the same slot+level is identical. Always
+ * a whole %. Meaningful only for HERO_PERCENT_STATS slots.
+ */
+export function itemBonusPct(slot: HeroItemSlot, level: number): number {
+  const raw = level * BONUS_PER_LEVEL * SLOT_META[slot].statMultiplier;
+  // Percentages are always whole numbers; every real item is worth at least 1%.
+  return Math.max(1, Math.round(raw));
+}
+
+/**
+ * The flat unit bonus an item grants to its (flat) slot's stat — whole units,
+ * at least 1. Meaningful only for HERO_FLAT_STATS slots.
+ */
+export function itemBonusFlat(slot: HeroItemSlot, level: number): number {
+  const stat = SLOT_META[slot].stat;
+  const perLevel = statIsFlat(stat) ? FLAT_PER_LEVEL[stat] : 0;
+  const raw = level * perLevel * SLOT_META[slot].statMultiplier;
+  return Math.max(1, Math.round(raw));
+}
+
+/**
+ * The bonus an item grants, tagged with whether it is a flat count or a %.
+ * The single entry point the UI should use to render an item's value.
+ */
+export function itemBonusValue(
+  slot: HeroItemSlot,
+  level: number
+): { flat: boolean; value: number } {
+  const flat = statIsFlat(SLOT_META[slot].stat);
+  return { flat, value: flat ? itemBonusFlat(slot, level) : itemBonusPct(slot, level) };
+}
+
+/** One resource line an item grants: its icon, its name, and the flat amount. */
+export interface ItemResourceLine {
+  icon: string;
+  label: string;
+  value: number;
+}
+
+/**
+ * The per-resource breakdown a resource-item grants — one line per covered
+ * resource, each with its icon, its word, and its flat amount (e.g.
+ * "⚙️ ברזל 20"). Empty for non-resource items (which show a single stat line).
+ */
+export function itemResourceBreakdown(
+  slot: HeroItemSlot,
+  level: number
+): ItemResourceLine[] {
+  if (SLOT_META[slot].stat !== "resources") return [];
+  const value = itemBonusFlat(slot, level);
+  return resourceItemResources(level).map((r) => ({
+    icon: RESOURCE_META[r].icon,
+    label: RESOURCE_META[r].label,
+    value,
+  }));
 }
 
 /** Equip requirement: the hero must be at least the item's level. */
@@ -216,45 +379,71 @@ export function canEquipItem(heroLevel: number, itemLevel: number): boolean {
 export type HeroWithItems = Hero & { items: HeroItem[] };
 
 export interface HeroBonuses {
-  /** % from allocated points only. */
-  points: Record<HeroStat, number>;
-  /** % from equipped items only. */
-  items: Record<HeroStat, number>;
-  /** points + items, per stat. */
-  total: Record<HeroStat, number>;
+  /** % from allocated points only (attack/defense/resources). */
+  points: Record<HeroPointStat, number>;
+  /** % from equipped items, for the percentage stats (attack/defense/spy). */
+  itemsPct: Record<HeroPercentStat, number>;
+  /** Flat unit counts from equipped items (resources/turns/diamonds/citizens). */
+  itemsFlat: Record<HeroFlatStat, number>;
+  /**
+   * Flat resource units from equipped resource-items, split across the specific
+   * resources each item covers (a specialised relic feeds one; an אגדי relic
+   * feeds all four). This — not `itemsFlat.resources` — drives production.
+   */
+  itemsFlatByResource: Record<StorableResource, number>;
+  /**
+   * Combined percentage per percentage stat = allocated points + item %.
+   * (spy has no point allocation, so its total is item-only.) These drive
+   * battle/spy power; the flat item counts drive production directly.
+   */
+  totalPct: Record<HeroPercentStat, number>;
 }
 
-/** Aggregate the hero's % bonuses: allocated points + equipped items. */
+/**
+ * Aggregate the hero's bonuses. Percentage stats (attack/defense/spy) combine
+ * allocated points with item %; flat stats (resources/turns/diamonds/citizens)
+ * come from equipped items only, as whole unit counts. Every value is an
+ * integer, so no rounding is needed here.
+ */
 export function heroBonuses(hero: HeroWithItems | null): HeroBonuses {
-  // Points cover only the three allocatable stats; the rest are item-only.
-  const points: Record<HeroStat, number> = {
+  const points: Record<HeroPointStat, number> = {
     attack: hero?.attackPoints ?? 0,
     defense: hero?.defensePoints ?? 0,
     resources: hero?.resourcePoints ?? 0,
-    turns: 0,
-    diamonds: 0,
-    citizens: 0,
   };
-  const items: Record<HeroStat, number> = {
-    attack: 0,
-    defense: 0,
+  const itemsPct: Record<HeroPercentStat, number> = { attack: 0, defense: 0, spy: 0 };
+  const itemsFlat: Record<HeroFlatStat, number> = {
     resources: 0,
     turns: 0,
     diamonds: 0,
     citizens: 0,
   };
+  const itemsFlatByResource: Record<StorableResource, number> = {
+    gold: 0,
+    wood: 0,
+    iron: 0,
+    stone: 0,
+  };
   for (const item of hero?.items ?? []) {
     if (!item.equipped) continue;
-    items[SLOT_META[item.slot].stat] += itemBonusPct(item.slot, item.level, item.rarity);
+    const stat = SLOT_META[item.slot].stat;
+    if (statIsFlat(stat)) {
+      const flat = itemBonusFlat(item.slot, item.level);
+      itemsFlat[stat] += flat;
+      // A resource item feeds only the specific resources its tier covers.
+      if (stat === "resources") {
+        for (const r of resourceItemResources(item.level)) itemsFlatByResource[r] += flat;
+      }
+    } else itemsPct[stat] += itemBonusPct(item.slot, item.level);
   }
-  const round1 = (v: number) => Math.round(v * 10) / 10;
-  const map = (fn: (stat: HeroStat) => number) =>
-    Object.fromEntries(HERO_STATS.map((stat) => [stat, round1(fn(stat))])) as Record<HeroStat, number>;
-  return {
-    points,
-    items: map((stat) => items[stat]),
-    total: map((stat) => points[stat] + items[stat]),
+  const totalPct: Record<HeroPercentStat, number> = {
+    // Wearing items no longer changes the point cards, but the *combined* hero
+    // power (shown in the summary and used in battle) does add both together.
+    attack: points.attack + itemsPct.attack,
+    defense: points.defense + itemsPct.defense,
+    spy: itemsPct.spy,
   };
+  return { points, itemsPct, itemsFlat, itemsFlatByResource, totalPct };
 }
 
 /** Multiplier form of a % bonus (e.g. 25 → 1.25). */
@@ -268,9 +457,10 @@ export function bonusMultiplier(pct: number): number {
 export const ITEM_DROP_CHANCE = 0.45;
 
 /**
- * Roll a captured item after a won attack. Rarity is weighted (rarer items
- * are much harder to capture) and the item level lands near the attacker's
- * hero level — loot you can actually use soon — snapped to a catalog tier.
+ * Roll a captured item after a won attack. The item level lands near the
+ * attacker's hero level (±12) — loot you can actually use soon — and its tier
+ * follows from that level. Rarer tiers are naturally scarcer because fewer
+ * levels map to them (only 1 in 10 is legendary).
  */
 export function rollItemDrop(
   attackerHeroLevel: number,
@@ -278,32 +468,17 @@ export function rollItemDrop(
 ): { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null {
   if (random() >= ITEM_DROP_CHANCE) return null;
 
-  // Weighted rarity roll.
-  const totalWeight = RARITY_ORDER.reduce((sum, r) => sum + RARITY_META[r].dropWeight, 0);
-  let roll = random() * totalWeight;
-  let rarity: HeroRarity = "COMMON";
-  for (const r of RARITY_ORDER) {
-    roll -= RARITY_META[r].dropWeight;
-    if (roll <= 0) {
-      rarity = r;
-      break;
-    }
-  }
-
   // Uniform slot.
   const slot = SLOT_ORDER[Math.floor(random() * SLOT_ORDER.length)];
 
-  // Level near the attacker's hero level (±12), snapped to the nearest tier.
+  // Level near the attacker's hero level (±12); the tier is derived from it.
   const jitter = Math.round((random() * 2 - 1) * 12);
-  const target = Math.min(HERO_MAX_LEVEL, Math.max(1, attackerHeroLevel + jitter));
-  const level = ITEM_LEVELS.reduce((best, tier) =>
-    Math.abs(tier - target) < Math.abs(best - target) ? tier : best
-  );
+  const level = Math.min(HERO_MAX_LEVEL, Math.max(1, attackerHeroLevel + jitter));
 
-  return { slot, level, rarity };
+  return { slot, level, rarity: tierForLevel(level) };
 }
 
-/** Display name, e.g. "חרב נדיר". */
-export function itemDisplayName(slot: HeroItemSlot, rarity: HeroRarity): string {
-  return `${SLOT_META[slot].label} ${RARITY_META[rarity].label}`;
+/** Display name, e.g. "חרב מתקדם" — the tier follows from the item's level. */
+export function itemDisplayName(slot: HeroItemSlot, level: number): string {
+  return `${SLOT_META[slot].label} ${RARITY_META[tierForLevel(level)].label}`;
 }

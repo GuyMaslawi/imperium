@@ -1,33 +1,58 @@
 import { requireEmpire } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { formatNumber } from "@/lib/game/format";
-import { Converter } from "./Converter";
+import { bankInterestRate } from "@/lib/game/constants";
+import { DiamondShop } from "@/components/game/DiamondShop";
+import { BOOSTABLE_RESOURCES, RESOURCE_BOOST_KIND } from "@/lib/game/diamondShop";
 
 export const metadata = { title: "יהלומים | WARZONE" };
 
-const TABS = [
-  { label: "קסמים", active: false },
-  { label: "רכישת יהלומים", active: true },
-  { label: "היסטוריה", active: false },
-];
-
-type Bonus = {
-  icon: string;
-  label: string;
-  price: string;
-  active?: string;
-};
-
-const BONUSES: Bonus[] = [
-  { icon: "🪨", label: "תוספת אבן", price: "45" },
-  { icon: "⛓️", label: "תוספת ברזל", price: "45", active: "03:13:34" },
-  { icon: "🪵", label: "תוספת עץ", price: "45" },
-  { icon: "🪙", label: "תוספת זהב", price: "45" },
-];
-
 export default async function DiamondsPage() {
   const empire = await requireEmpire();
+  const now = new Date();
   const diamonds = Math.floor(empire.diamonds);
+
+  // Diamond effects for this empire (timed boosts + cooldowns).
+  const effects = await prisma.diamondEffect.findMany({
+    where: { empireId: empire.id },
+  });
+  const byKind = new Map(effects.map((e) => [e.kind, e]));
+
+  const boosts = BOOSTABLE_RESOURCES.map((resource) => {
+    const e = byKind.get(RESOURCE_BOOST_KIND[resource]);
+    const active = e?.activeUntil != null && e.activeUntil > now;
+    return {
+      resource,
+      pct: active ? e!.magnitude : 0,
+      activeUntil: active ? e!.activeUntil!.toISOString() : null,
+    };
+  });
+
+  const discountEffect = byKind.get("SHOP_DISCOUNT");
+  const discountActiveUntil =
+    discountEffect?.activeUntil != null && discountEffect.activeUntil > now
+      ? discountEffect.activeUntil.toISOString()
+      : null;
+
+  const hero = empire.hero;
+  const allocatedPoints =
+    (hero?.attackPoints ?? 0) + (hero?.defensePoints ?? 0) + (hero?.resourcePoints ?? 0);
+  const activeSeason = await prisma.gameSeason.findFirst({
+    where: { isActive: true },
+    select: { id: true },
+  });
+  const pointsResetUsed = hero?.pointsResetSeasonId === (activeSeason?.id ?? "none");
+
+  const bankBalance = empire.bankAccount?.goldBalance ?? 0;
+  const interestLevel =
+    empire.upgrades.find((u) => u.type === "BANK_DAILY_INTEREST")?.level ?? 1;
+  const interestPreview = Math.floor(bankBalance * bankInterestRate(interestLevel));
+  const bankEffect = byKind.get("BANK_INTEREST");
+  const bankReadyAt =
+    bankEffect?.readyAt != null && bankEffect.readyAt > now
+      ? bankEffect.readyAt.toISOString()
+      : null;
 
   return (
     <div className="space-y-6">
@@ -50,66 +75,15 @@ export default async function DiamondsPage() {
         </div>
       </div>
 
-      {/* -------- VIP badge -------- */}
-      <div className="panel-inset mx-auto flex max-w-md items-center justify-center gap-2 rounded-xl border border-amber-400/30 py-2.5 text-center">
-        <span className="text-sm font-bold text-amber-300">👑 VIP פעיל</span>
-        <span className="text-xs text-zinc-400">
-          פג בתאריך:{" "}
-          <span className="nums" dir="ltr">
-            23:00 15/07/2026
-          </span>
-        </span>
-      </div>
-
-      {/* -------- tabs -------- */}
-      <div className="flex flex-wrap justify-center gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab.label}
-            type="button"
-            className={`${tab.active ? "btn btn-dark" : "btn btn-ghost"} px-4 py-2 text-sm`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* -------- converter -------- */}
-      <Converter />
-
-      {/* -------- bonuses grid -------- */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {BONUSES.map((b) => (
-          <div key={b.label} className="panel relative rounded-xl p-4">
-            {b.active && (
-              <div className="absolute left-3 top-3 flex items-center gap-1.5">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                <span className="nums text-[11px] font-bold text-emerald-400" dir="ltr">
-                  {b.active}
-                </span>
-              </div>
-            )}
-            <div className="text-3xl" aria-hidden>
-              {b.icon}
-            </div>
-            <p className="mt-2 text-sm font-bold text-zinc-100">{b.label}</p>
-            <p className="mt-1 text-[11px] text-zinc-400">
-              <span className="nums" dir="ltr">
-                +10%
-              </span>{" "}
-              · 24ש׳ · מצטבר
-            </p>
-            <div className="mt-3 flex items-center justify-between">
-              <button type="button" className="btn btn-gold px-4 py-2 text-sm">
-                רכוש
-              </button>
-              <span className="nums text-sm font-bold text-sky-300" dir="ltr">
-                {b.price} 💎
-              </span>
-            </div>
-          </div>
-        ))}
-      </div>
+      <DiamondShop
+        diamonds={diamonds}
+        boosts={boosts}
+        discountActiveUntil={discountActiveUntil}
+        allocatedPoints={allocatedPoints}
+        pointsResetUsed={pointsResetUsed}
+        interestPreview={interestPreview}
+        bankReadyAt={bankReadyAt}
+      />
     </div>
   );
 }

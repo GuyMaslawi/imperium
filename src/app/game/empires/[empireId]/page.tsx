@@ -14,7 +14,7 @@ import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
 import { ItemTile } from "@/components/game/ItemTile";
-import { itemDetails, uiRarity } from "@/components/game/heroItemView";
+import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, SLOT_ORDER } from "@/lib/game/hero";
 
 export const metadata = { title: "פרופיל אימפריה | אימפריום" };
@@ -65,8 +65,9 @@ export default async function EmpireProfilePage({
         orderBy: { createdAt: "desc" },
       });
 
-  // Detailed powers are shown for your own empire, or once a recent
-  // successful spy report exists. General power is always public.
+  // Power figures and population (general power, citizens, soldiers, gold…)
+  // are intel — hidden from strangers. Revealed only for your own empire, or
+  // once a recent successful spy report exists.
   const showDetails = isMe || spyReport !== null;
   const generalPower = getEmpireGeneralPower(empire.army, empire.weapons);
   const attackPower = getEmpireAttackPower(empire.army, empire.weapons);
@@ -84,10 +85,16 @@ export default async function EmpireProfilePage({
   const attackShare = duelTotal > 0 ? (attackPower / duelTotal) * 100 : 50;
 
   const publicStats = [
-    { label: "כוח כללי", value: `⚡ ${formatNumber(generalPower)}`, tone: "text-gold" },
     { label: "רמה", value: formatNumber(empire.level), tone: "text-gold-bright" },
-    { label: "אזרחים", value: formatNumber(empire.citizens), tone: "text-zinc-100" },
     { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
+    // Power and citizen count are intelligence — visible only for your own
+    // empire or after a successful spy mission.
+    ...(showDetails
+      ? [
+          { label: "כוח כללי", value: `⚡ ${formatNumber(generalPower)}`, tone: "text-gold" },
+          { label: "אזרחים", value: formatNumber(empire.citizens), tone: "text-zinc-100" },
+        ]
+      : []),
   ];
 
   return (
@@ -155,9 +162,11 @@ export default async function EmpireProfilePage({
               </h2>
               <p className="mt-0.5 text-sm text-zinc-400">קשת</p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">
-                  ⚡ {formatNumber(generalPower)}
-                </span>
+                {showDetails && (
+                  <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">
+                    ⚡ {formatNumber(generalPower)}
+                  </span>
+                )}
                 <span
                   className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
                   title="רמת הגיבור"
@@ -370,7 +379,7 @@ export default async function EmpireProfilePage({
                 icon={meta.icon}
                 level={item.level}
                 name={meta.label}
-                rarity={uiRarity(item.rarity)}
+                rarity={uiRarityForLevel(item.level)}
                 details={itemDetails(item, heroLevel, { equipped: true })}
               />
             );

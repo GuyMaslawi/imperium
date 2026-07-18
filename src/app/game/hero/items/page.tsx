@@ -6,16 +6,16 @@ import { catalogKey } from "@/components/game/heroItemView";
 
 export const metadata = { title: "כל הפריטים | WARZONE" };
 
-/** The complete hero item catalog: levels 1–100 in every rarity and slot. */
+/** The complete hero item catalog: every tier level in every slot. */
 export default async function HeroItemsPage() {
   const empire = await requireEmpire();
   const hero = empire.hero;
   if (!hero) return null;
 
-  const ownedKeys = hero.items.map((i) => catalogKey(i.slot, i.level, i.rarity));
+  const ownedKeys = hero.items.map((i) => catalogKey(i.slot, i.level));
   const equippedKeys = hero.items
     .filter((i) => i.equipped)
-    .map((i) => catalogKey(i.slot, i.level, i.rarity));
+    .map((i) => catalogKey(i.slot, i.level));
 
   return (
     <div className="space-y-6">

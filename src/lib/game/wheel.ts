@@ -8,6 +8,10 @@ import type { GameSeason } from "@prisma/client";
  */
 export const WHEEL_DAILY_GROWTH = 0.1;
 
+/** Spins granted on each daily update, and the most an empire may bank. */
+export const WHEEL_DAILY_SPINS = 4;
+export const WHEEL_SPINS_CAP = 20;
+
 export type WheelPrizeKind = "amount" | "unit";
 
 export interface WheelPrizeDef {
@@ -33,7 +37,7 @@ export const WHEEL_PRIZES: WheelPrizeDef[] = [
   { key: "stone", label: "אבן", icon: "🪨", color: "#6d1f1f", kind: "amount", base: 750, step: 50 },
   { key: "wood", label: "עץ", icon: "🪵", color: "#141414", kind: "amount", base: 1000, step: 50 },
   { key: "allWeapons", label: "כל הנשק", icon: "🗡️", color: "#6d1f1f", kind: "unit", base: 1, step: 1, note: "אחד מכל סוג נשק שפתחת" },
-  { key: "animal", label: "חיה", icon: "🐾", color: "#c9761b", kind: "unit", base: 1, step: 1 },
+  { key: "citizens", label: "אזרחים", icon: "👥", color: "#c9761b", kind: "amount", base: 40, step: 5 },
   { key: "item", label: "חפץ", icon: "✨", color: "#6d28d9", kind: "unit", base: 1, step: 1, note: "דורש מקום פנוי בתיק הגיבור" },
   { key: "loot", label: "שלל", icon: "🎁", color: "#141414", kind: "amount", base: 2000, step: 100, note: "חבילת משאבים מעורבת בשווי זהב" },
 ];
@@ -62,4 +66,9 @@ export function wheelPrizeAmount(prize: WheelPrizeDef, day: number): number {
   if (prize.kind === "unit") return 1;
   const grown = prize.base * (1 + WHEEL_DAILY_GROWTH * (Math.max(day, 1) - 1));
   return Math.max(prize.step, Math.round(grown / prize.step) * prize.step);
+}
+
+/** Uniformly pick a winning wedge index. The server owns this roll. */
+export function pickWheelPrizeIndex(random: () => number = Math.random): number {
+  return Math.floor(random() * WHEEL_PRIZES.length);
 }

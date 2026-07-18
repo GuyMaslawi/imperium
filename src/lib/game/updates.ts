@@ -12,6 +12,8 @@ import { dailyUpdatesBetween, elapsedRegularTicks, lastTickBoundary } from "./ti
 import { turnsGainFromUpgrades } from "./turns";
 import { bonusMultiplier, heroBonuses } from "./hero";
 import { getActiveGuildBuffPct } from "./guildBuffs";
+import { getActiveResourceBoosts } from "./diamondEffects";
+import { WHEEL_DAILY_SPINS, WHEEL_SPINS_CAP } from "./wheel";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -52,9 +54,10 @@ export async function applyPendingUpdates(
 
   const now = new Date();
 
-  // Hero bonuses (points + equipped items): resources boosts mine production,
-  // turns boosts the regular-update gain, diamonds/citizens boost the dailies.
-  const heroBonus = heroBonuses(empire.hero).total;
+  // Hero bonuses: the resources *points* still multiply mine production, while
+  // equipped items now add flat amounts — extra resources per tick, and extra
+  // turns/citizens/diamonds per update (whole units, not percentages).
+  const heroBonus = heroBonuses(empire.hero);
 
   /* ---- regular ticks: mine-slave production + turns ---- */
   const ticks = elapsedRegularTicks(empire.lastRegularUpdateAt, now);
@@ -62,22 +65,31 @@ export async function applyPendingUpdates(
   let turnsGained = 0;
   if (ticks > 0) {
     // An active guild resources spell multiplies mine production on top of
-    // the hero bonus for the ticks being settled now.
+    // the hero bonus for the ticks being settled now; diamond boosts add a
+    // further per-resource multiplier on top of both.
     const guildResourcesPct = await getActiveGuildBuffPct(empire.id, "RESOURCES", tx, now);
-    const productionMultiplier =
-      bonusMultiplier(heroBonus.resources) * bonusMultiplier(guildResourcesPct);
+    const resourceBoosts = await getActiveResourceBoosts(empire.id, tx, now);
+    const baseMultiplier =
+      bonusMultiplier(heroBonus.points.resources) * bonusMultiplier(guildResourcesPct);
     for (const building of empire.buildings) {
       const meta = BUILDING_META[building.type];
       if (!meta.producedResource) continue;
+      const multiplier =
+        baseMultiplier * bonusMultiplier(resourceBoosts[meta.producedResource]);
       gained[meta.producedResource] +=
-        mineProductionPerTick(building.level, building.slavesAssigned) *
-        ticks *
-        productionMultiplier;
+        mineProductionPerTick(building.level, building.slavesAssigned) * ticks * multiplier;
     }
-    // Full ticks only — no partial-tick turns, no cap for now.
-    turnsGained = Math.round(
-      ticks * turnsGainFromUpgrades(empire.upgrades) * bonusMultiplier(heroBonus.turns)
-    );
+    // Equipped resource items conjure a flat amount each tick — but only for
+    // the specific resources their tier covers (some feed one resource, some
+    // several, an אגדי relic all four).
+    for (const res of Object.keys(gained) as StorableResource[]) {
+      gained[res] += heroBonus.itemsFlatByResource[res] * ticks;
+    }
+    // Full ticks only — no partial-tick turns, no cap for now. Turn items add a
+    // flat number of turns per tick (not a percentage).
+    turnsGained =
+      Math.round(ticks * turnsGainFromUpgrades(empire.upgrades)) +
+      heroBonus.itemsFlat.turns * ticks;
   }
 
   /* ---- daily updates: citizens + diamonds + bank interest + deposit-period reset ---- */
@@ -87,20 +99,30 @@ export async function applyPendingUpdates(
   if (missedDailies.length > 0) {
     const growthLevel =
       empire.upgrades.find((u) => u.type === "CITIZEN_GROWTH")?.level ?? 1;
-    citizensGained = Math.round(
-      citizensPerDailyUpdate(growthLevel) *
-        missedDailies.length *
-        bonusMultiplier(heroBonus.citizens)
-    );
+    // Citizen/diamond items add a flat count per daily update (not a %).
+    citizensGained =
+      Math.round(citizensPerDailyUpdate(growthLevel) * missedDailies.length) +
+      heroBonus.itemsFlat.citizens * missedDailies.length;
 
     const diamondLevel =
       empire.upgrades.find((u) => u.type === "DIAMOND_YIELD")?.level ?? 1;
-    diamondsGained = Math.round(
-      diamondsPerDailyUpdate(diamondLevel) *
-        missedDailies.length *
-        bonusMultiplier(heroBonus.diamonds)
-    );
+    diamondsGained =
+      Math.round(diamondsPerDailyUpdate(diamondLevel) * missedDailies.length) +
+      heroBonus.itemsFlat.diamonds * missedDailies.length;
   }
+
+  // Top up wheel spins once per missed daily update, capped so they can't bank
+  // forever. Never lowers a balance already above the cap.
+  const wheelSpins =
+    missedDailies.length > 0
+      ? Math.max(
+          empire.wheelSpins,
+          Math.min(
+            WHEEL_SPINS_CAP,
+            empire.wheelSpins + WHEEL_DAILY_SPINS * missedDailies.length
+          )
+        )
+      : empire.wheelSpins;
 
   if (ticks === 0 && missedDailies.length === 0) return empire;
 
@@ -152,6 +174,7 @@ export async function applyPendingUpdates(
       diamonds: { increment: diamondsGained },
       citizens: { increment: citizensGained },
       turns: { increment: turnsGained },
+      ...(missedDailies.length > 0 ? { wheelSpins } : {}),
       // Snap to the global boundary that was just settled, so every empire
       // ticks together on round wall-clock times (XX:00, XX:05, …).
       ...(ticks > 0 ? { lastRegularUpdateAt: lastTickBoundary(now) } : {}),

@@ -31,6 +31,8 @@ import {
 } from "@/lib/game/constants";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
+import { getShopDiscountPct } from "@/lib/game/diamondEffects";
+import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { armyPower } from "@/lib/game/power";
 import {
   HERO_BAG_CAPACITY,
@@ -114,7 +116,8 @@ export async function upgradeMine(
         return { error: "המכרה כבר ברמה המקסימלית" };
       }
 
-      const cost = mineUpgradeCost(building.level);
+      const discountPct = await getShopDiscountPct(empireId, tx);
+      const cost = applyShopDiscount(mineUpgradeCost(building.level), discountPct);
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -441,14 +444,17 @@ export async function spyOnEmpire(
       const intelligenceLevel =
         attacker.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
       // Spy weapons add up to +15 percentage points on top of intelligence,
-      // capped at a 95% final chance. An active guild spy spell adds its
-      // percentage points on top, under the same cap.
+      // capped at a 95% final chance. An active guild spy spell and the hero's
+      // spy % (from equipped spy items) each add percentage points on top,
+      // under the same cap.
       const spyPower = weaponsPower(attacker.weapons, "SPY");
       const guildSpyBonusPct = await getActiveGuildBuffPct(empireId, "SPY", tx);
+      const heroSpyBonusPct = heroBonuses(attacker.hero).totalPct.spy;
       const chance = Math.min(
         0.95,
         finalSpyChance(spySuccessChance(intelligenceLevel), spyPower) +
-          guildSpyBonusPct / 100
+          guildSpyBonusPct / 100 +
+          heroSpyBonusPct / 100
       );
       const success = Math.random() < chance;
 
@@ -559,8 +565,8 @@ export async function attackEmpire(
       // multiplies it once more.
       const attackerHero = attacker.hero;
       const defenderHero = defender.hero;
-      const attackerHeroBonusPct = heroBonuses(attackerHero).total.attack;
-      const defenderHeroBonusPct = heroBonuses(defenderHero).total.defense;
+      const attackerHeroBonusPct = heroBonuses(attackerHero).totalPct.attack;
+      const defenderHeroBonusPct = heroBonuses(defenderHero).totalPct.defense;
       const attackerGuildBonusPct = await getActiveGuildBuffPct(
         empireId,
         "ATTACK",
@@ -814,7 +820,8 @@ export async function upgradeStorage(
       const storage = empire.storages.find((s) => s.resourceType === resourceType);
       if (!storage) return { error: "המחסן לא נמצא" };
 
-      const cost = storageUpgradeCost(storage.level);
+      const discountPct = await getShopDiscountPct(empireId, tx);
+      const cost = applyShopDiscount(storageUpgradeCost(storage.level), discountPct);
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -1083,7 +1090,11 @@ export async function upgradeEmpireUpgrade(
         return { error: "רמה מקסימלית" };
       }
 
-      const cost = empireUpgradeCostFor(upgradeType, upgrade.level);
+      const discountPct = await getShopDiscountPct(empireId, tx);
+      const cost = applyShopDiscount(
+        empireUpgradeCostFor(upgradeType, upgrade.level),
+        discountPct
+      );
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -1172,12 +1183,16 @@ export async function buyWeapon(
       }
 
       // Buying uses only available balances — warehouse stock is protected.
-      const cost = {
-        gold: weapon.cost.gold * quantity,
-        wood: weapon.cost.wood * quantity,
-        iron: weapon.cost.iron * quantity,
-        stone: weapon.cost.stone * quantity,
-      };
+      const discountPct = await getShopDiscountPct(empireId, tx);
+      const cost = applyShopDiscount(
+        {
+          gold: weapon.cost.gold * quantity,
+          wood: weapon.cost.wood * quantity,
+          iron: weapon.cost.iron * quantity,
+          stone: weapon.cost.stone * quantity,
+        },
+        discountPct
+      );
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -1249,7 +1264,8 @@ export async function unlockNextWeaponTier(
         return { error: "כל הנשקים בקטגוריה פתוחים." };
       }
 
-      const cost = weaponTierUnlockCost(unlock.unlockedTier);
+      const discountPct = await getShopDiscountPct(empireId, tx);
+      const cost = applyShopDiscount(weaponTierUnlockCost(unlock.unlockedTier), discountPct);
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||

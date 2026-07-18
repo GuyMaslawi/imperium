@@ -43,6 +43,9 @@ model Empire {
   diamonds            Float    @default(10)
   citizens            Int      @default(50)
   turns               Int      @default(0)
+  /// Remaining wheel-of-fortune spins. Consumed on each spin, topped up on
+  /// every daily update (capped) — see WHEEL_DAILY_SPINS / WHEEL_SPINS_CAP.
+  wheelSpins          Int      @default(4)
   lastRegularUpdateAt DateTime @default(now())
   lastDailyUpdateAt   DateTime @default(now())
   /// Last time the player opened the reports page — drives the "new reports" badge.
@@ -68,6 +71,40 @@ model Empire {
   messages           Message[]
   guildMembership    GuildMember?
   guildBuffs         GuildSpellBuff[]
+  diamondEffects     DiamondEffect[]
+}
+
+/* ------------------------------ diamond shop ------------------------------ */
+
+/// A purchasable diamond effect on an empire. Timed buffs (resource boosts,
+/// shop discount) use `magnitude` + `activeUntil`; cooldown-only spells
+/// (bank interest) use `readyAt`. One row per (empire, kind).
+enum DiamondEffectKind {
+  RESOURCE_BOOST_GOLD
+  RESOURCE_BOOST_WOOD
+  RESOURCE_BOOST_IRON
+  RESOURCE_BOOST_STONE
+  SHOP_DISCOUNT
+  BANK_INTEREST
+}
+
+model DiamondEffect {
+  id          String            @id @default(cuid())
+  empireId    String
+  kind        DiamondEffectKind
+  /// Boost/discount percent (0 for cooldown-only spells).
+  magnitude   Float             @default(0)
+  /// When a timed buff expires (null for cooldown-only spells).
+  activeUntil DateTime?
+  /// When a cooldown-only spell becomes usable again (null for buffs).
+  readyAt     DateTime?
+  updatedAt   DateTime          @updatedAt
+  createdAt   DateTime          @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, kind])
+  @@index([empireId, activeUntil])
 }
 
 /* ------------------------------ guilds ------------------------------ */
@@ -220,6 +257,8 @@ model Hero {
   defensePoints  Int      @default(0)
   resourcePoints Int      @default(0)
   resets         Int      @default(0)
+  /// The season in which the diamond points-reset was last used (once/season).
+  pointsResetSeasonId String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

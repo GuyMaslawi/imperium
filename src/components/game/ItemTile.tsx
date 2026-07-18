@@ -42,10 +42,18 @@ const RARITY: Record<
 export interface ItemTileDetails {
   name: string;
   rarityLabel: string;
-  /** What the item grants, e.g. +12.5% התקפה. */
+  /** What the item grants, e.g. +12% התקפה or +40 תורות. */
   statIcon: string;
   statLabel: string;
-  bonusPct: number;
+  /** The bonus amount — a percentage, unless `bonusIsFlat` is set. */
+  bonusValue: number;
+  /** When true, the bonus is a flat count of units (turns/diamonds/…), not a %. */
+  bonusIsFlat?: boolean;
+  /**
+   * For resource items: one line per resource granted (icon + word + amount).
+   * When present it replaces the single stat line.
+   */
+  resourceLines?: { icon: string; label: string; value: number }[];
   /** Requirement: the hero must be at least this level to equip. */
   requiredLevel: number;
   /** Whether the current hero meets the requirement. */
@@ -58,7 +66,8 @@ export interface ItemTileDetails {
 }
 
 export function formatBonus(pct: number): string {
-  return Number.isInteger(pct) ? String(pct) : pct.toFixed(1);
+  // Bonuses are always whole percentages.
+  return String(Math.round(pct));
 }
 
 /**
@@ -186,13 +195,29 @@ export function ItemTile({
           <div className="rule-gold my-2" />
 
           {/* what the item grants */}
-          <p className="text-xs text-zinc-300">
-            {details.statIcon}{" "}
-            <span className="nums font-black text-emerald-400" dir="ltr">
-              +{formatBonus(details.bonusPct)}%
-            </span>{" "}
-            {details.statLabel}
-          </p>
+          {details.resourceLines && details.resourceLines.length > 0 ? (
+            <div className="space-y-0.5 text-xs text-zinc-300">
+              {details.resourceLines.map((line) => (
+                <p key={line.label} className="flex items-center justify-between gap-2">
+                  <span>
+                    {line.icon} {line.label}
+                  </span>
+                  <span className="nums font-black text-emerald-400" dir="ltr">
+                    +{formatBonus(line.value)}
+                  </span>
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-300">
+              {details.statIcon}{" "}
+              <span className="nums font-black text-emerald-400" dir="ltr">
+                +{formatBonus(details.bonusValue)}
+                {details.bonusIsFlat ? "" : "%"}
+              </span>{" "}
+              {details.statLabel}
+            </p>
+          )}
 
           {/* requirement */}
           <p

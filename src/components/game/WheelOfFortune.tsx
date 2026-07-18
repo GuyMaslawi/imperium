@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WHEEL_PRIZES, wheelPrizeAmount, type WheelPrizeDef } from "@/lib/game/wheel";
-import { formatNumber } from "@/lib/game/format";
+import { WHEEL_PRIZES, type WheelPrizeDef } from "@/lib/game/wheel";
+import { spinWheel } from "@/server/actions/wheel";
 
 const SEG = 360 / WHEEL_PRIZES.length;
 const SPIN_MS = 4200;
@@ -11,13 +11,6 @@ const SPIN_MS = 4200;
 function conic(): string {
   const stops = WHEEL_PRIZES.map((p, i) => `${p.color} ${i * SEG}deg ${(i + 1) * SEG}deg`);
   return `conic-gradient(from -${SEG / 2}deg, ${stops.join(", ")})`;
-}
-
-/** "2,400 זהב" for amount prizes, just the label for unit prizes. */
-function prizeText(prize: WheelPrizeDef, day: number): string {
-  return prize.kind === "amount"
-    ? `${formatNumber(wheelPrizeAmount(prize, day))} ${prize.label}`
-    : prize.label;
 }
 
 type ConfettiPiece = { id: number; dx: string; dy: string; rot: string; delay: string; icon: string };
@@ -51,7 +44,8 @@ export function WheelOfFortune({
 }) {
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<WheelPrizeDef | null>(null);
+  const [result, setResult] = useState<{ prize: WheelPrizeDef; message: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [spinsLeft, setSpinsLeft] = useState(spinsAvailable);
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
   const timerRef = useRef<number | null>(null);
@@ -62,24 +56,33 @@ export function WheelOfFortune({
     };
   }, []);
 
-  function spin() {
+  async function spin() {
     if (spinning || spinsLeft <= 0) return;
     setSpinning(true);
     setResult(null);
+    setError(null);
     setConfetti([]);
 
-    const idx = Math.floor(Math.random() * WHEEL_PRIZES.length);
+    // The server owns the roll and the payout — we only animate to its result.
+    const outcome = await spinWheel();
+    if (!outcome.ok) {
+      setSpinning(false);
+      setError(outcome.error);
+      return;
+    }
+
+    const idx = outcome.prizeIndex;
     // Land the winning wedge under the pointer, with a little jitter inside
     // the wedge so it doesn't stop dead-center every time.
     const jitter = (Math.random() - 0.5) * SEG * 0.6;
     const restAngle = 360 - idx * SEG + jitter;
     const next = rotation - (rotation % 360) + 360 * 6 + restAngle;
     setRotation(next);
-    setSpinsLeft((n) => n - 1);
+    setSpinsLeft(outcome.spinsLeft);
 
     timerRef.current = window.setTimeout(() => {
       setSpinning(false);
-      setResult(WHEEL_PRIZES[idx]);
+      setResult({ prize: WHEEL_PRIZES[idx], message: outcome.message });
       setConfetti(makeConfetti());
     }, SPIN_MS);
   }
@@ -164,15 +167,9 @@ export function WheelOfFortune({
                     transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-108px) rotate(${-angle}deg)`,
                   }}
                 >
-                  <span className="text-xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{p.icon}</span>
+                  <span className="text-2xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{p.icon}</span>
                   <span className="whitespace-nowrap text-[10px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                     {p.label}
-                  </span>
-                  <span
-                    className="nums whitespace-nowrap text-[9px] font-black text-gold-bright drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
-                    dir="ltr"
-                  >
-                    {p.kind === "amount" ? formatNumber(wheelPrizeAmount(p, seasonDay)) : "x1"}
                   </span>
                 </div>
               );
@@ -215,12 +212,15 @@ export function WheelOfFortune({
         {/* result */}
         {result && (
           <div className="wheel-pop mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
-            <p className="text-sm font-bold text-emerald-300">
-              זכית ב־{result.icon} {prizeText(result, seasonDay)}!
-            </p>
-            {result.note && (
-              <p className="mt-0.5 text-[11px] text-emerald-200/70">{result.note}</p>
+            <p className="text-sm font-bold text-emerald-300">{result.message}</p>
+            {result.prize.note && (
+              <p className="mt-0.5 text-[11px] text-emerald-200/70">{result.prize.note}</p>
             )}
+          </div>
+        )}
+        {error && (
+          <div className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2">
+            <p className="text-sm font-bold text-red-300">{error}</p>
           </div>
         )}
 
