@@ -35,6 +35,64 @@ model GameConfig {
   updatedAt DateTime @updatedAt
 }
 
+enum MiniGameType {
+  GUESS_NUMBER
+  FIND_BALL
+}
+
+/// An admin-authored mini-game event (guess-the-number / find-the-ball). When
+/// `isActive`, it shows as a live bar at the top of every player's screen and
+/// grants the prize bundle to winners. `config` holds the secret answer +
+/// public params ({min,max,answer} or {cups,answer}) — never send answer to
+/// the client.
+model MiniGameEvent {
+  id           String       @id @default(cuid())
+  type         MiniGameType
+  title        String
+  config       Json
+  maxAttempts  Int          @default(5)
+  /// 0 = unlimited winners.
+  maxWinners   Int          @default(0)
+  winnersCount Int          @default(0)
+  isActive     Boolean      @default(false)
+
+  prizeGold       Float @default(0)
+  prizeWood       Float @default(0)
+  prizeIron       Float @default(0)
+  prizeStone      Float @default(0)
+  prizeDiamonds   Float @default(0)
+  prizeCitizens   Int   @default(0)
+  prizeTurns      Int   @default(0)
+  prizeWheelSpins Int   @default(0)
+
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime?
+  endedAt     DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  entries MiniGameEntry[]
+
+  @@index([isActive])
+}
+
+/// One player's participation in a mini-game event (attempts + win state).
+model MiniGameEntry {
+  id        String    @id @default(cuid())
+  eventId   String
+  empireId  String
+  attempts  Int       @default(0)
+  solved    Boolean   @default(false)
+  won       Boolean   @default(false)
+  wonAt     DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  event MiniGameEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, empireId])
+  @@index([eventId])
+}
+
 /// Append-only trail of every mutating admin action, for accountability.
 model AdminAuditLog {
   id         String   @id @default(cuid())

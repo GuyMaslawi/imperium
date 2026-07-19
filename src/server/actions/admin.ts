@@ -10,6 +10,7 @@ import type {
   HeroItemSlot,
   HeroRarity,
   MessageKind,
+  MiniGameType,
   Prisma,
   ResourceStorageType,
   Role,
@@ -992,6 +993,178 @@ export async function saveTunables(
     });
     revalidatePath("/admin/balance");
     return { success: "האיזון הגלובלי נשמר" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ============================================================= */
+/*                         MINI-GAMES                           */
+/* ============================================================= */
+
+const miniTypeSchema = z.enum(["GUESS_NUMBER", "FIND_BALL"]);
+
+/** Random integer in [min, max] (inclusive). */
+function randInt(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** Build a fresh secret config (with a new random answer) for a mini-game. */
+function freshConfig(
+  type: MiniGameType,
+  params: { min: number; max: number; cups: number }
+): { min?: number; max?: number; cups?: number; answer: number } {
+  if (type === "GUESS_NUMBER") {
+    return { min: params.min, max: params.max, answer: randInt(params.min, params.max) };
+  }
+  return { cups: params.cups, answer: randInt(0, params.cups - 1) };
+}
+
+function readPrizeBundle(formData: FormData) {
+  return {
+    prizeGold: Math.max(0, optNum(formData, "prizeGold")),
+    prizeWood: Math.max(0, optNum(formData, "prizeWood")),
+    prizeIron: Math.max(0, optNum(formData, "prizeIron")),
+    prizeStone: Math.max(0, optNum(formData, "prizeStone")),
+    prizeDiamonds: Math.max(0, optNum(formData, "prizeDiamonds")),
+    prizeCitizens: Math.max(0, Math.round(optNum(formData, "prizeCitizens"))),
+    prizeTurns: Math.max(0, Math.round(optNum(formData, "prizeTurns"))),
+    prizeWheelSpins: Math.max(0, Math.round(optNum(formData, "prizeWheelSpins"))),
+  };
+}
+
+/** Create a new (inactive) mini-game with a preset prize. */
+export async function createMiniGame(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const type = miniTypeSchema.parse(formData.get("type")) as MiniGameType;
+    const title = str(formData, "title");
+    if (title.length < 2) return { error: "כותרת קצרה מדי" };
+
+    const min = Math.round(optNum(formData, "min", 1));
+    const max = Math.round(optNum(formData, "max", 100));
+    const cups = Math.min(6, Math.max(2, Math.round(optNum(formData, "cups", 3))));
+    if (type === "GUESS_NUMBER" && max <= min) {
+      return { error: "הטווח לא תקין (מקסימום חייב להיות גדול ממינימום)" };
+    }
+    const maxAttempts = Math.max(1, Math.round(optNum(formData, "maxAttempts", 5)));
+    const maxWinners = Math.max(0, Math.round(optNum(formData, "maxWinners", 0)));
+
+    const event = await prisma.miniGameEvent.create({
+      data: {
+        type,
+        title,
+        config: freshConfig(type, { min, max, cups }),
+        maxAttempts,
+        maxWinners,
+        ...readPrizeBundle(formData),
+      },
+    });
+    await logAdmin(admin, {
+      action: "minigame.create",
+      targetType: "minigame",
+      targetId: event.id,
+      summary: `נוצר מיני-משחק "${title}"`,
+    });
+    revalidatePath("/admin/minigame");
+    return { success: "המיני-משחק נוצר. הפעל אותו כדי לשחרר לכולם." };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Activate a mini-game: fresh answer, cleared entries, live for everyone. */
+export async function activateMiniGame(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    const event = await prisma.miniGameEvent.findUnique({ where: { id } });
+    if (!event) return { error: "המיני-משחק לא נמצא" };
+
+    const cfg = (event.config ?? {}) as Record<string, number>;
+    const params = {
+      min: cfg.min ?? 1,
+      max: cfg.max ?? 100,
+      cups: cfg.cups ?? 3,
+    };
+
+    await prisma.$transaction([
+      prisma.miniGameEvent.updateMany({ data: { isActive: false } }),
+      prisma.miniGameEntry.deleteMany({ where: { eventId: id } }),
+      prisma.miniGameEvent.update({
+        where: { id },
+        data: {
+          isActive: true,
+          winnersCount: 0,
+          activatedAt: new Date(),
+          endedAt: null,
+          config: freshConfig(event.type, params),
+        },
+      }),
+    ]);
+    await logAdmin(admin, {
+      action: "minigame.activate",
+      targetType: "minigame",
+      targetId: id,
+      summary: `שוחרר מיני-משחק "${event.title}" לכל השחקנים`,
+    });
+    revalidatePath("/admin/minigame");
+    revalidatePath("/game", "layout");
+    return { success: "המיני-משחק שוחרר לכל השחקנים! 🎉" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Stop the active mini-game. */
+export async function deactivateMiniGame(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    await prisma.miniGameEvent.update({
+      where: { id },
+      data: { isActive: false, endedAt: new Date() },
+    });
+    await logAdmin(admin, {
+      action: "minigame.deactivate",
+      targetType: "minigame",
+      targetId: id,
+      summary: "מיני-משחק הופסק",
+    });
+    revalidatePath("/admin/minigame");
+    revalidatePath("/game", "layout");
+    return { success: "המיני-משחק הופסק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Delete a mini-game (and its entries). */
+export async function deleteMiniGame(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    await prisma.miniGameEvent.delete({ where: { id } });
+    await logAdmin(admin, {
+      action: "minigame.delete",
+      targetType: "minigame",
+      targetId: id,
+      summary: "מיני-משחק נמחק",
+    });
+    revalidatePath("/admin/minigame");
+    return { success: "המיני-משחק נמחק" };
   } catch (e) {
     return toErr(e);
   }

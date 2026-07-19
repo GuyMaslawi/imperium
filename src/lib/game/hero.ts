@@ -497,3 +497,33 @@ export function rollItemDrop(
 export function itemDisplayName(slot: HeroItemSlot, level: number): string {
   return `${SLOT_META[slot].label} ${RARITY_META[tierForLevel(level)].label}`;
 }
+
+/* ------------------------------ discard → wheel spin ------------------------------ */
+
+/**
+ * Throwing an item away can reward a wheel-of-fortune spin — the fates smile on
+ * those who part with their gear. The chance climbs sharply with the item's
+ * tier, so junk almost never pays while an אגדי pays a full 1-in-10.
+ */
+export const DISCARD_WHEEL_SPIN_CHANCE: Record<HeroRarity, number> = {
+  COMMON: 0.01, // פשוט — 1%
+  RARE: 0.03, // מתקדם — 3%
+  EPIC: 0.06, // אליט — 6%
+  LEGENDARY: 0.1, // אגדי — 10%
+};
+
+/** The wheel-spin drop chance for an item of the given level (by its tier). */
+export function discardWheelSpinChance(level: number): number {
+  return DISCARD_WHEEL_SPIN_CHANCE[tierForLevel(level)];
+}
+
+/**
+ * Roll whether throwing away an item of the given level grants a wheel spin.
+ * The server owns this roll, exactly like item drops.
+ */
+export function rollDiscardWheelSpin(
+  level: number,
+  random: () => number = Math.random
+): boolean {
+  return random() < discardWheelSpinChance(level);
+}

@@ -9,6 +9,8 @@ import { UpdateTimers } from "@/components/game/UpdateTimers";
 import { SeasonPassButton } from "@/components/game/SeasonPass";
 import { Sidebar } from "@/components/game/Sidebar";
 import { WarAlerts } from "@/components/game/WarAlerts";
+import { MiniGameLauncher } from "@/components/game/MiniGameLauncher";
+import { getMiniGameState } from "@/server/actions/minigame";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
@@ -33,6 +35,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const bonuses = heroBonuses(hero);
 
   const admin = await isAdmin();
+  const miniGame = await getMiniGameState();
 
   // Sidebar badges: unread inbox messages + reports since the last visit.
   const [unreadMessages, newBattleReports, newSpyReports] = await Promise.all([
@@ -62,6 +65,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           citizens: empire.citizens,
           turns: empire.turns,
         }}
+        miniGame={<MiniGameLauncher initial={miniGame} />}
       />
 
       <div

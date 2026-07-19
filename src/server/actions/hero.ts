@@ -16,6 +16,7 @@ import {
   itemDisplayName,
   itemUpgradeCost,
   nextTierLevel,
+  rollDiscardWheelSpin,
   tierForLevel,
 } from "@/lib/game/hero";
 import type { ActionState } from "./game";
@@ -257,7 +258,22 @@ export async function discardHeroItem(
       // Scope the delete to this hero so a stale id can't touch another's gear.
       await tx.heroItem.deleteMany({ where: { id: item.id, heroId: hero.id } });
 
-      return { success: `${itemDisplayName(item.slot, item.level)} נזרק` };
+      // The fates may reward parting with gear — rarer items pay far more often
+      // (אגדי pays 1-in-10). The server owns the roll.
+      const wonSpin = rollDiscardWheelSpin(item.level);
+      if (wonSpin) {
+        await tx.empire.update({
+          where: { id: empireId },
+          data: { wheelSpins: { increment: 1 } },
+        });
+      }
+
+      const name = itemDisplayName(item.slot, item.level);
+      return {
+        success: wonSpin
+          ? `${name} נזרק — ומזל טוב! 🎡 זכית בסיבוב גלגל מזל!`
+          : `${name} נזרק`,
+      };
     });
 
     revalidateGame();
@@ -293,14 +309,30 @@ export async function discardHeroItems(
       const hero = empire.hero;
       if (!hero) return { error: "הגיבור לא נמצא" };
 
-      const owned = hero.items.filter((i) => ids.has(i.id)).map((i) => i.id);
+      const owned = hero.items.filter((i) => ids.has(i.id));
       if (owned.length === 0) return { error: "הפריטים לא נמצאו בתיק שלך" };
 
       const { count } = await tx.heroItem.deleteMany({
-        where: { id: { in: owned }, heroId: hero.id },
+        where: { id: { in: owned.map((i) => i.id) }, heroId: hero.id },
       });
 
-      return { success: `${count} חפצים נזרקו` };
+      // Roll each thrown item independently — rarer gear pays a wheel spin far
+      // more often (אגדי pays 1-in-10). The server owns every roll.
+      let spinsWon = 0;
+      for (const item of owned) if (rollDiscardWheelSpin(item.level)) spinsWon += 1;
+      if (spinsWon > 0) {
+        await tx.empire.update({
+          where: { id: empireId },
+          data: { wheelSpins: { increment: spinsWon } },
+        });
+      }
+
+      return {
+        success:
+          spinsWon > 0
+            ? `${count} חפצים נזרקו — ומזל טוב! 🎡 זכית ב-${spinsWon} סיבובי גלגל מזל!`
+            : `${count} חפצים נזרקו`,
+      };
     });
 
     revalidateGame();

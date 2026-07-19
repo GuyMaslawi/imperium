@@ -16,6 +16,7 @@ import {
   RARITY_META,
   SLOT_META,
   canEquipItem,
+  discardWheelSpinChance,
   itemBonusValue,
   itemDisplayName,
   itemResourceBreakdown,
@@ -75,6 +76,20 @@ export function ItemDialog({
     startTransition(async () => {
       const res = await action({}, fd);
       if (res.success) onClose();
+      else setMsg(res);
+    });
+  };
+
+  // Throwing an item away may reward a wheel spin (🎡 in the success text). On a
+  // win keep the dialog open so the player actually sees the reward; otherwise
+  // close as usual.
+  const doDiscard = () => {
+    const fd = new FormData();
+    fd.set("itemId", item.id);
+    startTransition(async () => {
+      const res = await discardHeroItem({}, fd);
+      if (res.success?.includes("🎡")) setMsg(res);
+      else if (res.success) onClose();
       else setMsg(res);
     });
   };
@@ -247,7 +262,7 @@ export function ItemDialog({
 
         {confirmDiscard ? (
           <button
-            onClick={() => run(discardHeroItem)}
+            onClick={doDiscard}
             disabled={pending}
             className="btn py-2 text-sm font-black text-white"
             style={{ background: "linear-gradient(180deg,#b91c1c,#7f1d1d)" }}
@@ -264,6 +279,13 @@ export function ItemDialog({
           </button>
         )}
       </div>
+
+      {confirmDiscard && (
+        <p className="mt-2 text-center text-xs text-amber-300/80">
+          🎡 סיכוי {Math.round(discardWheelSpinChance(level) * 100)}% לזכות בסיבוב
+          גלגל מזל מהזריקה
+        </p>
+      )}
     </Dialog>
   );
 }

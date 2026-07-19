@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { type ResourceKey } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
@@ -55,8 +56,11 @@ const PILLS: PillConfig[] = [
 
 export function ResourceBar({
   resources,
+  miniGame,
 }: {
   resources: Record<ResourceKey, number>;
+  /** Optional slot rendered on the right of the command bar (mini-game die). */
+  miniGame?: ReactNode;
 }) {
   return (
     <header
@@ -81,6 +85,9 @@ export function ResourceBar({
             </Tip>
           ))}
         </div>
+
+        {/* mini-game die (right side of the command bar) */}
+        {miniGame}
 
         {/* language toggle */}
         <div className="hidden shrink-0 items-center overflow-hidden rounded-md border border-border-subtle text-xs font-bold sm:flex">
