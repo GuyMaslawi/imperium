@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 type Reward = { icon: string; label: string };
 type Tier = { tier: number; free: Reward; premium: Reward };
@@ -80,7 +81,7 @@ function PremiumTile({
       ) : claimed ? (
         <span className="text-[9px] font-bold text-emerald-400">נאסף ✅</span>
       ) : reached ? (
-        <span className="text-[9px] font-bold text-gold-bright">✨ מוכן לאיסוף</span>
+        <span className="flex items-center justify-center gap-0.5 text-[9px] font-bold text-gold-bright"><Icon name="spark" size={11} /> מוכן לאיסוף</span>
       ) : (
         <span className="text-[9px] font-bold text-zinc-500">🔒 טרם הושג</span>
       )}
@@ -163,8 +164,8 @@ export function SeasonPassButton({
             PREMIUM
           </span>
         ) : (
-          <span aria-hidden className="animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
-            שדרג ✨
+          <span aria-hidden className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
+            שדרג <Icon name="spark" size={11} />
           </span>
         )}
       </button>
@@ -207,15 +208,15 @@ export function SeasonPassButton({
             <div className="mt-5">
               <div className="flex items-center justify-between text-sm font-bold text-zinc-200">
                 <span>רמה נוכחית: {level}</span>
-                <span className="text-zinc-400">כל פעולה יומית = XP ✨</span>
+                <span className="inline-flex items-center gap-1 text-zinc-400">כל פעולה יומית = XP <Icon name="spark" size={12} /></span>
               </div>
               <div className="relative mt-2 h-5 overflow-hidden rounded-full border border-gold/40 bg-black/50">
                 <span
                   className="absolute inset-y-0 right-0 bg-gradient-to-l from-gold to-gold-bright"
                   style={{ width: `${pct}%` }}
                 />
-                <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black text-black/80 nums">
-                  XP {xp}/{xpMax} ⚡
+                <span className="absolute inset-0 flex items-center justify-center gap-1 text-[11px] font-black text-black/80 nums">
+                  XP {xp}/{xpMax} <Icon name="spark" size={12} />
                 </span>
               </div>
             </div>
@@ -229,7 +230,11 @@ export function SeasonPassButton({
                   disabled={collectableCount === 0}
                   className="btn btn-gold mt-3 px-6 py-2 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {collectableCount > 0 ? `🎁 אסוף ${collectableCount} תגמולים שהגעת אליהם` : "🎁 אין תגמולים לאיסוף"}
+                  {collectableCount > 0 ? (
+                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אסוף {collectableCount} תגמולים שהגעת אליהם</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אין תגמולים לאיסוף</span>
+                  )}
                 </button>
                 <p className="mt-1.5 text-[10px] text-zinc-500">אפשר לאסוף רק תגמולים מרמות שכבר עברת</p>
               </div>
@@ -239,7 +244,7 @@ export function SeasonPassButton({
                   shake ? "sp-shake" : ""
                 }`}
               >
-                <p className="text-lg font-black text-gold-bright">👑 שדרג ל־PREMIUM</p>
+                <p className="flex items-center justify-center gap-1.5 text-lg font-black text-gold-bright"><Icon name="crown" size={18} /> שדרג ל־PREMIUM</p>
                 <p className="mt-1 text-sm text-amber-100/90">
                   פתח את <span className="font-black text-gold-bright">כל 8 התגמולים</span> — פי 3 שלל,
                   יהלומים ופריטים אגדיים 🔥
@@ -251,12 +256,16 @@ export function SeasonPassButton({
                     unlocking ? "" : "animate-pulse"
                   }`}
                 >
-                  {unlocking ? "🔓 פותח..." : `🔓 שדרג עכשיו · ${PREMIUM_PRICE} 💎`}
+                  {unlocking ? "🔓 פותח..." : (
+                    <span className="inline-flex items-center gap-1">🔓 שדרג עכשיו · {PREMIUM_PRICE} <Icon name="diamond" size={14} /></span>
+                  )}
                 </button>
                 <p className={`mt-1.5 text-[10px] ${canAfford ? "text-amber-200/60" : "text-red-400 font-bold"}`}>
-                  {canAfford
-                    ? `יש לך ${diamonds} 💎 · מבצע לזמן מוגבל`
-                    : `אין מספיק יהלומים (${diamonds}/${PREMIUM_PRICE} 💎)`}
+                  {canAfford ? (
+                    <span className="inline-flex items-center gap-1">יש לך {diamonds} <Icon name="diamond" size={12} /> · מבצע לזמן מוגבל</span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1">אין מספיק יהלומים ({diamonds}/{PREMIUM_PRICE} <Icon name="diamond" size={12} />)</span>
+                  )}
                 </p>
               </div>
             )}
@@ -264,7 +273,7 @@ export function SeasonPassButton({
             {/* Column headers: right = free, left = premium (RTL) */}
             <div className="mt-6 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2">
               <div className="flex items-center justify-center gap-1 rounded-lg border border-gold/50 bg-amber-950/50 py-1.5 text-center text-xs font-black text-gold-bright">
-                👑 פרימיום {!owned && <span aria-hidden>🔒</span>}
+<Icon name="crown" size={13} className="inline-block align-text-bottom" /> פרימיום {!owned && <span aria-hidden>🔒</span>}
               </div>
               <div />
               <div className="rounded-lg border border-sky-500/40 bg-sky-950/40 py-1.5 text-center text-xs font-black text-sky-200">
@@ -309,7 +318,9 @@ export function SeasonPassButton({
                   unlocking ? "" : "animate-pulse"
                 }`}
               >
-                {unlocking ? "🔓 פותח את הצד הזהוב..." : `🔓 שדרג ל־PREMIUM · ${PREMIUM_PRICE} 💎`}
+                {unlocking ? "🔓 פותח את הצד הזהוב..." : (
+                  <span className="inline-flex items-center gap-1">🔓 שדרג ל־PREMIUM · {PREMIUM_PRICE} <Icon name="diamond" size={14} /></span>
+                )}
               </button>
             )}
           </div>

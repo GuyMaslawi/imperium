@@ -9,6 +9,7 @@ import {
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 const ALL_TO_RESOURCE: Array<{
   resource: "gold" | "wood" | "iron" | "stone";
@@ -37,7 +38,7 @@ export function MineSlaveQuickActions() {
   return (
     <div className="panel rounded-xl p-4 space-y-3">
       <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
-        <span aria-hidden>⚡</span>
+        <Icon name="spark" size={16} className="text-crimson-bright" />
         פעולות מהירות
       </h2>
       <div className="flex flex-wrap gap-2">

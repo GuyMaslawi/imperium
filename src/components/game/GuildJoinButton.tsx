@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { joinGuild } from "@/server/actions/guild";
 import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { Icon } from "@/components/ui/Icon";
 
 export interface GuildJoinButtonProps {
   guildId: string;
@@ -29,7 +30,7 @@ export function GuildJoinButton({ guildId, full }: GuildJoinButtonProps) {
         className="btn btn-ghost px-3 py-1 text-xs"
         pendingText="מצטרף..."
       >
-        ⚔️ הצטרף
+        <Icon name="attack" size={14} className="inline-block align-text-bottom" /> הצטרף
       </SubmitButton>
       {state.error && (
         <span className="text-[10px] text-red-400">{state.error}</span>

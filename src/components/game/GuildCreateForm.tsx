@@ -9,6 +9,7 @@ import {
 } from "@/lib/game/guild";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 export interface GuildCreateFormProps {
   /** The player's diamond balance — the form disables when it can't cover the cost. */
@@ -44,7 +45,7 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
         disabled={!canAfford}
         pendingText="מקים ברית..."
       >
-        ⚒️ שלם {GUILD_CREATION_COST_DIAMONDS} 💎 והקם ברית
+        ⚒️ שלם {GUILD_CREATION_COST_DIAMONDS} <Icon name="diamond" size={14} className="inline-block align-text-bottom" /> והקם ברית
       </SubmitButton>
 
       {!canAfford && (

@@ -3,6 +3,7 @@ import { UNIT_META, UNIT_KEYS } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
 import { TrainCard } from "@/components/game/TrainCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "צבא | אימפריום" };
 
@@ -23,7 +24,7 @@ export default async function ArmyPage() {
           <span className="rounded-lg border border-gold/40 bg-panel-inset px-3 py-1 text-sm">
             <span className="text-gold-dim">אזרחים פנויים </span>
             <span className="nums font-black text-gold-bright" dir="ltr">
-              👥 {formatNumber(empire.citizens)}
+              <Icon name="citizens" size={14} className="inline align-[-2px]" /> {formatNumber(empire.citizens)}
             </span>
           </span>
         </div>

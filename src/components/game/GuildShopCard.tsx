@@ -10,6 +10,7 @@ import {
 } from "@/lib/game/guild";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 export interface GuildShopCardProps {
   type: GuildSpellType;
@@ -70,8 +71,8 @@ export function GuildShopCard({
       <form className="mt-auto grid gap-2">
         <input type="hidden" name="type" value={type} />
         {isActive ? (
-          <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-center text-xs font-semibold text-emerald-400">
-            ✨ פעיל עד {activeLabel}
+          <span className="flex items-center justify-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-center text-xs font-semibold text-emerald-400">
+            <Icon name="spark" size={14} /> פעיל עד {activeLabel}
           </span>
         ) : (
           <SubmitButton
@@ -80,7 +81,7 @@ export function GuildShopCard({
             disabled={diamonds < castCost}
             pendingText="מטיל קסם..."
           >
-            הטל קסם · {castCost} 💎
+            הטל קסם · {castCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
           </SubmitButton>
         )}
         {upgradeCost != null ? (
@@ -91,11 +92,11 @@ export function GuildShopCard({
             disabled={diamonds < upgradeCost}
             pendingText="משדרג..."
           >
-            שדרג ל־{bonusPct + 1}% · {upgradeCost} 💎
+            שדרג ל־{bonusPct + 1}% · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
           </SubmitButton>
         ) : (
-          <span className="rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-            🏆 עזרה מקסימלית ({GUILD_SPELL_MAX_LEVEL}%)
+          <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
+            <Icon name="rankings" size={14} /> עזרה מקסימלית ({GUILD_SPELL_MAX_LEVEL}%)
           </span>
         )}
       </form>

@@ -7,6 +7,7 @@ import { lastDailyUpdate } from "@/lib/game/time";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "דירוג | אימפריום" };
 
@@ -50,7 +51,7 @@ export default async function RankingsPage() {
     <div className="space-y-6">
       {/* Other players train, attack and rise in rank — keep the table live. */}
       <AutoRefresh intervalMs={30_000} />
-      <SectionHeading title="דירוג" subtitle="LEADERBOARD" ornament="🏆" />
+      <SectionHeading title="דירוג" subtitle="LEADERBOARD" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
 
       {/* -------- status strip -------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -90,7 +91,7 @@ export default async function RankingsPage() {
       {/* -------- leaderboard -------- */}
       <div className="panel-gold overflow-x-auto rounded-xl p-0">
         <h2 className="flex items-center gap-2 px-4 pb-3 pt-4 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>🏆</span>
+          <Icon name="rankings" size={20} className="text-crimson-bright" />
           דירוג לפי ואלקריה
         </h2>
         <table className="w-full min-w-[640px] text-sm">
@@ -129,7 +130,7 @@ export default async function RankingsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-gradient-to-b from-gold-deep/40 to-black text-lg">
-                        👑
+                        <Icon name="crown" size={20} className="text-bone" />
                       </span>
                       <div className="min-w-0">
                         <Link
@@ -143,7 +144,7 @@ export default async function RankingsPage() {
                           <span className="nums" dir="ltr">
                             {empire.level}
                           </span>
-                          ) ✨
+                          ) <Icon name="spark" size={14} className="inline-block align-middle" />
                         </span>
                         {isMe && (
                           <span className="mr-1.5 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
@@ -157,7 +158,7 @@ export default async function RankingsPage() {
                             dir="ltr"
                             title={`רמת הגיבור: ${empire.hero?.level ?? 1}`}
                           >
-                            ⚔ {empire.hero?.level ?? 1}
+                            <Icon name="attack" size={12} className="inline-block align-middle" /> {empire.hero?.level ?? 1}
                           </span>
                           {(empire.hero?.resets ?? 0) > 0 && (
                             <span
@@ -169,7 +170,7 @@ export default async function RankingsPage() {
                             </span>
                           )}
                           <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
-                            100 ❤️
+                            100 <Icon name="heart" size={12} className="inline-block align-middle" />
                           </span>
                         </div>
                       </div>
@@ -181,7 +182,7 @@ export default async function RankingsPage() {
                       className="nums inline-flex items-center gap-1 font-bold text-gold-bright"
                       dir="ltr"
                     >
-                      {formatNumber(Math.floor(empire.gold))} 🪙
+                      {formatNumber(Math.floor(empire.gold))} <Icon name="gold" size={14} className="inline-block align-middle" />
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -199,23 +200,23 @@ export default async function RankingsPage() {
       {/* -------- hall of fame -------- */}
       <div>
         <h2 className="mb-3 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>🏆</span>
+          <Icon name="rankings" size={20} className="text-crimson-bright" />
           היכל התהילה
         </h2>
         <div className="grid gap-4 md:grid-cols-3">
           <div className="panel rounded-xl p-4">
-            <h3 className="mb-3 text-sm font-bold text-gold">🤝 בריתות</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold"><Icon name="guild" size={18} className="text-crimson-bright" /> בריתות</h3>
             <p className="text-sm text-zinc-500">מערכת הבריתות תיפתח בהמשך.</p>
           </div>
           <div className="panel rounded-xl p-4">
-            <h3 className="mb-3 text-sm font-bold text-gold">🕵️ מודיעין</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold"><Icon name="spy" size={18} className="text-crimson-bright" /> מודיעין</h3>
             <p className="text-sm text-zinc-500">
               דירוג המודיעין ייפתח בהמשך.
             </p>
           </div>
           <div className="panel-gold rounded-xl p-4">
-            <h3 className="mb-3 text-sm font-bold text-gold-bright">
-              ⚔️ כוח צבאי
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
+              <Icon name="attack" size={18} className="text-crimson-bright" /> כוח צבאי
             </h3>
             <ol className="space-y-2 text-sm">
               {podium.map((empire, index) => (

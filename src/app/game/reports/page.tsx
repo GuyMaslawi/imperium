@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { markReportsSeen } from "@/server/actions/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
@@ -95,7 +96,7 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markReportsSeen} />
-      <SectionHeading title="היסטוריה" subtitle="BATTLE HISTORY" ornament="📜" />
+      <SectionHeading title="היסטוריה" subtitle="BATTLE HISTORY" ornament={<Icon name="reports" size={22} className="text-crimson" />} />
 
       <ReportsTabs battles={battleRows} spies={spyRows} />
     </div>

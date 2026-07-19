@@ -8,6 +8,7 @@ import type { ActionState } from "@/server/actions/game";
 import { ItemTile } from "@/components/game/ItemTile";
 import { ItemDialog } from "@/components/game/ItemDialog";
 import { Dialog } from "@/components/ui/Dialog";
+import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 import {
   HERO_BAG_CAPACITY,
@@ -307,13 +308,13 @@ export function HeroBag({
                 }`}
                 dir="ltr"
               >
-                🪙 {totalUpgradeCost.toLocaleString("he-IL")}
+                <Icon name="gold" size={14} className="inline align-[-2px]" /> {totalUpgradeCost.toLocaleString("he-IL")}
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between">
               <span className="text-zinc-500">הזהב שלך</span>
               <span className="nums text-xs font-bold text-zinc-300" dir="ltr">
-                🪙 {Math.floor(gold).toLocaleString("he-IL")}
+                <Icon name="gold" size={14} className="inline align-[-2px]" /> {Math.floor(gold).toLocaleString("he-IL")}
               </span>
             </div>
           </div>

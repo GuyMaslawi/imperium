@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Dialog } from "@/components/ui/Dialog";
+import { Icon } from "@/components/ui/Icon";
 import { ItemTile, formatBonus } from "@/components/game/ItemTile";
 import { uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 import {
@@ -208,7 +209,7 @@ export function ItemDialog({
               className={`nums font-bold ${canAfford ? "text-gold-bright" : "text-red-400"}`}
               dir="ltr"
             >
-              🪙 {upgradeCost?.toLocaleString("he-IL")}
+              <Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost?.toLocaleString("he-IL")}
             </span>
           </div>
         </div>

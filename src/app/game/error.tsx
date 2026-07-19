@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { Icon } from "@/components/ui/Icon";
 
 /** Graceful error boundary for /game/* so a thrown error shows a themed
  *  recovery screen instead of the raw Next.js error overlay. */
@@ -28,7 +29,7 @@ export default function GameError({
           🔄 נסה שוב
         </button>
         <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm">
-          🏰 חזרה לבסיס
+          <Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס
         </Link>
       </div>
     </div>

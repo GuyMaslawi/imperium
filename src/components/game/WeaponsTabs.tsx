@@ -7,6 +7,7 @@ import {
   type AvailableResources,
 } from "@/components/game/WeaponCard";
 import { NextWeaponCard } from "@/components/game/NextWeaponCard";
+import { Icon } from "@/components/ui/Icon";
 
 export interface WeaponsTabData {
   category: "ATTACK" | "DEFENSE" | "SPY";
@@ -73,7 +74,7 @@ export function WeaponsTabs({
         <p className="text-sm font-semibold text-gold-dim">
           {active.totalPowerLabel}:{" "}
           <span className="font-bold text-gold-bright">
-            ⚡{" "}
+            <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
             <span className="nums" dir="ltr">
               {active.totalPower.toLocaleString("he-IL")}
             </span>

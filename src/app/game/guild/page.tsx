@@ -1,6 +1,7 @@
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import {
   GUILD_CAPACITY_MAX_LEVEL,
@@ -51,7 +52,7 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
       {/* -------- active recruitment (right in RTL) -------- */}
       <div className="panel rounded-xl p-4">
         <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>👥</span>
+          <Icon name="citizens" size={18} className="text-crimson" />
           גיוס בריתות פעיל
         </h2>
 
@@ -111,11 +112,11 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
       <div className="panel-gold relative rounded-xl p-4">
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>🏰</span>
+            <Icon name="base" size={18} className="text-crimson" />
             יצירת ברית
           </h2>
-          <span className="nums rounded-full border border-gold/50 bg-panel-inset px-3 py-1 text-sm font-bold text-sky-300">
-            💎 {GUILD_CREATION_COST_DIAMONDS}
+          <span className="nums flex items-center gap-1 rounded-full border border-gold/50 bg-panel-inset px-3 py-1 text-sm font-bold text-sky-300">
+            <Icon name="diamond" size={14} /> {GUILD_CREATION_COST_DIAMONDS}
           </span>
         </div>
 
@@ -150,7 +151,11 @@ export default async function GuildPage() {
   if (!membership) {
     return (
       <div className="space-y-6">
-        <SectionHeading title="הברית שלי" subtitle="MY GUILD" ornament="🏰" />
+        <SectionHeading
+          title="הברית שלי"
+          subtitle="MY GUILD"
+          ornament={<Icon name="base" size={22} className="text-crimson" />}
+        />
         <NoGuildView diamonds={diamonds} />
       </div>
     );
@@ -176,7 +181,11 @@ export default async function GuildPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title={guild.name} subtitle="MY GUILD" ornament="🏰" />
+      <SectionHeading
+        title={guild.name}
+        subtitle="MY GUILD"
+        ornament={<Icon name="base" size={22} className="text-crimson" />}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-400">
@@ -195,7 +204,7 @@ export default async function GuildPage() {
         {/* -------- members -------- */}
         <div className="panel rounded-xl p-4">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>👥</span>
+            <Icon name="citizens" size={18} className="text-crimson" />
             חברי הברית
             <span className="nums mr-auto text-sm font-bold text-zinc-400" dir="ltr">
               {members.length}/{capacity}
@@ -241,7 +250,7 @@ export default async function GuildPage() {
         {/* -------- guild bank -------- */}
         <div className="panel-gold rounded-xl p-4">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>🏦</span>
+            <Icon name="bank" size={18} className="text-crimson" />
             בנק הברית
           </h2>
 

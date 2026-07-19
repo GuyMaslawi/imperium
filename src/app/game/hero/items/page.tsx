@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { ItemCatalog } from "@/components/game/ItemCatalog";
 import { catalogKey } from "@/components/game/heroItemView";
 
@@ -23,7 +24,7 @@ export default async function HeroItemsPage() {
 
       <div className="flex justify-center">
         <Link href="/game/hero" className="btn btn-ghost px-4 py-2 text-sm">
-          ⚔ חזרה לגיבור
+          <Icon name="attack" size={16} className="inline align-[-2px]" /> חזרה לגיבור
         </Link>
       </div>
 

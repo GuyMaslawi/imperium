@@ -1,5 +1,6 @@
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { WeaponsTabs, type WeaponsTabData } from "@/components/game/WeaponsTabs";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
@@ -83,7 +84,7 @@ export default async function WeaponsPage({
                 {WEAPON_CATEGORY_META[tab.category].powerLabel}
               </p>
               <p className="text-lg font-black text-gold-bright">
-                ⚡{" "}
+                <Icon name="spark" size={16} className="inline align-[-2px]" />{" "}
                 <span className="nums" dir="ltr">
                   {tab.totalPower.toLocaleString("he-IL")}
                 </span>

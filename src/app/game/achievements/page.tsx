@@ -1,33 +1,39 @@
+import type { ReactNode } from "react";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 export const metadata = { title: "הישגים | WARZONE" };
 
 type Achievement = {
   name: string;
   reward: string;
-  rewardIcon: string;
+  rewardIcon: ReactNode;
   collected: boolean;
 };
 
+const rewardIcon = (name: IconName) => (
+  <Icon name={name} size={14} className="inline-block align-middle" />
+);
+
 const ACHIEVEMENTS: Achievement[] = [
-  { name: "תקיפה ראשונה", reward: "35+", rewardIcon: "👥", collected: true },
-  { name: "ריגול ראשון", reward: "35+", rewardIcon: "👥", collected: true },
-  { name: "למצוא חפץ ראשון", reward: "250+", rewardIcon: "💎", collected: true },
-  { name: "לקנות נשק התקפה", reward: "25+", rewardIcon: "⚔️", collected: true },
-  { name: "לקנות נשק הגנה", reward: "25+", rewardIcon: "🛡️", collected: true },
-  { name: "לקנות נשק ריגול", reward: "25+", rewardIcon: "🕵️", collected: true },
-  { name: "לשדרג קבלת מגויסים", reward: "45+", rewardIcon: "👥", collected: true },
-  { name: "לעלות עיר", reward: "1,000+", rewardIcon: "🏰", collected: true },
-  { name: "מיליונר ראשון", reward: "500+", rewardIcon: "🪙", collected: true },
-  { name: "לבנות מכרה", reward: "30+", rewardIcon: "⛏️", collected: true },
-  { name: "צבא של 1000", reward: "60+", rewardIcon: "👥", collected: true },
-  { name: "10 ניצחונות", reward: "120+", rewardIcon: "🏆", collected: true },
-  { name: "הפקדה ראשונה בבנק", reward: "20+", rewardIcon: "🏦", collected: true },
+  { name: "תקיפה ראשונה", reward: "35+", rewardIcon: rewardIcon("citizens"), collected: true },
+  { name: "ריגול ראשון", reward: "35+", rewardIcon: rewardIcon("citizens"), collected: true },
+  { name: "למצוא חפץ ראשון", reward: "250+", rewardIcon: rewardIcon("diamond"), collected: true },
+  { name: "לקנות נשק התקפה", reward: "25+", rewardIcon: rewardIcon("attack"), collected: true },
+  { name: "לקנות נשק הגנה", reward: "25+", rewardIcon: rewardIcon("shield"), collected: true },
+  { name: "לקנות נשק ריגול", reward: "25+", rewardIcon: rewardIcon("spy"), collected: true },
+  { name: "לשדרג קבלת מגויסים", reward: "45+", rewardIcon: rewardIcon("citizens"), collected: true },
+  { name: "לעלות עיר", reward: "1,000+", rewardIcon: rewardIcon("base"), collected: true },
+  { name: "מיליונר ראשון", reward: "500+", rewardIcon: rewardIcon("gold"), collected: true },
+  { name: "לבנות מכרה", reward: "30+", rewardIcon: rewardIcon("mine"), collected: true },
+  { name: "צבא של 1000", reward: "60+", rewardIcon: rewardIcon("citizens"), collected: true },
+  { name: "10 ניצחונות", reward: "120+", rewardIcon: rewardIcon("rankings"), collected: true },
+  { name: "הפקדה ראשונה בבנק", reward: "20+", rewardIcon: rewardIcon("bank"), collected: true },
   {
     name: "לכבוש מקום ראשון בדירוג",
     reward: "5,000+",
-    rewardIcon: "👑",
+    rewardIcon: rewardIcon("crown"),
     collected: false,
   },
 ];
@@ -41,7 +47,7 @@ export default async function AchievementsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-2">
-        <SectionHeading title="הישגים" subtitle="ACHIEVEMENTS" ornament="🏆" />
+        <SectionHeading title="הישגים" subtitle="ACHIEVEMENTS" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
         <span
           className="nums rounded-full border border-gold/40 bg-panel-inset px-3 py-0.5 text-sm font-bold text-gold"
           dir="ltr"
@@ -59,7 +65,7 @@ export default async function AchievementsPage() {
             {/* right: medallion + name */}
             <div className="flex items-center gap-3">
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gold/50 bg-panel-inset text-xl">
-                🏅
+                <Icon name="achievements" size={22} className="text-bone" />
               </span>
               <span className="font-bold text-zinc-100">{a.name}</span>
             </div>

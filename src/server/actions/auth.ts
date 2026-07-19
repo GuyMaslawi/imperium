@@ -47,15 +47,28 @@ export async function register(
     getTunables(),
   ]);
 
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: { email, passwordHash, name },
+  let user;
+  try {
+    user = await prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: { email, passwordHash, name },
+      });
+      await tx.empire.create({
+        data: newEmpireData(created.id, empireName, activeSeason?.id, tunables.starting),
+      });
+      return created;
     });
-    await tx.empire.create({
-      data: newEmpireData(created.id, empireName, activeSeason?.id, tunables.starting),
-    });
-    return created;
-  });
+  } catch (e) {
+    // The pre-checks above are not atomic with the insert; a concurrent signup
+    // can still trip the unique constraints on User.email / Empire.name. Map the
+    // Prisma P2002 to the same friendly message instead of crashing.
+    if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
+      const target = String((e as { meta?: { target?: unknown } }).meta?.target ?? "");
+      if (target.includes("name")) return { error: "שם האימפריה כבר תפוס, בחר שם אחר" };
+      return { error: "כתובת האימייל כבר רשומה במערכת" };
+    }
+    return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
+  }
 
   await createSession(user.id);
   redirect("/game/base");

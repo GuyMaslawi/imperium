@@ -1,6 +1,7 @@
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { bankInterestRate } from "@/lib/game/constants";
 import { DiamondShop } from "@/components/game/DiamondShop";
@@ -56,12 +57,16 @@ export default async function DiamondsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="יהלומים" subtitle="DIAMONDS" ornament="💎" />
+      <SectionHeading
+        title="יהלומים"
+        subtitle="DIAMONDS"
+        ornament={<Icon name="diamond" size={22} className="text-sky-300" />}
+      />
 
       {/* -------- balance -------- */}
       <div className="panel-gold flex items-center justify-between rounded-xl p-4">
         <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>💎</span>
+          <Icon name="diamond" size={18} className="text-sky-300" />
           חנות יהלומים
         </h2>
         <div className="flex items-center gap-2">
@@ -69,8 +74,8 @@ export default async function DiamondsPage() {
           <span className="nums text-2xl font-black text-sky-300" dir="ltr">
             {formatNumber(diamonds)}
           </span>
-          <span className="rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
-            💎
+          <span className="flex items-center rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
+            <Icon name="diamond" size={16} className="text-sky-300" />
           </span>
         </div>
       </div>

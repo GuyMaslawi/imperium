@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { buyWeapon, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
 
 export interface AvailableResources {
@@ -14,10 +15,10 @@ export interface AvailableResources {
 }
 
 const COST_RESOURCES = [
-  { key: "gold", icon: "🪙" },
-  { key: "wood", icon: "🪵" },
-  { key: "iron", icon: "⚙️" },
-  { key: "stone", icon: "🪨" },
+  { key: "gold", icon: "gold" },
+  { key: "wood", icon: "wood" },
+  { key: "iron", icon: "iron" },
+  { key: "stone", icon: "stone" },
 ] as const;
 
 /**
@@ -63,7 +64,7 @@ export function WeaponCard({
           </p>
         </div>
         <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
-          ⚡{" "}
+          <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
           <span className="nums" dir="ltr">
             {weapon.power}
           </span>{" "}
@@ -105,7 +106,7 @@ export function WeaponCard({
               className={missing ? "font-semibold text-red-400" : undefined}
               title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
             >
-              {icon}{" "}
+              <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
               <span className="nums" dir="ltr">
                 {weapon.cost[key].toLocaleString("he-IL")}
               </span>

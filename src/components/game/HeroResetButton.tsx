@@ -8,6 +8,7 @@ import {
   HERO_RESET_CITIZENS,
   HERO_RESET_POINTS,
 } from "@/lib/game/hero";
+import { Icon } from "@/components/ui/Icon";
 
 /**
  * Level-100 prestige reset with a two-step confirm: the hero returns to
@@ -21,7 +22,7 @@ export function HeroResetButton() {
   return (
     <div className="rounded-xl border border-gold/60 bg-gradient-to-b from-gold-deep/25 to-transparent p-4">
       <h3 className="text-sm font-black text-gold-bright">
-        ✨ הגיבור הגיע לרמה {HERO_MAX_LEVEL}!
+        <Icon name="spark" size={14} className="inline align-[-2px]" /> הגיבור הגיע לרמה {HERO_MAX_LEVEL}!
       </h3>
       <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
         איפוס הגיבור יחזיר אותו לרמה 1 ויעניק מיד{" "}

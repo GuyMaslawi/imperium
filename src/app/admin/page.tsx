@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +59,11 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="לוח בקרה" subtitle="CONTROL CENTER" ornament="🛡️" />
+      <SectionHeading
+        title="לוח בקרה"
+        subtitle="CONTROL CENTER"
+        ornament={<Icon name="shield" size={22} className="text-crimson" />}
+      />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <StatCard label="שחקנים" value={users} icon="👥" />
@@ -107,7 +112,7 @@ export default async function AdminDashboard() {
 
         <section className="panel rounded-xl p-4 sm:p-5">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-            📜 פעולות אדמין אחרונות
+            <Icon name="reports" size={18} /> פעולות אדמין אחרונות
           </h3>
           <ul className="space-y-2 text-sm">
             {recentAudit.map((a) => (

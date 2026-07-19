@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { getMiniGameState, submitMiniGameGuess } from "@/server/actions/minigame";
 import { MINIGAME_TYPE_META, type MiniGameState } from "@/lib/game/minigame";
+import { Icon } from "@/components/ui/Icon";
 
 const POLL_MS = 12_000;
 const DISMISS_KEY = "warzone-minigame-dismissed";
@@ -111,7 +112,7 @@ export function MiniGameLauncher({ initial }: { initial: MiniGameState | null })
           </span>
         )}
         <span className={`text-xl leading-none ${done ? "" : "animate-bounce"}`} aria-hidden>
-          🎲
+          <Icon name="dice" size={20} className="text-crimson-bright" />
         </span>
         <span className="hidden flex-col items-start leading-tight sm:flex">
           <span className="text-[10px] font-bold text-gold-dim">משחק</span>
@@ -232,7 +233,7 @@ export function MiniGameLauncher({ initial }: { initial: MiniGameState | null })
                           className="btn btn-dark flex h-16 w-16 items-center justify-center text-3xl transition-transform hover:-translate-y-1"
                           title={`כוס ${i + 1}`}
                         >
-                          🥤
+                          <Icon name="potion" size={30} />
                         </button>
                       ))}
                     </div>

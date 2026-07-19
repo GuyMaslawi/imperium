@@ -5,13 +5,14 @@ import { upgradeEmpireUpgrade, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import type { AvailableResources } from "@/components/game/WeaponCard";
 
 const COST_RESOURCES = [
-  { key: "gold", icon: "🪙" },
-  { key: "wood", icon: "🪵" },
-  { key: "iron", icon: "⚙️" },
-  { key: "stone", icon: "🪨" },
+  { key: "gold", icon: "gold" },
+  { key: "wood", icon: "wood" },
+  { key: "iron", icon: "iron" },
+  { key: "stone", icon: "stone" },
 ] as const;
 
 export interface UpgradeCardProps {
@@ -97,7 +98,7 @@ export function UpgradeCard({
                   className={missing ? "font-semibold text-red-400" : undefined}
                   title={missing ? "אין מספיק מהמשאב הזה לשדרוג" : undefined}
                 >
-                  {icon}{" "}
+                  <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
                   <span className="nums" dir="ltr">
                     {upgradeCost[key].toLocaleString("he-IL")}
                   </span>

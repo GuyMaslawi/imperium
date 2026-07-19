@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import {
   BUILDING_META,
   STORAGE_TYPES,
@@ -99,22 +100,22 @@ export default async function BasePage() {
 
   /* ---- season milestones (presentational, gated on empire progress) ---- */
   const milestones = [
-    { icon: "🏭", title: "מכונות רמה 100", need: 5 },
-    { icon: "🗡️", title: "כל הנשק", need: 6 },
-    { icon: "👥", title: "אוכלוסייה 500", need: 7 },
-    { icon: "🛡️", title: "גיבור רמה 100", need: 8 },
-    { icon: "🏰", title: "עיר 10", need: 10 },
+    { icon: <Icon name="factory" size={24} className="text-bone" />, title: "מכונות רמה 100", need: 5 },
+    { icon: <Icon name="attack" size={24} className="text-bone" />, title: "כל הנשק", need: 6 },
+    { icon: <Icon name="citizens" size={24} className="text-bone" />, title: "אוכלוסייה 500", need: 7 },
+    { icon: <Icon name="shield" size={24} className="text-bone" />, title: "גיבור רמה 100", need: 8 },
+    { icon: <Icon name="base" size={24} className="text-bone" />, title: "עיר 10", need: 10 },
   ].map((m) => ({ ...m, done: empire.level >= m.need }));
 
   const resourceTiles = [
-    { icon: "🎖️", label: "תורות", value: empire.turns, tone: "text-emerald-400" },
-    { icon: "⚙️", label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
-    { icon: "🪵", label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
-    { icon: "🪙", label: "זהב", value: empire.gold, tone: "text-gold-bright" },
-    { icon: "🏦", label: "בבנק", value: bankGold, tone: "text-gold" },
-    { icon: "💎", label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
-    { icon: "🪨", label: "אבן", value: empire.stone, tone: "text-zinc-200" },
-    { icon: "👥", label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
+    { icon: <Icon name="turns" size={14} className="text-emerald-400" />, label: "תורות", value: empire.turns, tone: "text-emerald-400" },
+    { icon: <Icon name="iron" size={14} className="text-zinc-200" />, label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
+    { icon: <Icon name="wood" size={14} className="text-amber-200/90" />, label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
+    { icon: <Icon name="gold" size={14} className="text-gold-bright" />, label: "זהב", value: empire.gold, tone: "text-gold-bright" },
+    { icon: <Icon name="bank" size={14} className="text-gold" />, label: "בבנק", value: bankGold, tone: "text-gold" },
+    { icon: <Icon name="diamond" size={14} className="text-sky-300" />, label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
+    { icon: <Icon name="stone" size={14} className="text-zinc-200" />, label: "אבן", value: empire.stone, tone: "text-zinc-200" },
+    { icon: <Icon name="citizens" size={14} className="text-zinc-200" />, label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
   ];
 
   // Server component renders once per request, so reading the clock here is safe.
@@ -129,7 +130,7 @@ export default async function BasePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מרכז הפיקוד" subtitle="COMMAND CENTER" ornament="🏰" />
+      <SectionHeading title="מרכז הפיקוד" subtitle="COMMAND CENTER" ornament={<Icon name="base" size={22} className="text-crimson" />} />
 
       {/* announcement */}
       <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
@@ -140,11 +141,11 @@ export default async function BasePage() {
             <span className="font-bold text-gold-bright">
               {season ? `${season.name} התחילה!` : "העונה פעילה"}
             </span>
-            <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! ⚔️</span>
+            <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! <Icon name="attack" size={14} className="inline-block align-middle" /></span>
           </p>
           {season && (
             <p className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <span aria-hidden>⏳</span>
+              <Icon name="turns" size={14} />
               סיום עונה:
               <span className="font-bold text-gold nums" dir="ltr">
                 {formatDate(season.endsAt)}
@@ -209,7 +210,7 @@ export default async function BasePage() {
       {/* base details + resources */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle icon="🏰">פרטי בסיס</CardTitle>
+          <CardTitle><Icon name="base" size={20} className="text-crimson-bright" />פרטי בסיס</CardTitle>
           <dl className="space-y-3 text-sm">
             <div className="flex items-center justify-between border-b border-border-subtle pb-2">
               <dt className="text-zinc-400">דירוג עולמי</dt>
@@ -225,13 +226,13 @@ export default async function BasePage() {
             </div>
           </dl>
           <Link href="/game/guild" className="btn btn-ghost mt-4 w-full py-2 text-sm">
-            🤝 הצטרף לברית
+            <Icon name="guild" size={16} className="inline-block align-middle" /> הצטרף לברית
           </Link>
         </Card>
 
         <Card variant="gold">
           <div className="mb-4 flex items-center justify-between">
-            <CardTitle className="mb-0" icon="💰">משאבים</CardTitle>
+            <CardTitle className="mb-0"><Icon name="gold" size={20} className="text-crimson-bright" />משאבים</CardTitle>
             <span className="text-xs text-zinc-400">
               מאוחסן:{" "}
               <span className="font-bold text-zinc-200 nums" dir="ltr">
@@ -257,7 +258,7 @@ export default async function BasePage() {
 
       {/* recent activity */}
       <Card>
-        <CardTitle icon="📜">פעילות אחרונה</CardTitle>
+        <CardTitle><Icon name="reports" size={20} className="text-crimson-bright" />פעילות אחרונה</CardTitle>
         {!hasActivity ? (
           <p className="text-sm text-zinc-400">
             אין דיווחים עדיין. היכנס לפרופיל אימפריה מעמוד הדירוג כדי לרגל או לתקוף.
@@ -271,7 +272,11 @@ export default async function BasePage() {
               return (
                 <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                   <span className="text-zinc-300">
-                    {isAttacker ? "⚔️ תקפת את" : "🛡️ הותקפת על ידי"}{" "}
+                    {isAttacker ? (
+                      <><Icon name="attack" size={16} className="inline-block align-middle" /> תקפת את</>
+                    ) : (
+                      <><Icon name="shield" size={16} className="inline-block align-middle" /> הותקפת על ידי</>
+                    )}{" "}
                     <span className="font-semibold">{rival}</span> —{" "}
                     <span className={won ? "text-emerald-400" : "text-red-400"}>
                       {won ? "ניצחון" : "הפסד"}
@@ -284,7 +289,7 @@ export default async function BasePage() {
             {recentSpies.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                 <span className="text-zinc-300">
-                  🕵️ ריגלת אחרי <span className="font-semibold">{r.defenderEmpire.name}</span> —{" "}
+                  <Icon name="spy" size={16} className="inline-block align-middle" /> ריגלת אחרי <span className="font-semibold">{r.defenderEmpire.name}</span> —{" "}
                   <span className={r.success ? "text-emerald-400" : "text-red-400"}>
                     {r.success ? "הצלחה" : "כישלון"}
                   </span>
@@ -295,7 +300,7 @@ export default async function BasePage() {
             {recentBankTransactions.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                 <span className="text-zinc-300">
-                  🏦{" "}
+                  <Icon name="bank" size={16} className="inline-block align-middle" />{" "}
                   {t.type === "DEPOSIT" ? "הפקדה לבנק" : t.type === "WITHDRAW" ? "משיכה מהבנק" : "ריבית מהבנק"}{" "}
                   —{" "}
                   <span className="font-semibold nums" dir="ltr">

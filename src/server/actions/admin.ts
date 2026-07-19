@@ -29,6 +29,20 @@ export interface AdminActionState {
 /* ------------------------------ helpers ------------------------------ */
 
 function toErr(e: unknown): AdminActionState {
+  // Next.js control-flow signals (redirect / notFound) are thrown as errors
+  // carrying a `digest`. They must propagate so the framework can act on them —
+  // swallowing them here would leak a "NEXT_REDIRECT;…" string to the client and
+  // silently drop the redirect (e.g. an expired admin session never lands on /login).
+  if (
+    e &&
+    typeof e === "object" &&
+    "digest" in e &&
+    typeof (e as { digest?: unknown }).digest === "string" &&
+    ((e as { digest: string }).digest.startsWith("NEXT_REDIRECT") ||
+      (e as { digest: string }).digest === "NEXT_NOT_FOUND")
+  ) {
+    throw e;
+  }
   const message = e instanceof Error ? e.message : "אירעה שגיאה";
   return { error: message };
 }

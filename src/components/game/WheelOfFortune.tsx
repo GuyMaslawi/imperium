@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { WHEEL_PRIZES, type WheelPrizeDef } from "@/lib/game/wheel";
 import { spinWheel } from "@/server/actions/wheel";
+import { Icon } from "@/components/ui/Icon";
 
 const SEG = 360 / WHEEL_PRIZES.length;
 const SPIN_MS = 4200;
@@ -83,6 +84,50 @@ export function WheelOfFortune({
     timerRef.current = window.setTimeout(() => {
       setSpinning(false);
       setResult({ prize: WHEEL_PRIZES[idx], message: outcome.message });
+      setConfetti(makeConfetti());
+    }, SPIN_MS);
+  }
+
+  // Spin ten times in a row, reusing the single-spin server action (which owns
+  // the guarded consume + payout), then reveal a combined result.
+  async function spinTen() {
+    if (spinning || spinsLeft < 10) return;
+    setSpinning(true);
+    setResult(null);
+    setError(null);
+    setConfetti([]);
+
+    let left = spinsLeft;
+    let lastIdx = 0;
+    let done = 0;
+    for (let i = 0; i < 10; i++) {
+      const outcome = await spinWheel();
+      if (!outcome.ok) {
+        setSpinsLeft(left);
+        if (done === 0) {
+          setSpinning(false);
+          setError(outcome.error);
+          return;
+        }
+        break; // partial batch succeeded — reveal what we won so far
+      }
+      done += 1;
+      left = outcome.spinsLeft;
+      lastIdx = outcome.prizeIndex;
+    }
+    setSpinsLeft(left);
+
+    const jitter = (Math.random() - 0.5) * SEG * 0.6;
+    const restAngle = 360 - lastIdx * SEG + jitter;
+    setRotation((r) => r - (r % 360) + 360 * 6 + restAngle);
+
+    const spun = done;
+    timerRef.current = window.setTimeout(() => {
+      setSpinning(false);
+      setResult({
+        prize: WHEEL_PRIZES[lastIdx],
+        message: `הושלמו ${spun} סיבובים! כל הפרסים נוספו לאימפריה שלך.`,
+      });
       setConfetti(makeConfetti());
     }, SPIN_MS);
   }
@@ -190,7 +235,7 @@ export function WheelOfFortune({
               result ? "wheel-pop" : ""
             }`}
           >
-            ⭐
+            <Icon name="spark" size={26} className="text-crimson" />
           </div>
           {/* confetti burst */}
           {confetti.map((c) => (
@@ -227,6 +272,7 @@ export function WheelOfFortune({
         {/* actions */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
+            onClick={spinTen}
             disabled={spinning || spinsLeft < 10}
             className="btn flex-col rounded-lg border border-sky-500/50 bg-gradient-to-b from-sky-700/70 to-sky-900/70 px-5 py-3 font-black text-sky-100 disabled:opacity-40"
             title="נפתח כשיש לפחות 10 סיבובים זמינים"
@@ -236,9 +282,9 @@ export function WheelOfFortune({
           <button
             onClick={spin}
             disabled={spinning || spinsLeft <= 0}
-            className="btn btn-dark px-5 py-3 text-base disabled:opacity-40"
+            className="btn btn-dark flex items-center justify-center gap-1.5 px-5 py-3 text-base disabled:opacity-40"
           >
-            🎰 {spinning ? "מסתובב…" : "סובב"}
+            <Icon name="wheel" size={18} /> {spinning ? "מסתובב…" : "סובב"}
           </button>
         </div>
         <p className="mt-2 text-[11px] text-zinc-500 nums" dir="ltr">

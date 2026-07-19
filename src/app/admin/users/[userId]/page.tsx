@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledInput, LabeledSelect, EditorSection } from "@/components/admin/fields";
 import {
@@ -90,7 +91,7 @@ export default async function AdminUserDetail({
       <SectionHeading
         title={empire?.name ?? user.name}
         subtitle={user.email}
-        ornament="⚙️"
+        ornament={<Icon name="iron" size={22} className="text-crimson" />}
       />
 
       {/* ---------------- account ---------------- */}

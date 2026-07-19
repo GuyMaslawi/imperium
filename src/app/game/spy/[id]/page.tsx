@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatNumber, formatDate } from "@/lib/game/format";
 
 export const metadata = { title: "תוצאת ריגול | WARZONE" };
@@ -25,20 +26,20 @@ export default async function SpyResultPage({
 
   const foe = report.defenderEmpire;
   const pop = [
-    { icon: "🪖", label: "חיילים", value: report.revealedSoldiers },
-    { icon: "🕵️", label: "מרגלים", value: report.revealedSpies },
-    { icon: "⛏️", label: "עבדי מכרות", value: report.revealedMineSlaves },
+    { icon: <Icon name="army" size={14} className="inline-block align-middle" />, label: "חיילים", value: report.revealedSoldiers },
+    { icon: <Icon name="spy" size={14} className="inline-block align-middle" />, label: "מרגלים", value: report.revealedSpies },
+    { icon: <Icon name="mine" size={14} className="inline-block align-middle" />, label: "עבדי מכרות", value: report.revealedMineSlaves },
   ];
   const res = [
-    { icon: "🪙", label: "זהב", value: report.revealedGold },
-    { icon: "🪵", label: "עץ", value: report.revealedWood },
-    { icon: "⚙️", label: "ברזל", value: report.revealedIron },
-    { icon: "🪨", label: "אבן", value: report.revealedStone },
+    { icon: <Icon name="gold" size={14} className="inline-block align-middle" />, label: "זהב", value: report.revealedGold },
+    { icon: <Icon name="wood" size={14} className="inline-block align-middle" />, label: "עץ", value: report.revealedWood },
+    { icon: <Icon name="iron" size={14} className="inline-block align-middle" />, label: "ברזל", value: report.revealedIron },
+    { icon: <Icon name="stone" size={14} className="inline-block align-middle" />, label: "אבן", value: report.revealedStone },
   ];
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="תוצאת ריגול" subtitle="SPY REPORT" ornament="🕵️" />
+      <SectionHeading title="תוצאת ריגול" subtitle="SPY REPORT" ornament={<Icon name="spy" size={22} className="text-crimson" />} />
 
       {/* verdict banner */}
       <div
@@ -68,7 +69,7 @@ export default async function SpyResultPage({
       {report.success && (
         <>
           <div className="panel-gold rounded-xl p-4">
-            <h3 className="mb-3 text-sm font-bold text-gold-bright">👥 אוכלוסייה</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="citizens" size={18} className="text-crimson-bright" /> אוכלוסייה</h3>
             <div className="grid grid-cols-3 gap-3">
               {pop.map((p) => (
                 <div key={p.label} className="panel-inset rounded-lg p-3 text-center">
@@ -82,7 +83,7 @@ export default async function SpyResultPage({
           </div>
 
           <div className="panel-gold rounded-xl p-4">
-            <h3 className="mb-3 text-sm font-bold text-gold-bright">💰 משאבים זמינים</h3>
+            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="gold" size={18} className="text-crimson-bright" /> משאבים זמינים</h3>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {res.map((r) => (
                 <div key={r.label} className="panel-inset rounded-lg p-3 text-center">
@@ -105,10 +106,10 @@ export default async function SpyResultPage({
         <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt)}</p>
         <div className="flex gap-2">
           <Link href={`/game/empires/${foe.id}`} className="btn btn-gold px-5 py-2 text-sm">
-            ⚔️ תקוף את {foe.name}
+            <Icon name="attack" size={16} className="inline-block align-middle" /> תקוף את {foe.name}
           </Link>
-          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm">🏰 חזרה לבסיס</Link>
-          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm">📜 היסטוריה</Link>
+          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס</Link>
+          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="reports" size={16} className="inline-block align-middle" /> היסטוריה</Link>
         </div>
       </div>
     </div>

@@ -13,8 +13,8 @@ export function SectionHeading({
 }: {
   title: ReactNode;
   subtitle?: string;
-  /** Emoji/icon shown on both sides of the title. */
-  ornament?: string;
+  /** Emoji/icon node shown on both sides of the title. */
+  ornament?: ReactNode;
   className?: string;
 }) {
   return (

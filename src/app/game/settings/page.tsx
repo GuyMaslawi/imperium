@@ -1,6 +1,7 @@
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CardTitle } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { logout } from "@/server/actions/auth";
 
@@ -11,7 +12,11 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="הגדרות" subtitle="SETTINGS" ornament="⚙️" />
+      <SectionHeading
+        title="הגדרות"
+        subtitle="SETTINGS"
+        ornament={<Icon name="settings" size={22} className="text-crimson" />}
+      />
 
       <div className="mx-auto max-w-xl space-y-4">
         <div className="panel rounded-xl p-4">
@@ -56,7 +61,7 @@ export default async function SettingsPage() {
               type="submit"
               className="btn btn-ghost px-4 py-2 text-sm text-red-400"
             >
-              🚪 התנתק מהמשחק
+              <Icon name="logout" size={16} className="inline-block align-text-bottom" /> התנתק מהמשחק
             </button>
           </form>
         </div>

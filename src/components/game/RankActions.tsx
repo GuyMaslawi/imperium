@@ -10,6 +10,7 @@ import {
 } from "@/server/actions/game";
 import { ATTACK_TURN_COST, SPY_TURN_COST } from "@/lib/game/constants";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 /** A big prominent submit button that shows a pending label while its form runs. */
 function ActionButton({
@@ -64,7 +65,7 @@ export function RankActions({
             disabled={!canAttack}
             title={canAttack ? `עלות תקיפה: ${ATTACK_TURN_COST} תורות` : "אין לך מספיק תורות לתקיפה"}
           >
-            ⚔️ תקיפה
+            <Icon name="attack" size={16} className="inline-block align-middle" /> תקיפה
           </ActionButton>
           <p className="mt-1 text-center text-[10px] text-zinc-500 nums" dir="ltr">
             {ATTACK_TURN_COST} תורות
@@ -78,7 +79,7 @@ export function RankActions({
             disabled={!canSpy}
             title={canSpy ? `עלות ריגול: ${SPY_TURN_COST} תורות` : "אין לך מספיק תורות לריגול"}
           >
-            🕵️ ריגול
+            <Icon name="spy" size={16} className="inline-block align-middle" /> ריגול
           </ActionButton>
           <p className="mt-1 text-center text-[10px] text-zinc-500 nums" dir="ltr">
             {SPY_TURN_COST} תורות

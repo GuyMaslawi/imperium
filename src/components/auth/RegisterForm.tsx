@@ -6,6 +6,7 @@ import { register, type AuthState } from "@/server/actions/auth";
 import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 export function RegisterForm() {
   const [state, action] = useActionState<AuthState, FormData>(register, {});
@@ -52,7 +53,7 @@ export function RegisterForm() {
       />
       <FormMessage error={state.error} />
       <SubmitButton className="w-full" pendingText="מקים אימפריה...">
-        הקם אימפריה 👑
+        הקם אימפריה <Icon name="crown" size={16} className="inline-block align-text-bottom" />
       </SubmitButton>
       <p className="text-center text-sm text-zinc-400">
         כבר יש לך אימפריה?{" "}

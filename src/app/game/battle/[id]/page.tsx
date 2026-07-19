@@ -8,14 +8,15 @@ import { AttackAgainButton } from "@/components/game/AttackAgainButton";
 import { Tip } from "@/components/ui/Tip";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "תוצאת קרב | WARZONE" };
 
 const RES = [
-  { key: "stolenGold", icon: "🪙", label: "זהב" },
-  { key: "stolenWood", icon: "🪵", label: "עץ" },
-  { key: "stolenIron", icon: "⚙️", label: "ברזל" },
-  { key: "stolenStone", icon: "🪨", label: "אבן" },
+  { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle" />, label: "זהב" },
+  { key: "stolenWood", icon: <Icon name="wood" size={14} className="inline-block align-middle" />, label: "עץ" },
+  { key: "stolenIron", icon: <Icon name="iron" size={14} className="inline-block align-middle" />, label: "ברזל" },
+  { key: "stolenStone", icon: <Icon name="stone" size={14} className="inline-block align-middle" />, label: "אבן" },
 ] as const;
 
 export default async function BattleResultPage({
@@ -116,10 +117,10 @@ export default async function BattleResultPage({
             label={iAmAttacker ? "⚔️ תקוף שוב" : "⚔️ נקום"}
           />
           <Link href={`/game/empires/${foe.id}`} className="btn btn-ghost px-5 py-2 text-sm">
-            👑 לפרופיל היריב
+            <Icon name="crown" size={16} className="inline-block align-middle" /> לפרופיל היריב
           </Link>
-          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm">🏰 חזרה לבסיס</Link>
-          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm">📜 היסטוריה</Link>
+          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס</Link>
+          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="reports" size={16} className="inline-block align-middle" /> היסטוריה</Link>
         </div>
         <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt)}</p>
       </div>
@@ -130,7 +131,7 @@ export default async function BattleResultPage({
           {/* my side */}
           <div className="flex flex-1 flex-col items-center gap-2 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-emerald-500/50 bg-gradient-to-b from-emerald-900/30 to-black text-4xl shadow-[0_0_30px_-8px_rgba(52,211,153,0.5)]">
-              🏹
+              <Icon name="hero" size={36} className="text-emerald-300" />
             </div>
             <p className="font-black text-emerald-300">{myName}</p>
             <p className="text-[11px] text-zinc-500">{iAmAttacker ? "תוקף" : "מגן"}</p>
@@ -152,7 +153,7 @@ export default async function BattleResultPage({
           {/* foe side */}
           <div className="flex flex-1 flex-col items-center gap-2 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-red-500/50 bg-gradient-to-b from-red-950/40 to-black text-4xl shadow-[0_0_30px_-8px_rgba(239,68,68,0.5)]">
-              👑
+              <Icon name="crown" size={36} className="text-red-300" />
             </div>
             <p className="font-black text-red-300">{foe.name}</p>
             <p className="text-[11px] text-zinc-500">{iAmAttacker ? "מגן" : "תוקף"}</p>
@@ -177,11 +178,11 @@ export default async function BattleResultPage({
       <div className={`grid gap-4 ${report.enslavedSoldiers > 0 ? "grid-cols-2 sm:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="panel-inset rounded-xl p-4 text-center">
           <p className="text-xs text-zinc-400">אבדות שלך</p>
-          <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">−{formatNumber(mySoldiersLost)} 🪖</p>
+          <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">−{formatNumber(mySoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
         </div>
         <div className="panel-inset rounded-xl p-4 text-center">
           <p className="text-xs text-zinc-400">אבדות היריב</p>
-          <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">−{formatNumber(foeSoldiersLost)} 🪖</p>
+          <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">−{formatNumber(foeSoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
         </div>
         {report.enslavedSoldiers > 0 && (
           <div className="panel-inset rounded-xl p-4 text-center">
@@ -192,7 +193,7 @@ export default async function BattleResultPage({
               className={`nums mt-1 text-xl font-black ${iAmAttacker ? "text-emerald-400" : "text-red-400"}`}
               dir="ltr"
             >
-              {iAmAttacker ? "+" : "−"}{formatNumber(report.enslavedSoldiers)} ⛏️
+              {iAmAttacker ? "+" : "−"}{formatNumber(report.enslavedSoldiers)} <Icon name="mine" size={18} className="inline-block align-middle" />
             </p>
           </div>
         )}
@@ -205,9 +206,9 @@ export default async function BattleResultPage({
       {/* -------- hero rewards -------- */}
       {(myHeroXp > 0 || capturedItem) && (
         <div className="panel rounded-xl p-4">
-          <h3 className="mb-3 text-sm font-bold text-gold-bright">✨ הגיבור שלך</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך</h3>
           <div className="flex flex-wrap items-center gap-4">
-            <Tip tip="ניסיון לגיבור מהקרב הזה — ניצחון בתקיפה מעניק הכי הרבה (תלוי ברמת גיבור היריב). כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודה.">
+            <Tip tip="ניסיון לגיבור מהקרב הזה — ניצחון בתקיפה מעניק הכי הרבה. הכמות תלויה ברמת היריב ובעד כמה הקרב היה צמוד: מחיקת יריב חלש מזכה במעט, ניצחון מול יריב שווה־כוח או חזק ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה.">
               <div className="panel-inset cursor-help rounded-lg p-3 text-center">
                 <p className="text-[11px] text-zinc-400">ניסיון שהתקבל</p>
                 <p className="nums mt-0.5 text-xl font-black text-purple-300" dir="ltr">
@@ -229,7 +230,7 @@ export default async function BattleResultPage({
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
-                    🎁 נלכד חפץ: {itemDisplayName(capturedItem.slot, capturedItem.level)}
+                    <Icon name="gift" size={16} className="inline-block align-middle" /> נלכד חפץ: {itemDisplayName(capturedItem.slot, capturedItem.level)}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     רמת פריט{" "}
@@ -239,7 +240,7 @@ export default async function BattleResultPage({
                     · נוסף לתיק הגיבור
                   </p>
                   <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
-                    ⚔ לציוד הגיבור
+                    <Icon name="attack" size={14} className="inline-block align-middle" /> לציוד הגיבור
                   </Link>
                 </div>
               </div>
@@ -283,7 +284,11 @@ export default async function BattleResultPage({
       {plunderTotal > 0 && (
         <div className="panel-gold rounded-xl p-4">
           <h3 className="mb-3 text-sm font-bold text-gold-bright">
-            {iAmAttacker ? "💰 שלל הביזה" : "💸 נבזז ממך"}
+            {iAmAttacker ? (
+              <><Icon name="gold" size={16} className="inline-block align-middle" /> שלל הביזה</>
+            ) : (
+              "💸 נבזז ממך"
+            )}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {RES.map((r) => (

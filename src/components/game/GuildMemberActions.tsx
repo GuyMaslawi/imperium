@@ -9,6 +9,7 @@ import {
 } from "@/server/actions/guild";
 import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { Icon } from "@/components/ui/Icon";
 
 export interface GuildMemberActionsProps {
   targetEmpireId: string;
@@ -69,7 +70,15 @@ export function GuildMemberActions({
             formAction={roleAction}
             pendingText="..."
           >
-            {targetRole === "DEPUTY" ? "🪖 הורד לחבר" : "⭐ מנה לסגן"}
+            {targetRole === "DEPUTY" ? (
+              <>
+                <Icon name="army" size={13} className="inline-block align-text-bottom" /> הורד לחבר
+              </>
+            ) : (
+              <>
+                <Icon name="spark" size={13} className="inline-block align-text-bottom" /> מנה לסגן
+              </>
+            )}
           </SubmitButton>
           <SubmitButton
             variant="secondary"
@@ -80,7 +89,7 @@ export function GuildMemberActions({
             )}
             pendingText="..."
           >
-            👑 העבר הנהגה
+            <Icon name="crown" size={13} className="inline-block align-text-bottom" /> העבר הנהגה
           </SubmitButton>
         </>
       )}

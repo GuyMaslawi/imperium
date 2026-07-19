@@ -30,6 +30,7 @@ import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { armyPower } from "@/lib/game/power";
 import {
+  CITIZENS_PER_LEVEL,
   HERO_BAG_CAPACITY,
   applyHeroXp,
   attackWinXp,
@@ -124,8 +125,16 @@ export async function upgradeMine(
         };
       }
 
-      await tx.empire.update({
-        where: { id: empireId },
+      // Guarded debit: the `gte` conditions make the decrement atomic so two
+      // concurrent upgrades can never drive resources negative or double-apply.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
         data: {
           gold: { decrement: cost.gold },
           wood: { decrement: cost.wood },
@@ -133,6 +142,11 @@ export async function upgradeMine(
           stone: { decrement: cost.stone },
         },
       });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+        };
+      }
       await tx.building.update({
         where: { id: building.id },
         data: { level: { increment: 1 } },
@@ -667,8 +681,30 @@ export async function attackEmpire(
       }
 
       if (attackerWins) {
-        await tx.empire.update({
+        // Re-read the defender's live balances inside the transaction and clamp
+        // the plunder to what is actually available, so overlapping attacks on
+        // the same defender can never drive it negative or mint resources for
+        // the attacker that were not truly removed.
+        const live = await tx.empire.findUnique({
           where: { id: targetEmpireId },
+          select: { gold: true, wood: true, iron: true, stone: true },
+        });
+        stolen.gold = Math.min(stolen.gold, Math.max(0, Math.floor(live?.gold ?? 0)));
+        stolen.wood = Math.min(stolen.wood, Math.max(0, Math.floor(live?.wood ?? 0)));
+        stolen.iron = Math.min(stolen.iron, Math.max(0, Math.floor(live?.iron ?? 0)));
+        stolen.stone = Math.min(stolen.stone, Math.max(0, Math.floor(live?.stone ?? 0)));
+
+        // Guarded debit: only remove what is still present at write time; if a
+        // concurrent attack already drained it, `count === 0` and we credit
+        // nothing rather than duplicating resources.
+        const looted = await tx.empire.updateMany({
+          where: {
+            id: targetEmpireId,
+            gold: { gte: stolen.gold },
+            wood: { gte: stolen.wood },
+            iron: { gte: stolen.iron },
+            stone: { gte: stolen.stone },
+          },
           data: {
             gold: { decrement: stolen.gold },
             wood: { decrement: stolen.wood },
@@ -676,6 +712,12 @@ export async function attackEmpire(
             stone: { decrement: stolen.stone },
           },
         });
+        if (looted.count === 0) {
+          stolen.gold = 0;
+          stolen.wood = 0;
+          stolen.iron = 0;
+          stolen.stone = 0;
+        }
         await tx.empire.update({
           where: { id: empireId },
           data: {
@@ -690,11 +732,21 @@ export async function attackEmpire(
       /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
       // A failed attack earns the attacker nothing.
       const attackerHeroXp = attackerWins
-        ? attackWinXp(defenderHero?.level ?? 1, defenderHero?.resets ?? 0)
+        ? attackWinXp(
+            defenderHero?.level ?? 1,
+            defenderHero?.resets ?? 0,
+            attackerPower,
+            defenderPower
+          )
         : 0;
       const defenderHeroXp = attackerWins
         ? defenseLossXp()
-        : defenseWinXp(attackerHero?.level ?? 1, attackerHero?.resets ?? 0);
+        : defenseWinXp(
+            attackerHero?.level ?? 1,
+            attackerHero?.resets ?? 0,
+            defenderPower,
+            attackerPower
+          );
 
       if (attackerHero && attackerHeroXp > 0) {
         const next = applyHeroXp(attackerHero, attackerHeroXp);
@@ -706,6 +758,14 @@ export async function attackEmpire(
             unspentPoints: { increment: next.pointsGained },
           },
         });
+        // Each hero level gained hands the empire fresh citizens.
+        const levelsGained = next.level - attackerHero.level;
+        if (levelsGained > 0) {
+          await tx.empire.update({
+            where: { id: empireId },
+            data: { citizens: { increment: levelsGained * CITIZENS_PER_LEVEL } },
+          });
+        }
       }
       if (defenderHero) {
         const next = applyHeroXp(defenderHero, defenderHeroXp);
@@ -717,6 +777,13 @@ export async function attackEmpire(
             unspentPoints: { increment: next.pointsGained },
           },
         });
+        const levelsGained = next.level - defenderHero.level;
+        if (levelsGained > 0) {
+          await tx.empire.update({
+            where: { id: targetEmpireId },
+            data: { citizens: { increment: levelsGained * CITIZENS_PER_LEVEL } },
+          });
+        }
       }
 
       /* ---- item capture: winning attacks can loot a hero item ---- */
@@ -840,8 +907,15 @@ export async function upgradeStorage(
         };
       }
 
-      await tx.empire.update({
-        where: { id: empireId },
+      // Guarded debit (atomic) — prevents concurrent upgrades from going negative.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
         data: {
           gold: { decrement: cost.gold },
           wood: { decrement: cost.wood },
@@ -849,6 +923,15 @@ export async function upgradeStorage(
           stone: { decrement: cost.stone },
         },
       });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(
+            empire,
+            cost,
+            "אין מספיק משאבים לשדרוג המחסן"
+          ),
+        };
+      }
       await tx.resourceStorage.update({
         where: { id: storage.id },
         data: { level: { increment: 1 } },
@@ -1109,8 +1192,15 @@ export async function upgradeEmpireUpgrade(
         };
       }
 
-      await tx.empire.update({
-        where: { id: empireId },
+      // Guarded debit (atomic) — prevents concurrent upgrades from going negative.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
         data: {
           gold: { decrement: cost.gold },
           wood: { decrement: cost.wood },
@@ -1118,6 +1208,11 @@ export async function upgradeEmpireUpgrade(
           stone: { decrement: cost.stone },
         },
       });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+        };
+      }
       await tx.empireUpgrade.update({
         where: { id: upgrade.id },
         data: { level: { increment: 1 } },
@@ -1211,8 +1306,15 @@ export async function buyWeapon(
         };
       }
 
-      await tx.empire.update({
-        where: { id: empireId },
+      // Guarded debit (atomic) — prevents concurrent buys from going negative.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
         data: {
           gold: { decrement: cost.gold },
           wood: { decrement: cost.wood },
@@ -1220,6 +1322,15 @@ export async function buyWeapon(
           stone: { decrement: cost.stone },
         },
       });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(
+            empire,
+            cost,
+            "אין מספיק משאבים זמינים לקנייה."
+          ),
+        };
+      }
       await tx.empireWeapon.upsert({
         where: { empireId_weaponKey: { empireId, weaponKey } },
         create: { empireId, weaponKey, quantity },
@@ -1284,8 +1395,15 @@ export async function unlockNextWeaponTier(
         };
       }
 
-      await tx.empire.update({
-        where: { id: empireId },
+      // Guarded debit (atomic) — prevents concurrent unlocks from going negative.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
         data: {
           gold: { decrement: cost.gold },
           wood: { decrement: cost.wood },
@@ -1293,6 +1411,15 @@ export async function unlockNextWeaponTier(
           stone: { decrement: cost.stone },
         },
       });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(
+            empire,
+            cost,
+            "אין מספיק משאבים לפתיחת הנשק הבא"
+          ),
+        };
+      }
       await tx.empireWeaponUnlock.update({
         where: { id: unlock.id },
         data: { unlockedTier: { increment: 1 } },

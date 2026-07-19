@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledInput, LabeledSelect } from "@/components/admin/fields";
 import { updateGuild, deleteGuild, setGuildMemberRole } from "@/server/actions/admin";
@@ -30,7 +31,11 @@ export default async function AdminGuildsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="בריתות" subtitle="GUILDS" ornament="🤝" />
+      <SectionHeading
+        title="בריתות"
+        subtitle="GUILDS"
+        ornament={<Icon name="guild" size={22} className="text-crimson" />}
+      />
 
       {guilds.length === 0 && (
         <p className="panel-inset rounded-xl p-6 text-center text-zinc-500">אין בריתות עדיין</p>
@@ -40,7 +45,9 @@ export default async function AdminGuildsPage() {
         {guilds.map((g) => (
           <div key={g.id} className="panel rounded-xl p-4 sm:p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-gold-bright">🤝 {g.name}</h3>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-gold-bright">
+                <Icon name="guild" size={18} /> {g.name}
+              </h3>
               <span className="text-[11px] text-zinc-500">
                 {g.members.length} חברים · קיבולת {1 + g.capacityLevel}
               </span>

@@ -7,38 +7,64 @@
    ========================================================================= */
 
 :root {
-  /* base surfaces — warm near-black */
-  --background: #0a0705;
-  --foreground: #f3ede1;
+  /* ===================================================================
+     IMPERIUM — "Obsidian & Crimson" identity
+     Obsidian black surfaces, blood-crimson primary accents, warm bone
+     for text / secondary. Dark-fantasy, gothic, sharp.
+     The historical token NAMES (--gold*, --tan*) are preserved and simply
+     remapped to the new palette, so every existing component recolors for
+     free. New code should prefer the semantic crimson / bone token names.
+     =================================================================== */
 
-  --panel: #141110;
-  --panel-raised: #1b1714;
-  --panel-inset: #0f0c0a;
+  /* base surfaces — obsidian near-black with a cold blue-violet cast */
+  --background: #08080b;
+  --foreground: #ece6da; /* bone-white body text */
 
-  /* gold family */
-  --gold: #d4a843;
-  --gold-bright: #f0cd78;
-  --gold-dim: #8a6d2b;
-  --gold-deep: #5c4718;
+  --panel: #131217;
+  --panel-raised: #1a1920;
+  --panel-inset: #0d0c10;
 
-  /* parchment tan (primary CTA fill) */
-  --tan: #d8b463;
-  --tan-bright: #ecca7e;
+  /* ANTIQUE GOLD — the PRIMARY accent. Muted, aged gold (not a bright/neon
+     yellow), so it reads premium and imperial on obsidian. The historical
+     --gold* names hold it directly; the --crimson* names (added earlier and
+     used across the wired screens) are kept as ALIASES pointing at the same
+     antique gold, so no screen needs re-editing when the palette shifts. */
+  --gold: #c4a032;
+  --gold-bright: #e4c35a;
+  --gold-dim: #8f7a45;    /* muted gold for subtitles / rules */
+  --gold-deep: #443413;
+
+  --crimson: var(--gold);
+  --crimson-bright: var(--gold-bright);
+  --crimson-dim: var(--gold-dim);
+  --crimson-deep: var(--gold-deep);
+
+  /* bone family (warm neutral — body text & secondary) */
+  --bone: #d6c9ad;
+  --bone-bright: #efe6ce;
+  --bone-dim: #948a70;
+
+  /* parchment/tan CTA fill — antique gold gradient with dark ink */
+  --tan: #c9a53c;
+  --tan-bright: #e4c35a;
 
   /* borders */
-  --border-subtle: #2a2420;
-  --border-gold: rgba(212, 168, 67, 0.28);
-  --border-gold-strong: rgba(212, 168, 67, 0.55);
+  --border-subtle: #2b2822;
+  --border-gold: rgba(196, 160, 50, 0.30);
+  --border-gold-strong: rgba(196, 160, 50, 0.55);
+  --border-crimson: rgba(196, 160, 50, 0.30);
+  --border-crimson-strong: rgba(196, 160, 50, 0.55);
+  --border-bone: rgba(214, 201, 173, 0.22);
 
   /* faction / status accents */
-  --accent-green: #34d399;
+  --accent-green: #35d39a;
   --accent-green-deep: #1f8f66;
-  --accent-red: #ef5350;
-  --accent-blue: #58a6e0;
-  --accent-purple: #8a6bd4;
+  --accent-red: #ff4d4d;
+  --accent-blue: #5aa6e8;
+  --accent-purple: #a06be0;
 
   --ring-health: #ef4444;
-  --ring-xp: #d4a843;
+  --ring-xp: #e02333;
 }
 
 @theme inline {
@@ -53,6 +79,15 @@
   --color-gold-bright: var(--gold-bright);
   --color-gold-dim: var(--gold-dim);
   --color-gold-deep: var(--gold-deep);
+
+  /* new semantic names for Obsidian & Crimson */
+  --color-crimson: var(--crimson);
+  --color-crimson-bright: var(--crimson-bright);
+  --color-crimson-dim: var(--crimson-dim);
+  --color-crimson-deep: var(--crimson-deep);
+  --color-bone: var(--bone);
+  --color-bone-bright: var(--bone-bright);
+  --color-bone-dim: var(--bone-dim);
 
   --color-tan: var(--tan);
   --color-tan-bright: var(--tan-bright);
@@ -83,35 +118,38 @@ body {
   font-family: var(--font-heebo), system-ui, sans-serif;
   overflow-x: hidden;
   max-width: 100vw;
-  background-color: #0a0705;
+  background-color: #08080a;
   background-image:
-    /* warm top glow */
-    radial-gradient(120% 90% at 50% -10%, rgba(150, 76, 30, 0.42), transparent 55%),
-    /* dusty orange horizon on the sides */
-    radial-gradient(70% 60% at 12% 42%, rgba(96, 48, 24, 0.5), transparent 60%),
-    radial-gradient(70% 60% at 88% 42%, rgba(96, 48, 24, 0.5), transparent 60%),
-    /* ember flicker low */
-    radial-gradient(80% 50% at 50% 108%, rgba(120, 44, 18, 0.35), transparent 60%),
-    /* left/right vignette */
-    linear-gradient(90deg, rgba(0, 0, 0, 0.5) 0%, transparent 20%, transparent 80%, rgba(0, 0, 0, 0.5) 100%),
-    /* base vertical warmth */
-    linear-gradient(180deg, #221208 0%, #150c07 45%, #0b0705 100%);
+    /* soft antique-gold glow, top center — subtle, not a spotlight */
+    radial-gradient(120% 90% at 50% -12%, rgba(150, 120, 40, 0.22), transparent 58%),
+    /* cool obsidian cast on the sides */
+    radial-gradient(70% 60% at 10% 40%, rgba(26, 24, 30, 0.6), transparent 62%),
+    radial-gradient(70% 60% at 90% 40%, rgba(26, 24, 30, 0.6), transparent 62%),
+    /* faint warm gold ember low */
+    radial-gradient(85% 50% at 50% 110%, rgba(120, 92, 30, 0.16), transparent 60%),
+    /* heavy left/right vignette */
+    linear-gradient(90deg, rgba(0, 0, 0, 0.6) 0%, transparent 22%, transparent 78%, rgba(0, 0, 0, 0.6) 100%),
+    /* base vertical obsidian */
+    linear-gradient(180deg, #0f0d0c 0%, #0b0a0b 45%, #070607 100%);
   background-attachment: fixed;
   background-size: cover;
 }
 
-/* Thin dark scrollbars fitting the war-room look */
+/* Thin gold-tinted obsidian scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #4a3f30 transparent;
+  scrollbar-color: #4a4028 transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #3a3226;
+  background: #3a3320;
   border-radius: 8px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #5c5030;
 }
 
 /* =========================================================================
@@ -121,22 +159,22 @@ body {
 /* --- The main ornate frame (central content shell) --- */
 .ornate-shell {
   position: relative;
-  border: 1px solid var(--border-gold-strong);
+  border: 1px solid var(--border-crimson-strong);
   background:
-    linear-gradient(180deg, rgba(26, 21, 16, 0.96), rgba(13, 10, 8, 0.97));
+    linear-gradient(180deg, rgba(22, 18, 24, 0.96), rgba(11, 10, 14, 0.97));
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.7),
-    0 0 0 4px rgba(212, 168, 67, 0.04),
-    0 30px 90px -20px rgba(0, 0, 0, 0.9),
-    inset 0 1px 0 rgba(240, 205, 120, 0.1),
-    inset 0 0 60px -30px rgba(212, 168, 67, 0.15);
+    0 0 0 1px rgba(0, 0, 0, 0.75),
+    0 0 0 4px rgba(196, 160, 50, 0.05),
+    0 30px 90px -20px rgba(0, 0, 0, 0.92),
+    inset 0 1px 0 rgba(228, 195, 90, 0.10),
+    inset 0 0 60px -30px rgba(196, 160, 50, 0.16);
 }
-/* subtle inner gold hairline for the framed panels */
+/* subtle inner bone hairline for the framed panels */
 .ornate-shell::before {
   content: "";
   position: absolute;
   inset: 4px;
-  border: 1px solid rgba(212, 168, 67, 0.14);
+  border: 1px solid rgba(201, 184, 150, 0.12);
   border-radius: inherit;
   pointer-events: none;
 }
@@ -149,8 +187,8 @@ body {
 }
 .panel-gold {
   border: 1px solid var(--border-gold);
-  background: linear-gradient(180deg, rgba(30, 24, 16, 0.6), rgba(16, 13, 10, 0.75));
-  box-shadow: inset 0 1px 0 rgba(240, 205, 120, 0.05), 0 8px 24px -12px rgba(0, 0, 0, 0.7);
+  background: linear-gradient(180deg, rgba(40, 32, 16, 0.5), rgba(15, 13, 11, 0.78));
+  box-shadow: inset 0 1px 0 rgba(228, 195, 90, 0.06), 0 8px 24px -12px rgba(0, 0, 0, 0.72);
 }
 .panel-inset {
   border: 1px solid var(--border-subtle);
@@ -173,35 +211,42 @@ body {
   opacity: 0.45;
   cursor: not-allowed;
 }
-/* Parchment-tan primary CTA */
+/* Antique-gold primary CTA (dark ink on gold) */
 .btn-gold {
   background: linear-gradient(180deg, var(--tan-bright), var(--tan));
-  color: #241701;
-  border: 1px solid #b8923f;
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  color: #241a06;
+  border: 1px solid #7a621f;
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 244, 210, 0.45),
+    0 6px 20px -8px rgba(196, 160, 50, 0.5);
 }
 .btn-gold:not(:disabled):hover {
-  background: linear-gradient(180deg, #f5d98e, #dcb968);
+  background: linear-gradient(180deg, #efce67, #d3ad42);
   transform: translateY(-1px);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 244, 210, 0.55),
+    0 10px 26px -8px rgba(196, 160, 50, 0.7);
 }
-/* Black w/ gold border (ghost / secondary) */
+/* Obsidian w/ gold border (ghost / secondary) */
 .btn-ghost {
-  background: linear-gradient(180deg, rgba(28, 23, 18, 0.9), rgba(14, 11, 9, 0.95));
-  color: var(--gold-bright);
+  background: linear-gradient(180deg, rgba(26, 23, 18, 0.9), rgba(13, 12, 10, 0.95));
+  color: var(--bone-bright);
   border: 1px solid var(--border-gold-strong);
-  box-shadow: inset 0 1px 0 rgba(240, 205, 120, 0.06);
+  box-shadow: inset 0 1px 0 rgba(228, 195, 90, 0.07);
 }
 .btn-ghost:not(:disabled):hover {
   border-color: var(--gold);
   color: #fff;
-  background: linear-gradient(180deg, rgba(40, 32, 22, 0.95), rgba(20, 16, 12, 0.98));
+  background: linear-gradient(180deg, rgba(40, 34, 22, 0.95), rgba(20, 17, 12, 0.98));
 }
-/* Solid dark primary (big action) */
+/* Solid obsidian primary (big action) */
 .btn-dark {
-  background: linear-gradient(180deg, #17130f, #0c0a08);
+  background: linear-gradient(180deg, #17140f, #0b0a08);
   color: var(--gold-bright);
   border: 1px solid var(--border-gold-strong);
-  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(240, 205, 120, 0.08);
+  box-shadow: 0 4px 16px -6px rgba(0, 0, 0, 0.82), inset 0 1px 0 rgba(228, 195, 90, 0.08);
 }
 .btn-dark:not(:disabled):hover {
   border-color: var(--gold);
@@ -264,7 +309,7 @@ body {
   padding: 0.35rem 0.75rem;
   border-radius: 0.6rem;
   border: 1px solid var(--border-subtle);
-  background: linear-gradient(180deg, rgba(26, 21, 16, 0.9), rgba(12, 10, 8, 0.95));
+  background: linear-gradient(180deg, rgba(24, 20, 26, 0.9), rgba(11, 10, 14, 0.95));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -346,11 +391,11 @@ body {
   0%,
   100% {
     border-color: var(--border-gold-strong);
-    box-shadow: 0 0 0 0 rgba(212, 168, 67, 0);
+    box-shadow: 0 0 0 0 rgba(196, 160, 50, 0);
   }
   50% {
     border-color: var(--gold-bright);
-    box-shadow: 0 0 16px 1px rgba(240, 205, 120, 0.45);
+    box-shadow: 0 0 16px 1px rgba(228, 195, 90, 0.5);
   }
 }
 .points-pulse {
@@ -363,13 +408,13 @@ body {
   0%, 100% {
     box-shadow:
       0 0 40px -8px rgba(0, 0, 0, 0.9),
-      0 0 26px -4px rgba(212, 168, 67, 0.35),
+      0 0 26px -4px rgba(196, 160, 50, 0.4),
       inset 0 0 20px rgba(0, 0, 0, 0.6);
   }
   50% {
     box-shadow:
       0 0 40px -8px rgba(0, 0, 0, 0.9),
-      0 0 60px 0 rgba(240, 205, 120, 0.7),
+      0 0 60px 0 rgba(228, 195, 90, 0.75),
       inset 0 0 20px rgba(0, 0, 0, 0.6);
   }
 }
@@ -437,7 +482,7 @@ body {
 
 /* toast shell: dark panel with a pulsing glow tinted by --alert-accent */
 .war-alert {
-  --alert-accent: 240 205 120;
+  --alert-accent: 196 160 50;
   border: 1px solid rgb(var(--alert-accent) / 0.55);
   background:
     linear-gradient(to bottom, rgb(var(--alert-accent) / 0.1), transparent 40%),

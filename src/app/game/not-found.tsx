@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Icon } from "@/components/ui/Icon";
 
 /** Themed 404 for missing game resources (bad empire/battle/spy id). */
 export default function GameNotFound() {
@@ -12,10 +13,10 @@ export default function GameNotFound() {
       </p>
       <div className="mt-2 flex gap-2">
         <Link href="/game/base" className="btn btn-gold px-5 py-2 text-sm">
-          🏰 חזרה לבסיס
+          <Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס
         </Link>
         <Link href="/game/rankings" className="btn btn-ghost px-5 py-2 text-sm">
-          🏆 לדירוג
+          <Icon name="rankings" size={16} className="inline-block align-middle" /> לדירוג
         </Link>
       </div>
     </div>

@@ -12,6 +12,7 @@ import { formatDate, formatNumber } from "@/lib/game/format";
 import { BankActions } from "@/components/game/BankActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "בנק | אימפריום" };
 
@@ -56,13 +57,17 @@ export default async function BankPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="בנק" subtitle="BANK" ornament="🏦" />
+      <SectionHeading
+        title="בנק"
+        subtitle="BANK"
+        ornament={<Icon name="bank" size={22} className="text-crimson" />}
+      />
 
       {/* -------- central bank card -------- */}
       <div className="panel-gold rounded-xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span aria-hidden className="text-3xl">🏦</span>
+            <Icon name="bank" size={32} className="text-crimson-bright" />
             <div>
               <h2 className="text-xl font-black text-gold-bright">הבנק המרכזי</h2>
               <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
@@ -98,7 +103,7 @@ export default async function BankPage() {
 
         <Card variant="gold" className="space-y-3">
           <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>📈</span>
+            <Icon name="upgrades" size={18} className="text-crimson" />
             תשואה יומית
           </h3>
           <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
@@ -134,7 +139,7 @@ export default async function BankPage() {
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card>
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>📈</span>
+            <Icon name="upgrades" size={18} className="text-crimson" />
             שדרוגי בנק
           </h3>
           <ul className="space-y-3 text-sm">
@@ -173,7 +178,7 @@ export default async function BankPage() {
 
         <Card>
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>📜</span>
+            <Icon name="reports" size={18} className="text-crimson" />
             תנועות אחרונות
           </h3>
           {transactions.length === 0 ? (

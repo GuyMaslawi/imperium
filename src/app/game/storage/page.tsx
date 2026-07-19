@@ -8,6 +8,7 @@ import {
 import { formatNumber } from "@/lib/game/format";
 import { StorageCard } from "@/components/game/StorageCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "מחסנים | אימפריום" };
 
@@ -68,7 +69,7 @@ export default async function StoragePage() {
       </div>
 
       <p className="panel-inset rounded-xl p-4 text-sm text-zinc-400">
-        🛡️ המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים
+        <Icon name="shield" size={16} className="inline align-[-2px]" /> המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים
         ויכולים להיגנב בתקיפה.
       </p>
 

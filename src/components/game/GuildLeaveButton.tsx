@@ -4,6 +4,7 @@ import { useActionState, type MouseEvent } from "react";
 import { leaveGuild } from "@/server/actions/guild";
 import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
+import { Icon } from "@/components/ui/Icon";
 
 export interface GuildLeaveButtonProps {
   /** A lone leader leaving disbands the guild — the confirm says so. */
@@ -28,7 +29,7 @@ export function GuildLeaveButton({ disbands }: GuildLeaveButtonProps) {
         onClick={handleClick}
         pendingText="עוזב..."
       >
-        🚪 {disbands ? "פרק את הברית" : "עזוב את הברית"}
+        <Icon name="logout" size={14} className="inline-block align-text-bottom" /> {disbands ? "פרק את הברית" : "עזוב את הברית"}
       </SubmitButton>
       {state.error && <span className="text-xs text-red-400">{state.error}</span>}
     </form>

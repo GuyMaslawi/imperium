@@ -271,9 +271,11 @@ export async function castBankInterestSpell(
       }
 
       const balanceAfter = bank.goldBalance + interest;
+      // Increment (not absolute set) so a bank deposit/withdraw committing
+      // between the read above and this write is not clobbered (lost update).
       await tx.bankAccount.update({
         where: { id: bank.id },
-        data: { goldBalance: balanceAfter },
+        data: { goldBalance: { increment: interest } },
       });
       await tx.bankTransaction.create({
         data: {

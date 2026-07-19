@@ -1,6 +1,8 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { Army } from "@prisma/client";
 import { Card } from "@/components/ui/Card";
+import { Icon } from "@/components/ui/Icon";
 import { weaponsPower, type WeaponQuantityRow } from "@/lib/game/weapons";
 import {
   armyPower,
@@ -36,7 +38,7 @@ function PowerCard({
   links,
   highlight = false,
 }: {
-  icon: string;
+  icon: ReactNode;
   title: string;
   value: number;
   breakdown: { label: string; value: number }[] | string;
@@ -58,16 +60,27 @@ function PowerCard({
       {typeof breakdown === "string" ? (
         <p className="mt-2 text-xs text-zinc-400">{breakdown}</p>
       ) : (
-        <dl className="mt-2 space-y-1 text-xs">
-          {breakdown.map((row) => (
-            <div key={row.label} className="flex justify-between">
-              <dt className="text-zinc-400">{row.label}</dt>
-              <dd className="font-semibold tabular-nums text-zinc-200">
-                {formatNumber(row.value)}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        // The breakdown floats over the card on hover so a longer list of
+        // active bonuses never stretches the card — the tile stays compact.
+        <span className="group/breakdown relative mt-2 inline-flex w-fit cursor-help items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-gold" tabIndex={0}>
+          מהרכב הכוח
+          <span aria-hidden className="text-[9px] leading-none">▾</span>
+          <span
+            role="tooltip"
+            className="pointer-events-none invisible absolute right-0 top-full z-50 mt-1.5 w-max min-w-[10rem] max-w-[16rem] rounded-lg border border-gold/40 bg-[#100d08]/97 px-3 py-2 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover/breakdown:visible group-hover/breakdown:opacity-100 group-focus-within/breakdown:visible group-focus-within/breakdown:opacity-100"
+          >
+            <dl className="space-y-1 text-xs">
+              {breakdown.map((row) => (
+                <div key={row.label} className="flex justify-between gap-4">
+                  <dt className="font-normal text-zinc-400">{row.label}</dt>
+                  <dd className="font-semibold tabular-nums text-zinc-200">
+                    {formatNumber(row.value)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </span>
+        </span>
       )}
       {helper && <p className="mt-2 text-[11px] leading-snug text-zinc-500">{helper}</p>}
       {links && links.length > 0 && (
@@ -112,12 +125,12 @@ export function PowerSummary({
   return (
     <section>
       <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gold">
-        <span aria-hidden>⚡</span>
+        <Icon name="spark" size={20} className="text-crimson-bright" />
         כוח האימפריה
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PowerCard
-          icon="⚔️"
+          icon={<Icon name="attack" size={28} className="text-red-400" />}
           title="כוח התקפה"
           value={attackValue}
           breakdown={[
@@ -136,7 +149,7 @@ export function PowerSummary({
           ]}
         />
         <PowerCard
-          icon="🛡️"
+          icon={<Icon name="shield" size={28} className="text-sky-300" />}
           title="כוח הגנה"
           value={defenseValue}
           breakdown={[
@@ -155,7 +168,7 @@ export function PowerSummary({
           ]}
         />
         <PowerCard
-          icon="🕵️"
+          icon={<Icon name="spy" size={28} className="text-gold" />}
           title="כוח מודיעין"
           value={getEmpireSpyPower(army, weapons)}
           breakdown={[
@@ -169,7 +182,7 @@ export function PowerSummary({
           ]}
         />
         <PowerCard
-          icon="👑"
+          icon={<Icon name="crown" size={28} className="text-gold-bright" />}
           title="כוח כללי"
           value={getEmpireGeneralPower(army, weapons)}
           breakdown="התקפה + הגנה + מודיעין"

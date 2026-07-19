@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getUnreadAlerts, type LiveAlert } from "@/server/actions/messages";
+import { Icon } from "@/components/ui/Icon";
 
 const POLL_MS = 20_000;
 const TOAST_MS = 12_000;
@@ -12,7 +14,7 @@ const SEEN_KEY = "warzone-alerts-seen";
 const SEEN_CAP = 200;
 
 type KindStyle = {
-  icon: string;
+  icon: ReactNode;
   tag: string;
   /** rgb triplet for the pulsing glow + accent, e.g. "239 68 68" */
   accent: string;
@@ -21,19 +23,19 @@ type KindStyle = {
 
 const KIND_STYLE: Record<LiveAlert["kind"], KindStyle> = {
   BATTLE: {
-    icon: "⚔️",
+    icon: <Icon name="attack" size={22} />,
     tag: "התקפה",
     accent: "239 68 68",
     tagClass: "bg-red-600 text-white",
   },
   SPY: {
-    icon: "🕵️",
+    icon: <Icon name="spy" size={22} />,
     tag: "ריגול",
     accent: "168 85 247",
     tagClass: "bg-purple-600 text-white",
   },
   SYSTEM: {
-    icon: "✉️",
+    icon: <Icon name="messages" size={22} />,
     tag: "הודעה",
     accent: "240 205 120",
     tagClass: "bg-amber-500 text-black",

@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { trainUnits, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 
 export interface TrainCardProps {
   unit: "soldiers" | "spies" | "mineSlaves";
@@ -43,7 +44,7 @@ export function TrainCard({
         </div>
         {power > 0 && (
           <span className="rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
-            ⚡{" "}
+            <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
             <span className="nums" dir="ltr">
               {power}
             </span>{" "}

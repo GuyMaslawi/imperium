@@ -9,6 +9,7 @@ import {
   type HeroPointStat,
 } from "@/lib/game/hero";
 import { formatBonus } from "@/components/game/ItemTile";
+import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
 /**
@@ -35,7 +36,7 @@ export function HeroStatsCards({
         <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בכרטיס מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
           <div className="points-pulse w-full rounded-lg border bg-gold/10 p-3 text-center">
             <p className="text-xs font-bold text-gold-bright">
-              ⭐ יש לך נקודות פנויות!
+              <Icon name="spark" size={14} className="inline align-[-2px]" /> יש לך נקודות פנויות!
             </p>
             <p className="nums text-2xl font-black text-gold-bright" dir="ltr">
               {unspentPoints}

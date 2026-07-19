@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,11 @@ export default async function AdminAuditPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="יומן פעולות" subtitle="AUDIT LOG" ornament="📜" />
+      <SectionHeading
+        title="יומן פעולות"
+        subtitle="AUDIT LOG"
+        ornament={<Icon name="reports" size={22} className="text-crimson" />}
+      />
       <p className="text-xs text-zinc-500">מציג {entries.length} רשומות אחרונות.</p>
 
       <div className="overflow-x-auto">

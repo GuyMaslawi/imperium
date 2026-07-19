@@ -14,6 +14,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
+import { Icon } from "@/components/ui/Icon";
 
 export interface StorageCardProps {
   resourceType: "GOLD" | "WOOD" | "IRON" | "STONE";
@@ -241,10 +242,10 @@ export function StorageCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
-            <span className="nums" dir="ltr">🪙 {upgradeCost.gold.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪵 {upgradeCost.wood.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">⚙️ {upgradeCost.iron.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪨 {upgradeCost.stone.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost.gold.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="wood" size={14} className="inline align-[-2px]" /> {upgradeCost.wood.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="iron" size={14} className="inline align-[-2px]" /> {upgradeCost.iron.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="stone" size={14} className="inline align-[-2px]" /> {upgradeCost.stone.toLocaleString("he-IL")}</span>
           </div>
         </div>
         <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">

@@ -2,17 +2,19 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { markMessagesRead } from "@/server/actions/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
 import type { MessageKind } from "@prisma/client";
+import type { ReactNode } from "react";
 
 export const metadata = { title: "הודעות | אימפריום" };
 
-const KIND_META: Record<MessageKind, { icon: string; label: string; tone: string }> = {
+const KIND_META: Record<MessageKind, { icon: ReactNode; label: string; tone: string }> = {
   SYSTEM: { icon: "📣", label: "מערכת", tone: "border-gold/40 text-gold" },
-  BATTLE: { icon: "⚔️", label: "קרב", tone: "border-red-500/40 text-red-400" },
-  SPY: { icon: "🕵️", label: "ריגול", tone: "border-purple-500/40 text-purple-300" },
+  BATTLE: { icon: <Icon name="attack" size={22} />, label: "קרב", tone: "border-red-500/40 text-red-400" },
+  SPY: { icon: <Icon name="spy" size={22} />, label: "ריגול", tone: "border-purple-500/40 text-purple-300" },
 };
 
 export default async function MessagesPage() {
@@ -33,7 +35,7 @@ export default async function MessagesPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markMessagesRead} />
-      <SectionHeading title="הודעות" subtitle="MESSAGES" ornament="✉️" />
+      <SectionHeading title="הודעות" subtitle="MESSAGES" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
 
       {messages.length === 0 ? (
         <div className="panel-gold rounded-xl p-10 text-center">

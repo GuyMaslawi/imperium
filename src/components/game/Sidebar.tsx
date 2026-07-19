@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation";
 import { logout } from "@/server/actions/auth";
 import { DuelBar, Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatCompact } from "@/lib/game/format";
 
 type NavItem = {
   href: string;
   label: string;
-  icon: string;
+  icon: IconName;
   badge?: number;
 };
 
@@ -62,24 +63,24 @@ export function Sidebar({
     {
       title: "פעולות",
       items: [
-        { href: "/game/base", label: "בסיס", icon: "🏰" },
-        { href: "/game/hero", label: "גיבור", icon: "🛡️" },
-        { href: "/game/rankings", label: "דירוג", icon: "🏆" },
-        { href: "/game/weapons", label: "מפעל", icon: "⚙️" },
-        { href: "/game/army", label: "ניהול", icon: "🛠️", badge: recruits },
-        { href: "/game/production", label: "מכונות", icon: "🏭" },
-        { href: "/game/guild", label: "ברית", icon: "🤝" },
+        { href: "/game/base", label: "בסיס", icon: "base" },
+        { href: "/game/hero", label: "גיבור", icon: "hero" },
+        { href: "/game/rankings", label: "דירוג", icon: "rankings" },
+        { href: "/game/weapons", label: "מפעל", icon: "factory" },
+        { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
+        { href: "/game/production", label: "מכונות", icon: "mine" },
+        { href: "/game/guild", label: "ברית", icon: "guild" },
       ],
     },
     {
       title: "משאבים",
       items: [
-        { href: "/game/diamonds", label: "יהלומים", icon: "💎" },
-        { href: "/game/bank", label: "בנק", icon: "🏦" },
-        { href: "/game/storage", label: "מחסנים", icon: "📦" },
-        { href: "/game/achievements", label: "הישגים", icon: "🎖️" },
-        { href: "/game/upgrades", label: "שדרוגים", icon: "📈" },
-        { href: "/game/reports", label: "דוחות", icon: "📜" },
+        { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
+        { href: "/game/bank", label: "בנק", icon: "bank" },
+        { href: "/game/storage", label: "מחסנים", icon: "storage" },
+        { href: "/game/achievements", label: "הישגים", icon: "achievements" },
+        { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
+        { href: "/game/reports", label: "דוחות", icon: "reports" },
       ],
     },
   ];
@@ -97,22 +98,22 @@ export function Sidebar({
               title="התנתקות"
               className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-red-500/50 hover:text-red-400"
             >
-              ⎋
+              <Icon name="logout" size={17} />
             </button>
           </form>
           <Link
             href="/game/settings"
             title="הגדרות"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-gold/50 hover:text-gold"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-crimson/50 hover:text-crimson-bright"
           >
-            ⚙
+            <Icon name="settings" size={17} />
           </Link>
         </div>
         <div className="min-w-0 text-right">
           <p className="text-[11px] text-zinc-400">ברוך שובך,</p>
           <p className="flex items-center justify-end gap-1.5 truncate font-black text-gold-bright">
             {empireName}
-            <span aria-hidden>👑</span>
+            <Icon name="crown" size={16} className="shrink-0 text-crimson-bright" />
           </p>
         </div>
       </div>
@@ -126,7 +127,7 @@ export function Sidebar({
               pathname.startsWith("/game/reports") ? "border-gold text-white" : ""
             }`}
           >
-            📜 היסטוריה
+            <Icon name="reports" size={15} /> היסטוריה
             {newReports > 0 && (
               <span className="absolute -left-1.5 -top-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
                 {newReports}
@@ -141,7 +142,7 @@ export function Sidebar({
               pathname.startsWith("/game/messages") ? "border-gold text-white" : ""
             }`}
           >
-            ✉️ הודעות
+            <Icon name="messages" size={15} /> הודעות
             {unreadMessages > 0 && (
               <span className="absolute -left-1.5 -top-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
                 {unreadMessages}
@@ -156,7 +157,7 @@ export function Sidebar({
           href="/admin"
           className="btn btn-gold flex w-full items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold"
         >
-          🛡️ מרכז שליטה
+          <Icon name="shield" size={16} /> מרכז שליטה
         </Link>
       )}
 
@@ -164,8 +165,8 @@ export function Sidebar({
       <div className="panel-gold rounded-lg p-3">
         <div className="flex items-center justify-between gap-3">
           <span className="relative">
-            <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-gold/50 bg-gradient-to-b from-[#2a2138] to-[#0e0b16] text-2xl shadow-inner">
-              🏹
+            <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
+              <Icon name="hero" size={30} className="text-crimson-bright" />
             </span>
             <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap">
               <Tip tip="רמת הגיבור — עולה מ-XP שנצבר בקרבות">
@@ -206,7 +207,7 @@ export function Sidebar({
         </div>
         <div className="mt-3 flex items-center justify-between text-xs">
           <Tip tip="אחוז ההתקדמות לרמה הבאה של הגיבור">
-            <span className="flex items-center gap-1 text-purple-300">✨ {xpPct}%</span>
+            <span className="flex items-center gap-1 text-purple-300"><Icon name="spark" size={14} /> {xpPct}%</span>
           </Tip>
           <div className="flex items-center gap-1.5">
             <Tip tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)">
@@ -221,7 +222,7 @@ export function Sidebar({
             </Tip>
             <Tip tip="בריאות הגיבור">
               <span className="flex items-center gap-0.5 text-red-400">
-                {heroHealthPct} <span aria-hidden>❤️</span>
+                {heroHealthPct} <Icon name="heart" size={13} />
               </span>
             </Tip>
           </div>
@@ -266,9 +267,11 @@ export function Sidebar({
                               </span>
                             )}
                           </span>
-                          <span aria-hidden className="text-base opacity-90">
-                            {item.icon}
-                          </span>
+                          <Icon
+                            name={item.icon}
+                            size={20}
+                            className={active ? "text-crimson-bright" : "text-bone-dim opacity-90 group-hover:text-bone"}
+                          />
                         </Link>
                       </li>
                     );

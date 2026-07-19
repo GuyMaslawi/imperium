@@ -8,6 +8,9 @@ export const HERO_MAX_LEVEL = 100;
 /** Stat points granted per hero level-up (1 point = +1% to the chosen stat). */
 export const POINTS_PER_LEVEL = 1;
 
+/** Citizens the empire receives for each hero level gained. */
+export const CITIZENS_PER_LEVEL = 25;
+
 /** Reset ("prestige") at level 100: the hero returns to level 1 with these. */
 export const HERO_RESET_CITIZENS = 2500;
 export const HERO_RESET_POINTS = 25;
@@ -31,19 +34,54 @@ export function resetXpMultiplier(resets: number): number {
 }
 
 /**
- * Battle XP: attacking is the main source; defending well also pays. The reward
- * scales with the opponent hero's level *and* how many times they have reset —
- * a stronger, more prestiged target is worth proportionally more XP, so the
- * gain is dynamic on every attack rather than a fixed amount.
+ * How real the fight was, as a reward factor. `foePower / ownPower` is ~0 when
+ * you crush someone far weaker and approaches 1 for an even match (on a win the
+ * ratio is always < 1, since the winner had the greater power). We map it to a
+ * 0.3x–2x band so a stomp still pays a small floor while a nail-biter — or an
+ * upset against a stronger foe — pays full and then some. This is what makes
+ * the gain sensible relative to *who you picked*, and dynamic on every attack:
+ * as both armies change, so does the ratio, so no two attacks pay the same.
  */
-export function attackWinXp(defenderHeroLevel: number, defenderResets = 0): number {
-  return Math.round((50 + defenderHeroLevel * 10) * resetXpMultiplier(defenderResets));
+export const MIN_MATCHUP_XP_FACTOR = 0.3;
+export const MAX_MATCHUP_XP_FACTOR = 2;
+export function matchupXpFactor(ownPower: number, foePower: number): number {
+  const ratio = ownPower > 0 ? foePower / ownPower : 0;
+  return Math.min(MAX_MATCHUP_XP_FACTOR, Math.max(MIN_MATCHUP_XP_FACTOR, 0.3 + ratio * 1.4));
+}
+
+/**
+ * Battle XP: attacking is the main source; defending well also pays. The reward
+ * scales with three things — the opponent hero's level (a higher target is
+ * inherently worth more), how many times they have prestiged (+25% per reset),
+ * and the power matchup (see `matchupXpFactor`). Because the matchup factor
+ * folds in *your* strength relative to the target, a strong hero stomping the
+ * weak no longer earns the same flat XP every time; you are paid for the fight
+ * you actually picked.
+ */
+export function attackWinXp(
+  defenderHeroLevel: number,
+  defenderResets: number,
+  attackerPower: number,
+  defenderPower: number
+): number {
+  const base = 40 + defenderHeroLevel * 10;
+  return Math.round(
+    base * matchupXpFactor(attackerPower, defenderPower) * resetXpMultiplier(defenderResets)
+  );
 }
 export function attackLossXp(): number {
   return 15;
 }
-export function defenseWinXp(attackerHeroLevel: number, attackerResets = 0): number {
-  return Math.round((25 + attackerHeroLevel * 5) * resetXpMultiplier(attackerResets));
+export function defenseWinXp(
+  attackerHeroLevel: number,
+  attackerResets: number,
+  defenderPower: number,
+  attackerPower: number
+): number {
+  const base = 20 + attackerHeroLevel * 5;
+  return Math.round(
+    base * matchupXpFactor(defenderPower, attackerPower) * resetXpMultiplier(attackerResets)
+  );
 }
 export function defenseLossXp(): number {
   return 10;

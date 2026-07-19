@@ -4,14 +4,15 @@ import { useActionState } from "react";
 import { unlockNextWeaponTier, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
 import type { AvailableResources } from "@/components/game/WeaponCard";
 
 const COST_RESOURCES = [
-  { key: "gold", icon: "🪙" },
-  { key: "wood", icon: "🪵" },
-  { key: "iron", icon: "⚙️" },
-  { key: "stone", icon: "🪨" },
+  { key: "gold", icon: "gold" },
+  { key: "wood", icon: "wood" },
+  { key: "iron", icon: "iron" },
+  { key: "stone", icon: "stone" },
 ] as const;
 
 /**
@@ -72,7 +73,7 @@ export function NextWeaponCard({
         <span className="text-zinc-400">
           עוצמה ליחידה:{" "}
           <span className="nums font-bold text-gold-bright" dir="ltr">
-            ⚡ {weapon.power}
+            <Icon name="spark" size={14} className="inline align-[-2px]" /> {weapon.power}
           </span>
         </span>
         <span className="col-span-2 flex flex-wrap gap-x-3 gap-y-1 text-zinc-400">
@@ -86,7 +87,7 @@ export function NextWeaponCard({
                 className={missing ? "font-semibold text-red-400" : undefined}
                 title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
               >
-                {icon}{" "}
+                <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
                 <span className="nums" dir="ltr">
                   {weapon.cost[key].toLocaleString("he-IL")}
                 </span>
@@ -112,7 +113,7 @@ export function NextWeaponCard({
                 className={missing ? "font-semibold text-red-400" : undefined}
                 title={missing ? "אין מספיק מהמשאב הזה לפתיחה" : undefined}
               >
-                {icon}{" "}
+                <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
                 <span className="nums" dir="ltr">
                   {unlockCost[key].toLocaleString("he-IL")}
                 </span>

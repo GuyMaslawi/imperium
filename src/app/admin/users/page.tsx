@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,11 @@ export default async function AdminUsersPage({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="שחקנים" subtitle="PLAYERS" ornament="👥" />
+      <SectionHeading
+        title="שחקנים"
+        subtitle="PLAYERS"
+        ornament={<Icon name="citizens" size={22} className="text-crimson" />}
+      />
 
       <form className="flex gap-2" action="/admin/users">
         <input

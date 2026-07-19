@@ -438,21 +438,21 @@ export async function upgradeHeroItems(
         return { error: "אין פריטים לשדרוג מבין הנבחרים" };
       }
 
+      // First build the upgrade plan WITHOUT mutating anything, so payment can
+      // be taken (and verified) before any item level is written. Applying the
+      // item updates first and only then paying would commit the upgrades even
+      // when the guarded payment fails under a concurrent gold spend.
       let budget = empire.gold;
       let spent = 0;
-      let upgraded = 0;
+      const plan: { itemId: string; targetLevel: number }[] = [];
       for (const { item, targetLevel, cost } of upgradeable) {
         if (cost > budget) break;
-        await tx.heroItem.update({
-          where: { id: item.id },
-          data: { level: targetLevel, rarity: tierForLevel(targetLevel) },
-        });
+        plan.push({ itemId: item.id, targetLevel });
         budget -= cost;
         spent += cost;
-        upgraded += 1;
       }
 
-      if (upgraded === 0) {
+      if (plan.length === 0) {
         const cheapest = upgradeable[0].cost;
         return {
           error: `אין מספיק זהב — השדרוג הזול ביותר עולה ${cheapest.toLocaleString(
@@ -461,13 +461,21 @@ export async function upgradeHeroItems(
         };
       }
 
-      // Guarded decrement of the exact total spent.
+      // Guarded decrement of the exact total spent — pay before applying.
       const paid = await tx.empire.updateMany({
         where: { id: empireId, gold: { gte: spent } },
         data: { gold: { decrement: spent } },
       });
       if (paid.count === 0) return { error: "אין מספיק זהב לשדרוג" };
 
+      for (const { itemId, targetLevel } of plan) {
+        await tx.heroItem.update({
+          where: { id: itemId },
+          data: { level: targetLevel, rarity: tierForLevel(targetLevel) },
+        });
+      }
+
+      const upgraded = plan.length;
       const skipped = upgradeable.length - upgraded;
       const suffix = skipped > 0 ? ` (${skipped} לא שודרגו — חסר זהב)` : "";
       return {

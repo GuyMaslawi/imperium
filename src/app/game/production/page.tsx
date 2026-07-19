@@ -15,6 +15,7 @@ import { mineProductionBreakdown } from "@/lib/game/resources";
 import { MineCard } from "@/components/game/MineCard";
 import { MineSlaveQuickActions } from "@/components/game/MineSlaveQuickActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "ייצור | אימפריום" };
 
@@ -50,11 +51,15 @@ export default async function ProductionPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מכונות" subtitle="WAR MACHINES" ornament="⚙️" />
+      <SectionHeading
+        title="מכונות"
+        subtitle="WAR MACHINES"
+        ornament={<Icon name="mine" size={22} className="text-crimson" />}
+      />
 
       <div className="panel-gold rounded-xl p-4">
         <h2 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>⚒️</span>
+          <Icon name="mine" size={20} className="text-crimson-bright" />
           מפעלים ותעשייה
         </h2>
         <div className="grid grid-cols-3 gap-3">

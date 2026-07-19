@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { formatNumber } from "@/lib/game/format";
+import { Icon } from "@/components/ui/Icon";
 
 export type BattleRow = {
   id: string;
@@ -187,9 +188,9 @@ export function ReportsTabs({
                             r.plunderIsMine ? "text-gold" : "text-zinc-500"
                           }`}
                         >
-                          שלל: 🪙 {num(r.stolenGold)} · 🪵{" "}
-                          {num(r.stolenWood)} · ⚙️{" "}
-                          {num(r.stolenIron)} · 🪨{" "}
+                          שלל: <Icon name="gold" size={14} className="inline-block align-middle" /> {num(r.stolenGold)} · <Icon name="wood" size={14} className="inline-block align-middle" />{" "}
+                          {num(r.stolenWood)} · <Icon name="iron" size={14} className="inline-block align-middle" />{" "}
+                          {num(r.stolenIron)} · <Icon name="stone" size={14} className="inline-block align-middle" />{" "}
                           {num(r.stolenStone)}
                         </p>
                       )}
@@ -260,13 +261,13 @@ export function ReportsTabs({
                     <td className="px-4 py-3">
                       {r.success ? (
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-300 sm:grid-cols-3">
-                          <span>🪙 {num(r.revealedGold)}</span>
-                          <span>🪵 {num(r.revealedWood)}</span>
-                          <span>⚙️ {num(r.revealedIron)}</span>
-                          <span>🪨 {num(r.revealedStone)}</span>
-                          <span>🪖 {num(r.revealedSoldiers)}</span>
-                          <span>🕵️ {num(r.revealedSpies)}</span>
-                          <span>⛏️ {num(r.revealedMineSlaves)}</span>
+                          <span><Icon name="gold" size={14} className="inline-block align-middle" /> {num(r.revealedGold)}</span>
+                          <span><Icon name="wood" size={14} className="inline-block align-middle" /> {num(r.revealedWood)}</span>
+                          <span><Icon name="iron" size={14} className="inline-block align-middle" /> {num(r.revealedIron)}</span>
+                          <span><Icon name="stone" size={14} className="inline-block align-middle" /> {num(r.revealedStone)}</span>
+                          <span><Icon name="army" size={14} className="inline-block align-middle" /> {num(r.revealedSoldiers)}</span>
+                          <span><Icon name="spy" size={14} className="inline-block align-middle" /> {num(r.revealedSpies)}</span>
+                          <span><Icon name="mine" size={14} className="inline-block align-middle" /> {num(r.revealedMineSlaves)}</span>
                         </div>
                       ) : (
                         <span className="text-xs text-zinc-500">

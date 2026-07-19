@@ -8,6 +8,7 @@ import {
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { Icon } from "@/components/ui/Icon";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
 
 const nis = (n: number) => Math.round(n).toLocaleString("he-IL");
@@ -116,7 +117,7 @@ export function MineCard({
       {breakdown.lines.length > 0 && (
         <div className="panel-inset rounded-lg p-3 text-xs space-y-1.5">
           <p className="flex items-center gap-1.5 font-semibold text-gold-dim">
-            <span aria-hidden>✨</span>
+            <Icon name="spark" size={14} className="text-crimson-bright" />
             בונוסים פעילים
           </p>
           {breakdown.lines.map((line) => (
@@ -173,10 +174,10 @@ export function MineCard({
         {!isMaxLevel && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
-            <span className="nums" dir="ltr">🪙 {upgradeCost.gold.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪵 {upgradeCost.wood.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">⚙️ {upgradeCost.iron.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪨 {upgradeCost.stone.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost.gold.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="wood" size={14} className="inline align-[-2px]" /> {upgradeCost.wood.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="iron" size={14} className="inline align-[-2px]" /> {upgradeCost.iron.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr"><Icon name="stone" size={14} className="inline align-[-2px]" /> {upgradeCost.stone.toLocaleString("he-IL")}</span>
           </div>
         )}
         <SubmitButton className="btn btn-dark w-full" pendingText="משדרג..." disabled={isMaxLevel}>

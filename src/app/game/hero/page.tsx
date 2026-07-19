@@ -1,5 +1,6 @@
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { HeroBag } from "@/components/game/HeroBag";
@@ -37,11 +38,17 @@ export default async function HeroPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="גיבור" subtitle="WAR HERO" ornament="⚔" />
+      <SectionHeading
+        title="גיבור"
+        subtitle="WAR HERO"
+        ornament={<Icon name="attack" size={22} className="text-crimson" />}
+      />
 
       <div className="flex justify-center">
         <Tip tip="חנות פריטים וחיזוקים לגיבור — בקרוב" side="bottom">
-          <button className="btn btn-ghost px-4 py-2 text-sm">🛒 חנות גיבור</button>
+          <button className="btn btn-ghost px-4 py-2 text-sm">
+            <Icon name="shop" size={16} className="inline align-[-2px]" /> חנות גיבור
+          </button>
         </Tip>
       </div>
 
@@ -55,8 +62,8 @@ export default async function HeroPage() {
           <div className="flex items-center justify-between gap-4">
             <Tip tip="בריאות הגיבור — כרגע תמיד מלאה; אינה נפגעת בקרבות">
               <div className="flex flex-col items-center">
-                <span className="text-4xl text-red-500" aria-hidden>
-                  ❤️
+                <span className="text-red-500" aria-hidden>
+                  <Icon name="heart" size={36} />
                 </span>
                 <span className="nums mt-1 text-sm font-bold text-red-400" dir="ltr">
                   100%
@@ -91,7 +98,7 @@ export default async function HeroPage() {
                 </Tip>
               </div>
               <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black text-3xl">
-                <span aria-hidden>🏹</span>
+                <Icon name="hero" size={32} className="text-bone" aria-hidden />
                 <span
                   className="nums absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-gold/50 bg-black px-2 text-[10px] font-bold text-gold-bright"
                   dir="rtl"

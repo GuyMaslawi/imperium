@@ -6,6 +6,7 @@ import {
 } from "@/lib/game/constants";
 import { UpgradeCard } from "@/components/game/UpgradeCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "שדרוגים | אימפריום" };
 
@@ -21,7 +22,11 @@ export default async function UpgradesPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="שדרוגים" subtitle="UPGRADES" ornament="📈" />
+      <SectionHeading
+        title="שדרוגים"
+        subtitle="UPGRADES"
+        ornament={<Icon name="upgrades" size={22} className="text-crimson" />}
+      />
 
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
         שדרוגי אימפריה קבועים שמשפרים אזרחים, יהלומים, מודיעין, בנקאות וקבלת תורות.
