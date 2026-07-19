@@ -3,17 +3,15 @@ import { prisma } from "@/lib/prisma";
 import {
   BUILDING_META,
   bankInterestRate,
-  citizensPerDailyUpdate,
-  diamondsPerDailyUpdate,
   mineProductionPerTick,
   type StorableResource,
 } from "./constants";
+import { getTunables } from "./config";
 import { dailyUpdatesBetween, elapsedRegularTicks, lastTickBoundary } from "./time";
 import { turnsGainFromUpgrades } from "./turns";
 import { bonusMultiplier, heroBonuses } from "./hero";
 import { getActiveGuildBuffPct } from "./guildBuffs";
 import { getActiveResourceBoosts } from "./diamondEffects";
-import { WHEEL_DAILY_SPINS, WHEEL_SPINS_CAP } from "./wheel";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -53,6 +51,7 @@ export async function applyPendingUpdates(
   }
 
   const now = new Date();
+  const tunables = await getTunables();
 
   // Hero bonuses: the resources *points* still multiply mine production, while
   // equipped items now add flat amounts — extra resources per tick, and extra
@@ -70,7 +69,9 @@ export async function applyPendingUpdates(
     const guildResourcesPct = await getActiveGuildBuffPct(empire.id, "RESOURCES", tx, now);
     const resourceBoosts = await getActiveResourceBoosts(empire.id, tx, now);
     const baseMultiplier =
-      bonusMultiplier(heroBonus.points.resources) * bonusMultiplier(guildResourcesPct);
+      bonusMultiplier(heroBonus.points.resources) *
+      bonusMultiplier(guildResourcesPct) *
+      tunables.economy.mineProductionMultiplier;
     for (const building of empire.buildings) {
       const meta = BUILDING_META[building.type];
       if (!meta.producedResource) continue;
@@ -99,15 +100,17 @@ export async function applyPendingUpdates(
   if (missedDailies.length > 0) {
     const growthLevel =
       empire.upgrades.find((u) => u.type === "CITIZEN_GROWTH")?.level ?? 1;
+    const citizensPerDaily =
+      tunables.daily.citizensBase + growthLevel * tunables.daily.citizensPerLevel;
     // Citizen/diamond items add a flat count per daily update (not a %).
     citizensGained =
-      Math.round(citizensPerDailyUpdate(growthLevel) * missedDailies.length) +
+      Math.round(citizensPerDaily * missedDailies.length) +
       heroBonus.itemsFlat.citizens * missedDailies.length;
 
     const diamondLevel =
       empire.upgrades.find((u) => u.type === "DIAMOND_YIELD")?.level ?? 1;
     diamondsGained =
-      Math.round(diamondsPerDailyUpdate(diamondLevel) * missedDailies.length) +
+      Math.round(diamondLevel * tunables.daily.diamondsPerLevel * missedDailies.length) +
       heroBonus.itemsFlat.diamonds * missedDailies.length;
   }
 
@@ -118,8 +121,8 @@ export async function applyPendingUpdates(
       ? Math.max(
           empire.wheelSpins,
           Math.min(
-            WHEEL_SPINS_CAP,
-            empire.wheelSpins + WHEEL_DAILY_SPINS * missedDailies.length
+            tunables.daily.wheelSpinsCap,
+            empire.wheelSpins + tunables.daily.wheelSpins * missedDailies.length
           )
         )
       : empire.wheelSpins;

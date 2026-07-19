@@ -99,9 +99,8 @@ export default async function RankingsPage() {
               <th className="px-4 py-2.5 font-semibold">#</th>
               <th className="px-4 py-2.5 font-semibold">שם הצבא</th>
               <th className="px-4 py-2.5 font-semibold">ברית</th>
-              <th className="px-4 py-2.5 font-semibold">עוצמה</th>
+              <th className="px-4 py-2.5 font-semibold">זהב</th>
               <th className="px-4 py-2.5 font-semibold">חיילים</th>
-              <th className="px-4 py-2.5 font-semibold">פעולה</th>
             </tr>
           </thead>
           <tbody>
@@ -178,26 +177,17 @@ export default async function RankingsPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-600">—</td>
                   <td className="px-4 py-3">
-                    <span className="nums font-bold text-gold" dir="ltr">
-                      ⚡ {formatCompact(empire.power)}
+                    <span
+                      className="nums inline-flex items-center gap-1 font-bold text-gold-bright"
+                      dir="ltr"
+                    >
+                      {formatNumber(Math.floor(empire.gold))} 🪙
                     </span>
                   </td>
                   <td className="px-4 py-3">
                     <span className="nums text-zinc-300" dir="ltr">
                       {formatNumber(empire.army?.soldiers ?? 0)}
                     </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    {isMe ? (
-                      <span className="text-xs text-zinc-600">—</span>
-                    ) : (
-                      <Link
-                        href={`/game/empires/${empire.id}`}
-                        className="btn btn-ghost px-3 py-1.5 text-xs"
-                      >
-                        פרופיל ←
-                      </Link>
-                    )}
                   </td>
                 </tr>
               );

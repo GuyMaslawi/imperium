@@ -5,6 +5,14 @@ import { unlockNextWeaponTier, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
+import type { AvailableResources } from "@/components/game/WeaponCard";
+
+const COST_RESOURCES = [
+  { key: "gold", icon: "🪙" },
+  { key: "wood", icon: "🪵" },
+  { key: "iron", icon: "⚙️" },
+  { key: "stone", icon: "🪨" },
+] as const;
 
 /**
  * The next locked weapon in a category's progression path, with the tier
@@ -14,10 +22,12 @@ export function NextWeaponCard({
   weapon,
   category,
   unlockCost,
+  available,
 }: {
   weapon: WeaponDefinition;
   category: "ATTACK" | "DEFENSE" | "SPY";
   unlockCost: WeaponCost;
+  available: AvailableResources;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(
     unlockNextWeaponTier,
@@ -67,10 +77,22 @@ export function NextWeaponCard({
         </span>
         <span className="col-span-2 flex flex-wrap gap-x-3 gap-y-1 text-zinc-400">
           <span className="font-semibold text-gold-dim">עלות ליחידה:</span>
-          {weapon.cost.gold > 0 && <span className="nums" dir="ltr">🪙 {weapon.cost.gold.toLocaleString("he-IL")}</span>}
-          {weapon.cost.wood > 0 && <span className="nums" dir="ltr">🪵 {weapon.cost.wood.toLocaleString("he-IL")}</span>}
-          {weapon.cost.iron > 0 && <span className="nums" dir="ltr">⚙️ {weapon.cost.iron.toLocaleString("he-IL")}</span>}
-          {weapon.cost.stone > 0 && <span className="nums" dir="ltr">🪨 {weapon.cost.stone.toLocaleString("he-IL")}</span>}
+          {COST_RESOURCES.map(({ key, icon }) => {
+            if (weapon.cost[key] <= 0) return null;
+            const missing = available[key] < weapon.cost[key];
+            return (
+              <span
+                key={key}
+                className={missing ? "font-semibold text-red-400" : undefined}
+                title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
+              >
+                {icon}{" "}
+                <span className="nums" dir="ltr">
+                  {weapon.cost[key].toLocaleString("he-IL")}
+                </span>
+              </span>
+            );
+          })}
         </span>
       </div>
 
@@ -82,10 +104,21 @@ export function NextWeaponCard({
         <input type="hidden" name="category" value={category} />
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
           <span className="font-semibold text-gold-dim">עלות פתיחה:</span>
-          <span className="nums" dir="ltr">🪙 {unlockCost.gold.toLocaleString("he-IL")}</span>
-          <span className="nums" dir="ltr">🪵 {unlockCost.wood.toLocaleString("he-IL")}</span>
-          <span className="nums" dir="ltr">⚙️ {unlockCost.iron.toLocaleString("he-IL")}</span>
-          <span className="nums" dir="ltr">🪨 {unlockCost.stone.toLocaleString("he-IL")}</span>
+          {COST_RESOURCES.map(({ key, icon }) => {
+            const missing = available[key] < unlockCost[key];
+            return (
+              <span
+                key={key}
+                className={missing ? "font-semibold text-red-400" : undefined}
+                title={missing ? "אין מספיק מהמשאב הזה לפתיחה" : undefined}
+              >
+                {icon}{" "}
+                <span className="nums" dir="ltr">
+                  {unlockCost[key].toLocaleString("he-IL")}
+                </span>
+              </span>
+            );
+          })}
         </div>
         <SubmitButton className="btn btn-gold w-full" pendingText="פותח...">
           🔓 פתח נשק הבא

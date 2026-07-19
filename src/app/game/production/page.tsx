@@ -4,11 +4,14 @@ import {
   MINE_MAX_LEVEL,
   PRODUCTION_BUILDING_TYPES,
   RESOURCE_META,
-  mineProductionPerTick,
   mineProductionValue,
   mineUpgradeCost,
 } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
+import { heroBonuses } from "@/lib/game/hero";
+import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
+import { getActiveResourceBoosts } from "@/lib/game/diamondEffects";
+import { mineProductionBreakdown } from "@/lib/game/resources";
 import { MineCard } from "@/components/game/MineCard";
 import { MineSlaveQuickActions } from "@/components/game/MineSlaveQuickActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -26,6 +29,14 @@ export default async function ProductionPage() {
       assignedSlaves: building?.slavesAssigned ?? 0,
     };
   });
+
+  // Same bonus inputs the game clock uses when settling production, so the
+  // breakdown shown on each card matches what actually gets credited.
+  const heroBonus = heroBonuses(empire.hero);
+  const [guildResourcesPct, resourceBoosts] = await Promise.all([
+    getActiveGuildBuffPct(empire.id, "RESOURCES"),
+    getActiveResourceBoosts(empire.id),
+  ]);
 
   const totalSlaves = empire.army?.mineSlaves ?? 0;
   const assignedTotal = mines.reduce((sum, m) => sum + m.assignedSlaves, 0);
@@ -64,6 +75,14 @@ export default async function ProductionPage() {
         {mines.map((mine) => {
           const meta = BUILDING_META[mine.type];
           const resource = meta.producedResource!;
+          const breakdown = mineProductionBreakdown({
+            level: mine.level,
+            assignedSlaves: mine.assignedSlaves,
+            heroResourcesPct: heroBonus.points.resources,
+            guildResourcesPct,
+            diamondBoostPct: resourceBoosts[resource],
+            heroItemFlat: heroBonus.itemsFlatByResource[resource],
+          });
           return (
             <MineCard
               key={mine.type}
@@ -77,7 +96,7 @@ export default async function ProductionPage() {
               freeSlaves={freeSlaves}
               resourceLabel={RESOURCE_META[resource].label}
               productionPerSlave={mineProductionValue(mine.level)}
-              productionPerTick={mineProductionPerTick(mine.level, mine.assignedSlaves)}
+              breakdown={breakdown}
               upgradeCost={mineUpgradeCost(mine.level)}
             />
           );

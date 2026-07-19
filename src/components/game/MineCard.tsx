@@ -8,6 +8,9 @@ import {
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import type { MineProductionBreakdown } from "@/lib/game/resources";
+
+const nis = (n: number) => Math.round(n).toLocaleString("he-IL");
 
 export interface MineCardProps {
   resource: "gold" | "wood" | "iron" | "stone";
@@ -21,8 +24,8 @@ export interface MineCardProps {
   resourceLabel: string;
   /** Production per assigned mine slave per regular update. */
   productionPerSlave: number;
-  /** Total production per regular update. */
-  productionPerTick: number;
+  /** Real production per regular update, broken down by active bonus. */
+  breakdown: MineProductionBreakdown;
   upgradeCost: { gold: number; wood: number; iron: number; stone: number };
 }
 
@@ -37,7 +40,7 @@ export function MineCard({
   freeSlaves,
   resourceLabel,
   productionPerSlave,
-  productionPerTick,
+  breakdown,
   upgradeCost,
 }: MineCardProps) {
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
@@ -83,9 +86,12 @@ export function MineCard({
 
       <div className="panel-inset rounded-lg p-3 text-center">
         <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
-          +{productionPerTick.toLocaleString("he-IL")}
+          +{nis(breakdown.total)}
         </p>
-        <p className="text-xs text-gold-dim">{resourceLabel} לעדכון רגיל</p>
+        <p className="text-xs text-gold-dim">
+          {resourceLabel} לעדכון רגיל
+          {breakdown.lines.length > 0 ? " (כולל בונוסים)" : ""}
+        </p>
       </div>
 
       {/* min-height keeps the stat boxes and forms aligned across the four
@@ -101,11 +107,42 @@ export function MineCard({
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
           {productionPerSlave.toLocaleString("he-IL")} {resourceLabel}
         </dd>
-        <dt className="text-zinc-400">ייצור לעדכון רגיל</dt>
-        <dd className="nums text-left font-bold text-emerald-400" dir="ltr">
-          +{productionPerTick.toLocaleString("he-IL")} {resourceLabel}
+        <dt className="text-zinc-400">תפוקת בסיס לעדכון</dt>
+        <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
+          +{nis(breakdown.base)} {resourceLabel}
         </dd>
       </dl>
+
+      {breakdown.lines.length > 0 && (
+        <div className="panel-inset rounded-lg p-3 text-xs space-y-1.5">
+          <p className="flex items-center gap-1.5 font-semibold text-gold-dim">
+            <span aria-hidden>✨</span>
+            בונוסים פעילים
+          </p>
+          {breakdown.lines.map((line) => (
+            <div key={line.key} className="flex items-center justify-between gap-2">
+              <span className="text-zinc-400">
+                {line.label}
+                {line.pct !== undefined ? (
+                  <span className="nums" dir="ltr">
+                    {" "}
+                    (+{line.pct}%)
+                  </span>
+                ) : null}
+              </span>
+              <span className="nums font-bold text-emerald-300" dir="ltr">
+                +{nis(line.amount)}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between gap-2 border-t border-border-subtle pt-1.5">
+            <span className="font-semibold text-gold-dim">סה״כ בפועל</span>
+            <span className="nums font-black text-emerald-400" dir="ltr">
+              +{nis(breakdown.total)} {resourceLabel}
+            </span>
+          </div>
+        </div>
+      )}
 
       <form action={assignAction} className="flex items-end gap-2">
         <input type="hidden" name="resource" value={resource} />

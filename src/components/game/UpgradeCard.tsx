@@ -5,6 +5,14 @@ import { upgradeEmpireUpgrade, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
+import type { AvailableResources } from "@/components/game/WeaponCard";
+
+const COST_RESOURCES = [
+  { key: "gold", icon: "🪙" },
+  { key: "wood", icon: "🪵" },
+  { key: "iron", icon: "⚙️" },
+  { key: "stone", icon: "🪨" },
+] as const;
 
 export interface UpgradeCardProps {
   upgradeType:
@@ -21,6 +29,7 @@ export interface UpgradeCardProps {
   currentEffect: string;
   nextEffect: string;
   upgradeCost: { gold: number; wood: number; iron: number; stone: number };
+  available: AvailableResources;
   isMaxLevel?: boolean;
 }
 
@@ -33,6 +42,7 @@ export function UpgradeCard({
   currentEffect,
   nextEffect,
   upgradeCost,
+  available,
   isMaxLevel = false,
 }: UpgradeCardProps) {
   const [state, action] = useActionState<ActionState, FormData>(
@@ -78,10 +88,22 @@ export function UpgradeCard({
         {!isMaxLevel && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
-            <span className="nums" dir="ltr">🪙 {upgradeCost.gold.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪵 {upgradeCost.wood.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">⚙️ {upgradeCost.iron.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr">🪨 {upgradeCost.stone.toLocaleString("he-IL")}</span>
+            {COST_RESOURCES.map(({ key, icon }) => {
+              if (upgradeCost[key] <= 0) return null;
+              const missing = available[key] < upgradeCost[key];
+              return (
+                <span
+                  key={key}
+                  className={missing ? "font-semibold text-red-400" : undefined}
+                  title={missing ? "אין מספיק מהמשאב הזה לשדרוג" : undefined}
+                >
+                  {icon}{" "}
+                  <span className="nums" dir="ltr">
+                    {upgradeCost[key].toLocaleString("he-IL")}
+                  </span>
+                </span>
+              );
+            })}
           </div>
         )}
         <SubmitButton

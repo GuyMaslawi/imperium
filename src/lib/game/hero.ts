@@ -20,15 +20,30 @@ export function xpToNextLevel(level: number): number {
   return 120 + (level - 1) * 35;
 }
 
-/** Battle XP: attacking is the main source; defending well also pays. */
-export function attackWinXp(defenderHeroLevel: number): number {
-  return 50 + defenderHeroLevel * 10;
+/**
+ * Extra XP multiplier from an opponent's prestige: every reset marks a foe who
+ * has already climbed the full level curve at least once, so beating (or
+ * repelling) them is worth more. +25% per reset, so a fresh hero adds nothing.
+ */
+export const XP_PER_RESET_BONUS = 0.25;
+export function resetXpMultiplier(resets: number): number {
+  return 1 + Math.max(0, resets) * XP_PER_RESET_BONUS;
+}
+
+/**
+ * Battle XP: attacking is the main source; defending well also pays. The reward
+ * scales with the opponent hero's level *and* how many times they have reset —
+ * a stronger, more prestiged target is worth proportionally more XP, so the
+ * gain is dynamic on every attack rather than a fixed amount.
+ */
+export function attackWinXp(defenderHeroLevel: number, defenderResets = 0): number {
+  return Math.round((50 + defenderHeroLevel * 10) * resetXpMultiplier(defenderResets));
 }
 export function attackLossXp(): number {
   return 15;
 }
-export function defenseWinXp(attackerHeroLevel: number): number {
-  return 25 + attackerHeroLevel * 5;
+export function defenseWinXp(attackerHeroLevel: number, attackerResets = 0): number {
+  return Math.round((25 + attackerHeroLevel * 5) * resetXpMultiplier(attackerResets));
 }
 export function defenseLossXp(): number {
   return 10;

@@ -7,18 +7,12 @@ import type { BuildingType, Prisma, ResourceStorageType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import {
-  ATTACK_TURN_COST,
-  ENSLAVE_MIN_SOLDIERS,
-  ENSLAVE_RATE,
   BUILDING_META,
-  DEFENSE_BONUS,
   EMPIRE_UPGRADE_META,
   MINE_MAX_LEVEL,
-  PLUNDER_RATE,
   PRODUCTION_BUILDING_TYPES,
   RESOURCE_META,
   RESOURCE_TO_MINE,
-  SPY_TURN_COST,
   STORAGE_META,
   UNIT_META,
   empireUpgradeCostFor,
@@ -29,6 +23,7 @@ import {
   type StorableResource,
   type UnitKey,
 } from "@/lib/game/constants";
+import { getTunables } from "@/lib/game/config";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
@@ -422,6 +417,7 @@ export async function spyOnEmpire(
     }
 
     outcome = await prisma.$transaction(async (tx) => {
+      const { spyTurnCost: SPY_TURN_COST } = (await getTunables()).battle;
       const attacker = await applyPendingUpdates(empireId, tx);
       if (!attacker.army || attacker.army.spies < 1) {
         return { error: "נדרש לפחות מרגל אחד למשימת ריגול" };
@@ -534,6 +530,13 @@ export async function attackEmpire(
     }
 
     outcome = await prisma.$transaction(async (tx) => {
+      const {
+        attackTurnCost: ATTACK_TURN_COST,
+        defenseBonus: DEFENSE_BONUS,
+        plunderRate: PLUNDER_RATE,
+        enslaveRate: ENSLAVE_RATE,
+        enslaveMinSoldiers: ENSLAVE_MIN_SOLDIERS,
+      } = (await getTunables()).battle;
       const attacker = await applyPendingUpdates(empireId, tx);
       if (attacker.turns < ATTACK_TURN_COST) {
         return { error: "אין לך מספיק תורות לביצוע תקיפה." };
@@ -687,11 +690,11 @@ export async function attackEmpire(
       /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
       // A failed attack earns the attacker nothing.
       const attackerHeroXp = attackerWins
-        ? attackWinXp(defenderHero?.level ?? 1)
+        ? attackWinXp(defenderHero?.level ?? 1, defenderHero?.resets ?? 0)
         : 0;
       const defenderHeroXp = attackerWins
         ? defenseLossXp()
-        : defenseWinXp(attackerHero?.level ?? 1);
+        : defenseWinXp(attackerHero?.level ?? 1, attackerHero?.resets ?? 0);
 
       if (attackerHero && attackerHeroXp > 0) {
         const next = applyHeroXp(attackerHero, attackerHeroXp);

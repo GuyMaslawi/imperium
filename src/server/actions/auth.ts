@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession } from "@/lib/auth";
 import { newEmpireData } from "@/lib/game/createEmpire";
+import { getTunables } from "@/lib/game/config";
 
 export interface AuthState {
   error?: string;
@@ -41,17 +42,17 @@ export async function register(
 
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const activeSeason = await prisma.gameSeason.findFirst({
-    where: { isActive: true },
-    select: { id: true },
-  });
+  const [activeSeason, tunables] = await Promise.all([
+    prisma.gameSeason.findFirst({ where: { isActive: true }, select: { id: true } }),
+    getTunables(),
+  ]);
 
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: { email, passwordHash, name },
     });
     await tx.empire.create({
-      data: newEmpireData(created.id, empireName, activeSeason?.id),
+      data: newEmpireData(created.id, empireName, activeSeason?.id, tunables.starting),
     });
     return created;
   });
@@ -81,6 +82,9 @@ export async function login(
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     return { error: "אימייל או סיסמה שגויים" };
+  }
+  if (user.bannedAt) {
+    return { error: "החשבון נחסם על ידי ההנהלה" };
   }
 
   await createSession(user.id);

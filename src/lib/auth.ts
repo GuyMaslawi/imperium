@@ -63,6 +63,11 @@ export const requireEmpire = cache(async () => {
     include: { user: true },
   });
   if (!existing) redirect("/login");
+  // Banned users lose all game access.
+  if (existing.user.bannedAt) {
+    await destroySession();
+    redirect("/login");
+  }
 
   const empire = await applyPendingUpdates(existing.id);
   return { ...empire, user: existing.user };

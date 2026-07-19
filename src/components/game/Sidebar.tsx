@@ -33,6 +33,7 @@ export function Sidebar({
   recruits,
   unreadMessages = 0,
   newReports = 0,
+  isAdmin = false,
 }: {
   empireName: string;
   heroClass: string;
@@ -52,6 +53,8 @@ export function Sidebar({
   unreadMessages?: number;
   /** Reports created since the last reports-page visit — badge on היסטוריה. */
   newReports?: number;
+  /** Show the admin control-center link (admins only). */
+  isAdmin?: boolean;
 }) {
   const pathname = usePathname();
 
@@ -147,6 +150,15 @@ export function Sidebar({
           </Link>
         </Tip>
       </div>
+
+      {isAdmin && (
+        <Link
+          href="/admin"
+          className="btn btn-gold flex w-full items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold"
+        >
+          🛡️ מרכז שליטה
+        </Link>
+      )}
 
       {/* hero card */}
       <div className="panel-gold rounded-lg p-3">

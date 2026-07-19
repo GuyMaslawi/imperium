@@ -7,15 +7,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  USER
+  ADMIN
+}
+
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  role         Role      @default(USER)
+  /// When set, the user is banned — login is refused and game access blocked.
+  bannedAt     DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   empire Empire?
+}
+
+/// Single-row (`id = "singleton"`) table holding admin-editable global game
+/// balance. `data` is a JSON overlay merged over DEFAULT_TUNABLES in code —
+/// see src/lib/game/config.ts.
+model GameConfig {
+  id        String   @id @default("singleton")
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}
+
+/// Append-only trail of every mutating admin action, for accountability.
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  adminEmail String
+  action     String
+  /// e.g. "empire", "user", "season", "guild", "broadcast", "config".
+  targetType String?
+  targetId   String?
+  /// Human-readable summary shown in the audit log UI.
+  summary    String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([adminId])
 }
 
 model GameSeason {

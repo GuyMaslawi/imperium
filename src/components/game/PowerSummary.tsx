@@ -9,8 +9,18 @@ import {
   getEmpireDefensePower,
   getEmpireSpyPower,
   getEmpireGeneralPower,
+  type CombatPowerBreakdown,
 } from "@/lib/game/power";
 import { formatNumber } from "@/lib/game/format";
+
+/** Turn a base decomposition plus a bonus breakdown into PowerCard rows. */
+function bonusRows(breakdown: CombatPowerBreakdown | undefined) {
+  if (!breakdown) return [];
+  return breakdown.lines.map((line) => ({
+    label: `${line.label} (+${line.pct}%)`,
+    value: Math.round(line.amount),
+  }));
+}
 
 interface PowerLink {
   href: string;
@@ -80,15 +90,24 @@ function PowerCard({
 export function PowerSummary({
   army,
   weapons,
+  attackBreakdown,
+  defenseBreakdown,
 }: {
   army: Pick<Army, "soldiers" | "spies"> | null;
   weapons: readonly WeaponQuantityRow[];
+  /** When given, the attack card shows real battle power with active bonuses. */
+  attackBreakdown?: CombatPowerBreakdown;
+  /** When given, the defense card shows real battle power (incl. +20%). */
+  defenseBreakdown?: CombatPowerBreakdown;
 }) {
   const soldiersPower = armyPower(army);
   const spyUnitsPower = spiesPower(army);
   const attackWeaponsPower = weaponsPower(weapons, "ATTACK");
   const defenseWeaponsPower = weaponsPower(weapons, "DEFENSE");
   const spyWeaponsPower = weaponsPower(weapons, "SPY");
+
+  const attackValue = attackBreakdown?.total ?? getEmpireAttackPower(army, weapons);
+  const defenseValue = defenseBreakdown?.total ?? getEmpireDefensePower(army, weapons);
 
   return (
     <section>
@@ -100,11 +119,17 @@ export function PowerSummary({
         <PowerCard
           icon="⚔️"
           title="כוח התקפה"
-          value={getEmpireAttackPower(army, weapons)}
+          value={attackValue}
           breakdown={[
             { label: "חיילים", value: soldiersPower },
             { label: "נשקי התקפה", value: attackWeaponsPower },
+            ...bonusRows(attackBreakdown),
           ]}
+          helper={
+            attackBreakdown && attackBreakdown.lines.length > 0
+              ? "כולל בונוסים פעילים (גיבור / קסם ברית)."
+              : undefined
+          }
           links={[
             { href: "/game/weapons", label: "ניהול נשקים" },
             { href: "/game/army", label: "אימון צבא" },
@@ -113,12 +138,17 @@ export function PowerSummary({
         <PowerCard
           icon="🛡️"
           title="כוח הגנה"
-          value={getEmpireDefensePower(army, weapons)}
+          value={defenseValue}
           breakdown={[
             { label: "חיילים", value: soldiersPower },
             { label: "נשקי הגנה", value: defenseWeaponsPower },
+            ...bonusRows(defenseBreakdown),
           ]}
-          helper="בקרב הגנה מתקבל בונוס הגנה של 20%."
+          helper={
+            defenseBreakdown
+              ? "כוח ההגנה בפועל בקרב, כולל בונוס מגן ובונוסים פעילים."
+              : "בקרב הגנה מתקבל בונוס הגנה של 20%."
+          }
           links={[
             { href: "/game/weapons", label: "ניהול נשקים" },
             { href: "/game/army", label: "אימון צבא" },

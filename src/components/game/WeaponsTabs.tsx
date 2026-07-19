@@ -108,6 +108,7 @@ export function WeaponsTabs({
             weapon={next.weapon}
             category={active.category}
             unlockCost={active.unlockCost}
+            available={available}
           />
         )}
         {unlocked.map(({ weapon, owned }) => (

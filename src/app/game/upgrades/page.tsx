@@ -12,6 +12,13 @@ export const metadata = { title: "שדרוגים | אימפריום" };
 export default async function UpgradesPage() {
   const empire = await requireEmpire();
 
+  const available = {
+    gold: Math.floor(empire.gold),
+    wood: Math.floor(empire.wood),
+    iron: Math.floor(empire.iron),
+    stone: Math.floor(empire.stone),
+  };
+
   return (
     <div className="space-y-6">
       <SectionHeading title="שדרוגים" subtitle="UPGRADES" ornament="📈" />
@@ -37,6 +44,7 @@ export default async function UpgradesPage() {
               currentEffect={meta.effectLabel(level)}
               nextEffect={meta.effectLabel(level + 1)}
               upgradeCost={empireUpgradeCostFor(type, level)}
+              available={available}
               isMaxLevel={isMaxLevel}
             />
           );

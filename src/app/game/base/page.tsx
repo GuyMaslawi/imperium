@@ -10,6 +10,9 @@ import {
   type StorableResource,
 } from "@/lib/game/constants";
 import { productionPerTick } from "@/lib/game/resources";
+import { heroBonuses } from "@/lib/game/hero";
+import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
+import { attackPowerBreakdown, defensePowerBreakdown } from "@/lib/game/power";
 import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
 import { seasonDay } from "@/lib/game/wheel";
@@ -20,8 +23,14 @@ export const metadata = { title: "בסיס | WARZONE" };
 export default async function BasePage() {
   const empire = await requireEmpire();
 
-  const [recentBattles, recentSpies, recentBankTransactions, season] =
-    await Promise.all([
+  const [
+    recentBattles,
+    recentSpies,
+    recentBankTransactions,
+    season,
+    guildAttackPct,
+    guildDefensePct,
+  ] = await Promise.all([
       prisma.battleReport.findMany({
         where: {
           OR: [{ attackerEmpireId: empire.id }, { defenderEmpireId: empire.id }],
@@ -44,7 +53,25 @@ export default async function BasePage() {
       empire.seasonId
         ? prisma.gameSeason.findUnique({ where: { id: empire.seasonId } })
         : null,
+      getActiveGuildBuffPct(empire.id, "ATTACK"),
+      getActiveGuildBuffPct(empire.id, "DEFENSE"),
     ]);
+
+  // Real battle power for the attack/defense cards: same hero + guild
+  // multipliers the fight itself applies, so the numbers match combat.
+  const heroBonus = heroBonuses(empire.hero);
+  const attackBreakdown = attackPowerBreakdown({
+    army: empire.army,
+    weapons: empire.weapons,
+    heroAttackPct: heroBonus.totalPct.attack,
+    guildAttackPct,
+  });
+  const defenseBreakdown = defensePowerBreakdown({
+    army: empire.army,
+    weapons: empire.weapons,
+    heroDefensePct: heroBonus.totalPct.defense,
+    guildDefensePct,
+  });
 
   /* ---- production per regular update, grouped by resource ---- */
   const productionByResource = new Map<StorableResource, number>();
@@ -172,7 +199,12 @@ export default async function BasePage() {
       </div>
 
       {/* empire power */}
-      <PowerSummary army={empire.army} weapons={empire.weapons} />
+      <PowerSummary
+        army={empire.army}
+        weapons={empire.weapons}
+        attackBreakdown={attackBreakdown}
+        defenseBreakdown={defenseBreakdown}
+      />
 
       {/* base details + resources */}
       <div className="grid gap-4 lg:grid-cols-2">

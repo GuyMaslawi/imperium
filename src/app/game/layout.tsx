@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin";
 import { nextDailyUpdate, nextRegularUpdate, formatGameTime } from "@/lib/game/time";
 import { HERO_MAX_LEVEL, heroBonuses, xpToNextLevel } from "@/lib/game/hero";
 import { ResourceBar } from "@/components/game/ResourceBar";
@@ -30,6 +31,8 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const heroXpMax = heroAtCap ? 1 : xpToNextLevel(heroLevel);
   const heroXp = heroAtCap ? 1 : hero?.xp ?? 0;
   const bonuses = heroBonuses(hero);
+
+  const admin = await isAdmin();
 
   // Sidebar badges: unread inbox messages + reports since the last visit.
   const [unreadMessages, newBattleReports, newSpyReports] = await Promise.all([
@@ -79,6 +82,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           recruits={empire.citizens}
           unreadMessages={unreadMessages}
           newReports={newBattleReports + newSpyReports}
+          isAdmin={admin}
         />
 
         <main className="min-w-0 flex-1">

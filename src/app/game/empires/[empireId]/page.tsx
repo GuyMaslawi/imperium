@@ -42,6 +42,7 @@ export default async function EmpireProfilePage({
       season: true,
       weapons: true,
       hero: { include: { items: { where: { equipped: true } } } },
+      guildMembership: { include: { guild: true } },
     },
   });
   if (!empire) notFound();
@@ -84,9 +85,14 @@ export default async function EmpireProfilePage({
   const duelTotal = attackPower + defensePower;
   const attackShare = duelTotal > 0 ? (attackPower / duelTotal) * 100 : 50;
 
+  const guildName = empire.guildMembership?.guild.name ?? null;
+
   const publicStats = [
     { label: "רמה", value: formatNumber(empire.level), tone: "text-gold-bright" },
     { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
+    // Gold and soldier count are shown openly on every profile.
+    { label: "זהב", value: `🪙 ${formatNumber(Math.floor(empire.gold))}`, tone: "text-gold-bright" },
+    { label: "חיילים", value: `🪖 ${formatNumber(empire.army?.soldiers ?? 0)}`, tone: "text-zinc-100" },
     // Power and citizen count are intelligence — visible only for your own
     // empire or after a successful spy mission.
     ...(showDetails
@@ -184,6 +190,14 @@ export default async function EmpireProfilePage({
                 <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
                   100 ❤️
                 </span>
+                {guildName && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
+                    title="הברית של השחקן"
+                  >
+                    🤝 {guildName}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -427,7 +441,13 @@ export default async function EmpireProfilePage({
           )}
           <div className="flex justify-between gap-2 border-b border-border-subtle pb-2.5">
             <dt className="text-zinc-400">ברית</dt>
-            <dd className="text-zinc-500">מערכת הבריתות תיפתח בהמשך</dd>
+            {guildName ? (
+              <dd className="inline-flex items-center gap-1 font-medium text-gold-bright">
+                🤝 {guildName}
+              </dd>
+            ) : (
+              <dd className="text-zinc-500">ללא ברית</dd>
+            )}
           </div>
         </dl>
       </div>

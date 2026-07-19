@@ -173,38 +173,6 @@ export default async function BattleResultPage({
         </div>
       </div>
 
-      {/* -------- power breakdowns -------- */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {[
-          { title: myName, tone: "emerald", rows: mySide, total: myPower },
-          { title: foe.name, tone: "red", rows: foeSide, total: foePower },
-        ].map((side) => (
-          <div key={side.title} className="panel rounded-xl p-4">
-            <h3
-              className={`mb-3 border-b border-border-subtle pb-2 text-sm font-bold ${
-                side.tone === "emerald" ? "text-emerald-300" : "text-red-300"
-              }`}
-            >
-              {side.title}
-            </h3>
-            <dl className="space-y-2 text-sm">
-              {side.rows.map((r) => (
-                <div key={r.label} className="flex items-center justify-between">
-                  <Tip tip={r.tip}>
-                    <dt className="cursor-help text-zinc-400">{r.label}</dt>
-                  </Tip>
-                  <dd className="nums font-semibold text-zinc-200" dir="ltr">{r.value}</dd>
-                </div>
-              ))}
-              <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-                <dt className="text-zinc-300">סה״כ כוח</dt>
-                <dd className="nums font-black text-gold-bright" dir="ltr">{formatNumber(side.total)}</dd>
-              </div>
-            </dl>
-          </div>
-        ))}
-      </div>
-
       {/* -------- aftermath -------- */}
       <div className={`grid gap-4 ${report.enslavedSoldiers > 0 ? "grid-cols-2 sm:grid-cols-4" : "sm:grid-cols-3"}`}>
         <div className="panel-inset rounded-xl p-4 text-center">
@@ -279,6 +247,38 @@ export default async function BattleResultPage({
           </div>
         </div>
       )}
+
+      {/* -------- power breakdowns (details, below the critical stats) -------- */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        {[
+          { title: myName, tone: "emerald", rows: mySide, total: myPower },
+          { title: foe.name, tone: "red", rows: foeSide, total: foePower },
+        ].map((side) => (
+          <div key={side.title} className="panel rounded-xl p-4">
+            <h3
+              className={`mb-3 border-b border-border-subtle pb-2 text-sm font-bold ${
+                side.tone === "emerald" ? "text-emerald-300" : "text-red-300"
+              }`}
+            >
+              {side.title}
+            </h3>
+            <dl className="space-y-2 text-sm">
+              {side.rows.map((r) => (
+                <div key={r.label} className="flex items-center justify-between">
+                  <Tip tip={r.tip}>
+                    <dt className="cursor-help text-zinc-400">{r.label}</dt>
+                  </Tip>
+                  <dd className="nums font-semibold text-zinc-200" dir="ltr">{r.value}</dd>
+                </div>
+              ))}
+              <div className="flex items-center justify-between border-t border-border-subtle pt-2">
+                <dt className="text-zinc-300">סה״כ כוח</dt>
+                <dd className="nums font-black text-gold-bright" dir="ltr">{formatNumber(side.total)}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
+      </div>
 
       {plunderTotal > 0 && (
         <div className="panel-gold rounded-xl p-4">
