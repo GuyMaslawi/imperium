@@ -20,6 +20,15 @@ import {
 } from "@/lib/game/hero";
 import { itemDetails, uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 
+/** Identical items (same slot+level) merged into one tile, keeping every id. */
+type BagStack = {
+  key: string;
+  slot: HeroItemView["slot"];
+  level: number;
+  rarity: HeroRarity;
+  ids: string[];
+};
+
 /**
  * The hero's bag: unequipped items in a 24-slot grid with rarity filters.
  * Clicking an item opens its detail dialog (wear / upgrade / discard). A
@@ -44,25 +53,53 @@ export function HeroBag({
   const [msg, setMsg] = useState<ActionState>({});
 
   const rarityRank = (r: HeroRarity) => RARITY_ORDER.indexOf(r);
-  const sorted = [...items].sort(
+
+  // Merge identical items (same slot+level look and perform identically) into a
+  // single stack, keeping every underlying id so bulk actions still apply to
+  // the whole stack.
+  const stackMap = new Map<string, BagStack>();
+  for (const it of items) {
+    const key = `${it.slot}-${it.level}`;
+    const cur = stackMap.get(key);
+    if (cur) cur.ids.push(it.id);
+    else
+      stackMap.set(key, {
+        key,
+        slot: it.slot,
+        level: it.level,
+        rarity: it.rarity,
+        ids: [it.id],
+      });
+  }
+  const stacks = [...stackMap.values()].sort(
     (a, b) => rarityRank(b.rarity) - rarityRank(a.rarity) || b.level - a.level
   );
-  const visible = filter ? sorted.filter((i) => i.rarity === filter) : sorted;
-  const emptySlots = Math.max(0, HERO_BAG_CAPACITY - visible.length);
+  const visible = filter ? stacks.filter((s) => s.rarity === filter) : stacks;
+  // Pad only to complete the last row so the grid stays tidy; real capacity is
+  // shown in the header, and the grid scrolls past ~4 rows.
+  const COLS = 6;
+  const emptySlots =
+    visible.length === 0 ? COLS : (COLS - (visible.length % COLS)) % COLS;
+
+  // Expand the selected stacks back to the individual item ids the actions need.
+  const selectedIds = stacks
+    .filter((s) => selected.has(s.key))
+    .flatMap((s) => s.ids);
+  const selectedIdSet = new Set(selectedIds);
 
   const allVisibleSelected =
-    visible.length > 0 && visible.every((i) => selected.has(i.id));
+    visible.length > 0 && visible.every((s) => selected.has(s.key));
 
-  const toggleSelect = (id: string) =>
+  const toggleSelect = (key: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
 
   const selectAll = () =>
-    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((i) => i.id)));
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((s) => s.key)));
 
   const exitSelect = () => {
     setSelecting(false);
@@ -72,9 +109,9 @@ export function HeroBag({
   const runBulk = (
     action: (prev: ActionState, fd: FormData) => Promise<ActionState>
   ) => {
-    if (selected.size === 0) return;
+    if (selectedIds.length === 0) return;
     const fd = new FormData();
-    fd.set("itemIds", Array.from(selected).join(","));
+    fd.set("itemIds", selectedIds.join(","));
     startTransition(async () => {
       const res = await action({}, fd);
       setMsg(res);
@@ -82,11 +119,11 @@ export function HeroBag({
     });
   };
 
-  const selectedCount = selected.size;
+  const selectedCount = selectedIds.length;
   // Selected items that can still be upgraded (not yet legendary), with the
   // gold each costs — the total drives the confirmation dialog.
   const selectedUpgrades = items
-    .filter((i) => selected.has(i.id) && nextTierLevel(i.level) !== null)
+    .filter((i) => selectedIdSet.has(i.id) && nextTierLevel(i.level) !== null)
     .map((i) => ({ item: i, cost: itemUpgradeCost(i.level) ?? 0 }));
   const selectedUpgradeable = selectedUpgrades.length;
   const totalUpgradeCost = selectedUpgrades.reduce((sum, u) => sum + u.cost, 0);
@@ -149,59 +186,78 @@ export function HeroBag({
         </span>
       </div>
 
-      <div className="mt-2 grid grid-cols-4 gap-3 sm:grid-cols-6">
-        {visible.map((item) => {
-          const isSelected = selected.has(item.id);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() =>
-                selecting ? toggleSelect(item.id) : setOpenItem(item)
-              }
-              className={`relative block w-full rounded-xl transition ${
-                selecting && isSelected
-                  ? "ring-2 ring-gold ring-offset-2 ring-offset-black"
-                  : ""
-              }`}
-              aria-label={`${SLOT_META[item.slot].label} רמה ${item.level}`}
-            >
-              <ItemTile
-                slug={SLOT_META[item.slot].slug}
-                icon={SLOT_META[item.slot].icon}
-                level={item.level}
-                rarity={uiRarity(item.rarity)}
-                details={
-                  selecting
-                    ? undefined
-                    : itemDetails(item, heroLevel, { hint: "לחץ לפרטים" })
+      <div className="mt-2 max-h-[21rem] overflow-y-auto pr-0.5">
+        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
+          {visible.map((stack) => {
+            const isSelected = selected.has(stack.key);
+            const view: HeroItemView = {
+              id: stack.ids[0],
+              slot: stack.slot,
+              level: stack.level,
+              rarity: stack.rarity,
+            };
+            return (
+              <button
+                key={stack.key}
+                type="button"
+                onClick={() =>
+                  selecting ? toggleSelect(stack.key) : setOpenItem(view)
                 }
-              />
-              {selecting && (
-                <span
-                  aria-hidden
-                  className={`absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-black ${
-                    isSelected
-                      ? "border-gold bg-gold text-black"
-                      : "border-white/50 bg-black/70 text-transparent"
-                  }`}
-                >
-                  ✓
-                </span>
-              )}
-            </button>
-          );
-        })}
-        {Array.from({ length: emptySlots }).map((_, i) => (
-          <div
-            key={`empty-${i}`}
-            className="panel-inset flex aspect-square items-center justify-center rounded-xl text-zinc-700"
-          >
-            <span aria-hidden className="text-xl">
-              ◇
-            </span>
-          </div>
-        ))}
+                className={`relative block w-full rounded-xl transition ${
+                  selecting && isSelected
+                    ? "ring-2 ring-gold ring-offset-2 ring-offset-black"
+                    : ""
+                }`}
+                aria-label={`${SLOT_META[stack.slot].label} רמה ${stack.level}${
+                  stack.ids.length > 1 ? ` ×${stack.ids.length}` : ""
+                }`}
+              >
+                <ItemTile
+                  slug={SLOT_META[stack.slot].slug}
+                  icon={SLOT_META[stack.slot].icon}
+                  level={stack.level}
+                  rarity={uiRarity(stack.rarity)}
+                  details={
+                    selecting
+                      ? undefined
+                      : itemDetails(view, heroLevel, { hint: "לחץ לפרטים" })
+                  }
+                />
+                {stack.ids.length > 1 && (
+                  <span
+                    aria-hidden
+                    className="nums absolute left-1 top-1 z-10 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-black text-gold-bright"
+                    dir="ltr"
+                  >
+                    ×{stack.ids.length}
+                  </span>
+                )}
+                {selecting && (
+                  <span
+                    aria-hidden
+                    className={`absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-black ${
+                      isSelected
+                        ? "border-gold bg-gold text-black"
+                        : "border-white/50 bg-black/70 text-transparent"
+                    }`}
+                  >
+                    ✓
+                  </span>
+                )}
+              </button>
+            );
+          })}
+          {Array.from({ length: emptySlots }).map((_, i) => (
+            <div
+              key={`empty-${i}`}
+              className="panel-inset flex aspect-square items-center justify-center rounded-xl text-zinc-700"
+            >
+              <span aria-hidden className="text-xl">
+                ◇
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {(msg.error || msg.success) && (

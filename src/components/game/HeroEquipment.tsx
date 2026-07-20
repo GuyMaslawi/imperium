@@ -31,7 +31,7 @@ export function HeroEquipment({
           ציוד פעיל
         </h3>
       </Tip>
-      <div className="grid grid-cols-3 gap-3.5">
+      <div className="grid max-w-[14rem] grid-cols-3 gap-3">
         {SLOT_ORDER.map((slot) => {
           const meta = SLOT_META[slot];
           const item = bySlot.get(slot);
@@ -67,7 +67,6 @@ export function HeroEquipment({
                 level={item.level}
                 name={meta.label}
                 rarity={uiRarity(item.rarity)}
-                size="lg"
                 details={itemDetails(item, heroLevel, {
                   equipped: true,
                   hint: "לחץ לפרטים",
