@@ -1,12 +1,13 @@
 import { requireEmpire } from "@/lib/auth";
+import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Icon } from "@/components/ui/Icon";
 import { WeaponsTabs, type WeaponsTabData } from "@/components/game/WeaponsTabs";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   MAX_WEAPON_TIER,
   WEAPON_CATEGORIES,
   WEAPON_CATEGORY_META,
+  weaponGateStatus,
   weaponsOfCategory,
   weaponsPower,
   weaponTierUnlockCost,
@@ -40,26 +41,37 @@ export default async function WeaponsPage({
     empire.weapons.map((w) => [w.weaponKey, w.quantity])
   );
 
+  // Unlocking is cross-cutting — a single shared tier across all categories.
+  const sharedTier = empire.weaponUnlocks.reduce(
+    (max, u) => Math.max(max, u.unlockedTier),
+    INITIAL_WEAPON_UNLOCKED_TIER
+  );
+
   const tabs: WeaponsTabData[] = WEAPON_CATEGORIES.map((category) => {
     const meta = WEAPON_CATEGORY_META[category];
-    const unlockedTier =
-      empire.weaponUnlocks.find((u) => u.category === category)?.unlockedTier ??
-      INITIAL_WEAPON_UNLOCKED_TIER;
     return {
       category,
       label: meta.label,
       icon: meta.icon,
       totalPowerLabel: TAB_POWER_LABELS[category],
       totalPower: weaponsPower(empire.weapons, category),
-      unlockedTier,
+      unlockedTier: sharedTier,
       maxTier: MAX_WEAPON_TIER,
-      unlockCost: weaponTierUnlockCost(unlockedTier),
+      unlockCost: weaponTierUnlockCost(sharedTier),
       weapons: weaponsOfCategory(category).map((weapon) => ({
         weapon,
         owned: ownedByKey.get(weapon.key) ?? 0,
       })),
     };
   });
+
+  // Active shop-discount spell — reflected on every weapon price below.
+  const discountPct = await getShopDiscountPct(empire.id);
+
+  // Requirements for the next (shared) tier: cities + hero level.
+  const heroLevel = empire.hero?.level ?? 0;
+  const nextTier = Math.min(sharedTier + 1, MAX_WEAPON_TIER);
+  const gate = weaponGateStatus(nextTier, empire.cities, heroLevel);
 
   const available = {
     gold: Math.floor(empire.gold),
@@ -72,29 +84,15 @@ export default async function WeaponsPage({
     <div className="space-y-6">
       <SectionHeading title="חנות נשקים" subtitle="SHOP" ornament="🛍️" />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        {tabs.map((tab) => (
-          <div
-            key={tab.category}
-            className="panel rounded-xl p-4 flex items-center gap-3"
-          >
-            <span aria-hidden className="text-3xl">{tab.icon}</span>
-            <div>
-              <p className="text-xs text-gold-dim">
-                {WEAPON_CATEGORY_META[tab.category].powerLabel}
-              </p>
-              <p className="text-lg font-black text-gold-bright">
-                <Icon name="spark" size={16} className="inline align-[-2px]" />{" "}
-                <span className="nums" dir="ltr">
-                  {tab.totalPower.toLocaleString("he-IL")}
-                </span>
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <WeaponsTabs tabs={tabs} available={available} initialCategory={initialCategory} />
+      <WeaponsTabs
+        tabs={tabs}
+        available={available}
+        initialCategory={initialCategory}
+        gate={gate}
+        cities={empire.cities}
+        heroLevel={heroLevel}
+        discountPct={discountPct}
+      />
     </div>
   );
 }

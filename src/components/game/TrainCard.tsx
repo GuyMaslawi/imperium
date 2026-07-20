@@ -5,6 +5,7 @@ import { trainUnits, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 
 export interface TrainCardProps {
   unit: "soldiers" | "spies" | "mineSlaves";
@@ -37,7 +38,7 @@ export function TrainCard({
             <p className="text-xs text-gold-dim">
               ברשותך:{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
-                {owned.toLocaleString("he-IL")}
+                {formatNumber(owned)}
               </span>
             </p>
           </div>
@@ -65,7 +66,7 @@ export function TrainCard({
           <span className="text-xs text-gold-dim">
             כמות לאימון (אזרחים פנויים:{" "}
             <span className="nums" dir="ltr">
-              {availableCitizens.toLocaleString("he-IL")}
+              {formatNumber(availableCitizens)}
             </span>
             )
           </span>

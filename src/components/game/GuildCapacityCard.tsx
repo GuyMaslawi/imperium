@@ -6,20 +6,22 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 
 export interface GuildCapacityCardProps {
   memberCount: number;
   capacity: number;
-  /** Diamonds for one more seat; null when the guild is fully expanded. */
+  /** Treasury gold for one more seat; null when the guild is fully expanded. */
   upgradeCost: number | null;
-  diamonds: number;
+  /** Gold in the guild treasury (the upgrade is paid from it). */
+  guildGold: number;
 }
 
 export function GuildCapacityCard({
   memberCount,
   capacity,
   upgradeCost,
-  diamonds,
+  guildGold,
 }: GuildCapacityCardProps) {
   const [state, action] = useActionState<ActionState, FormData>(
     upgradeGuildCapacity,
@@ -39,22 +41,22 @@ export function GuildCapacityCard({
       </div>
 
       <p className="text-xs leading-relaxed text-zinc-400">
-        הרחבת הברית מוסיפה מקום לחבר נוסף.
+        הרחבת הברית מוסיפה מקום לחבר נוסף — עד 10 חברים.
       </p>
 
       <form action={action} className="mt-auto">
         {upgradeCost != null ? (
           <SubmitButton
-            variant="secondary"
-            className="btn btn-ghost w-full"
-            disabled={diamonds < upgradeCost}
+            className="btn btn-dark w-full"
+            disabled={guildGold < upgradeCost}
             pendingText="מרחיב..."
           >
-            הרחב ל־{capacity + 1} חברים · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            הרחב ל־{capacity + 1} · {formatNumber(upgradeCost)}{" "}
+            <Icon name="gold" size={14} className="inline-block align-text-bottom text-gold-bright" />
           </SubmitButton>
         ) : (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-            <Icon name="rankings" size={14} /> קיבולת מקסימלית
+            <Icon name="rankings" size={14} /> קיבולת מקסימלית (10)
           </span>
         )}
       </form>

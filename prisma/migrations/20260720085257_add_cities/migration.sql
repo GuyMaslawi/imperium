@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Empire" ADD COLUMN     "cities" INTEGER NOT NULL DEFAULT 1;

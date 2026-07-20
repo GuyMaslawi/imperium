@@ -4,12 +4,15 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import {
+  GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
   GUILD_ROLE_META,
   GUILD_SPELL_MAX_LEVEL,
   GUILD_SPELL_TYPES,
-  capacityUpgradeCostDiamonds,
+  aidUpgradeCostGold,
+  capacityUpgradeCostGold,
+  guildAidPct,
   guildCapacity,
   guildSpellBonusPct,
   spellCastCostDiamonds,
@@ -20,6 +23,7 @@ import { GuildJoinButton } from "@/components/game/GuildJoinButton";
 import { GuildBankPanel } from "@/components/game/GuildBankPanel";
 import { GuildShopCard } from "@/components/game/GuildShopCard";
 import { GuildCapacityCard } from "@/components/game/GuildCapacityCard";
+import { GuildAidCard } from "@/components/game/GuildAidCard";
 import { GuildMemberActions } from "@/components/game/GuildMemberActions";
 import { GuildLeaveButton } from "@/components/game/GuildLeaveButton";
 
@@ -163,6 +167,7 @@ export default async function GuildPage() {
 
   const { guild } = membership;
   const capacity = guildCapacity(guild.capacityLevel);
+  const treasuryGold = Math.floor(guild.goldBalance);
   const members = [...guild.members].sort(
     (a, b) =>
       GUILD_ROLE_META[a.role].order - GUILD_ROLE_META[b.role].order ||
@@ -295,18 +300,63 @@ export default async function GuildPage() {
         </div>
       </div>
 
-      {/* -------- guild shop -------- */}
+      {/* -------- gold treasury upgrades -------- */}
       <div className="panel rounded-xl p-4">
-        <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <span aria-hidden>🔮</span>
-          חנות הברית
-        </h2>
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="gold" size={18} className="text-gold-bright" />
+            שדרוגי זהב הברית
+          </h2>
+          <span className="nums flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-3 py-1 text-xs font-bold text-gold-bright" dir="ltr">
+            {formatNumber(treasuryGold)}{" "}
+            <Icon name="gold" size={13} className="text-gold-bright" />
+          </span>
+        </div>
         <p className="mb-4 text-xs text-zinc-500">
-          קסמים נקנים ביהלומים אישיים. שדרוג קסם מעלה את עזרת הברית לכל החברים —
+          שדרוגים לכל הברית — משולמים מ<span className="font-semibold text-gold-dim">קופת הזהב</span> המשותפת, לא מיהלומים.
+        </p>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <GuildCapacityCard
+            memberCount={members.length}
+            capacity={capacity}
+            upgradeCost={
+              guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL
+                ? null
+                : capacityUpgradeCostGold(guild.capacityLevel)
+            }
+            guildGold={treasuryGold}
+          />
+          <GuildAidCard
+            aidPct={guildAidPct(guild.aidLevel)}
+            upgradeCost={
+              guild.aidLevel >= GUILD_AID_MAX_LEVEL
+                ? null
+                : aidUpgradeCostGold(guild.aidLevel)
+            }
+            guildGold={treasuryGold}
+          />
+        </div>
+      </div>
+
+      {/* -------- diamond spell shop -------- */}
+      <div className="panel rounded-xl p-4">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
+          <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="diamond" size={18} className="text-cyan-300" />
+            קסמי יהלום
+          </h2>
+          <span className="nums flex items-center gap-1 rounded-full border border-cyan-400/40 bg-panel-inset px-3 py-1 text-xs font-bold text-cyan-300" dir="ltr">
+            {formatNumber(diamonds)}{" "}
+            <Icon name="diamond" size={13} className="text-cyan-300" />
+          </span>
+        </div>
+        <p className="mb-4 text-xs text-zinc-500">
+          קסמים נקנים ב<span className="font-semibold text-cyan-300">יהלומים</span> אישיים. שדרוג קסם מעלה את עזרת הקסם לכל החברים —
           עד {GUILD_SPELL_MAX_LEVEL}% — והטלה מעניקה לך באפ אישי ל־24 שעות.
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {GUILD_SPELL_TYPES.map((type) => {
             const level = spellLevelByType.get(type) ?? 1;
             return (
@@ -325,16 +375,6 @@ export default async function GuildPage() {
               />
             );
           })}
-          <GuildCapacityCard
-            memberCount={members.length}
-            capacity={capacity}
-            upgradeCost={
-              guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL
-                ? null
-                : capacityUpgradeCostDiamonds(guild.capacityLevel)
-            }
-            diamonds={diamonds}
-          />
         </div>
       </div>
     </div>

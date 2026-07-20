@@ -1,4 +1,6 @@
 import type { WeaponCategory } from "@prisma/client";
+import { MAX_CITIES } from "./constants";
+import { HERO_MAX_LEVEL } from "./hero";
 
 /* ------------------------------ weapon categories ------------------------------ */
 
@@ -232,6 +234,58 @@ export function weaponTierUnlockCost(currentUnlockedTier: number): WeaponCost {
     iron: Math.round(1200 * currentUnlockedTier * 1.6),
     stone: Math.round(900 * currentUnlockedTier * 1.5),
   };
+}
+
+/* ------------------------------ progression gates ------------------------------ */
+
+/**
+ * Weapon progression is **shared** across all three categories — unlocking a
+ * tier in one place (attack / defense / spy) advances all of them together.
+ */
+
+/** A new city + hero-level requirement kicks in every this many tiers. */
+export const WEAPON_GATE_EVERY = 4;
+/** Hero level required grows by this much at every gate step. */
+export const WEAPON_GATE_HERO_STEP = 10;
+
+export interface WeaponTierGate {
+  /** Cities the empire must have founded to unlock this tier. */
+  cities: number;
+  /** Hero level required to unlock this tier. */
+  heroLevel: number;
+}
+
+/**
+ * Requirements to unlock up to `tier`. Every {@link WEAPON_GATE_EVERY} tiers
+ * demands both a newly founded city and a higher hero level, so weapons, hero
+ * and cities all advance in lockstep. Between gate steps the requirement stays
+ * flat, so once a step is crossed the next few tiers open on resources alone.
+ */
+export function weaponTierGate(tier: number): WeaponTierGate {
+  const step = Math.max(0, Math.floor((tier - 1) / WEAPON_GATE_EVERY));
+  return {
+    cities: Math.min(MAX_CITIES, 1 + step),
+    heroLevel: Math.min(HERO_MAX_LEVEL, step * WEAPON_GATE_HERO_STEP),
+  };
+}
+
+export interface WeaponGateStatus extends WeaponTierGate {
+  citiesMet: boolean;
+  heroLevelMet: boolean;
+  /** True when both the city and hero-level requirements are satisfied. */
+  met: boolean;
+}
+
+/** The gate for `tier` resolved against a specific empire's cities + hero level. */
+export function weaponGateStatus(
+  tier: number,
+  cities: number,
+  heroLevel: number
+): WeaponGateStatus {
+  const gate = weaponTierGate(tier);
+  const citiesMet = cities >= gate.cities;
+  const heroLevelMet = heroLevel >= gate.heroLevel;
+  return { ...gate, citiesMet, heroLevelMet, met: citiesMet && heroLevelMet };
 }
 
 /* ------------------------------ power ------------------------------ */

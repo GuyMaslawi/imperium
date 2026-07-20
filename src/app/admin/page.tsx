@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { formatIls } from "@/lib/game/diamondStore";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,7 @@ export default async function AdminDashboard() {
     recentUsers,
     recentAudit,
     resources,
+    revenue,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "ADMIN" } }),
@@ -54,6 +56,11 @@ export default async function AdminDashboard() {
     }),
     prisma.empire.aggregate({
       _sum: { gold: true, diamonds: true },
+    }),
+    prisma.diamondPurchase.aggregate({
+      where: { status: "PAID", isTest: false },
+      _sum: { priceIls: true },
+      _count: true,
     }),
   ]);
 
@@ -78,6 +85,13 @@ export default async function AdminDashboard() {
           value={Math.round(resources._sum.diamonds ?? 0)}
           icon="💎"
         />
+        <Link href="/admin/purchases" className="contents">
+          <StatCard
+            label="הכנסות"
+            value={formatIls(revenue._sum.priceIls ?? 0)}
+            icon="💳"
+          />
+        </Link>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

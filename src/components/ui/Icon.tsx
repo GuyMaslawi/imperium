@@ -88,3 +88,13 @@ export const RESOURCE_ICON: Record<string, IconName> = {
   gold: "gold", wood: "wood", iron: "iron", stone: "stone",
   diamonds: "diamond", citizens: "citizens", turns: "turns",
 };
+
+/** Authentic per-resource icon tint, so each resource reads at a glance. */
+export const RESOURCE_ICON_COLOR: Record<string, string> = {
+  gold: "text-gold-bright",
+  wood: "text-amber-600",
+  iron: "text-slate-300",
+  stone: "text-stone-400",
+  diamond: "text-cyan-300",
+  diamonds: "text-cyan-300",
+};

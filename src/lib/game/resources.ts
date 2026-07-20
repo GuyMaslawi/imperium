@@ -11,7 +11,7 @@ export function productionPerTick(building: Building): number {
 
 /** One active bonus contributing to a mine's real production. */
 export interface ProductionBonusLine {
-  key: "hero-points" | "guild-spell" | "diamond-boost" | "hero-item";
+  key: "cities" | "hero" | "guild-spell" | "diamond-boost";
   label: string;
   /** Percent, for the multiplicative bonuses (absent for flat item bonuses). */
   pct?: number;
@@ -39,6 +39,8 @@ export interface MineProductionBreakdown {
 export function mineProductionBreakdown(params: {
   level: number;
   assignedSlaves: number;
+  /** Live city count — production scales linearly with it (×1 at one city). */
+  cities: number;
   /** Hero "resources" allocated points, as a percent. */
   heroResourcesPct: number;
   /** Active guild RESOURCES spell, as a percent. */
@@ -51,13 +53,32 @@ export function mineProductionBreakdown(params: {
   const base = mineProductionPerTick(params.level, params.assignedSlaves);
   const lines: ProductionBonusLine[] = [];
 
-  const afterHero = base * bonusMultiplier(params.heroResourcesPct);
-  if (params.heroResourcesPct > 0 && afterHero - base > 0) {
+  // Cities multiply raw output before every other bonus, matching the clock.
+  const afterCities = base * params.cities;
+  if (params.cities > 1 && afterCities - base > 0) {
     lines.push({
-      key: "hero-points",
-      label: "בונוס גיבור — נקודות משאבים",
-      pct: params.heroResourcesPct,
-      amount: afterHero - base,
+      key: "cities",
+      label: `ערים — ×${params.cities}`,
+      amount: afterCities - base,
+    });
+  }
+
+  // Everything the hero contributes — the resource-points percentage bonus and
+  // any equipped relic's flat resources — folded into a single line, so the
+  // card shows one "the hero brings X" figure regardless of where it came from.
+  const afterHero = afterCities * bonusMultiplier(params.heroResourcesPct);
+  const heroAmount = afterHero - afterCities + params.heroItemFlat;
+  if (heroAmount > 0) {
+    lines.push({
+      key: "hero",
+      label: "בונוס גיבור",
+      // Show the percentage only when the flat relic isn't muddying it, so the
+      // number stays meaningful; otherwise the combined amount speaks for itself.
+      pct:
+        params.heroItemFlat === 0 && params.heroResourcesPct > 0
+          ? params.heroResourcesPct
+          : undefined,
+      amount: heroAmount,
     });
   }
 
@@ -78,14 +99,6 @@ export function mineProductionBreakdown(params: {
       label: "בוסט יהלומים",
       pct: params.diamondBoostPct,
       amount: afterDiamond - afterGuild,
-    });
-  }
-
-  if (params.heroItemFlat > 0) {
-    lines.push({
-      key: "hero-item",
-      label: "פריט גיבור — פרי שטן",
-      amount: params.heroItemFlat,
     });
   }
 

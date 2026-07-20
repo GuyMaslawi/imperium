@@ -6,6 +6,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 import type { AvailableResources } from "@/components/game/WeaponCard";
 
 const COST_RESOURCES = [
@@ -100,7 +101,7 @@ export function UpgradeCard({
                 >
                   <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
                   <span className="nums" dir="ltr">
-                    {upgradeCost[key].toLocaleString("he-IL")}
+                    {formatNumber(upgradeCost[key])}
                   </span>
                 </span>
               );

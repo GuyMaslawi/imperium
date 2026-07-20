@@ -9,6 +9,7 @@ import {
   HERO_RESET_POINTS,
 } from "@/lib/game/hero";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 
 /**
  * Level-100 prestige reset with a two-step confirm: the hero returns to
@@ -27,7 +28,7 @@ export function HeroResetButton() {
       <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
         איפוס הגיבור יחזיר אותו לרמה 1 ויעניק מיד{" "}
         <b className="text-emerald-400">
-          {HERO_RESET_CITIZENS.toLocaleString("he-IL")} אזרחים
+          {formatNumber(HERO_RESET_CITIZENS)} אזרחים
         </b>{" "}
         ו-<b className="text-gold-bright">{HERO_RESET_POINTS} נקודות גיבור</b>.
         כל הנקודות שהוקצו יימחקו, וחפצים מעל רמה 1 יוסרו לתיק.

@@ -4,7 +4,9 @@ import { useActionState, useState } from "react";
 import { buyWeapon, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
+import { discountedAmount } from "@/lib/game/diamondShop";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
 
 export interface AvailableResources {
@@ -40,16 +42,27 @@ export function WeaponCard({
   weapon,
   owned,
   available,
+  discountPct,
 }: {
   weapon: WeaponDefinition;
   owned: number;
   available: AvailableResources;
+  /** Active shop-discount percent (0 when none). */
+  discountPct: number;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(buyWeapon, {});
   const [quantity, setQuantity] = useState("1");
   const [showMaxError, setShowMaxError] = useState(false);
 
-  const maxQuantity = maxAffordableQuantity(weapon.cost, available);
+  const hasDiscount = discountPct > 0;
+  // Affordability & MAX use the discounted per-unit cost, matching the server.
+  const netCost: WeaponCost = {
+    gold: discountedAmount(weapon.cost.gold, discountPct),
+    wood: discountedAmount(weapon.cost.wood, discountPct),
+    iron: discountedAmount(weapon.cost.iron, discountPct),
+    stone: discountedAmount(weapon.cost.stone, discountPct),
+  };
+  const maxQuantity = maxAffordableQuantity(netCost, available);
 
   return (
     <div className="panel rounded-xl p-3 flex flex-col gap-3">
@@ -63,13 +76,15 @@ export function WeaponCard({
             </span>
           </p>
         </div>
-        <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
-          <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
-          <span className="nums" dir="ltr">
-            {weapon.power}
-          </span>{" "}
-          עוצמה
-        </span>
+        {hasDiscount && (
+          <span
+            className="nums shrink-0 rounded-full border border-emerald-400/50 bg-emerald-500/15 px-2.5 py-1 text-xs font-black text-emerald-300"
+            dir="ltr"
+            title="קסם הנחה פעיל"
+          >
+            ✨ −{discountPct}%
+          </span>
+        )}
       </div>
 
       <p className="text-sm text-zinc-400">{weapon.description}</p>
@@ -78,37 +93,47 @@ export function WeaponCard({
         <span className="text-zinc-400">
           ברשותך:{" "}
           <span className="nums font-bold text-zinc-100" dir="ltr">
-            {owned.toLocaleString("he-IL")}
+            {formatNumber(owned)}
           </span>
         </span>
         <span className="text-zinc-400">
           עוצמה ליחידה:{" "}
           <span className="nums font-bold text-zinc-100" dir="ltr">
-            {weapon.power}
-          </span>
-        </span>
-        <span className="col-span-2 text-zinc-400">
-          עוצמה כוללת מנשק זה:{" "}
-          <span className="nums font-bold text-gold-bright" dir="ltr">
-            {(owned * weapon.power).toLocaleString("he-IL")}
+            {formatNumber(weapon.power)}
           </span>
         </span>
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-        <span className="font-semibold text-gold-dim">עלות ליחידה:</span>
         {COST_RESOURCES.map(({ key, icon }) => {
           if (weapon.cost[key] <= 0) return null;
-          const missing = available[key] < weapon.cost[key];
+          const missing = available[key] < netCost[key];
           return (
             <span
               key={key}
-              className={missing ? "font-semibold text-red-400" : undefined}
               title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
             >
-              <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
-              <span className="nums" dir="ltr">
-                {weapon.cost[key].toLocaleString("he-IL")}
+              <Icon
+                name={icon}
+                size={14}
+                className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[key]}`}
+              />{" "}
+              {hasDiscount && (
+                <span className="nums text-zinc-600 line-through" dir="ltr">
+                  {formatNumber(weapon.cost[key])}
+                </span>
+              )}{" "}
+              <span
+                className={`nums font-semibold ${
+                  missing
+                    ? "text-red-400"
+                    : hasDiscount
+                      ? "text-emerald-300"
+                      : "font-normal"
+                }`}
+                dir="ltr"
+              >
+                {formatNumber(netCost[key])}
               </span>
             </span>
           );

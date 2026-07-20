@@ -19,9 +19,30 @@ export function guildCapacity(capacityLevel: number): number {
 /** Top capacity level — 10 members. */
 export const GUILD_CAPACITY_MAX_LEVEL = 9;
 
-/** Diamond cost to expand from `level` to `level + 1`. */
-export function capacityUpgradeCostDiamonds(level: number): number {
-  return 150 * (level + 1);
+/**
+ * Gold cost (from the guild treasury) to expand from `level` to `level + 1`.
+ * Capacity is a guild-wide, in-game-gold upgrade — not a diamond one.
+ */
+export function capacityUpgradeCostGold(level: number): number {
+  return 50_000 * (level + 1);
+}
+
+/* ------------------------------ guild aid ------------------------------ */
+
+/**
+ * Guild aid pools the whole guild's strength: every member fights with a flat
+ * power bonus equal to `aidLevel`% of the guild's total military power, up to
+ * a 10% cap. Bought with treasury gold, level starts at 0 (no aid).
+ */
+export const GUILD_AID_MAX_LEVEL = 10;
+
+export function guildAidPct(level: number): number {
+  return Math.min(GUILD_AID_MAX_LEVEL, Math.max(0, level));
+}
+
+/** Gold cost (from the guild treasury) to raise aid from `level` to `level + 1`. */
+export function aidUpgradeCostGold(level: number): number {
+  return 75_000 * (level + 1);
 }
 
 /* ------------------------------ spells ------------------------------ */

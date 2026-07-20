@@ -83,6 +83,7 @@ export default async function ProductionPage() {
           const breakdown = mineProductionBreakdown({
             level: mine.level,
             assignedSlaves: mine.assignedSlaves,
+            cities: empire.cities,
             heroResourcesPct: heroBonus.points.resources,
             guildResourcesPct,
             diamondBoostPct: resourceBoosts[resource],
@@ -102,7 +103,7 @@ export default async function ProductionPage() {
               resourceLabel={RESOURCE_META[resource].label}
               productionPerSlave={mineProductionValue(mine.level)}
               breakdown={breakdown}
-              upgradeCost={mineUpgradeCost(mine.level)}
+              upgradeCost={mineUpgradeCost(mine.level, resource)}
             />
           );
         })}

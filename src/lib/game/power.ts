@@ -66,11 +66,19 @@ export function getEmpireMilitaryPower(
 
 /** One active bonus contributing to a side's real battle power. */
 export interface CombatPowerLine {
-  key: "defense-bonus" | "hero" | "guild-spell";
+  key: "defense-bonus" | "hero" | "guild-spell" | "guild-aid";
   label: string;
   pct: number;
   /** Extra power this bonus adds (incremental, in the same order battle uses). */
   amount: number;
+}
+
+/** Flat guild-aid reinforcement, added after every multiplier in battle. */
+export interface GuildAidInput {
+  /** Aid percent of the guild's total power (for the display label). */
+  pct: number;
+  /** Flat power the aid contributes. */
+  power: number;
 }
 
 export interface CombatPowerBreakdown {
@@ -95,6 +103,8 @@ export function attackPowerBreakdown(params: {
   heroAttackPct: number;
   /** Active guild ATTACK spell %. */
   guildAttackPct: number;
+  /** Flat guild-aid reinforcement, if any. */
+  guildAid?: GuildAidInput;
 }): CombatPowerBreakdown {
   const base = getEmpireAttackPower(params.army, params.weapons);
   const lines: CombatPowerLine[] = [];
@@ -109,7 +119,12 @@ export function attackPowerBreakdown(params: {
     lines.push({ key: "guild-spell", label: "קסם ברית", pct: params.guildAttackPct, amount: afterGuild - afterHero });
   }
 
-  return { base, lines, total: afterGuild };
+  const aidPower = params.guildAid?.power ?? 0;
+  if (aidPower > 0) {
+    lines.push({ key: "guild-aid", label: "עזרת ברית", pct: params.guildAid!.pct, amount: aidPower });
+  }
+
+  return { base, lines, total: afterGuild + aidPower };
 }
 
 /**
@@ -125,6 +140,8 @@ export function defensePowerBreakdown(params: {
   heroDefensePct: number;
   /** Active guild DEFENSE spell %. */
   guildDefensePct: number;
+  /** Flat guild-aid reinforcement, if any. */
+  guildAid?: GuildAidInput;
 }): CombatPowerBreakdown {
   const base = getEmpireDefensePower(params.army, params.weapons);
   const lines: CombatPowerLine[] = [];
@@ -147,7 +164,12 @@ export function defensePowerBreakdown(params: {
     lines.push({ key: "guild-spell", label: "קסם ברית", pct: params.guildDefensePct, amount: afterGuild - afterHero });
   }
 
-  return { base, lines, total: afterGuild };
+  const aidPower = params.guildAid?.power ?? 0;
+  if (aidPower > 0) {
+    lines.push({ key: "guild-aid", label: "עזרת ברית", pct: params.guildAid!.pct, amount: aidPower });
+  }
+
+  return { base, lines, total: afterGuild + aidPower };
 }
 
 /** General power: attack + defense + intelligence. */

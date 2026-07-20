@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 import { ItemTile, formatBonus } from "@/components/game/ItemTile";
 import { uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 import {
@@ -66,6 +67,8 @@ export function ItemDialog({
   const nextBonus =
     upgradeToLevel != null ? itemBonusValue(item.slot, upgradeToLevel).value : null;
   const canAfford = upgradeCost != null && gold >= upgradeCost;
+  // Can't upgrade an item past the hero's own level.
+  const meetsUpgradeLevel = upgradeToLevel != null && heroLevel >= upgradeToLevel;
 
   const meetsLevel = canEquipItem(heroLevel, level);
 
@@ -209,9 +212,14 @@ export function ItemDialog({
               className={`nums font-bold ${canAfford ? "text-gold-bright" : "text-red-400"}`}
               dir="ltr"
             >
-              <Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost?.toLocaleString("he-IL")}
+              <Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost != null ? formatNumber(upgradeCost) : ""}
             </span>
           </div>
+          {!meetsUpgradeLevel && (
+            <p className="mt-2 text-[11px] font-semibold text-red-400">
+              דרוש גיבור רמה {upgradeToLevel} כדי לשדרג (אתה ברמה {heroLevel})
+            </p>
+          )}
         </div>
       )}
 
@@ -248,17 +256,23 @@ export function ItemDialog({
 
         <button
           onClick={doUpgrade}
-          disabled={pending || upgradeToLevel == null || !canAfford}
+          disabled={pending || upgradeToLevel == null || !meetsUpgradeLevel || !canAfford}
           title={
             upgradeToLevel == null
               ? "הפריט כבר ברמה הגבוהה ביותר"
-              : !canAfford
-                ? "אין מספיק זהב"
-                : undefined
+              : !meetsUpgradeLevel
+                ? `דרוש גיבור רמה ${upgradeToLevel} כדי לשדרג`
+                : !canAfford
+                  ? "אין מספיק זהב"
+                  : undefined
           }
           className="btn btn-dark py-2 text-sm"
         >
-          {upgradeToLevel == null ? "רמה מקסימלית" : "שדרג"}
+          {upgradeToLevel == null
+            ? "רמה מקסימלית"
+            : !meetsUpgradeLevel
+              ? `דרוש רמה ${upgradeToLevel}`
+              : "שדרג"}
         </button>
 
         {confirmDiscard ? (

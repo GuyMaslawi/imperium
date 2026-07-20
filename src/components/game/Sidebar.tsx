@@ -76,6 +76,7 @@ export function Sidebar({
       title: "משאבים",
       items: [
         { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
+        { href: "/game/diamonds/buy", label: "רכישת יהלומים", icon: "shop" },
         { href: "/game/bank", label: "בנק", icon: "bank" },
         { href: "/game/storage", label: "מחסנים", icon: "storage" },
         { href: "/game/achievements", label: "הישגים", icon: "achievements" },

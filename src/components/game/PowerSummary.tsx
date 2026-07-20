@@ -140,7 +140,7 @@ export function PowerSummary({
           ]}
           helper={
             attackBreakdown && attackBreakdown.lines.length > 0
-              ? "כולל בונוסים פעילים (גיבור / קסם ברית)."
+              ? "כולל בונוסים פעילים (גיבור / קסם / עזרת ברית)."
               : undefined
           }
           links={[

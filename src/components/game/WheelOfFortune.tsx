@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { WHEEL_PRIZES, type WheelPrizeDef } from "@/lib/game/wheel";
+import { WHEEL_PRIZES, wheelPrizeByKey, type WheelPrizeDef } from "@/lib/game/wheel";
 import { spinWheel } from "@/server/actions/wheel";
+import { formatNumber } from "@/lib/game/format";
 import { Icon } from "@/components/ui/Icon";
+
+/** One line in a batch reveal: a prize totalled across the whole batch. */
+type HaulEntry = { prize: WheelPrizeDef; total: number };
 
 const SEG = 360 / WHEEL_PRIZES.length;
 const SPIN_MS = 4200;
@@ -45,7 +49,12 @@ export function WheelOfFortune({
 }) {
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<{ prize: WheelPrizeDef; message: string } | null>(null);
+  const [result, setResult] = useState<{
+    prize: WheelPrizeDef;
+    message: string;
+    /** Present for a batch spin — every prize won, totalled by exact amount. */
+    haul?: HaulEntry[];
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [spinsLeft, setSpinsLeft] = useState(spinsAvailable);
   const [confetti, setConfetti] = useState<ConfettiPiece[]>([]);
@@ -88,10 +97,13 @@ export function WheelOfFortune({
     }, SPIN_MS);
   }
 
-  // Spin ten times in a row, reusing the single-spin server action (which owns
-  // the guarded consume + payout), then reveal a combined result.
-  async function spinTen() {
-    if (spinning || spinsLeft < 10) return;
+  // Spin the whole available batch at once (up to 10), reusing the single-spin
+  // server action (which owns the guarded consume + payout), then reveal a
+  // combined result. When the player has fewer than 10 spins this runs through
+  // all of them instead of forcing one-by-one spins.
+  async function spinBatch() {
+    const batch = Math.min(spinsLeft, 10);
+    if (spinning || batch < 2) return;
     setSpinning(true);
     setResult(null);
     setError(null);
@@ -100,7 +112,12 @@ export function WheelOfFortune({
     let left = spinsLeft;
     let lastIdx = 0;
     let done = 0;
-    for (let i = 0; i < 10; i++) {
+    // Every prize won, totalled by exact granted amount, in first-seen order.
+    // Keyed by the *grant* key (so a loot pack lands on gold/wood/iron/stone
+    // and a bag-full "item" that paid gold lands on gold) — this is exactly
+    // what the player received, not just which wedge the wheel stopped on.
+    const haul: HaulEntry[] = [];
+    for (let i = 0; i < batch; i++) {
       const outcome = await spinWheel();
       if (!outcome.ok) {
         setSpinsLeft(left);
@@ -114,6 +131,13 @@ export function WheelOfFortune({
       done += 1;
       left = outcome.spinsLeft;
       lastIdx = outcome.prizeIndex;
+      for (const grant of outcome.grants) {
+        const prize = wheelPrizeByKey(grant.key);
+        if (!prize) continue;
+        const existing = haul.find((h) => h.prize.key === prize.key);
+        if (existing) existing.total += grant.amount;
+        else haul.push({ prize, total: grant.amount });
+      }
     }
     setSpinsLeft(left);
 
@@ -126,7 +150,8 @@ export function WheelOfFortune({
       setSpinning(false);
       setResult({
         prize: WHEEL_PRIZES[lastIdx],
-        message: `הושלמו ${spun} סיבובים! כל הפרסים נוספו לאימפריה שלך.`,
+        message: `הושלמו ${spun} סיבובים — הנה מה שזכית בו:`,
+        haul,
       });
       setConfetti(makeConfetti());
     }, SPIN_MS);
@@ -258,8 +283,25 @@ export function WheelOfFortune({
         {result && (
           <div className="wheel-pop mt-4 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2">
             <p className="text-sm font-bold text-emerald-300">{result.message}</p>
-            {result.prize.note && (
-              <p className="mt-0.5 text-[11px] text-emerald-200/70">{result.prize.note}</p>
+            {result.haul ? (
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                {result.haul.map((h) => (
+                  <span
+                    key={h.prize.key}
+                    className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-100"
+                  >
+                    <span className="text-sm">{h.prize.icon}</span>
+                    {h.prize.label}
+                    <span className="nums rounded bg-emerald-400/25 px-1 text-[10px] text-gold-bright" dir="ltr">
+                      {h.prize.kind === "unit" ? `x${h.total}` : `+${formatNumber(h.total)}`}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              result.prize.note && (
+                <p className="mt-0.5 text-[11px] text-emerald-200/70">{result.prize.note}</p>
+              )
             )}
           </div>
         )}
@@ -272,12 +314,12 @@ export function WheelOfFortune({
         {/* actions */}
         <div className="mt-5 grid grid-cols-2 gap-3">
           <button
-            onClick={spinTen}
-            disabled={spinning || spinsLeft < 10}
+            onClick={spinBatch}
+            disabled={spinning || spinsLeft < 2}
             className="btn flex-col rounded-lg border border-sky-500/50 bg-gradient-to-b from-sky-700/70 to-sky-900/70 px-5 py-3 font-black text-sky-100 disabled:opacity-40"
-            title="נפתח כשיש לפחות 10 סיבובים זמינים"
+            title="סובב את כל הסיבובים הזמינים בבת אחת (עד 10)"
           >
-            x10 סיבובים
+            x{Math.min(spinsLeft, 10)} סיבובים
           </button>
           <button
             onClick={spin}
@@ -287,8 +329,8 @@ export function WheelOfFortune({
             <Icon name="wheel" size={18} /> {spinning ? "מסתובב…" : "סובב"}
           </button>
         </div>
-        <p className="mt-2 text-[11px] text-zinc-500 nums" dir="ltr">
-          x10 נפתח כשיש לפחות 10 סיבובים זמינים.
+        <p className="mt-2 text-[11px] text-zinc-500">
+          כפתור הבאטץ&apos; מסובב את כל הסיבובים הזמינים בבת אחת (עד 10).
         </p>
       </div>
     </div>

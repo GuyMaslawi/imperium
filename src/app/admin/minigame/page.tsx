@@ -2,7 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
-import { LabeledInput, LabeledSelect, EditorSection } from "@/components/admin/fields";
+import { EditorSection } from "@/components/admin/fields";
+import { MiniGameCreator } from "@/components/admin/MiniGameCreator";
 import { prizeText, MINIGAME_TYPE_META } from "@/lib/game/minigame";
 import {
   createMiniGame,
@@ -25,44 +26,12 @@ export default async function AdminMiniGamePage() {
       <SectionHeading title="מיני-משחק" subtitle="MINI-GAME" ornament="🎯" />
 
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
-        צור מיני-משחק עם פרס מוגדר מראש. ברגע שתפעיל אותו — הוא משוחרר לכל השחקנים כפס עליון חי בראש המסך.
-        התשובה מוגרלת אוטומטית בכל הפעלה. שדה מקסימום זוכים ששווה 0 פירושו ללא הגבלה.
+        בחר סוג, קבע פרס — ולחץ <span className="font-bold text-gold-bright">🚀 צור והפעל מיד</span> כדי לשחרר לכולם בלחיצה אחת.
+        כותרת ריקה מקבלת אוטומטית את שם המשחק. התשובה מוגרלת מחדש בכל הפעלה.
       </p>
 
-      <EditorSection title="מיני-משחק חדש" icon="➕">
-        <ActionForm action={createMiniGame} submitLabel="צור מיני-משחק">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <LabeledSelect
-              label="סוג"
-              name="type"
-              options={[
-                { value: "GUESS_NUMBER", label: "🔢 נחש את המספר" },
-                { value: "FIND_BALL", label: "🔮 מצא את הכדור" },
-              ]}
-            />
-            <LabeledInput label="כותרת" name="title" required placeholder="נחשו וזכו!" />
-            <LabeledInput label="מקסימום ניסיונות לשחקן" name="maxAttempts" type="number" min={1} defaultValue={5} />
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-4">
-            <LabeledInput label="מינימום (נחש מספר)" name="min" type="number" defaultValue={1} />
-            <LabeledInput label="מקסימום (נחש מספר)" name="max" type="number" defaultValue={100} />
-            <LabeledInput label="מספר כוסות (מצא כדור)" name="cups" type="number" min={2} defaultValue={3} hint="2–6" />
-            <LabeledInput label="מקסימום זוכים (0=ללא הגבלה)" name="maxWinners" type="number" min={0} defaultValue={0} />
-          </div>
-
-          <p className="text-xs font-semibold text-gold-dim">פרס</p>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <LabeledInput label="🪙 זהב" name="prizeGold" type="number" min={0} placeholder="0" />
-            <LabeledInput label="🪵 עץ" name="prizeWood" type="number" min={0} placeholder="0" />
-            <LabeledInput label="⚙️ ברזל" name="prizeIron" type="number" min={0} placeholder="0" />
-            <LabeledInput label="🪨 אבן" name="prizeStone" type="number" min={0} placeholder="0" />
-            <LabeledInput label="💎 יהלומים" name="prizeDiamonds" type="number" min={0} placeholder="0" />
-            <LabeledInput label="👥 אזרחים" name="prizeCitizens" type="number" min={0} placeholder="0" />
-            <LabeledInput label="⏳ תורות" name="prizeTurns" type="number" min={0} placeholder="0" />
-            <LabeledInput label="🎡 סיבובים" name="prizeWheelSpins" type="number" min={0} placeholder="0" />
-          </div>
-        </ActionForm>
+      <EditorSection title="משחק חדש" icon="➕">
+        <MiniGameCreator action={createMiniGame} />
       </EditorSection>
 
       <div className="space-y-3">

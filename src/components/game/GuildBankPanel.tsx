@@ -6,6 +6,7 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
+import { formatNumber } from "@/lib/game/format";
 
 export interface GuildBankPanelProps {
   /** Whole gold available outside the warehouse. */
@@ -14,7 +15,7 @@ export interface GuildBankPanelProps {
   guildGold: number;
 }
 
-const formatAmount = (value: number) => Math.floor(value).toLocaleString("he-IL");
+const formatAmount = (value: number) => formatNumber(value);
 
 export function GuildBankPanel({ availableGold, guildGold }: GuildBankPanelProps) {
   const [depositState, depositAction] = useActionState<ActionState, FormData>(
@@ -104,6 +105,25 @@ export function GuildBankPanel({ availableGold, guildGold }: GuildBankPanelProps
             ⬆️ משוך מהקופה
           </SubmitButton>
         </div>
+      </form>
+
+      {/* Deposit-all: its own form so it always sends the full available gold,
+          independent of the amount typed above. */}
+      <form
+        action={depositAction}
+        onClick={() => {
+          setClientError(undefined);
+          setLastAction("deposit");
+        }}
+      >
+        <input type="hidden" name="amount" value={availableGold} />
+        <SubmitButton
+          className="btn btn-gold w-full"
+          disabled={availableGold <= 0}
+          pendingText="מפקיד..."
+        >
+          💰 הפקד הכל ({formatAmount(availableGold)})
+        </SubmitButton>
       </form>
 
       <FormMessage

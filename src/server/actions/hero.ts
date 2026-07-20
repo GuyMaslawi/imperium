@@ -13,6 +13,7 @@ import {
   HERO_STAT_META,
   RARITY_META,
   canEquipItem,
+  canUpgradeItem,
   itemDisplayName,
   itemUpgradeCost,
   nextTierLevel,
@@ -367,6 +368,13 @@ export async function upgradeHeroItem(
       const targetLevel = nextTierLevel(item.level);
       if (targetLevel === null) return { error: "הפריט כבר ברמה הגבוהה ביותר" };
 
+      // Can't push an item above the hero's own level.
+      if (hero.level < targetLevel) {
+        return {
+          error: `דרוש גיבור רמה ${targetLevel} כדי לשדרג (אתה ברמה ${hero.level})`,
+        };
+      }
+
       const cost = itemUpgradeCost(item.level) ?? 0;
       if (empire.gold < cost) {
         return {
@@ -423,10 +431,11 @@ export async function upgradeHeroItems(
       const hero = empire.hero;
       if (!hero) return { error: "הגיבור לא נמצא" };
 
-      // Only upgradeable items (not at max level), cheapest first so a limited
-      // gold budget buys as many upgrades as possible.
+      // Only upgradeable items (not at max level, and whose next level the hero
+      // is high enough to reach), cheapest first so a limited gold budget buys
+      // as many upgrades as possible.
       const upgradeable = hero.items
-        .filter((i) => ids.has(i.id) && nextTierLevel(i.level) !== null)
+        .filter((i) => ids.has(i.id) && canUpgradeItem(hero.level, i.level))
         .map((i) => ({
           item: i,
           targetLevel: nextTierLevel(i.level)!,

@@ -135,6 +135,9 @@ model Empire {
   stone               Float    @default(1000)
   diamonds            Float    @default(10)
   citizens            Int      @default(50)
+  /// Cities the empire holds (1..MAX_CITIES). Each city adds 100 to the
+  /// citizen capacity, so ten cities ceiling the population at 1,000.
+  cities              Int      @default(1)
   turns               Int      @default(0)
   /// Remaining wheel-of-fortune spins. Consumed on each spin, topped up on
   /// every daily update (capped) — see WHEEL_DAILY_SPINS / WHEEL_SPINS_CAP.
@@ -165,6 +168,76 @@ model Empire {
   guildMembership    GuildMember?
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
+  diamondPurchases   DiamondPurchase[]
+}
+
+/* --------------------------- diamond store (real money) --------------------------- */
+
+/// Lifecycle of a real-money diamond-package purchase.
+enum PurchaseStatus {
+  /// Charge created with the provider, not yet confirmed.
+  PENDING
+  /// Charge succeeded and the diamonds were credited.
+  PAID
+  /// Charge failed or was declined — no diamonds credited.
+  FAILED
+}
+
+/// One real-money purchase attempt of a diamond package — a full financial
+/// audit row. Created PENDING, then settled to PAID (diamonds credited in the
+/// same transaction) or FAILED by the payment provider result.
+///
+/// Everything needed to read a receipt is snapshotted at purchase time, because
+/// (a) packages live in code (DIAMOND_PACKAGES), not in rows, and (b) the buyer
+/// or their empire may later be renamed or deleted. `empireId` is therefore
+/// nullable with onDelete: SetNull — deleting an account never erases its
+/// purchase history. `isTest` marks charges that moved no real money (the mock
+/// provider), so real revenue can be reported separately.
+model DiamondPurchase {
+  id           String         @id @default(cuid())
+  empireId     String?
+  /// Snapshot of the buyer's user id (survives empire/account deletion).
+  userId       String?
+  /// Snapshot of the buyer's email at purchase time (for receipts/support).
+  userEmail    String?
+  /// Snapshot of the empire name at purchase time.
+  empireName   String?
+  /// Package id from DIAMOND_PACKAGES.
+  packageId    String
+  /// Total diamonds granted (base + bonus), snapshotted at purchase time.
+  diamonds     Int
+  /// Base diamonds of the package (without the bonus).
+  baseDiamonds Int            @default(0)
+  /// Bonus diamonds thrown in on top.
+  bonusDiamonds Int           @default(0)
+  /// Price actually charged, after any admin discount.
+  priceIls     Float
+  /// Full list price before the admin discount (for the receipt).
+  basePriceIls Float          @default(0)
+  /// Discount percent applied at purchase time.
+  discountPct  Float          @default(0)
+  /// ISO-4217 currency of the charge.
+  currency     String         @default("ILS")
+  /// Payment provider that handled the charge ("mock" until a real one is wired).
+  provider     String
+  /// Provider-side transaction reference, once charged.
+  providerRef  String?
+  /// True when no real money moved (mock provider / admin test purchase).
+  isTest       Boolean        @default(false)
+  status       PurchaseStatus @default(PENDING)
+  /// Why the charge failed (only set on FAILED).
+  failureReason String?
+  /// When the charge settled as PAID.
+  paidAt       DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  empire Empire? @relation(fields: [empireId], references: [id], onDelete: SetNull)
+
+  @@index([empireId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 /* ------------------------------ diamond shop ------------------------------ */
@@ -179,6 +252,11 @@ enum DiamondEffectKind {
   RESOURCE_BOOST_STONE
   SHOP_DISCOUNT
   BANK_INTEREST
+  CITY_SIEGE
+  TURN_PACK_1
+  TURN_PACK_2
+  TURN_PACK_3
+  TURN_PACK_4
 }
 
 model DiamondEffect {
@@ -225,6 +303,10 @@ model Guild {
   goldBalance   Float    @default(0)
   /// Member capacity = 1 + level, so a fresh guild (level 1) holds 2 members.
   capacityLevel Int      @default(1)
+  /// Guild aid level — each level adds 1% of the guild's total military power
+  /// as flat combat power for every member in battle, up to 10%. Bought with
+  /// treasury gold.
+  aidLevel      Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 

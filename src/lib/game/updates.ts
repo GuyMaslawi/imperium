@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import {
   BUILDING_META,
   bankInterestRate,
+  citizenCapacity,
+  cityProductionMultiplier,
   mineProductionPerTick,
   type StorableResource,
 } from "./constants";
@@ -68,10 +70,13 @@ export async function applyPendingUpdates(
     // further per-resource multiplier on top of both.
     const guildResourcesPct = await getActiveGuildBuffPct(empire.id, "RESOURCES", tx, now);
     const resourceBoosts = await getActiveResourceBoosts(empire.id, tx, now);
+    // Cities multiply raw mine output: ×1 at one city, ×10 at ten. Derived from
+    // the live count, so a city lost to siege drops production on the next tick.
     const baseMultiplier =
       bonusMultiplier(heroBonus.points.resources) *
       bonusMultiplier(guildResourcesPct) *
-      tunables.economy.mineProductionMultiplier;
+      tunables.economy.mineProductionMultiplier *
+      cityProductionMultiplier(empire.cities);
     for (const building of empire.buildings) {
       const meta = BUILDING_META[building.type];
       if (!meta.producedResource) continue;
@@ -106,6 +111,11 @@ export async function applyPendingUpdates(
     citizensGained =
       Math.round(citizensPerDaily * missedDailies.length) +
       heroBonus.itemsFlat.citizens * missedDailies.length;
+
+    // Cities cap the population: the daily intake fills up to the city ceiling
+    // (cities × 100) and no further. Already at or above the ceiling → no gain.
+    const capacity = citizenCapacity(empire.cities);
+    citizensGained = Math.max(0, Math.min(citizensGained, capacity - empire.citizens));
 
     const diamondLevel =
       empire.upgrades.find((u) => u.type === "DIAMOND_YIELD")?.level ?? 1;

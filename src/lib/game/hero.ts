@@ -262,8 +262,31 @@ export function nextTierLevel(level: number): number | null {
   return null;
 }
 
-/** Gold per target level — a higher-level upgrade costs proportionally more. */
-export const UPGRADE_GOLD_PER_LEVEL = 120;
+/**
+ * An item's rung on the upgrade ladder: how many upgrade levels it has reached
+ * (1..40). This — not the raw level — drives the bonus, because every upgrade
+ * advances the item by exactly one rung, so bonuses keyed to the rung are
+ * *guaranteed* to strictly increase on each upgrade (never the +17 → +17 that a
+ * rounded level-based bonus produced when a rate fell below 1/level). A dropped
+ * item at any level shares the rung of the last upgrade level it has passed, so
+ * two items in the same tier band (e.g. levels 41 and 42) read identically.
+ */
+export function upgradeStep(level: number): number {
+  let k = 0;
+  for (const v of UPGRADE_LEVELS) {
+    if (v <= level) k += 1;
+    else break;
+  }
+  return Math.max(1, k);
+}
+
+/**
+ * Gold per target level. Anchored so the early upgrades (the first tier band,
+ * target levels 1→10) cost between 100k and 1M gold, then keep climbing
+ * linearly with the target level: 100k at level 1, 1M at level 10, 10M at the
+ * cap (level 100). A higher-level upgrade costs proportionally more.
+ */
+export const UPGRADE_GOLD_PER_LEVEL = 100_000;
 
 /**
  * Gold needed to upgrade one item to the next tier level, or null when it is
@@ -329,20 +352,31 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
  */
 export const ITEM_LEVELS: number[] = UPGRADE_LEVELS;
 
-/** Bonus % per item level (before the slot's multiplier), for percentage stats. */
-export const BONUS_PER_LEVEL = 0.25;
+/**
+ * Bonuses scale with the item's upgrade *rung* (see `upgradeStep`), not its raw
+ * level, so every upgrade adds a whole, strictly-larger amount — an upgrade can
+ * never leave the bonus unchanged. There are 40 rungs (levels 1→100), so each
+ * stat's per-rung increment × 40 is its bonus at the cap.
+ */
 
 /**
- * Flat units granted per item level (before the slot's multiplier), for the
- * flat-count stats. Units differ wildly (a turn is not a citizen), so each
- * flat stat scales at its own rate. Tune these to taste — they are the item
- * side of the economy.
+ * Percentage added per upgrade rung (before the slot's multiplier), for the
+ * percentage stats. 1%/rung → a level-100 combat item grants 40% (up from the
+ * old ~25%), so every one of the 40 upgrades is a visible +1%.
  */
-export const FLAT_PER_LEVEL: Record<HeroFlatStat, number> = {
-  resources: 1, // added to each resource the item covers, per regular tick
-  turns: 0.2, // extra turns per regular tick
-  diamonds: 0.15, // extra diamonds per daily update
-  citizens: 3, // extra citizens per daily update
+export const PCT_PER_STEP = 1;
+
+/**
+ * Flat units granted per upgrade rung (before the slot's ×2), for the flat-count
+ * stats. Units differ wildly (a turn is not a citizen), so each scales at its
+ * own rate; every value clears 1/rung *after* the ×2, so no upgrade is a no-op.
+ * ×2 × 40 rungs gives the cap: turns 40, diamonds 40, resources 200, citizens 600.
+ */
+export const FLAT_PER_STEP: Record<HeroFlatStat, number> = {
+  resources: 2.5, // ×2 = +5 per rung → 200 at the cap
+  turns: 0.5, // ×2 = +1 per rung → 40 at the cap
+  diamonds: 0.5, // ×2 = +1 per rung → 40 at the cap
+  citizens: 7.5, // ×2 = +15 per rung → 600 at the cap
 };
 
 /**
@@ -369,7 +403,7 @@ export function resourceItemResources(level: number): StorableResource[] {
  * a whole %. Meaningful only for HERO_PERCENT_STATS slots.
  */
 export function itemBonusPct(slot: HeroItemSlot, level: number): number {
-  const raw = level * BONUS_PER_LEVEL * SLOT_META[slot].statMultiplier;
+  const raw = upgradeStep(level) * PCT_PER_STEP * SLOT_META[slot].statMultiplier;
   // Percentages are always whole numbers; every real item is worth at least 1%.
   return Math.max(1, Math.round(raw));
 }
@@ -380,8 +414,8 @@ export function itemBonusPct(slot: HeroItemSlot, level: number): number {
  */
 export function itemBonusFlat(slot: HeroItemSlot, level: number): number {
   const stat = SLOT_META[slot].stat;
-  const perLevel = statIsFlat(stat) ? FLAT_PER_LEVEL[stat] : 0;
-  const raw = level * perLevel * SLOT_META[slot].statMultiplier;
+  const perStep = statIsFlat(stat) ? FLAT_PER_STEP[stat] : 0;
+  const raw = upgradeStep(level) * perStep * SLOT_META[slot].statMultiplier;
   return Math.max(1, Math.round(raw));
 }
 
@@ -425,6 +459,16 @@ export function itemResourceBreakdown(
 /** Equip requirement: the hero must be at least the item's level. */
 export function canEquipItem(heroLevel: number, itemLevel: number): boolean {
   return heroLevel >= itemLevel;
+}
+
+/**
+ * Upgrade requirement: the level the item would *reach* must not exceed the
+ * hero's own level — you can't push gear above your hero. Returns false when the
+ * item is already maxed (nothing higher to upgrade to).
+ */
+export function canUpgradeItem(heroLevel: number, itemLevel: number): boolean {
+  const target = nextTierLevel(itemLevel);
+  return target !== null && heroLevel >= target;
 }
 
 /* ------------------------------ combined bonuses ------------------------------ */

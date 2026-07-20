@@ -13,6 +13,7 @@ import {
 import { productionPerTick } from "@/lib/game/resources";
 import { heroBonuses } from "@/lib/game/hero";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
+import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { attackPowerBreakdown, defensePowerBreakdown } from "@/lib/game/power";
 import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
@@ -31,6 +32,7 @@ export default async function BasePage() {
     season,
     guildAttackPct,
     guildDefensePct,
+    guildAid,
   ] = await Promise.all([
       prisma.battleReport.findMany({
         where: {
@@ -56,6 +58,7 @@ export default async function BasePage() {
         : null,
       getActiveGuildBuffPct(empire.id, "ATTACK"),
       getActiveGuildBuffPct(empire.id, "DEFENSE"),
+      getGuildAidBonus(empire.id),
     ]);
 
   // Real battle power for the attack/defense cards: same hero + guild
@@ -66,12 +69,14 @@ export default async function BasePage() {
     weapons: empire.weapons,
     heroAttackPct: heroBonus.totalPct.attack,
     guildAttackPct,
+    guildAid,
   });
   const defenseBreakdown = defensePowerBreakdown({
     army: empire.army,
     weapons: empire.weapons,
     heroDefensePct: heroBonus.totalPct.defense,
     guildDefensePct,
+    guildAid,
   });
 
   /* ---- production per regular update, grouped by resource ---- */

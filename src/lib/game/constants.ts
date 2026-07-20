@@ -134,17 +134,28 @@ export function mineProductionPerTick(level: number, assignedSlaves: number): nu
   return assignedSlaves * mineProductionValue(level);
 }
 
+/** Per-tier base price of a mine upgrade, in the mine's own resource. */
+const MINE_UPGRADE_BASE: Record<StorableResource, number> = {
+  gold: 500 * 1.5,
+  wood: 300 * 1.4,
+  iron: 300 * 1.4,
+  stone: 250 * 1.4,
+};
+
 /**
  * Cost to upgrade a mine from `level` to `level + 1`. Priced by the next
- * tier so the first upgrade (level 0 → 1) is never free.
+ * tier so the first upgrade (level 0 → 1) is never free. Each mine is
+ * upgraded with its own resource only — a gold mine costs gold, a wood
+ * camp costs wood, and so on; the other three resources are always 0.
  */
-export function mineUpgradeCost(level: number) {
+export function mineUpgradeCost(level: number, resource: StorableResource) {
   const tier = level + 1;
   return {
-    gold: Math.round(500 * tier * 1.5),
-    wood: Math.round(300 * tier * 1.4),
-    iron: Math.round(300 * tier * 1.4),
-    stone: Math.round(250 * tier * 1.4),
+    gold: 0,
+    wood: 0,
+    iron: 0,
+    stone: 0,
+    [resource]: Math.round(MINE_UPGRADE_BASE[resource] * tier),
   };
 }
 
@@ -259,14 +270,80 @@ export function spySuccessChance(intelligenceLevel: number): number {
   return Math.min(0.9, 0.6 + intelligenceLevel * 0.03);
 }
 
-/** Bank deposits allowed between one daily update and the next. */
+/** Highest number of deposits the upgrade can reach. */
+export const BANK_DEPOSIT_MAX = 10;
+/** Top level of the deposit-count upgrade — level 9 reaches the 10-deposit cap. */
+export const BANK_DEPOSIT_COUNT_MAX_LEVEL = 9;
+
+/** Bank deposits allowed between one daily update and the next (capped at 10). */
 export function allowedDepositsPerDailyPeriod(level: number): number {
-  return 1 + level;
+  return Math.min(BANK_DEPOSIT_MAX, 1 + level);
 }
 
-/** Bank interest per daily update, capped at 10%. */
+/** Bank interest per daily update, capped at 15%. */
 export function bankInterestRate(level: number): number {
-  return Math.min(0.1, 0.01 + level * 0.0025);
+  return Math.min(0.15, 0.01 + level * 0.0025);
+}
+
+/* ------------------------------ cities ------------------------------ */
+
+/** Citizen capacity contributed by each city. */
+export const CITIZENS_PER_CITY = 100;
+
+/** Highest number of cities a single empire can hold. */
+export const MAX_CITIES = 10;
+
+/** Hero levels demanded per city tier: the 2nd city needs 10, 3rd needs 20… */
+export const CITY_HERO_LEVEL_PER_TIER = 10;
+
+/**
+ * Hero level the empire must reach before founding its next city. Scales with
+ * how many cities it already holds: 10 for the 2nd city, 20 for the 3rd, and so
+ * on (`cities` is the current count — 1 for the 2nd city, up to 9 for the 10th).
+ */
+export function cityHeroLevelRequired(cities: number): number {
+  return cities * CITY_HERO_LEVEL_PER_TIER;
+}
+
+/**
+ * Total citizen capacity for an empire holding `cities` cities. The first city
+ * holds 100, the second raises the ceiling to 200, and so on up to 1,000 at ten
+ * cities. The daily citizen intake is clamped to this ceiling.
+ */
+export function citizenCapacity(cities: number): number {
+  return cities * CITIZENS_PER_CITY;
+}
+
+/**
+ * Mine-production multiplier granted by the empire's cities: output scales
+ * linearly with the current city count (×1 at one city, ×10 at ten). Because it
+ * is derived from the live `cities` value on every tick, losing a city — e.g. to
+ * an enemy CITY_SIEGE spell — lowers production automatically.
+ */
+export function cityProductionMultiplier(cities: number): number {
+  return cities;
+}
+
+/** Every city tier above the first multiplies the previous tier's cost by this. */
+export const CITY_COST_TIER_MULTIPLIER = 2.5;
+
+/**
+ * Cost to upgrade to the next city, going from `cities` → `cities + 1`. Upgrading
+ * to the 2nd city costs 1M gold + 500K of each other resource; every tier past
+ * that multiplies the whole bill — resources *and* soldiers — by 2.5. Soldiers
+ * are a garrison requirement the empire must field, not a currency it spends.
+ * `cities` is the current count — 1 for the second city, up to 9 for the tenth.
+ */
+export function cityCost(cities: number) {
+  const tier = cities - 1; // 0 for the 2nd city … 8 for the 10th
+  const mult = Math.pow(CITY_COST_TIER_MULTIPLIER, tier);
+  return {
+    gold: Math.round(1_000_000 * mult),
+    wood: Math.round(500_000 * mult),
+    iron: Math.round(500_000 * mult),
+    stone: Math.round(500_000 * mult),
+    soldiers: Math.round(200 * mult),
+  };
 }
 
 /* ------------------------------ turns ------------------------------ */
@@ -309,6 +386,7 @@ export const EMPIRE_UPGRADE_META: Record<EmpireUpgradeType, EmpireUpgradeMeta> =
     description: "מגדיל את מספר ההפקדות שניתן לבצע בבנק בין עדכון יומי לעדכון יומי.",
     effectLabel: (level) =>
       `${allowedDepositsPerDailyPeriod(level).toLocaleString("he-IL")} הפקדות בין עדכון יומי לעדכון יומי`,
+    maxLevel: BANK_DEPOSIT_COUNT_MAX_LEVEL,
   },
   BANK_DAILY_INTEREST: {
     label: "ריבית בנק",

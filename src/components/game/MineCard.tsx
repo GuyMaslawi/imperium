@@ -3,15 +3,17 @@
 import { useActionState } from "react";
 import {
   upgradeMine,
+  upgradeMineToMax,
   assignMineSlavesToResource,
   type ActionState,
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
 
-const nis = (n: number) => Math.round(n).toLocaleString("he-IL");
+const nis = (n: number) => formatNumber(n);
 
 export interface MineCardProps {
   resource: "gold" | "wood" | "iron" | "stone";
@@ -46,6 +48,10 @@ export function MineCard({
 }: MineCardProps) {
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeMine,
+    {}
+  );
+  const [maxState, maxAction] = useActionState<ActionState, FormData>(
+    upgradeMineToMax,
     {}
   );
   const [assignState, assignAction] = useActionState<ActionState, FormData>(
@@ -102,11 +108,11 @@ export function MineCard({
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 panel-inset rounded-lg p-3 text-xs">
         <dt className="text-zinc-400">עבדי מכרות מוצבים</dt>
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
-          {assignedSlaves.toLocaleString("he-IL")}
+          {nis(assignedSlaves)}
         </dd>
         <dt className="text-zinc-400">תפוקה לעבד מכרות</dt>
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
-          {productionPerSlave.toLocaleString("he-IL")} {resourceLabel}
+          {nis(productionPerSlave)} {resourceLabel}
         </dd>
         <dt className="text-zinc-400">תפוקת בסיס לעדכון</dt>
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
@@ -151,7 +157,7 @@ export function MineCard({
           <span className="text-xs text-gold-dim">
             ניהול עובדים (פנויים:{" "}
             <span className="nums" dir="ltr">
-              {freeSlaves.toLocaleString("he-IL")}
+              {nis(freeSlaves)}
             </span>
             )
           </span>
@@ -174,20 +180,31 @@ export function MineCard({
         {!isMaxLevel && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
-            <span className="nums" dir="ltr"><Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost.gold.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr"><Icon name="wood" size={14} className="inline align-[-2px]" /> {upgradeCost.wood.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr"><Icon name="iron" size={14} className="inline align-[-2px]" /> {upgradeCost.iron.toLocaleString("he-IL")}</span>
-            <span className="nums" dir="ltr"><Icon name="stone" size={14} className="inline align-[-2px]" /> {upgradeCost.stone.toLocaleString("he-IL")}</span>
+            <span className="nums" dir="ltr">
+              <Icon name={resource} size={14} className="inline align-[-2px]" />{" "}
+              {nis(upgradeCost[resource])} {resourceLabel}
+            </span>
           </div>
         )}
-        <SubmitButton className="btn btn-dark w-full" pendingText="משדרג..." disabled={isMaxLevel}>
-          {isMaxLevel ? "רמה מקסימלית" : "שדרג רמה"}
-        </SubmitButton>
+        <div className="grid grid-cols-2 gap-2">
+          <SubmitButton className="btn btn-dark w-full" pendingText="משדרג..." disabled={isMaxLevel}>
+            {isMaxLevel ? "רמה מקסימלית" : "שדרג רמה"}
+          </SubmitButton>
+          <SubmitButton
+            formAction={maxAction}
+            variant="secondary"
+            className="btn btn-ghost w-full"
+            pendingText="משדרג..."
+            disabled={isMaxLevel}
+          >
+            שדרג למקסימום
+          </SubmitButton>
+        </div>
       </form>
 
       <FormMessage
-        error={upgradeState.error ?? assignState.error}
-        success={upgradeState.success ?? assignState.success}
+        error={upgradeState.error ?? maxState.error ?? assignState.error}
+        success={assignState.success}
       />
     </div>
   );

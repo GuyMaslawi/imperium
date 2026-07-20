@@ -49,6 +49,11 @@ export interface GameTunables {
   economy: {
     mineProductionMultiplier: number;
   };
+  /** Diamond store (real-money purchase page) tunables. */
+  diamondStore: {
+    /** Percent off every diamond package price (0 = full price). */
+    purchaseDiscountPct: number;
+  };
 }
 
 export const DEFAULT_TUNABLES: GameTunables = {
@@ -83,6 +88,9 @@ export const DEFAULT_TUNABLES: GameTunables = {
   },
   economy: {
     mineProductionMultiplier: 1,
+  },
+  diamondStore: {
+    purchaseDiscountPct: 0,
   },
 };
 
@@ -139,6 +147,13 @@ export const TUNABLE_META: Record<
       mineProductionMultiplier: { label: "מכפיל תפוקת מכרות גלובלי", step: 0.1 },
     },
   },
+  diamondStore: {
+    label: "חנות יהלומים — רכישה",
+    icon: "💎",
+    fields: {
+      purchaseDiscountPct: { label: "אחוז הנחה על מחירי חבילות יהלומים (0-100)" },
+    },
+  },
 };
 
 function mergeGroup<T extends Record<string, number>>(base: T, overlay: unknown): T {
@@ -161,6 +176,7 @@ export function mergeTunables(overlay: unknown): GameTunables {
     daily: mergeGroup(DEFAULT_TUNABLES.daily, o.daily),
     battle: mergeGroup(DEFAULT_TUNABLES.battle, o.battle),
     economy: mergeGroup(DEFAULT_TUNABLES.economy, o.economy),
+    diamondStore: mergeGroup(DEFAULT_TUNABLES.diamondStore, o.diamondStore),
   };
 }
 

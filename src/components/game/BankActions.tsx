@@ -12,6 +12,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { formatNumber } from "@/lib/game/format";
 
 export interface BankActionsProps {
   /** Whole gold available outside the warehouse. */
@@ -25,7 +26,7 @@ export interface BankActionsProps {
 
 type BankActionKind = "deposit" | "withdraw" | "depositAll" | "withdrawAll";
 
-const formatAmount = (value: number) => Math.floor(value).toLocaleString("he-IL");
+const formatAmount = (value: number) => formatNumber(value);
 
 export function BankActions({
   availableGold,

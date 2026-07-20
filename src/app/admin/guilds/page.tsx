@@ -55,10 +55,11 @@ export default async function AdminGuildsPage() {
 
             <ActionForm action={updateGuild} submitLabel="שמור" submitVariant="secondary">
               <input type="hidden" name="id" value={g.id} />
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <LabeledInput label="שם" name="name" defaultValue={g.name} required />
                 <LabeledInput label="💰 אוצר" name="goldBalance" type="number" min={0} defaultValue={Math.round(g.goldBalance)} />
-                <LabeledInput label="רמת קיבולת" name="capacityLevel" type="number" min={1} defaultValue={g.capacityLevel} />
+                <LabeledInput label="רמת קיבולת (עד 9)" name="capacityLevel" type="number" min={1} defaultValue={g.capacityLevel} />
+                <LabeledInput label="עזרת ברית % (עד 10)" name="aidLevel" type="number" min={0} defaultValue={g.aidLevel} />
               </div>
             </ActionForm>
 

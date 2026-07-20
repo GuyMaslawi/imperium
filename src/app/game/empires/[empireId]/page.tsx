@@ -54,6 +54,10 @@ export default async function EmpireProfilePage({
   const equippedBySlot = new Map((hero?.items ?? []).map((item) => [item.slot, item]));
 
   const isMe = empire.id === myEmpire.id;
+  // Espionage and combat are confined to your own city — an empire is "in your
+  // city" when it holds the same number of cities as you.
+  const sameCity = empire.cities === myEmpire.cities;
+  const canEngage = !isMe && sameCity;
 
   const spyReport = isMe
     ? null
@@ -108,8 +112,20 @@ export default async function EmpireProfilePage({
     <div className="space-y-6">
       <SectionHeading title="פרופיל" subtitle="EMPIRE PROFILE" ornament={<Icon name="crown" size={22} className="text-crimson" />} />
 
+      {/* An empire outside your city is off-limits: no spying, no attacking. */}
+      {!isMe && !sameCity && (
+        <div className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
+          <Icon name="shield" size={16} className="mb-1 inline-block align-[-3px] text-gold-dim" />{" "}
+          אימפריה זו נמצאת בעיר אחרת (
+          <span className="nums" dir="ltr">
+            {empire.cities}
+          </span>{" "}
+          ערים) — לא ניתן לרגל או לתקוף אותה. ניתן לפעול רק נגד אימפריות בעיר שלך.
+        </div>
+      )}
+
       {/* -------- command bar: attack actions live on top, ready to fire -------- */}
-      {!isMe && (
+      {canEngage && (
         <div className="panel-gold rounded-xl p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <RankActions
@@ -277,7 +293,7 @@ export default async function EmpireProfilePage({
         </div>
 
         {/* -------- intelligence / spy report -------- */}
-        {!isMe && (
+        {canEngage && (
           <div className="panel-gold rounded-xl p-4">
             <h3 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
               <Icon name="spy" size={20} className="text-crimson-bright" />

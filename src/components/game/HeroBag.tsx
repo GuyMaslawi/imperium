@@ -9,14 +9,15 @@ import { ItemTile } from "@/components/game/ItemTile";
 import { ItemDialog } from "@/components/game/ItemDialog";
 import { Dialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
+import { formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
 import {
   HERO_BAG_CAPACITY,
   RARITY_META,
   RARITY_ORDER,
   SLOT_META,
+  canUpgradeItem,
   itemUpgradeCost,
-  nextTierLevel,
 } from "@/lib/game/hero";
 import { itemDetails, uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 
@@ -120,10 +121,11 @@ export function HeroBag({
   };
 
   const selectedCount = selectedIds.length;
-  // Selected items that can still be upgraded (not yet legendary), with the
-  // gold each costs — the total drives the confirmation dialog.
+  // Selected items that can still be upgraded — not yet maxed, and whose next
+  // level the hero is high enough to reach — with the gold each costs; the
+  // total drives the confirmation dialog.
   const selectedUpgrades = items
-    .filter((i) => selectedIdSet.has(i.id) && nextTierLevel(i.level) !== null)
+    .filter((i) => selectedIdSet.has(i.id) && canUpgradeItem(heroLevel, i.level))
     .map((i) => ({ item: i, cost: itemUpgradeCost(i.level) ?? 0 }));
   const selectedUpgradeable = selectedUpgrades.length;
   const totalUpgradeCost = selectedUpgrades.reduce((sum, u) => sum + u.cost, 0);
@@ -364,13 +366,13 @@ export function HeroBag({
                 }`}
                 dir="ltr"
               >
-                <Icon name="gold" size={14} className="inline align-[-2px]" /> {totalUpgradeCost.toLocaleString("he-IL")}
+                <Icon name="gold" size={14} className="inline align-[-2px]" /> {formatNumber(totalUpgradeCost)}
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between">
               <span className="text-zinc-500">הזהב שלך</span>
               <span className="nums text-xs font-bold text-zinc-300" dir="ltr">
-                <Icon name="gold" size={14} className="inline align-[-2px]" /> {Math.floor(gold).toLocaleString("he-IL")}
+                <Icon name="gold" size={14} className="inline align-[-2px]" /> {formatNumber(gold)}
               </span>
             </div>
           </div>

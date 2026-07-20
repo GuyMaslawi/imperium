@@ -42,6 +42,22 @@ export const WHEEL_PRIZES: WheelPrizeDef[] = [
   { key: "loot", label: "שלל", icon: "🎁", color: "#141414", kind: "amount", base: 2000, step: 100, note: "חבילת משאבים מעורבת בשווי זהב" },
 ];
 
+/** A concrete quantity actually granted by a spin, in the prize's own unit. */
+export interface WheelGrant {
+  /** A `WHEEL_PRIZES` key — the display icon/label is resolved from that def. */
+  key: string;
+  amount: number;
+}
+
+const PRIZE_BY_KEY: Record<string, WheelPrizeDef> = Object.fromEntries(
+  WHEEL_PRIZES.map((p) => [p.key, p])
+);
+
+/** Resolve the prize definition (icon/label/kind) behind a grant's key. */
+export function wheelPrizeByKey(key: string): WheelPrizeDef | undefined {
+  return PRIZE_BY_KEY[key];
+}
+
 /**
  * Current day of the season (1-based), clamped to the season's length so an
  * expired season keeps paying its final-day amounts rather than growing

@@ -10,6 +10,7 @@ import {
   pickWheelPrizeIndex,
   seasonDay,
   wheelPrizeAmount,
+  type WheelGrant,
   type WheelPrizeDef,
 } from "@/lib/game/wheel";
 import {
@@ -22,7 +23,14 @@ import type { FullEmpire } from "@/lib/game/updates";
 
 /** What a spin returns to the client so it can animate to the right wedge. */
 export type SpinResult =
-  | { ok: true; prizeIndex: number; message: string; spinsLeft: number }
+  | {
+      ok: true;
+      prizeIndex: number;
+      message: string;
+      /** Exactly what was granted, so a batch can total each prize precisely. */
+      grants: WheelGrant[];
+      spinsLeft: number;
+    }
   | { ok: false; error: string };
 
 async function requireOwnEmpireId(): Promise<string> {
@@ -48,32 +56,32 @@ async function grantPrize(
   empire: FullEmpire,
   prize: WheelPrizeDef,
   day: number
-): Promise<string> {
+): Promise<{ message: string; grants: WheelGrant[] }> {
   const empireId = empire.id;
   const amount = wheelPrizeAmount(prize, day);
 
   switch (prize.key) {
     case "diamonds":
       await tx.empire.update({ where: { id: empireId }, data: { diamonds: { increment: amount } } });
-      return `זכית ב־💎 ${heNum(amount)} יהלומים!`;
+      return { message: `זכית ב־💎 ${heNum(amount)} יהלומים!`, grants: [{ key: "diamonds", amount }] };
     case "turns":
       await tx.empire.update({ where: { id: empireId }, data: { turns: { increment: amount } } });
-      return `זכית ב־🔄 ${heNum(amount)} תורות!`;
+      return { message: `זכית ב־🔄 ${heNum(amount)} תורות!`, grants: [{ key: "turns", amount }] };
     case "gold":
       await tx.empire.update({ where: { id: empireId }, data: { gold: { increment: amount } } });
-      return `זכית ב־🪙 ${heNum(amount)} זהב!`;
+      return { message: `זכית ב־🪙 ${heNum(amount)} זהב!`, grants: [{ key: "gold", amount }] };
     case "iron":
       await tx.empire.update({ where: { id: empireId }, data: { iron: { increment: amount } } });
-      return `זכית ב־⚙️ ${heNum(amount)} ברזל!`;
+      return { message: `זכית ב־⚙️ ${heNum(amount)} ברזל!`, grants: [{ key: "iron", amount }] };
     case "stone":
       await tx.empire.update({ where: { id: empireId }, data: { stone: { increment: amount } } });
-      return `זכית ב־🪨 ${heNum(amount)} אבן!`;
+      return { message: `זכית ב־🪨 ${heNum(amount)} אבן!`, grants: [{ key: "stone", amount }] };
     case "wood":
       await tx.empire.update({ where: { id: empireId }, data: { wood: { increment: amount } } });
-      return `זכית ב־🪵 ${heNum(amount)} עץ!`;
+      return { message: `זכית ב־🪵 ${heNum(amount)} עץ!`, grants: [{ key: "wood", amount }] };
     case "citizens":
       await tx.empire.update({ where: { id: empireId }, data: { citizens: { increment: amount } } });
-      return `זכית ב־👥 ${heNum(amount)} אזרחים!`;
+      return { message: `זכית ב־👥 ${heNum(amount)} אזרחים!`, grants: [{ key: "citizens", amount }] };
     case "loot": {
       // Mixed resource pack: split the gold-value evenly across all four.
       const each = Math.round(amount / 4);
@@ -86,7 +94,16 @@ async function grantPrize(
           stone: { increment: each },
         },
       });
-      return `זכית ב־🎁 חבילת שלל: ${heNum(each)} מכל משאב!`;
+      return {
+        message: `זכית ב־🎁 חבילת שלל: ${heNum(each)} מכל משאב!`,
+        // Report the split so a batch totals each resource exactly.
+        grants: [
+          { key: "gold", amount: each },
+          { key: "wood", amount: each },
+          { key: "iron", amount: each },
+          { key: "stone", amount: each },
+        ],
+      };
     }
     case "allWeapons": {
       // One of every weapon the empire has already unlocked, per category.
@@ -105,7 +122,10 @@ async function grantPrize(
           granted += 1;
         }
       }
-      return `זכית ב־🗡️ אחד מכל ${heNum(granted)} סוגי הנשק שפתחת!`;
+      return {
+        message: `זכית ב־🗡️ אחד מכל ${heNum(granted)} סוגי הנשק שפתחת!`,
+        grants: [{ key: "allWeapons", amount: granted }],
+      };
     }
     case "item": {
       const hero = empire.hero;
@@ -122,7 +142,10 @@ async function grantPrize(
         });
         if (drop) {
           await tx.heroItem.create({ data: { heroId: hero.id, ...drop } });
-          return `זכית ב־✨ ${itemDisplayName(drop.slot, drop.level)} לתיק הגיבור!`;
+          return {
+            message: `זכית ב־✨ ${itemDisplayName(drop.slot, drop.level)} לתיק הגיבור!`,
+            grants: [{ key: "item", amount: 1 }],
+          };
         }
       }
       // No room / no hero — pay a gold consolation so the spin isn't wasted.
@@ -134,10 +157,14 @@ async function grantPrize(
         where: { id: empireId },
         data: { gold: { increment: consolation } },
       });
-      return `התיק מלא — קיבלת 🪙 ${heNum(consolation)} זהב במקום החפץ.`;
+      // Grant reflects what actually landed (gold), not the item wedge.
+      return {
+        message: `התיק מלא — קיבלת 🪙 ${heNum(consolation)} זהב במקום החפץ.`,
+        grants: [{ key: "gold", amount: consolation }],
+      };
     }
     default:
-      return "זכית בפרס!";
+      return { message: "זכית בפרס!", grants: [] };
   }
 }
 
@@ -163,9 +190,9 @@ export async function spinWheel(): Promise<SpinResult> {
       const day = seasonDay(season, Date.now());
 
       const prizeIndex = pickWheelPrizeIndex();
-      const message = await grantPrize(tx, empire, WHEEL_PRIZES[prizeIndex], day);
+      const { message, grants } = await grantPrize(tx, empire, WHEEL_PRIZES[prizeIndex], day);
 
-      return { ok: true, prizeIndex, message, spinsLeft: empire.wheelSpins - 1 };
+      return { ok: true, prizeIndex, message, grants, spinsLeft: empire.wheelSpins - 1 };
     });
 
     revalidatePath("/game", "layout");

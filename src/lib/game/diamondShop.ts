@@ -37,6 +37,12 @@ export interface ResourceCost {
   stone: number;
 }
 
+/** Apply the shop discount % to a single amount, rounded up (matches purchase math). */
+export function discountedAmount(amount: number, discountPct: number): number {
+  if (discountPct <= 0) return amount;
+  return Math.ceil(amount * (1 - discountPct / 100));
+}
+
 /** Apply the shop discount % to a {gold,wood,iron,stone} cost, rounded up. */
 export function applyShopDiscount(cost: ResourceCost, discountPct: number): ResourceCost {
   if (discountPct <= 0) return cost;
@@ -54,14 +60,27 @@ export function applyShopDiscount(cost: ResourceCost, discountPct: number): Reso
 export interface TurnPackage {
   turns: number;
   cost: number; // diamonds
+  /** How long this package stays on cooldown after buying it. */
+  cooldownHours: number;
+  /** DiamondEffectKind holding this package's personal cooldown. */
+  cooldownKind: DiamondEffectKind;
 }
 
+/**
+ * Turn packages, cheapest → largest. Each package has its own independent
+ * cooldown that grows with the size of the package, so the largest one can only
+ * be bought once every 12 hours while small top-ups recharge quickly.
+ */
 export const TURN_PACKAGES: TurnPackage[] = [
-  { turns: 100, cost: 40 },
-  { turns: 300, cost: 100 },
-  { turns: 800, cost: 240 },
-  { turns: 2000, cost: 500 },
+  { turns: 100, cost: 40, cooldownHours: 1, cooldownKind: "TURN_PACK_1" },
+  { turns: 300, cost: 100, cooldownHours: 3, cooldownKind: "TURN_PACK_2" },
+  { turns: 800, cost: 240, cooldownHours: 6, cooldownKind: "TURN_PACK_3" },
+  { turns: 2000, cost: 500, cooldownHours: 12, cooldownKind: "TURN_PACK_4" },
 ];
+
+export const TURN_PACKAGE_KINDS: DiamondEffectKind[] = TURN_PACKAGES.map(
+  (p) => p.cooldownKind
+);
 
 /* ------------------------------ hero points reset ------------------------------ */
 
@@ -74,8 +93,12 @@ export const BANK_INTEREST_SPELL_COST = 60;
 export const BANK_INTEREST_COOLDOWN_HOURS = 24;
 export const BANK_INTEREST_COOLDOWN_MS = BANK_INTEREST_COOLDOWN_HOURS * 3_600_000;
 
-/* ------------------------------ city spell (coming soon) ------------------------------ */
+/* ------------------------------ city downgrade spell ------------------------------ */
 
-/** The "descend a city" spell is a scaffold until the cities system lands. */
+/** DiamondEffectKind that stores the city-downgrade cooldown for the caster. */
+export const CITY_SPELL_KIND: DiamondEffectKind = "CITY_SIEGE";
+/** Diamonds to downgrade an enemy by one city. */
+export const CITY_SPELL_COST = 120;
+/** The spell recharges once per hour. */
 export const CITY_SPELL_COOLDOWN_HOURS = 1;
-export const CITY_SPELL_ENABLED = false;
+export const CITY_SPELL_COOLDOWN_MS = CITY_SPELL_COOLDOWN_HOURS * 3_600_000;

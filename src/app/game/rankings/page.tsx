@@ -14,12 +14,17 @@ export const metadata = { title: "דירוג | אימפריום" };
 export default async function RankingsPage() {
   const myEmpire = await requireEmpire();
 
+  // The ranking is confined to your own city — you only see (and may attack or
+  // spy) empires that hold the same number of cities as you.
+  const myCity = myEmpire.cities;
+
   // The game clock is lazy (applied when an empire is loaded), so empires of
   // players who haven't logged in since the last daily update would show
   // stale numbers here. Settle just those — at most twice a day per empire.
   const staleDaily = await prisma.empire.findMany({
     where: {
       id: { not: myEmpire.id },
+      cities: myCity,
       lastDailyUpdateAt: { lt: lastDailyUpdate(new Date()) },
     },
     select: { id: true },
@@ -33,6 +38,7 @@ export default async function RankingsPage() {
   );
 
   const empires = await prisma.empire.findMany({
+    where: { cities: myCity },
     include: { army: true, weapons: true, hero: true },
   });
 
@@ -56,37 +62,35 @@ export default async function RankingsPage() {
       {/* -------- status strip -------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-panel-inset px-3 py-1.5 text-xs text-zinc-300">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--color-accent-green)]" />
-          אונליין (48ש):{" "}
+          <Icon name="base" size={14} className="text-crimson-bright" />
+          העיר שלך (
+          <span className="nums font-bold text-gold-bright" dir="ltr">
+            {myCity}
+          </span>{" "}
+          ערים):{" "}
           <span className="nums font-bold text-emerald-400" dir="ltr">
             {ranked.length}
-          </span>
+          </span>{" "}
+          אימפריות
         </span>
         <span className="text-xs text-zinc-400">
           בדירוג שלך:{" "}
           <span className="nums font-bold text-gold-bright" dir="ltr">
             {myRank}
-          </span>{" "}
-          / מוסתרים:{" "}
-          <span className="nums font-bold text-zinc-300" dir="ltr">
-            0
-          </span>{" "}
-          🔒
+          </span>
         </span>
       </div>
 
-      {/* -------- filters -------- */}
+      {/* Interaction is city-scoped; the cross-game boards live on their own page. */}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className="btn btn-ghost px-4 py-2 text-sm">
-          לפי העיר שלי
-        </button>
-        <button type="button" className="btn btn-dark px-4 py-2 text-sm">
-          הצבאות הטובים ביותר
-        </button>
-        <button type="button" className="btn btn-ghost px-4 py-2 text-sm">
-          דירוג בריתות
-        </button>
+        <Link href="/game/leaderboards" className="btn btn-gold px-4 py-2 text-sm">
+          <Icon name="rankings" size={16} className="inline-block align-middle" /> טבלאות מובילים
+        </Link>
       </div>
+
+      <p className="panel-inset rounded-lg p-3 text-center text-xs text-zinc-400">
+        הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.
+      </p>
 
       {/* -------- leaderboard -------- */}
       <div className="panel-gold overflow-x-auto rounded-xl p-0">

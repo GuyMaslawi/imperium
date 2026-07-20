@@ -9,6 +9,7 @@ import {
   buyShopDiscount,
   buyTurns,
   castBankInterestSpell,
+  castCitySiegeSpell,
   resetHeroPointsWithDiamonds,
 } from "@/server/actions/diamondShop";
 import {
@@ -16,6 +17,7 @@ import {
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
   BANK_INTEREST_SPELL_COST,
+  CITY_SPELL_COST,
   HERO_POINTS_RESET_COST,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_PCT,
@@ -26,9 +28,15 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
-/** HH:MM of an ISO timestamp (deterministic — no Date.now in render). */
-function hhmm(iso: string): string {
-  return new Date(iso).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+/**
+ * Date + time of an ISO timestamp, e.g. "20.07 · 14:30" — the day is shown so a
+ * next-day expiry isn't mistaken for today. Deterministic — no Date.now in render.
+ */
+function whenLabel(iso: string): string {
+  const d = new Date(iso);
+  const date = d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
+  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  return `${date} · ${time}`;
 }
 
 function ActiveBadge({ label }: { label: string }) {
@@ -88,7 +96,7 @@ function ResourceBoostCard({
 
       <form className="mt-auto grid gap-1.5">
         <input type="hidden" name="resource" value={resource} />
-        {activeUntil && <ActiveBadge label={`✨ פעיל עד ${hhmm(activeUntil)}`} />}
+        {activeUntil && <ActiveBadge label={`✨ פעיל עד ${whenLabel(activeUntil)}`} />}
         {atCap ? (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
             <Icon name="rankings" size={14} /> בתקרה (+{BOOST_MAX_PCT}%)
@@ -120,7 +128,7 @@ function DiscountCard({
 }) {
   const [state, action] = useActionState<ActionState, FormData>(buyShopDiscount, {});
   return (
-    <div className="panel-inset flex flex-col gap-2 rounded-lg p-4">
+    <div className="panel-inset flex flex-col gap-1.5 rounded-lg p-3">
       <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
         <span aria-hidden className="text-lg">🏷️</span>
         הנחת חנות {SHOP_DISCOUNT_PCT}%
@@ -131,7 +139,7 @@ function DiscountCard({
       </p>
       <form className="mt-auto grid gap-1.5">
         {activeUntil ? (
-          <ActiveBadge label={`✨ פעיל עד ${hhmm(activeUntil)}`} />
+          <ActiveBadge label={`✨ פעיל עד ${whenLabel(activeUntil)}`} />
         ) : (
           <SubmitButton
             className="btn btn-gold w-full"
@@ -150,37 +158,88 @@ function DiscountCard({
 
 /* ------------------------------ turn packages ------------------------------ */
 
-function TurnPackageCard({
+/** "12 שעות" / "45 דקות" from a whole number of hours. */
+function cooldownLabel(hours: number): string {
+  return hours >= 1 ? `${hours} שעות` : `${Math.round(hours * 60)} דקות`;
+}
+
+/** One turn package as a row inside the shared turns box. */
+function TurnPackageRow({
   index,
   turns,
   cost,
+  cooldownHours,
+  readyAt,
   diamonds,
 }: {
   index: number;
   turns: number;
   cost: number;
+  cooldownHours: number;
+  readyAt: string | null;
   diamonds: number;
 }) {
   const [state, action] = useActionState<ActionState, FormData>(buyTurns, {});
+  const onCooldown = readyAt != null;
+
   return (
-    <div className="panel-inset flex flex-col items-center gap-2 rounded-lg p-3 text-center">
-      <Icon name="turns" size={26} className="text-crimson-bright" />
-      <p className="nums text-lg font-black text-amber-300" dir="ltr">
-        {formatNumber(turns)}
-      </p>
-      <p className="text-[11px] text-zinc-500">תורות</p>
-      <form className="mt-auto w-full">
-        <input type="hidden" name="packageIndex" value={index} />
-        <SubmitButton
-          className="btn btn-gold w-full"
-          formAction={action}
-          disabled={diamonds < cost}
-          pendingText="רוכש..."
-        >
-          {cost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
-        </SubmitButton>
-      </form>
+    <div className="flex flex-col gap-1.5 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <Icon name="turns" size={22} className="shrink-0 text-crimson-bright" />
+          <div className="leading-tight">
+            <p className="nums text-base font-black text-amber-300" dir="ltr">
+              {formatNumber(turns)}
+            </p>
+            <p className="text-[11px] text-zinc-500">
+              תורות · אחת ל־{cooldownLabel(cooldownHours)}
+            </p>
+          </div>
+        </div>
+
+        <form className="shrink-0">
+          <input type="hidden" name="packageIndex" value={index} />
+          {onCooldown ? (
+            <span className="inline-block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+              זמין ב־{whenLabel(readyAt!)}
+            </span>
+          ) : (
+            <SubmitButton
+              className="btn btn-gold min-w-[6rem]"
+              formAction={action}
+              disabled={diamonds < cost}
+              pendingText="רוכש..."
+            >
+              {cost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            </SubmitButton>
+          )}
+        </form>
+      </div>
       <FormMessage error={state.error} success={state.success} />
+    </div>
+  );
+}
+
+function TurnPackagesBox({
+  turnReadyAt,
+  diamonds,
+}: {
+  turnReadyAt: (string | null)[];
+  diamonds: number;
+}) {
+  return (
+    <div className="panel-inset rounded-lg px-4 py-1 divide-y divide-border-subtle/60">
+      {TURN_PACKAGES.map((pkg, i) => (
+        <TurnPackageRow
+          key={i}
+          index={i}
+          turns={pkg.turns}
+          cost={pkg.cost}
+          cooldownHours={pkg.cooldownHours}
+          readyAt={turnReadyAt[i] ?? null}
+          diamonds={diamonds}
+        />
+      ))}
     </div>
   );
 }
@@ -201,7 +260,7 @@ function HeroResetCard({
     {}
   );
   return (
-    <div className="panel-inset flex flex-col gap-2 rounded-lg p-4">
+    <div className="panel-inset flex flex-col gap-1.5 rounded-lg p-3">
       <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
         <span aria-hidden className="text-lg">🔄</span>
         איפוס נקודות גיבור
@@ -253,7 +312,7 @@ function BankInterestCard({
     {}
   );
   return (
-    <div className="panel-inset flex flex-col gap-2 rounded-lg p-4">
+    <div className="panel-inset flex flex-col gap-1.5 rounded-lg p-3">
       <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
         <Icon name="bank" size={18} />
         קסם ריבית בנק
@@ -270,7 +329,7 @@ function BankInterestCard({
       <form className="mt-auto grid gap-1.5">
         {readyAt ? (
           <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            בקירור · זמין ב־{hhmm(readyAt)}
+            בקירור · זמין ב־{whenLabel(readyAt)}
           </span>
         ) : (
           <SubmitButton
@@ -288,21 +347,83 @@ function BankInterestCard({
   );
 }
 
-/* ------------------------------ city spell (coming soon) ------------------------------ */
+/* ------------------------------ city siege spell ------------------------------ */
 
-function CitySpellCard() {
+export interface SiegeTarget {
+  id: string;
+  name: string;
+  cities: number;
+}
+
+function CitySiegeCard({
+  targets,
+  readyAt,
+  diamonds,
+  casterCities,
+}: {
+  targets: SiegeTarget[];
+  readyAt: string | null;
+  diamonds: number;
+  casterCities: number;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(castCitySiegeSpell, {});
+  const locked = casterCities <= 1;
+  const noTargets = targets.length === 0;
+
   return (
-    <div className="panel-inset flex flex-col gap-2 rounded-lg p-4 opacity-80">
+    <div className="panel-inset flex flex-col gap-1.5 rounded-lg p-3">
       <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
         <span aria-hidden className="text-lg">🏙️</span>
-        קסם הורדת עיר
+        קסם ירידת עיר
       </p>
       <p className="text-[11px] text-zinc-500">
-        קסם ייעודי להורדת עיר, זמין אחת לשעה. ייפתח עם מערכת הערים.
+        מוריד ליריב עיר אחת (ומקטין את קיבולת האזרחים שלו בהתאם). ניתן להטיל אחת
+        לשעה. לא ניתן לפגוע ביריב שנותרה לו עיר אחת בלבד. נפתח מעיר 2 ומעלה.
       </p>
-      <span className="mt-auto flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-        <Icon name="spark" size={14} /> בקרוב
-      </span>
+
+      <form className="mt-auto grid gap-1.5">
+        {locked ? (
+          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+            נפתח מעיר 2 ומעלה
+          </span>
+        ) : readyAt ? (
+          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+            בקירור · זמין ב־{whenLabel(readyAt)}
+          </span>
+        ) : noTargets ? (
+          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+            אין יעדים זמינים
+          </span>
+        ) : (
+          <>
+            <select
+              name="targetEmpireId"
+              required
+              defaultValue=""
+              dir="rtl"
+              className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-xs text-zinc-100 focus:border-gold/60 focus:outline-none"
+            >
+              <option value="" disabled>
+                בחר יעד…
+              </option>
+              {targets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} · {t.cities} ערים
+                </option>
+              ))}
+            </select>
+            <SubmitButton
+              className="btn btn-gold w-full"
+              formAction={action}
+              disabled={diamonds < CITY_SPELL_COST}
+              pendingText="מוריד עיר..."
+            >
+              הורד עיר · {CITY_SPELL_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            </SubmitButton>
+          </>
+        )}
+      </form>
+      <FormMessage error={state.error} success={state.success} />
     </div>
   );
 }
@@ -312,21 +433,29 @@ function CitySpellCard() {
 export interface DiamondShopProps {
   diamonds: number;
   boosts: { resource: StorableResource; pct: number; activeUntil: string | null }[];
+  turnReadyAt: (string | null)[];
   discountActiveUntil: string | null;
   allocatedPoints: number;
   pointsResetUsed: boolean;
   interestPreview: number;
   bankReadyAt: string | null;
+  citySiegeReadyAt: string | null;
+  siegeTargets: SiegeTarget[];
+  casterCities: number;
 }
 
 export function DiamondShop({
   diamonds,
   boosts,
+  turnReadyAt,
   discountActiveUntil,
   allocatedPoints,
   pointsResetUsed,
   interestPreview,
   bankReadyAt,
+  citySiegeReadyAt,
+  siegeTargets,
+  casterCities,
 }: DiamondShopProps) {
   return (
     <div className="space-y-8">
@@ -340,18 +469,12 @@ export function DiamondShop({
       </section>
 
       <section>
-        <SectionTitle icon={<Icon name="turns" size={20} className="text-crimson" />} title="חבילות תורות" />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {TURN_PACKAGES.map((pkg, i) => (
-            <TurnPackageCard
-              key={i}
-              index={i}
-              turns={pkg.turns}
-              cost={pkg.cost}
-              diamonds={diamonds}
-            />
-          ))}
-        </div>
+        <SectionTitle
+          icon={<Icon name="turns" size={20} className="text-crimson" />}
+          title="חבילות תורות"
+          hint="כל חבילה בקירור נפרד · הגדולה אחת ל־12ש׳"
+        />
+        <TurnPackagesBox turnReadyAt={turnReadyAt} diamonds={diamonds} />
       </section>
 
       <section>
@@ -368,7 +491,12 @@ export function DiamondShop({
             used={pointsResetUsed}
             diamonds={diamonds}
           />
-          <CitySpellCard />
+          <CitySiegeCard
+            targets={siegeTargets}
+            readyAt={citySiegeReadyAt}
+            diamonds={diamonds}
+            casterCities={casterCities}
+          />
         </div>
       </section>
     </div>

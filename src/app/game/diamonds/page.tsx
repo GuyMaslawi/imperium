@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -5,7 +6,11 @@ import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { bankInterestRate } from "@/lib/game/constants";
 import { DiamondShop } from "@/components/game/DiamondShop";
-import { BOOSTABLE_RESOURCES, RESOURCE_BOOST_KIND } from "@/lib/game/diamondShop";
+import {
+  BOOSTABLE_RESOURCES,
+  RESOURCE_BOOST_KIND,
+  TURN_PACKAGES,
+} from "@/lib/game/diamondShop";
 
 export const metadata = { title: "יהלומים | WARZONE" };
 
@@ -28,6 +33,12 @@ export default async function DiamondsPage() {
       pct: active ? e!.magnitude : 0,
       activeUntil: active ? e!.activeUntil!.toISOString() : null,
     };
+  });
+
+  // Per-package turn cooldowns: each package recharges independently.
+  const turnReadyAt = TURN_PACKAGES.map((pkg) => {
+    const e = byKind.get(pkg.cooldownKind);
+    return e?.readyAt != null && e.readyAt > now ? e.readyAt.toISOString() : null;
   });
 
   const discountEffect = byKind.get("SHOP_DISCOUNT");
@@ -55,6 +66,20 @@ export default async function DiamondsPage() {
       ? bankEffect.readyAt.toISOString()
       : null;
 
+  // City-downgrade spell: cooldown lives on the caster, and only empires holding
+  // more than their founding city can be targeted.
+  const citySiegeEffect = byKind.get("CITY_SIEGE");
+  const citySiegeReadyAt =
+    citySiegeEffect?.readyAt != null && citySiegeEffect.readyAt > now
+      ? citySiegeEffect.readyAt.toISOString()
+      : null;
+  const siegeTargets = await prisma.empire.findMany({
+    where: { id: { not: empire.id }, cities: { gt: 1 } },
+    select: { id: true, name: true, cities: true },
+    orderBy: [{ cities: "desc" }, { name: "asc" }],
+    take: 100,
+  });
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -69,25 +94,37 @@ export default async function DiamondsPage() {
           <Icon name="diamond" size={18} className="text-sky-300" />
           חנות יהלומים
         </h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-zinc-400">היתרה שלך:</span>
-          <span className="nums text-2xl font-black text-sky-300" dir="ltr">
-            {formatNumber(diamonds)}
-          </span>
-          <span className="flex items-center rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
-            <Icon name="diamond" size={16} className="text-sky-300" />
-          </span>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/game/diamonds/buy"
+            className="flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1.5 text-sm font-black text-black transition-colors hover:bg-sky-400"
+          >
+            <Icon name="shop" size={16} /> רכישת יהלומים
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-zinc-400">היתרה שלך:</span>
+            <span className="nums text-2xl font-black text-sky-300" dir="ltr">
+              {formatNumber(diamonds)}
+            </span>
+            <span className="flex items-center rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
+              <Icon name="diamond" size={16} className="text-sky-300" />
+            </span>
+          </div>
         </div>
       </div>
 
       <DiamondShop
         diamonds={diamonds}
         boosts={boosts}
+        turnReadyAt={turnReadyAt}
         discountActiveUntil={discountActiveUntil}
         allocatedPoints={allocatedPoints}
         pointsResetUsed={pointsResetUsed}
         interestPreview={interestPreview}
         bankReadyAt={bankReadyAt}
+        citySiegeReadyAt={citySiegeReadyAt}
+        siegeTargets={siegeTargets}
+        casterCities={empire.cities}
       />
     </div>
   );

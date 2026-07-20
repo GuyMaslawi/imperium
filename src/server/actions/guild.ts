@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import {
+  GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
   GUILD_NAME_MAX_LENGTH,
@@ -14,7 +15,9 @@ import {
   GUILD_SPELL_BUFF_MS,
   GUILD_SPELL_MAX_LEVEL,
   GUILD_SPELL_META,
-  capacityUpgradeCostDiamonds,
+  aidUpgradeCostGold,
+  capacityUpgradeCostGold,
+  guildAidPct,
   guildCapacity,
   guildSpellBonusPct,
   spellCastCostDiamonds,
@@ -50,6 +53,23 @@ async function spendDiamonds(
   const updated = await tx.empire.updateMany({
     where: { id: empireId, diamonds: { gte: cost } },
     data: { diamonds: { decrement: cost } },
+  });
+  return updated.count > 0;
+}
+
+/**
+ * Spend gold from the guild treasury. The guarded update means concurrent
+ * guild-wide upgrades can never drive the treasury negative; returns false
+ * when the treasury lacks enough gold.
+ */
+async function spendGuildGold(
+  tx: Prisma.TransactionClient,
+  guildId: string,
+  cost: number
+): Promise<boolean> {
+  const updated = await tx.guild.updateMany({
+    where: { id: guildId, goldBalance: { gte: cost } },
+    data: { goldBalance: { decrement: cost } },
   });
   return updated.count > 0;
 }
@@ -496,7 +516,7 @@ export async function upgradeGuildSpell(
 }
 
 export async function upgradeGuildCapacity(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx) => {
     const { guild } = membership;
     if (guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL) {
       return {
@@ -504,9 +524,11 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
       };
     }
 
-    const cost = capacityUpgradeCostDiamonds(guild.capacityLevel);
-    if (!(await spendDiamonds(tx, empireId, cost))) {
-      return { error: `ההרחבה עולה ${cost} יהלומים — אין לך מספיק.` };
+    // Paid from the shared treasury — the guarded debit also guards the
+    // capacity increment, so two concurrent upgrades can't both go through.
+    const cost = capacityUpgradeCostGold(guild.capacityLevel);
+    if (!(await spendGuildGold(tx, guild.id, cost))) {
+      return { error: `ההרחבה עולה ${cost.toLocaleString("he-IL")} זהב מקופת הברית — אין מספיק.` };
     }
 
     const upgraded = await tx.guild.updateMany({
@@ -517,6 +539,32 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
 
     return {
       success: `הברית הורחבה ל־${guildCapacity(guild.capacityLevel + 1)} חברים!`,
+    };
+  });
+}
+
+export async function upgradeGuildAid(): Promise<ActionState> {
+  return runMemberAction(async (membership, tx) => {
+    const { guild } = membership;
+    if (guild.aidLevel >= GUILD_AID_MAX_LEVEL) {
+      return {
+        error: `עזרת הברית כבר ברמה המקסימלית (${GUILD_AID_MAX_LEVEL}%).`,
+      };
+    }
+
+    const cost = aidUpgradeCostGold(guild.aidLevel);
+    if (!(await spendGuildGold(tx, guild.id, cost))) {
+      return { error: `השדרוג עולה ${cost.toLocaleString("he-IL")} זהב מקופת הברית — אין מספיק.` };
+    }
+
+    const upgraded = await tx.guild.updateMany({
+      where: { id: guild.id, aidLevel: guild.aidLevel },
+      data: { aidLevel: { increment: 1 } },
+    });
+    if (upgraded.count === 0) throw new Error("aid upgrade conflict");
+
+    return {
+      success: `עזרת הברית שודרגה ל־${guildAidPct(guild.aidLevel + 1)}% מהכוח הכולל של הברית!`,
     };
   });
 }

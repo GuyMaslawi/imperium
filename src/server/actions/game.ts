@@ -8,13 +8,16 @@ import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import {
   BUILDING_META,
+  cityHeroLevelRequired,
   EMPIRE_UPGRADE_META,
+  MAX_CITIES,
   MINE_MAX_LEVEL,
   PRODUCTION_BUILDING_TYPES,
   RESOURCE_META,
   RESOURCE_TO_MINE,
   STORAGE_META,
   UNIT_META,
+  cityCost,
   empireUpgradeCostFor,
   mineUpgradeCost,
   spySuccessChance,
@@ -26,6 +29,7 @@ import {
 import { getTunables } from "@/lib/game/config";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
+import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { armyPower } from "@/lib/game/power";
@@ -43,10 +47,11 @@ import {
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   MAX_WEAPON_TIER,
-  WEAPON_CATEGORY_META,
+  WEAPON_CATEGORIES,
   finalSpyChance,
   spyWeaponsBonusPercent,
   weaponByKey,
+  weaponGateStatus,
   weaponTierUnlockCost,
   weaponsPower,
 } from "@/lib/game/weapons";
@@ -113,7 +118,10 @@ export async function upgradeMine(
       }
 
       const discountPct = await getShopDiscountPct(empireId, tx);
-      const cost = applyShopDiscount(mineUpgradeCost(building.level), discountPct);
+      const cost = applyShopDiscount(
+        mineUpgradeCost(building.level, parsed.data),
+        discountPct
+      );
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -154,6 +162,116 @@ export async function upgradeMine(
 
       return {
         success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + 1}!`,
+      };
+    });
+
+    revalidateGame();
+    return result;
+  } catch {
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/* --------------------------- upgrade mine to max --------------------------- */
+
+export async function upgradeMineToMax(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = resourceSchema.safeParse(formData.get("resource"));
+  if (!parsed.success) return { error: "סוג משאב לא תקין" };
+  const type: BuildingType = RESOURCE_TO_MINE[parsed.data];
+
+  try {
+    const empireId = await requireOwnEmpireId();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const empire = await applyPendingUpdates(empireId, tx);
+      const building = empire.buildings.find((b) => b.type === type);
+      if (!building) return { error: "המכרה לא נמצא" };
+      if (building.level >= MINE_MAX_LEVEL) {
+        return { error: "המכרה כבר ברמה המקסימלית" };
+      }
+
+      const discountPct = await getShopDiscountPct(empireId, tx);
+
+      // Walk from the current level upward, accumulating the cost of each
+      // affordable level until the empire runs out of any resource or hits the
+      // cap. We debit the summed cost and bump the level in a single write so
+      // the whole "upgrade to max" is one atomic, guarded transaction.
+      let levels = 0;
+      const total = { gold: 0, wood: 0, iron: 0, stone: 0 };
+      let gold = empire.gold;
+      let wood = empire.wood;
+      let iron = empire.iron;
+      let stone = empire.stone;
+      for (let lvl = building.level; lvl < MINE_MAX_LEVEL; lvl++) {
+        const cost = applyShopDiscount(
+          mineUpgradeCost(lvl, parsed.data),
+          discountPct
+        );
+        if (
+          gold < cost.gold ||
+          wood < cost.wood ||
+          iron < cost.iron ||
+          stone < cost.stone
+        ) {
+          break;
+        }
+        gold -= cost.gold;
+        wood -= cost.wood;
+        iron -= cost.iron;
+        stone -= cost.stone;
+        total.gold += cost.gold;
+        total.wood += cost.wood;
+        total.iron += cost.iron;
+        total.stone += cost.stone;
+        levels++;
+      }
+
+      if (levels === 0) {
+        const cost = applyShopDiscount(
+          mineUpgradeCost(building.level, parsed.data),
+          discountPct
+        );
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+        };
+      }
+
+      // Guarded debit: the `gte` conditions keep the summed decrement atomic so
+      // concurrent upgrades can never drive resources negative or double-apply.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          gold: { gte: total.gold },
+          wood: { gte: total.wood },
+          iron: { gte: total.iron },
+          stone: { gte: total.stone },
+        },
+        data: {
+          gold: { decrement: total.gold },
+          wood: { decrement: total.wood },
+          iron: { decrement: total.iron },
+          stone: { decrement: total.stone },
+        },
+      });
+      if (paid.count === 0) {
+        const cost = applyShopDiscount(
+          mineUpgradeCost(building.level, parsed.data),
+          discountPct
+        );
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+        };
+      }
+      await tx.building.update({
+        where: { id: building.id },
+        data: { level: { increment: levels } },
+      });
+
+      return {
+        success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + levels}!`,
       };
     });
 
@@ -445,6 +563,12 @@ export async function spyOnEmpire(
       );
       if (!defender) return { error: "האימפריה המבוקשת לא נמצאה" };
 
+      // You may only operate against empires in your own city — an empire is
+      // "in your city" when it holds the same number of cities as you.
+      if (defender.cities !== attacker.cities) {
+        return { error: "לא ניתן לרגל אחר אימפריה שאינה בעיר שלך." };
+      }
+
       // All validations passed — the mission launches, so it costs turns
       // whether the spy succeeds or fails.
       if (!(await spendTurns(tx, empireId, SPY_TURN_COST))) {
@@ -561,6 +685,12 @@ export async function attackEmpire(
       );
       if (!defender) return { error: "האימפריה המבוקשת לא נמצאה" };
 
+      // Combat is confined to your own city — an empire is "in your city" when
+      // it holds the same number of cities as you.
+      if (defender.cities !== attacker.cities) {
+        return { error: "לא ניתן לתקוף אימפריה שאינה בעיר שלך." };
+      }
+
       const attackerArmy = attacker.army;
       const defenderArmy = defender.army;
 
@@ -594,19 +724,26 @@ export async function attackEmpire(
         "DEFENSE",
         tx
       );
+      // Passive guild aid: each side's guild reinforces the fighter with a
+      // flat power equal to a % of the guild's total power, added after every
+      // own-troop multiplier.
+      const attackerGuildAid = await getGuildAidBonus(empireId, tx);
+      const defenderGuildAid = await getGuildAidBonus(targetEmpireId, tx);
       const attackerSoldiersPower = armyPower(attackerArmy);
       const attackerWeaponsPower = weaponsPower(attacker.weapons, "ATTACK");
       const defenderSoldiersPower = armyPower(defenderArmy);
       const defenderWeaponsPower = weaponsPower(defender.weapons, "DEFENSE");
       const attackerPower =
         (attackerSoldiersPower + attackerWeaponsPower) *
-        bonusMultiplier(attackerHeroBonusPct) *
-        bonusMultiplier(attackerGuildBonusPct);
+          bonusMultiplier(attackerHeroBonusPct) *
+          bonusMultiplier(attackerGuildBonusPct) +
+        attackerGuildAid.power;
       const defenderPower =
         (defenderSoldiersPower + defenderWeaponsPower) *
-        DEFENSE_BONUS *
-        bonusMultiplier(defenderHeroBonusPct) *
-        bonusMultiplier(defenderGuildBonusPct);
+          DEFENSE_BONUS *
+          bonusMultiplier(defenderHeroBonusPct) *
+          bonusMultiplier(defenderGuildBonusPct) +
+        defenderGuildAid.power;
       const attackerWins = attackerPower > defenderPower;
       const winnerEmpireId = attackerWins ? attacker.id : defender.id;
 
@@ -1232,21 +1369,104 @@ export async function upgradeEmpireUpgrade(
   }
 }
 
-/* ------------------------------ weapons ------------------------------ */
-
-const weaponCategorySchema = z.enum(["ATTACK", "DEFENSE", "SPY"]);
+/* ------------------------------ found city ------------------------------ */
 
 /**
- * The highest weapon tier this empire may buy in a category. Empires
- * created before the weapons system have no unlock rows and default to
- * the initial two tiers.
+ * Upgrade to the next city. Requires the hero to have reached the level demanded
+ * for this city tier (10 for the 2nd, 20 for the 3rd…) and a standing garrison of
+ * soldiers — the soldiers are only a *gate*, never consumed. Resources are spent
+ * and the debit is guarded (gte) so concurrent calls can never over-spend or
+ * push the empire past MAX_CITIES. Each city also multiplies mine production, so
+ * upgrading immediately raises resource output.
  */
-function unlockedTierFor(
-  empire: FullEmpire,
-  category: "ATTACK" | "DEFENSE" | "SPY"
-): number {
-  return (
-    empire.weaponUnlocks.find((u) => u.category === category)?.unlockedTier ??
+export async function foundCity(
+  _prev: ActionState,
+  _formData: FormData
+): Promise<ActionState> {
+  try {
+    const empireId = await requireOwnEmpireId();
+
+    const result = await prisma.$transaction(async (tx) => {
+      const empire = await applyPendingUpdates(empireId, tx);
+
+      if (empire.cities >= MAX_CITIES) {
+        return { error: `הגעת לרמת העיר המרבית (${MAX_CITIES}).` };
+      }
+      const heroRequired = cityHeroLevelRequired(empire.cities);
+      if ((empire.hero?.level ?? 1) < heroRequired) {
+        return {
+          error: `נדרש גיבור ברמה ${heroRequired} כדי לעלות עיר.`,
+        };
+      }
+
+      const cost = cityCost(empire.cities);
+      if (
+        empire.gold < cost.gold ||
+        empire.wood < cost.wood ||
+        empire.iron < cost.iron ||
+        empire.stone < cost.stone
+      ) {
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים כדי לעלות עיר."),
+        };
+      }
+      // Soldiers are only a requirement — the empire must field a garrison of
+      // this size, but upgrading the city never consumes it.
+      if ((empire.army?.soldiers ?? 0) < cost.soldiers) {
+        return {
+          error: `נדרשים ${cost.soldiers.toLocaleString("he-IL")} חיילים בצבא כדי לעלות עיר.`,
+        };
+      }
+
+      // Guarded resource debit + city increment, atomic against concurrent calls.
+      const paid = await tx.empire.updateMany({
+        where: {
+          id: empireId,
+          cities: { lt: MAX_CITIES },
+          gold: { gte: cost.gold },
+          wood: { gte: cost.wood },
+          iron: { gte: cost.iron },
+          stone: { gte: cost.stone },
+        },
+        data: {
+          gold: { decrement: cost.gold },
+          wood: { decrement: cost.wood },
+          iron: { decrement: cost.iron },
+          stone: { decrement: cost.stone },
+          cities: { increment: 1 },
+        },
+      });
+      if (paid.count === 0) {
+        return {
+          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים כדי לעלות עיר."),
+        };
+      }
+
+      // Soldiers are a gate, not a currency — the garrison is left untouched.
+
+      return {
+        success: `עלית לעיר ${empire.cities + 1}! התפוקה שלך גדלה בהתאם.`,
+      };
+    });
+
+    revalidateGame();
+    return result;
+  } catch {
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/* ------------------------------ weapons ------------------------------ */
+
+/**
+ * The highest weapon tier this empire may buy. Progression is **shared** across
+ * all three categories — a tier unlocked anywhere counts everywhere — so this is
+ * the maximum unlocked tier over the empire's unlock rows. Empires created
+ * before the weapons system have no rows and default to the initial two tiers.
+ */
+function sharedUnlockedTier(empire: FullEmpire): number {
+  return empire.weaponUnlocks.reduce(
+    (max, u) => Math.max(max, u.unlockedTier),
     INITIAL_WEAPON_UNLOCKED_TIER
   );
 }
@@ -1276,7 +1496,7 @@ export async function buyWeapon(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
 
-      if (weapon.tier > unlockedTierFor(empire, weapon.category)) {
+      if (weapon.tier > sharedUnlockedTier(empire)) {
         return { error: "הנשק נעול — פתח נשק מתקדם כדי לקנות אותו" };
       }
 
@@ -1351,35 +1571,41 @@ export async function buyWeapon(
 
 export async function unlockNextWeaponTier(
   _prev: ActionState,
-  formData: FormData
+  _formData: FormData
 ): Promise<ActionState> {
-  const parsed = weaponCategorySchema.safeParse(formData.get("category"));
-  if (!parsed.success) return { error: "קטגוריית נשק לא תקינה" };
-  const category = parsed.data;
-
   try {
     const empireId = await requireOwnEmpireId();
 
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
-      // A missing row (an empire predating the weapons system) starts at
-      // the initial unlocked tier.
-      const unlock =
-        empire.weaponUnlocks.find((u) => u.category === category) ??
-        (await tx.empireWeaponUnlock.create({
-          data: {
-            empireId,
-            category,
-            unlockedTier: INITIAL_WEAPON_UNLOCKED_TIER,
-          },
-        }));
 
-      if (unlock.unlockedTier >= MAX_WEAPON_TIER) {
-        return { error: "כל הנשקים בקטגוריה פתוחים." };
+      // Unlocking is cross-cutting: the shared tier is the highest tier over
+      // all categories, and advancing it opens the next weapon in all three.
+      const currentTier = sharedUnlockedTier(empire);
+      if (currentTier >= MAX_WEAPON_TIER) {
+        return { error: "כל הנשקים פתוחים." };
+      }
+      const targetTier = currentTier + 1;
+
+      // Every few tiers demands a founded city and a hero level — so weapons,
+      // hero and cities advance together.
+      const heroLevel = empire.hero?.level ?? 0;
+      const gate = weaponGateStatus(targetTier, empire.cities, heroLevel);
+      if (!gate.met) {
+        const needs: string[] = [];
+        if (!gate.citiesMet) {
+          needs.push(`${gate.cities} ערים (יש לך ${empire.cities})`);
+        }
+        if (!gate.heroLevelMet) {
+          needs.push(`גיבור ברמה ${gate.heroLevel} (הגיבור שלך ברמה ${heroLevel})`);
+        }
+        return {
+          error: `כדי לפתוח רמה ${targetTier} צריך ${needs.join(" ו-")}.`,
+        };
       }
 
       const discountPct = await getShopDiscountPct(empireId, tx);
-      const cost = applyShopDiscount(weaponTierUnlockCost(unlock.unlockedTier), discountPct);
+      const cost = applyShopDiscount(weaponTierUnlockCost(currentTier), discountPct);
       if (
         empire.gold < cost.gold ||
         empire.wood < cost.wood ||
@@ -1420,15 +1646,17 @@ export async function unlockNextWeaponTier(
           ),
         };
       }
-      await tx.empireWeaponUnlock.update({
-        where: { id: unlock.id },
-        data: { unlockedTier: { increment: 1 } },
-      });
+      // Advance every category together — the unlock is cross-cutting.
+      for (const cat of WEAPON_CATEGORIES) {
+        await tx.empireWeaponUnlock.upsert({
+          where: { empireId_category: { empireId, category: cat } },
+          create: { empireId, category: cat, unlockedTier: targetTier },
+          update: { unlockedTier: targetTier },
+        });
+      }
 
       return {
-        success: `נפתחה רמה ${unlock.unlockedTier + 1} בקטגוריית ${
-          WEAPON_CATEGORY_META[category].label
-        }!`,
+        success: `נפתחה רמה ${targetTier} לכל הנשקים — התקפה, הגנה וריגול!`,
       };
     });
 

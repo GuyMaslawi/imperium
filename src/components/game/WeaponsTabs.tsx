@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
+import type {
+  WeaponCost,
+  WeaponDefinition,
+  WeaponGateStatus,
+} from "@/lib/game/weapons";
 import {
   WeaponCard,
   type AvailableResources,
 } from "@/components/game/WeaponCard";
 import { NextWeaponCard } from "@/components/game/NextWeaponCard";
-import { Icon } from "@/components/ui/Icon";
 
 export interface WeaponsTabData {
   category: "ATTACK" | "DEFENSE" | "SPY";
@@ -26,10 +29,22 @@ export function WeaponsTabs({
   tabs,
   available,
   initialCategory,
+  gate,
+  cities,
+  heroLevel,
+  discountPct,
 }: {
   tabs: WeaponsTabData[];
   available: AvailableResources;
   initialCategory?: WeaponsTabData["category"];
+  /** Shared next-tier requirements (cities + hero level). */
+  gate: WeaponGateStatus;
+  /** The empire's current city count. */
+  cities: number;
+  /** The empire's current hero level. */
+  heroLevel: number;
+  /** Active shop-discount percent (0 when no discount spell is running). */
+  discountPct: number;
 }) {
   const [activeCategory, setActiveCategory] = useState(
     initialCategory ?? tabs[0]?.category
@@ -46,8 +61,40 @@ export function WeaponsTabs({
     ({ weapon }) => weapon.tier === active.unlockedTier + 1
   );
 
+  const hasDiscount = discountPct > 0;
+
   return (
     <div className="space-y-4">
+      {hasDiscount && (
+        <div className="relative overflow-hidden rounded-xl border border-emerald-400/40 bg-gradient-to-l from-emerald-500/15 via-emerald-400/5 to-transparent px-4 py-3">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-8 -top-10 h-28 w-28 animate-pulse rounded-full bg-emerald-400/20 blur-2xl"
+          />
+          <div className="relative flex items-center gap-3">
+            <span aria-hidden className="text-3xl">
+              ✨
+            </span>
+            <div className="min-w-0">
+              <p className="font-bold text-emerald-300">קסם הנחה פעיל!</p>
+              <p className="text-xs text-emerald-200/80">
+                כל הנשקים והפתיחות ב־
+                <span className="nums font-bold" dir="ltr">
+                  {discountPct}%
+                </span>{" "}
+                הנחה כל עוד הקסם פעיל.
+              </p>
+            </div>
+            <span
+              className="nums mr-auto shrink-0 rounded-full border border-emerald-400/50 bg-emerald-400/15 px-3 py-1 text-sm font-black text-emerald-300"
+              dir="ltr"
+            >
+              −{discountPct}%
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap justify-center gap-2">
         {tabs.map((tab) => (
           <button
@@ -66,20 +113,11 @@ export function WeaponsTabs({
 
       {!next && (
         <div className="panel-gold rounded-xl p-4 text-center text-sm font-bold text-gold-bright">
-          🎉 המפעל במקסימום! כל הנשקים בקטגוריה פתוחים.
+          🎉 המפעל במקסימום! כל הנשקים פתוחים.
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-sm font-semibold text-gold-dim">
-          {active.totalPowerLabel}:{" "}
-          <span className="font-bold text-gold-bright">
-            <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
-            <span className="nums" dir="ltr">
-              {active.totalPower.toLocaleString("he-IL")}
-            </span>
-          </span>
-        </p>
+      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
         <div className="flex items-center gap-2 text-xs text-gold-dim">
           <span>מסלול התקדמות:</span>
           <div className="flex items-center gap-1.5" aria-hidden>
@@ -110,6 +148,10 @@ export function WeaponsTabs({
             category={active.category}
             unlockCost={active.unlockCost}
             available={available}
+            gate={gate}
+            cities={cities}
+            heroLevel={heroLevel}
+            discountPct={discountPct}
           />
         )}
         {unlocked.map(({ weapon, owned }) => (
@@ -118,6 +160,7 @@ export function WeaponsTabs({
             weapon={weapon}
             owned={owned}
             available={available}
+            discountPct={discountPct}
           />
         ))}
       </div>

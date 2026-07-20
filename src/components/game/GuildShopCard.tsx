@@ -81,7 +81,7 @@ export function GuildShopCard({
             disabled={diamonds < castCost}
             pendingText="מטיל קסם..."
           >
-            הטל קסם · {castCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            הטל קסם · {castCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
         {upgradeCost != null ? (
@@ -92,7 +92,7 @@ export function GuildShopCard({
             disabled={diamonds < upgradeCost}
             pendingText="משדרג..."
           >
-            שדרג ל־{bonusPct + 1}% · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            שדרג ל־{bonusPct + 1}% · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         ) : (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
