@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { bankInterestRate, citizenCapacity } from "@/lib/game/constants";
 import {
@@ -27,14 +27,10 @@ import {
 import type { ActionState } from "./game";
 
 async function requireOwnEmpireId(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) throw new Error("לא מחובר");
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!empire) throw new Error("לא נמצאה אימפריה");
-  return empire.id;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  const empireId = await getActiveEmpireId();
+  if (empireId === null) throw new Error("לא מחובר");
+  return empireId;
 }
 
 function revalidateGame() {
@@ -57,6 +53,24 @@ async function spendDiamonds(
   return updated.count > 0;
 }
 
+/**
+ * Lock the caller's empire row for the rest of the transaction.
+ *
+ * The cooldown / once-per-season guards below are check-then-act: they read
+ * `readyAt` / `pointsResetSeasonId`, then upsert the new value at the end. Under
+ * READ COMMITTED two concurrent casts by the same player could both pass the
+ * check before either persists, letting a player collect bank interest N times
+ * per window, buy a cooldown turn-pack repeatedly, or double-refund hero points.
+ * Taking this row lock first serializes a player's own concurrent casts, so the
+ * second one blocks until the first commits and then sees the fresh cooldown.
+ */
+async function lockEmpire(
+  tx: Prisma.TransactionClient,
+  empireId: string
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
+}
+
 /* ------------------------------ resource boost ------------------------------ */
 
 const resourceSchema = z.enum(["gold", "wood", "iron", "stone"]);
@@ -74,6 +88,7 @@ export async function buyResourceBoost(
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
       const now = new Date();
 
@@ -118,6 +133,7 @@ export async function buyShopDiscount(
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
       const now = new Date();
 
@@ -167,6 +183,7 @@ export async function buyTurns(
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
       const now = new Date();
 
@@ -217,6 +234,7 @@ export async function resetHeroPointsWithDiamonds(
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
       if (!hero) return { error: "הגיבור לא נמצא" };
@@ -268,6 +286,7 @@ export async function castBankInterestSpell(
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
       const now = new Date();
 
@@ -358,6 +377,7 @@ export async function castCitySiegeSpell(
     }
 
     const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
       const caster = await applyPendingUpdates(empireId, tx);
       const now = new Date();
 

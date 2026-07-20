@@ -72,5 +72,10 @@ export function getPaymentProvider(): PaymentProvider {
  * to "true" together with wiring a real provider.
  */
 export function arePurchasesLive(): boolean {
-  return process.env.DIAMOND_PURCHASES_LIVE === "true";
+  if (process.env.DIAMOND_PURCHASES_LIVE !== "true") return false;
+  // Interlock: purchases are never "live" while the mock provider is active,
+  // even if the flag is on. Otherwise flipping DIAMOND_PURCHASES_LIVE before a
+  // real gateway is wired would let every player mint free diamonds through the
+  // always-succeeds mock charge. Go-live requires BOTH steps, not just the flag.
+  return getPaymentProvider().name !== "mock";
 }

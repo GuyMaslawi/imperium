@@ -20,8 +20,12 @@ export interface GuildShopCardProps {
   upgradeCost: number | null;
   /** Diamonds to cast a personal 24h buff at the current %. */
   castCost: number;
-  /** ISO timestamp while the caller's buff is active, else null. */
-  activeUntil: string | null;
+  /**
+   * The buff's expiry time as an "HH:MM" label while it is active, else null.
+   * Computed on the server (this app is server-rendered) so the client never
+   * reads the clock during render — avoiding an impure render / hydration skew.
+   */
+  activeLabel: string | null;
   /** The player's diamond balance. */
   diamonds: number;
 }
@@ -31,7 +35,7 @@ export function GuildShopCard({
   bonusPct,
   upgradeCost,
   castCost,
-  activeUntil,
+  activeLabel,
   diamonds,
 }: GuildShopCardProps) {
   const [castState, castAction] = useActionState<ActionState, FormData>(
@@ -44,14 +48,7 @@ export function GuildShopCard({
   );
 
   const meta = GUILD_SPELL_META[type];
-  const isActive =
-    activeUntil != null && new Date(activeUntil).getTime() > Date.now();
-  const activeLabel = isActive
-    ? new Date(activeUntil).toLocaleTimeString("he-IL", {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  const isActive = activeLabel != null;
 
   return (
     <div className="panel-inset flex flex-col gap-3 rounded-lg p-3">

@@ -139,6 +139,52 @@ export async function applyPendingUpdates(
 
   if (ticks === 0 && missedDailies.length === 0) return empire;
 
+  // Claim this settlement atomically. The guard pins the clock columns to the
+  // exact snapshot we read; if a concurrent settlement of the same empire has
+  // already advanced the clock, this updateMany matches zero rows and we bail
+  // out without re-crediting. Without this guard the derived production, turns,
+  // citizens and diamonds would be credited N times when N requests settle the
+  // same backlog at once — and this runs *without* an outer transaction on
+  // every page load (see requireEmpire in lib/auth.ts) and across many empires
+  // concurrently on the rankings page.
+  const claim = await tx.empire.updateMany({
+    where: {
+      id: empireId,
+      ...(ticks > 0 ? { lastRegularUpdateAt: empire.lastRegularUpdateAt } : {}),
+      ...(missedDailies.length > 0
+        ? { lastDailyUpdateAt: empire.lastDailyUpdateAt }
+        : {}),
+    },
+    data: {
+      gold: { increment: gained.gold },
+      wood: { increment: gained.wood },
+      iron: { increment: gained.iron },
+      stone: { increment: gained.stone },
+      diamonds: { increment: diamondsGained },
+      citizens: { increment: citizensGained },
+      turns: { increment: turnsGained },
+      ...(missedDailies.length > 0 ? { wheelSpins } : {}),
+      // Snap to the global boundary that was just settled, so every empire
+      // ticks together on round wall-clock times (XX:00, XX:05, …).
+      ...(ticks > 0 ? { lastRegularUpdateAt: lastTickBoundary(now) } : {}),
+      ...(missedDailies.length > 0
+        ? { lastDailyUpdateAt: missedDailies[missedDailies.length - 1] }
+        : {}),
+    },
+  });
+
+  // Lost the race: another settlement already applied this backlog. Return the
+  // freshly-settled row without crediting anything again (bank interest below
+  // is likewise skipped, so interest cannot compound twice per daily boundary).
+  if (claim.count === 0) {
+    return tx.empire.findUniqueOrThrow({
+      where: { id: empireId },
+      include: FULL_EMPIRE_INCLUDE,
+    });
+  }
+
+  // Only the settlement that won the claim compounds bank interest and opens a
+  // new deposit period.
   const bankAccount = empire.bankAccount;
   if (bankAccount && missedDailies.length > 0) {
     // Interest compounds once per missed daily update, floored to whole gold.
@@ -177,24 +223,8 @@ export async function applyPendingUpdates(
 
   // Warehouse capacity limits only the protected stored pool — production
   // accumulates freely into the available balance.
-  return tx.empire.update({
+  return tx.empire.findUniqueOrThrow({
     where: { id: empireId },
-    data: {
-      gold: { increment: gained.gold },
-      wood: { increment: gained.wood },
-      iron: { increment: gained.iron },
-      stone: { increment: gained.stone },
-      diamonds: { increment: diamondsGained },
-      citizens: { increment: citizensGained },
-      turns: { increment: turnsGained },
-      ...(missedDailies.length > 0 ? { wheelSpins } : {}),
-      // Snap to the global boundary that was just settled, so every empire
-      // ticks together on round wall-clock times (XX:00, XX:05, …).
-      ...(ticks > 0 ? { lastRegularUpdateAt: lastTickBoundary(now) } : {}),
-      ...(missedDailies.length > 0
-        ? { lastDailyUpdateAt: missedDailies[missedDailies.length - 1] }
-        : {}),
-    },
     include: FULL_EMPIRE_INCLUDE,
   });
 }

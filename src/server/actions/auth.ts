@@ -79,6 +79,14 @@ const loginSchema = z.object({
   password: z.string().min(1, "יש להזין סיסמה"),
 });
 
+// A valid bcrypt hash (cost 10) of a throwaway string. When no account matches
+// the email we still run a bcrypt.compare against this so the response takes the
+// same time as a real password check — otherwise an attacker could tell which
+// emails are registered purely from login latency (the compare is skipped for a
+// missing user via short-circuit).
+const LOGIN_TIMING_DUMMY_HASH =
+  "$2b$10$e3STZXV8u3ZN76vG9DTWbOdwJq4HByWmLRugxd/ULnd.vXxy/R2V2";
+
 export async function login(
   _prev: AuthState,
   formData: FormData
@@ -93,7 +101,13 @@ export async function login(
   const { email, password } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  // Always run a bcrypt.compare (against a dummy hash when the user is missing)
+  // so both branches cost the same — no account-enumeration timing side-channel.
+  const passwordOk = await bcrypt.compare(
+    password,
+    user?.passwordHash ?? LOGIN_TIMING_DUMMY_HASH
+  );
+  if (!user || !passwordOk) {
     return { error: "אימייל או סיסמה שגויים" };
   }
   if (user.bannedAt) {

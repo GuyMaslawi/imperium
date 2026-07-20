@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import {
   WHEEL_PRIZES,
@@ -34,14 +34,10 @@ export type SpinResult =
   | { ok: false; error: string };
 
 async function requireOwnEmpireId(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) throw new Error("לא מחובר");
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!empire) throw new Error("לא נמצאה אימפריה");
-  return empire.id;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  const empireId = await getActiveEmpireId();
+  if (empireId === null) throw new Error("לא מחובר");
+  return empireId;
 }
 
 const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");

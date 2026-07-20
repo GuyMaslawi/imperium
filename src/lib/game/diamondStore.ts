@@ -46,3 +46,21 @@ export function discountedPrice(priceIls: number, discountPct: number): number {
 export function formatIls(priceIls: number): string {
   return `₪${priceIls.toFixed(2)}`;
 }
+
+/**
+ * Result of a diamond-package checkout.
+ * - `unavailable`: purchases are gated (no real provider yet) and the caller
+ *   isn't an admin — shown as a friendly "coming soon", not an error.
+ *
+ * Lives here (a client-safe module) rather than in the `"use server"` action
+ * file: a `"use server"` file may only export async functions, so the
+ * `STORE_IDLE` constant below cannot be exported from there.
+ */
+export interface StoreActionState {
+  status: "idle" | "success" | "error" | "unavailable";
+  message?: string;
+  /** Total diamonds credited on a successful purchase. */
+  diamonds?: number;
+}
+
+export const STORE_IDLE: StoreActionState = { status: "idle" };

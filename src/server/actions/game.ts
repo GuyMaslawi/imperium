@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import type { BuildingType, Prisma, ResourceStorageType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import {
   BUILDING_META,
   cityHeroLevelRequired,
@@ -80,14 +80,10 @@ function insufficientResourcesError(
 }
 
 async function requireOwnEmpireId(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) throw new Error("לא מחובר");
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!empire) throw new Error("לא נמצאה אימפריה");
-  return empire.id;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  const empireId = await getActiveEmpireId();
+  if (empireId === null) throw new Error("לא מחובר");
+  return empireId;
 }
 
 function revalidateGame() {
@@ -668,6 +664,16 @@ export async function attackEmpire(
     }
 
     outcome = await prisma.$transaction(async (tx) => {
+      // Serialize concurrent battles that involve either empire. The army
+      // decrements and hero level-up / citizen grants below read a snapshot and
+      // then apply unguarded increments/decrements, so without this two
+      // simultaneous attacks on the same defender could drive its soldiers
+      // negative or double-credit level-up citizens/XP. Locking both empire rows
+      // up front — ordered by id so A→B and B→A can't deadlock — forces the
+      // second attack to re-read fresh values after the first commits.
+      const [lockLo, lockHi] = [empireId, targetEmpireId].sort();
+      await tx.$queryRaw`SELECT id FROM "Empire" WHERE id IN (${lockLo}, ${lockHi}) FOR UPDATE`;
+
       const {
         attackTurnCost: ATTACK_TURN_COST,
         defenseBonus: DEFENSE_BONUS,

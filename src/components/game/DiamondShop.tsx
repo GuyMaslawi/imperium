@@ -163,7 +163,7 @@ function cooldownLabel(hours: number): string {
   return hours >= 1 ? `${hours} שעות` : `${Math.round(hours * 60)} דקות`;
 }
 
-/** One turn package as a row inside the shared turns box. */
+/** One turn package as a compact row inside the shared turns box. */
 function TurnPackageRow({
   index,
   turns,
@@ -183,16 +183,16 @@ function TurnPackageRow({
   const onCooldown = readyAt != null;
 
   return (
-    <div className="flex flex-col gap-1.5 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <Icon name="turns" size={22} className="shrink-0 text-crimson-bright" />
+    <div className="flex flex-col gap-1 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Icon name="turns" size={18} className="shrink-0 text-crimson-bright" />
           <div className="leading-tight">
-            <p className="nums text-base font-black text-amber-300" dir="ltr">
+            <p className="nums text-sm font-black text-amber-300" dir="ltr">
               {formatNumber(turns)}
             </p>
-            <p className="text-[11px] text-zinc-500">
-              תורות · אחת ל־{cooldownLabel(cooldownHours)}
+            <p className="text-[10px] text-zinc-500">
+              אחת ל־{cooldownLabel(cooldownHours)}
             </p>
           </div>
         </div>
@@ -200,17 +200,17 @@ function TurnPackageRow({
         <form className="shrink-0">
           <input type="hidden" name="packageIndex" value={index} />
           {onCooldown ? (
-            <span className="inline-block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+            <span className="inline-block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-2 py-1.5 text-center text-[10px] font-semibold text-zinc-400">
               זמין ב־{whenLabel(readyAt!)}
             </span>
           ) : (
             <SubmitButton
-              className="btn btn-gold min-w-[6rem]"
+              className="btn btn-gold min-w-[4.5rem] px-2 py-1.5"
               formAction={action}
               disabled={diamonds < cost}
-              pendingText="רוכש..."
+              pendingText="..."
             >
-              {cost} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+              {cost} <Icon name="diamond" size={13} className="inline-block align-text-bottom" />
             </SubmitButton>
           )}
         </form>
@@ -228,7 +228,7 @@ function TurnPackagesBox({
   diamonds: number;
 }) {
   return (
-    <div className="panel-inset rounded-lg px-4 py-1 divide-y divide-border-subtle/60">
+    <div className="panel-inset max-w-xs rounded-lg px-3 divide-y divide-border-subtle/60">
       {TURN_PACKAGES.map((pkg, i) => (
         <TurnPackageRow
           key={i}
@@ -472,7 +472,6 @@ export function DiamondShop({
         <SectionTitle
           icon={<Icon name="turns" size={20} className="text-crimson" />}
           title="חבילות תורות"
-          hint="כל חבילה בקירור נפרד · הגדולה אחת ל־12ש׳"
         />
         <TurnPackagesBox turnReadyAt={turnReadyAt} diamonds={diamonds} />
       </section>

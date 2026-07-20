@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { GuildRole, GuildSpellType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import {
   GUILD_AID_MAX_LEVEL,
@@ -26,14 +26,10 @@ import {
 import type { ActionState } from "./game";
 
 async function requireOwnEmpireId(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) throw new Error("לא מחובר");
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!empire) throw new Error("לא נמצאה אימפריה");
-  return empire.id;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  const empireId = await getActiveEmpireId();
+  if (empireId === null) throw new Error("לא מחובר");
+  return empireId;
 }
 
 function revalidateGuild() {
@@ -199,6 +195,14 @@ export async function joinGuild(
       });
       if (existingMembership) return { error: "אתה כבר חבר בברית." };
 
+      // Lock the guild row so concurrent joins serialize. Under READ COMMITTED
+      // two joins into the last seat each insert their own row and neither sees
+      // the other's uncommitted insert, so both counts stay within capacity and
+      // both commit — overfilling the guild. The FOR UPDATE lock makes the
+      // second join wait until the first commits, so its re-count below sees the
+      // new member.
+      await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${guildId} FOR UPDATE`;
+
       const guild = await tx.guild.findUnique({ where: { id: guildId } });
       if (!guild) return { error: "הברית לא נמצאה." };
 
@@ -356,6 +360,9 @@ export async function transferGuildLeadership(
     if (membership.role !== "LEADER") {
       return { error: "רק המנהיג יכול להעביר את ההנהגה." };
     }
+    if (targetEmpireId === membership.empireId) {
+      return { error: "אתה כבר מנהיג הברית." };
+    }
     const target = await loadTargetMember(tx, membership.guildId, targetEmpireId);
     if (!target) return { error: "החבר לא נמצא בברית." };
 
@@ -384,7 +391,14 @@ export async function transferGuildLeadership(
 
 /* ------------------------------ guild bank ------------------------------ */
 
-const amountSchema = z.coerce.number().int().min(1).max(1_000_000_000);
+// Empire and guild gold are Float columns, so a "deposit/withdraw all" button
+// can submit a fractional amount (e.g. 1234.56). Floor first, then validate,
+// so those amounts aren't rejected by an int-only check.
+const amountSchema = z.coerce
+  .number()
+  .finite()
+  .transform((n) => Math.floor(n))
+  .pipe(z.number().int().min(1).max(1_000_000_000));
 
 export async function depositGuildGold(
   _prev: ActionState,
@@ -518,6 +532,11 @@ export async function upgradeGuildSpell(
 export async function upgradeGuildCapacity(): Promise<ActionState> {
   return runMemberAction(async (membership, tx) => {
     const { guild } = membership;
+    // Spends the shared treasury — restrict to leadership so a plain member
+    // can't drain the guild bank on capacity upgrades.
+    if (membership.role === "MEMBER") {
+      return { error: "רק מנהיג או סגן יכולים לשדרג מקופת הברית." };
+    }
     if (guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL) {
       return {
         error: `הברית כבר בקיבולת המקסימלית (${guildCapacity(GUILD_CAPACITY_MAX_LEVEL)} חברים).`,
@@ -546,6 +565,10 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
 export async function upgradeGuildAid(): Promise<ActionState> {
   return runMemberAction(async (membership, tx) => {
     const { guild } = membership;
+    // Spends the shared treasury — restrict to leadership (see upgradeGuildCapacity).
+    if (membership.role === "MEMBER") {
+      return { error: "רק מנהיג או סגן יכולים לשדרג מקופת הברית." };
+    }
     if (guild.aidLevel >= GUILD_AID_MAX_LEVEL) {
       return {
         error: `עזרת הברית כבר ברמה המקסימלית (${GUILD_AID_MAX_LEVEL}%).`,

@@ -9,13 +9,11 @@ import {
   discountedPrice,
   formatIls,
   packageTotal,
-  type DiamondPackage,
-} from "@/lib/game/diamondStore";
-import {
-  purchaseDiamondPackage,
   STORE_IDLE,
+  type DiamondPackage,
   type StoreActionState,
-} from "@/server/actions/diamondStore";
+} from "@/lib/game/diamondStore";
+import { purchaseDiamondPackage } from "@/server/actions/diamondStore";
 
 const TAG_META: Record<
   NonNullable<DiamondPackage["tag"]>,

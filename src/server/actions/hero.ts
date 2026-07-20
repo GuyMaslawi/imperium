@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import {
   HERO_BAG_CAPACITY,
@@ -23,14 +23,10 @@ import {
 import type { ActionState } from "./game";
 
 async function requireOwnEmpireId(): Promise<string> {
-  const userId = await getSessionUserId();
-  if (!userId) throw new Error("לא מחובר");
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  if (!empire) throw new Error("לא נמצאה אימפריה");
-  return empire.id;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  const empireId = await getActiveEmpireId();
+  if (empireId === null) throw new Error("לא מחובר");
+  return empireId;
 }
 
 function revalidateGame() {
@@ -392,10 +388,14 @@ export async function upgradeHeroItem(
       if (paid.count === 0) return { error: "אין מספיק זהב לשדרוג" };
 
       // Level drives the item's stats and tier; keep the stored tier in sync.
-      await tx.heroItem.update({
-        where: { id: item.id },
+      // Guard on the level we read and paid for: if a concurrent upgrade already
+      // advanced this item, throw to roll back the gold debit above rather than
+      // charging twice for a single tier gain.
+      const upgraded = await tx.heroItem.updateMany({
+        where: { id: item.id, level: item.level },
         data: { level: targetLevel, rarity: tierForLevel(targetLevel) },
       });
+      if (upgraded.count === 0) throw new Error("item upgrade conflict");
 
       return {
         success: `${itemDisplayName(item.slot, item.level)} שודרג לרמה ${targetLevel} (${RARITY_META[tierForLevel(targetLevel)].label})!`,

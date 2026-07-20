@@ -9,6 +9,7 @@ import {
   discountedPrice,
   formatIls,
   packageTotal,
+  type StoreActionState,
 } from "@/lib/game/diamondStore";
 import {
   arePurchasesLive,
@@ -16,19 +17,11 @@ import {
   type ChargeInput,
 } from "@/server/payments";
 
-/**
- * Result of a diamond-package checkout.
- * - `unavailable`: purchases are gated (no real provider yet) and the caller
- *   isn't an admin — shown as a friendly "coming soon", not an error.
- */
-export interface StoreActionState {
-  status: "idle" | "success" | "error" | "unavailable";
-  message?: string;
-  /** Total diamonds credited on a successful purchase. */
-  diamonds?: number;
-}
-
-export const STORE_IDLE: StoreActionState = { status: "idle" };
+// The `StoreActionState` type and the `STORE_IDLE` idle constant now live in
+// the client-safe `@/lib/game/diamondStore` module — a `"use server"` file may
+// only export async functions, so the object constant cannot originate here.
+// Re-export the type for existing type-only consumers.
+export type { StoreActionState };
 
 /**
  * Buy a diamond package for real money. The price is recomputed server-side
@@ -118,21 +111,26 @@ export async function purchaseDiamondPackage(
       return { status: "error", message: "התשלום נכשל — לא חויבת. נסה שוב." };
     }
 
-    // Settle atomically: credit the diamonds and mark the row PAID together.
-    await prisma.$transaction([
-      prisma.empire.update({
-        where: { id: empire.id },
-        data: { diamonds: { increment: total } },
-      }),
-      prisma.diamondPurchase.update({
-        where: { id: purchase.id },
+    // Settle atomically, guarding the PENDING→PAID transition so the diamonds
+    // are credited only if *this* call is the one that flipped the row. A
+    // retried/duplicated settlement (as a real payment gateway can deliver via
+    // repeated webhooks) finds the row already PAID and credits nothing —
+    // preventing a double-credit before a live provider is wired.
+    await prisma.$transaction(async (tx) => {
+      const settled = await tx.diamondPurchase.updateMany({
+        where: { id: purchase.id, status: "PENDING" },
         data: {
           status: "PAID",
           providerRef: result.providerRef,
           paidAt: new Date(),
         },
-      }),
-    ]);
+      });
+      if (settled.count === 0) return;
+      await tx.empire.update({
+        where: { id: empire.id },
+        data: { diamonds: { increment: total } },
+      });
+    });
 
     // Admins running mock purchases before go-live leave an audit trail too.
     if (isTest && user.role === "ADMIN") {

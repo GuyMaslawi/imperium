@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { MiniGameEvent, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { getSessionUserId } from "@/lib/auth";
+import { getActiveEmpireId } from "@/lib/auth";
 import {
   prizeText,
   publicConfig,
@@ -13,13 +13,8 @@ import {
 } from "@/lib/game/minigame";
 
 async function ownEmpireId(): Promise<string | null> {
-  const userId = await getSessionUserId();
-  if (!userId) return null;
-  const empire = await prisma.empire.findUnique({
-    where: { userId },
-    select: { id: true },
-  });
-  return empire?.id ?? null;
+  // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
+  return getActiveEmpireId();
 }
 
 function toState(
@@ -163,7 +158,29 @@ export async function submitMiniGameGuess(
         };
       }
 
-      // Correct! Claim a prize slot atomically (respecting maxWinners).
+      // Correct! First claim *this player's* single solve atomically. The
+      // read-check on `entry.solved` above is not enough on its own: two
+      // concurrent correct submissions both read solved=false. The guarded
+      // updateMany takes a row lock and re-checks `solved:false` after it, so
+      // only one of them flips the entry — the loser matches zero rows and skips
+      // the prize entirely. Without this the unlimited-winner (maxWinners===0)
+      // path, which has no other atomic guard, would grant the prize twice.
+      const solveClaim = await tx.miniGameEntry.updateMany({
+        where: { id: entry.id, solved: false },
+        data: { attempts: { increment: 1 }, solved: true },
+      });
+      if (solveClaim.count === 0) {
+        const current = await tx.miniGameEntry.findUniqueOrThrow({
+          where: { id: entry.id },
+        });
+        return {
+          state: toState(event, current),
+          feedback: "כבר פתרת את המשחק 🎉",
+          tone: "info" as const,
+        };
+      }
+
+      // We own the solve — now claim a prize slot (respecting maxWinners).
       let won: boolean;
       if (event.maxWinners === 0) {
         await tx.miniGameEvent.update({
@@ -182,8 +199,6 @@ export async function submitMiniGameGuess(
       const updatedEntry = await tx.miniGameEntry.update({
         where: { id: entry.id },
         data: {
-          attempts: { increment: 1 },
-          solved: true,
           won,
           wonAt: won ? new Date() : null,
         },

@@ -42,11 +42,36 @@ export const getSessionUserId = cache(async (): Promise<string | null> => {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, secretKey());
+    // Pin the algorithm so verification can only accept the HS256 tokens we
+    // issue (defense-in-depth against algorithm-confusion attacks).
+    const { payload } = await jwtVerify(token, secretKey(), {
+      algorithms: ["HS256"],
+    });
     return typeof payload.sub === "string" ? payload.sub : null;
   } catch {
     return null;
   }
+});
+
+/**
+ * Resolve the logged-in user's empire id for a server action, **enforcing the
+ * ban on every action** — not just on page load.
+ *
+ * Sessions are stateless 30-day JWTs that a ban does not revoke, and
+ * `requireEmpire` only runs on `/game/*` page loads. Without this check a user
+ * banned mid-session could keep POSTing to server actions (bank, training,
+ * wheel, diamond shop, guild, messages…) indefinitely. Returns `null` when the
+ * caller is unauthenticated, has no empire, or is banned.
+ */
+export const getActiveEmpireId = cache(async (): Promise<string | null> => {
+  const userId = await getSessionUserId();
+  if (!userId) return null;
+  const empire = await prisma.empire.findUnique({
+    where: { userId },
+    select: { id: true, user: { select: { bannedAt: true } } },
+  });
+  if (!empire || empire.user.bannedAt) return null;
+  return empire.id;
 });
 
 /**

@@ -49,22 +49,53 @@ function toErr(e: unknown): AdminActionState {
   return { error: message };
 }
 
-/** Read a required numeric form field (finite). Throws on invalid input. */
+// Upper bound for any admin-entered number. Prevents a fat-fingered or hostile
+// value (e.g. 1e308) from overflowing a column or corrupting the economy; it
+// sits well above any legitimate resource total. Applied symmetrically so
+// negative inputs are bounded too (callers still Math.max(0, …) where needed).
+const ADMIN_NUM_MAX = 1_000_000_000_000; // 1e12
+
+function clampNum(n: number): number {
+  return Math.max(-ADMIN_NUM_MAX, Math.min(ADMIN_NUM_MAX, n));
+}
+
+/** Read a required numeric form field (finite, bounded). Throws on invalid input. */
 function num(formData: FormData, key: string): number {
   const raw = formData.get(key);
   const n = Number(raw);
   if (raw == null || raw === "" || !Number.isFinite(n)) {
     throw new Error(`ערך לא תקין בשדה ${key}`);
   }
-  return n;
+  return clampNum(n);
 }
 
-/** Read an optional numeric field; returns `fallback` when blank. */
+/** Read an optional numeric field (bounded); returns `fallback` when blank. */
 function optNum(formData: FormData, key: string, fallback = 0): number {
   const raw = formData.get(key);
   if (raw == null || raw === "") return fallback;
   const n = Number(raw);
-  return Number.isFinite(n) ? n : fallback;
+  return Number.isFinite(n) ? clampNum(n) : fallback;
+}
+
+/**
+ * Guard against peer-admin takeover. There is no super-admin tier, so every
+ * admin is otherwise omnipotent over every other admin — one admin could reset
+ * another's password, ban them out (locking them at requireAdmin), or delete
+ * them. This blocks mutating a target that is *itself* an ADMIN unless it's the
+ * caller's own account. Promoting a plain USER to ADMIN stays allowed.
+ */
+async function assertNotPeerAdmin(
+  admin: { id: string },
+  targetUserId: string
+): Promise<void> {
+  if (!targetUserId || targetUserId === admin.id) return;
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { role: true },
+  });
+  if (target?.role === "ADMIN") {
+    throw new Error("אין הרשאה לפעול על חשבון אדמין אחר");
+  }
 }
 
 function str(formData: FormData, key: string): string {
@@ -128,6 +159,8 @@ export async function updateUserAccount(
     if (userId === admin.id && role !== "ADMIN") {
       return { error: "אי אפשר להסיר לעצמך הרשאות אדמין" };
     }
+    // Can't edit (rename / re-email / demote) another admin's account.
+    await assertNotPeerAdmin(admin, userId);
 
     const clash = await prisma.user.findFirst({
       where: { email, NOT: { id: userId } },
@@ -158,6 +191,7 @@ export async function toggleUserBan(
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
     if (userId === admin.id) return { error: "אי אפשר לחסום את עצמך" };
+    await assertNotPeerAdmin(admin, userId);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -191,6 +225,7 @@ export async function resetUserPassword(
   try {
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
+    await assertNotPeerAdmin(admin, userId);
     const password = String(formData.get("password") ?? "");
     if (password.length < 6) return { error: "סיסמה חייבת להכיל לפחות 6 תווים" };
 
@@ -217,6 +252,7 @@ export async function deleteUser(
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
     if (userId === admin.id) return { error: "אי אפשר למחוק את עצמך" };
+    await assertNotPeerAdmin(admin, userId);
     const confirm = str(formData, "confirm");
     if (confirm !== "DELETE") return { error: 'יש להקליד DELETE לאישור המחיקה' };
 

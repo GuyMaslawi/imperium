@@ -359,6 +359,16 @@ export default async function GuildPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {GUILD_SPELL_TYPES.map((type) => {
             const level = spellLevelByType.get(type) ?? 1;
+            // Resolve the "active until HH:MM" label here (server-side) so the
+            // client card never reads the clock during render.
+            const activeUntil = activeUntilByType.get(type) ?? null;
+            const activeLabel =
+              activeUntil && new Date(activeUntil).getTime() > new Date().getTime()
+                ? new Date(activeUntil).toLocaleTimeString("he-IL", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : null;
             return (
               <GuildShopCard
                 key={type}
@@ -370,7 +380,7 @@ export default async function GuildPage() {
                     : spellUpgradeCostDiamonds(level)
                 }
                 castCost={spellCastCostDiamonds(level)}
-                activeUntil={activeUntilByType.get(type) ?? null}
+                activeLabel={activeLabel}
                 diamonds={diamonds}
               />
             );
