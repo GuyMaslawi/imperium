@@ -553,3 +553,76 @@ body {
   0%, 100% { opacity: 0; }
   50% { opacity: 1; }
 }
+
+/* =========================================================================
+   Hero item tiles — "treasure" shimmer: a diagonal light sweep that glides
+   across the art, plus twinkling star sparkles tinted to the item's rarity.
+   The tile art container is position:relative + overflow:hidden, so both the
+   sweep and the sparkles are clipped to the frame. Each tile carries a small
+   --shine-delay so a grid of items twinkles out of sync, not in a wave.
+   ========================================================================= */
+
+/* the light sweep — a thin bright band riding a diagonal gradient */
+.item-shine::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  z-index: 5;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.14) 47%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 255, 255, 0.14) 53%,
+    transparent 62%
+  );
+  transform: translateX(-160%);
+  opacity: 0;
+}
+
+/* a four-point star; `currentColor` (set per-rarity) tints its glow */
+.item-sparkle {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  background: #fff;
+  clip-path: polygon(
+    50% 0%, 60% 40%, 100% 50%, 60% 60%,
+    50% 100%, 40% 60%, 0% 50%, 40% 40%
+  );
+  filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 6px currentColor);
+  opacity: 0;
+  transform: scale(0);
+}
+
+/* a soft breathing halo behind the rarest pieces */
+.item-aura {
+  animation: item-aura 3.4s ease-in-out infinite;
+}
+
+@keyframes item-shine {
+  0% { transform: translateX(-160%); opacity: 0; }
+  6% { opacity: 1; }
+  20% { transform: translateX(160%); opacity: 1; }
+  26%, 100% { transform: translateX(160%); opacity: 0; }
+}
+@keyframes item-twinkle {
+  0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+  45% { transform: scale(1) rotate(35deg); opacity: 0.95; }
+  60% { transform: scale(0.7) rotate(55deg); opacity: 0.5; }
+}
+@keyframes item-aura {
+  0%, 100% { box-shadow: inset 0 0 12px -6px currentColor; }
+  50% { box-shadow: inset 0 0 20px -3px currentColor; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .item-shine::after {
+    animation: item-shine 5s ease-in-out infinite;
+    animation-delay: var(--shine-delay, 0s);
+  }
+  .item-sparkle {
+    animation: item-twinkle 2.6s ease-in-out infinite;
+  }
+}

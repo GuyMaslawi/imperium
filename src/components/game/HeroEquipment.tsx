@@ -31,7 +31,7 @@ export function HeroEquipment({
           ציוד פעיל
         </h3>
       </Tip>
-      <div className="grid max-w-[14rem] grid-cols-3 gap-3">
+      <div className="mx-auto grid max-w-[15rem] grid-cols-3 gap-3 sm:mx-0 sm:max-w-none">
         {SLOT_ORDER.map((slot) => {
           const meta = SLOT_META[slot];
           const item = bySlot.get(slot);

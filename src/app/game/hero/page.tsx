@@ -135,7 +135,7 @@ export default async function HeroPage() {
 
           <div className="rule-gold my-4" />
 
-          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+          <div className="grid items-start gap-5 sm:grid-cols-2">
             {/* active equipment */}
             <HeroEquipment
               equipped={equippedItems}
@@ -146,12 +146,12 @@ export default async function HeroPage() {
             {/* stat cards + point allocation (points only — items excluded) */}
             <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
           </div>
-
-          {/* combined yield from points + items together */}
-          <div className="rule-gold my-4" />
-          <HeroPowerSummary bonuses={bonuses} />
         </div>
       </div>
+
+      {/* combined yield from points + items together — full-width footer so the
+          two columns above stay balanced and nothing trails off into blank space */}
+      <HeroPowerSummary bonuses={bonuses} />
     </div>
   );
 }

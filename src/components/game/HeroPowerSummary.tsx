@@ -197,38 +197,45 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
         עמומות ממתינות לחפץ מתאים.
       </p>
 
-      {/* battle percentages: attack / defense / spy */}
-      <SectionLabel>בונוסי קרב · באחוזים</SectionLabel>
-      <div className="flex flex-col gap-1.5">
-        {percentRows.map(({ stat, value, note }) => (
-          <StatRow key={stat} stat={stat} value={value} suffix="%" note={note} />
-        ))}
-      </div>
+      {/* Three labelled groups laid side-by-side on wide screens so the
+          full-width footer fills its row instead of trailing off into blank
+          space; they stack on narrow screens. */}
+      <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
+        {/* battle percentages: attack / defense / spy */}
+        <div>
+          <SectionLabel>בונוסי קרב · באחוזים</SectionLabel>
+          <div className="flex flex-col gap-1.5">
+            {percentRows.map(({ stat, value, note }) => (
+              <StatRow key={stat} stat={stat} value={value} suffix="%" note={note} />
+            ))}
+          </div>
+        </div>
 
-      <div className="rule-gold my-4" />
+        {/* flat per-tick yield from items: turns / diamonds / citizens */}
+        <div>
+          <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
+          <div className="flex flex-col gap-1.5">
+            {flatRows.map(({ stat, value, note }) => (
+              <StatRow
+                key={stat}
+                stat={stat}
+                value={value}
+                note={note}
+                format={(v) => `+${formatNumber(v)}`}
+              />
+            ))}
+          </div>
+        </div>
 
-      {/* flat per-tick yield from items: turns / diamonds / citizens */}
-      <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
-      <div className="flex flex-col gap-1.5">
-        {flatRows.map(({ stat, value, note }) => (
-          <StatRow
-            key={stat}
-            stat={stat}
-            value={value}
-            note={note}
-            format={(v) => `+${formatNumber(v)}`}
+        {/* resources: hybrid — % from points (mines) + flat from the relic */}
+        <div>
+          <SectionLabel>תפוקת משאבים · נקודות + חפץ</SectionLabel>
+          <ResourcesRow
+            pointsPct={points.resources}
+            itemFlat={itemsFlat.resources}
+            itemNote={resourcesNote}
           />
-        ))}
-      </div>
-
-      {/* resources: hybrid — % from points (mines) + flat from the relic */}
-      <div className="mt-4">
-        <SectionLabel>תפוקת משאבים · נקודות + חפץ</SectionLabel>
-        <ResourcesRow
-          pointsPct={points.resources}
-          itemFlat={itemsFlat.resources}
-          itemNote={resourcesNote}
-        />
+        </div>
       </div>
     </div>
   );

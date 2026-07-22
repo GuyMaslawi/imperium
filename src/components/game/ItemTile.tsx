@@ -6,7 +6,19 @@ export type Rarity = "legendary" | "epic" | "rare" | "common";
 
 const RARITY: Record<
   Rarity,
-  { ring: string; glow: string; bg: string; badge: string; text: string }
+  {
+    ring: string;
+    glow: string;
+    bg: string;
+    badge: string;
+    text: string;
+    /** Hex the sparkle stars glow with, tinted to the rarity. */
+    spark: string;
+    /** How many star sparkles twinkle on the tile — rarer = more. */
+    sparks: number;
+    /** Whether the piece gets a breathing inner aura (top rarities only). */
+    aura: boolean;
+  }
 > = {
   legendary: {
     ring: "border-gold/80",
@@ -14,6 +26,9 @@ const RARITY: Record<
     bg: "from-[#3a2c10] to-[#0f0b06]",
     badge: "text-gold-bright",
     text: "text-gold-bright",
+    spark: "#f7dd7a",
+    sparks: 3,
+    aura: true,
   },
   epic: {
     ring: "border-purple-400/70",
@@ -21,6 +36,9 @@ const RARITY: Record<
     bg: "from-[#2a1740] to-[#0e0916]",
     badge: "text-purple-200",
     text: "text-purple-300",
+    spark: "#cda2f7",
+    sparks: 3,
+    aura: true,
   },
   rare: {
     ring: "border-sky-400/70",
@@ -28,6 +46,9 @@ const RARITY: Record<
     bg: "from-[#0f2b40] to-[#080f16]",
     badge: "text-sky-200",
     text: "text-sky-300",
+    spark: "#7fcdf7",
+    sparks: 2,
+    aura: false,
   },
   common: {
     ring: "border-emerald-400/60",
@@ -35,8 +56,18 @@ const RARITY: Record<
     bg: "from-[#123023] to-[#080f0c]",
     badge: "text-emerald-200",
     text: "text-emerald-300",
+    spark: "#74e6ac",
+    sparks: 1,
+    aura: false,
   },
 };
+
+/** Fixed twinkle anchors (inside the frame); each tile uses the first N. */
+const SPARK_SPOTS: { top: string; left: string; size: number; delay: string }[] = [
+  { top: "14%", left: "18%", size: 9, delay: "0s" },
+  { top: "72%", left: "76%", size: 7, delay: "0.9s" },
+  { top: "40%", left: "83%", size: 6, delay: "1.7s" },
+];
 
 /** Everything the hover tooltip shows about an item. */
 export interface ItemTileDetails {
@@ -102,6 +133,10 @@ export function ItemTile({
   const r = RARITY[rarity];
   const iconSize = size === "lg" ? "text-6xl" : "text-4xl";
   const locked = details?.meetsRequirement === false;
+  // Locked items stay dim & inert; everything else shimmers. Desync each tile's
+  // sweep from a stable seed so a grid twinkles unevenly rather than in a wave.
+  const sparkle = !locked;
+  const shineDelay = `${(((level ?? 1) * 37 + (slug?.length ?? 3) * 13) % 40) / 10}s`;
 
   // On localhost the image can finish loading before React hydrates, so the
   // onLoad event never fires — check `.complete` on mount to catch that.
@@ -114,8 +149,13 @@ export function ItemTile({
     <div className="group relative flex flex-col items-center gap-1.5">
       <div
         className={`relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-b ${r.ring} ${r.glow} ${r.bg} ${
-          locked ? "opacity-90" : ""
-        }`}
+          sparkle ? "item-shine" : ""
+        } ${sparkle && r.aura ? "item-aura" : ""} ${locked ? "opacity-90" : ""}`}
+        style={
+          sparkle
+            ? ({ "--shine-delay": shineDelay, color: r.spark } as React.CSSProperties)
+            : undefined
+        }
       >
         {/* emoji base — always visible; generated art (if any) overlays it */}
         <span
@@ -139,6 +179,21 @@ export function ItemTile({
             onError={() => setImgOk(false)}
           />
         )}
+        {sparkle &&
+          SPARK_SPOTS.slice(0, r.sparks).map((s, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="item-sparkle"
+              style={{
+                top: s.top,
+                left: s.left,
+                width: s.size,
+                height: s.size,
+                animationDelay: s.delay,
+              }}
+            />
+          ))}
         {level != null && (
           <span
             className={`nums absolute right-1 top-1 rounded px-1.5 py-0.5 text-[10px] font-black ${

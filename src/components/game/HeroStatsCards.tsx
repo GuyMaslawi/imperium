@@ -31,7 +31,7 @@ export function HeroStatsCards({
   );
 
   return (
-    <div className="flex flex-col gap-3 sm:w-40">
+    <div className="flex w-full flex-col gap-3">
       {unspentPoints > 0 && (
         <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בכרטיס מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
           <div className="points-pulse w-full rounded-lg border bg-gold/10 p-3 text-center">
