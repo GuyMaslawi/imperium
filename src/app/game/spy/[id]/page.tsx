@@ -54,13 +54,13 @@ export default async function SpyResultPage({
         </p>
         <p className="mt-1 text-sm text-zinc-400">
           {report.success
-            ? "המידע על האימפריה נחשף במלואו."
-            : "המרגל אבד. נסה שוב עם מודיעין גבוה יותר או נשקי ריגול."}
+            ? "כח המודיעין שלך גבר על היעד — המידע נחשף במלואו."
+            : "כח המודיעין של היעד גבר — המרגל אבד. שדרג מודיעין, גייס מרגלים או נשקי ריגול."}
         </p>
-        {report.finalChance != null && (
+        {report.attackerIntel != null && report.defenderIntel != null && (
           <p className="mt-2 text-xs text-zinc-500 nums" dir="ltr">
-            סיכוי הצלחה: {Math.round(report.finalChance * 100)}%
-            {report.weaponsBonus ? ` · בונוס נשקים +${Math.round(report.weaponsBonus)}%` : ""}
+            כח מודיעין: {formatNumber(Math.round(report.attackerIntel))}
+            {" "}מול {formatNumber(Math.round(report.defenderIntel))}
             {report.guildBonus ? ` · קסם ברית +${Math.round(report.guildBonus)}%` : ""}
           </p>
         )}

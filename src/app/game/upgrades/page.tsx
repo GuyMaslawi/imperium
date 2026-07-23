@@ -3,6 +3,7 @@ import {
   EMPIRE_UPGRADE_META,
   EMPIRE_UPGRADE_TYPES,
   empireUpgradeCostFor,
+  empireUpgradeMaxLevel,
   cityHeroLevelRequired,
   MAX_CITIES,
   citizenCapacity,
@@ -129,7 +130,7 @@ export default async function UpgradesPage() {
 
       {/* -------- empire upgrades -------- */}
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
-        שדרוגי אימפריה קבועים שמשפרים אזרחים, יהלומים, מודיעין, בנקאות וקבלת תורות.
+        שדרוגי אימפריה קבועים שמשפרים אזרחים, מודיעין, בנקאות וקבלת תורות.
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,7 +138,8 @@ export default async function UpgradesPage() {
           const meta = EMPIRE_UPGRADE_META[type];
           const upgrade = empire.upgrades.find((u) => u.type === type);
           const level = upgrade?.level ?? 1;
-          const isMaxLevel = meta.maxLevel !== undefined && level >= meta.maxLevel;
+          const maxLevel = empireUpgradeMaxLevel(type, cities);
+          const isMaxLevel = maxLevel !== undefined && level >= maxLevel;
           return (
             <UpgradeCard
               key={type}

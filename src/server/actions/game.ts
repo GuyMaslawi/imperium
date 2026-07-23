@@ -10,6 +10,7 @@ import {
   BUILDING_META,
   cityHeroLevelRequired,
   EMPIRE_UPGRADE_META,
+  empireUpgradeMaxLevel,
   MAX_CITIES,
   MINE_MAX_LEVEL,
   PRODUCTION_BUILDING_TYPES,
@@ -20,9 +21,9 @@ import {
   cityCost,
   empireUpgradeCostFor,
   mineUpgradeCost,
-  spySuccessChance,
   storageCapacityForLevel,
   storageUpgradeCost,
+  wheelLuckBonus,
   type StorableResource,
   type UnitKey,
 } from "@/lib/game/constants";
@@ -32,7 +33,7 @@ import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
-import { armyPower } from "@/lib/game/power";
+import { armyPower, getEmpireIntelPower } from "@/lib/game/power";
 import {
   CITIZENS_PER_LEVEL,
   HERO_BAG_CAPACITY,
@@ -48,8 +49,6 @@ import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   MAX_WEAPON_TIER,
   WEAPON_CATEGORIES,
-  finalSpyChance,
-  spyWeaponsBonusPercent,
   weaponByKey,
   weaponGateStatus,
   weaponTierUnlockCost,
@@ -571,30 +570,37 @@ export async function spyOnEmpire(
         return { error: "אין לך מספיק תורות לביצוע ריגול." };
       }
 
-      const intelligenceLevel =
+      // Spy missions resolve deterministically: the attacker's intelligence
+      // power against the defender's. Both sides scale their raw spy power
+      // (spies + spy weapons) by their own intelligence upgrade (+10%/level).
+      // The attacker additionally gets its hero spy % and active guild spy
+      // spell as percentage-point bonuses. Strictly-greater wins — a tie fails.
+      const attackerIntelLevel =
         attacker.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
-      // Spy weapons add up to +15 percentage points on top of intelligence,
-      // capped at a 95% final chance. An active guild spy spell and the hero's
-      // spy % (from equipped spy items) each add percentage points on top,
-      // under the same cap.
-      const spyPower = weaponsPower(attacker.weapons, "SPY");
+      const defenderIntelLevel =
+        defender.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
       const guildSpyBonusPct = await getActiveGuildBuffPct(empireId, "SPY", tx);
       const heroSpyBonusPct = heroBonuses(attacker.hero).totalPct.spy;
-      const chance = Math.min(
-        0.95,
-        finalSpyChance(spySuccessChance(intelligenceLevel), spyPower) +
-          guildSpyBonusPct / 100 +
-          heroSpyBonusPct / 100
+      const attackerIntel = getEmpireIntelPower(
+        attacker.army,
+        attacker.weapons,
+        attackerIntelLevel,
+        guildSpyBonusPct + heroSpyBonusPct
       );
-      const success = Math.random() < chance;
+      const defenderIntel = getEmpireIntelPower(
+        defender.army,
+        defender.weapons,
+        defenderIntelLevel
+      );
+      const success = attackerIntel > defenderIntel;
 
       const report = await tx.spyReport.create({
         data: {
           attackerEmpireId: empireId,
           defenderEmpireId: targetEmpireId,
           success,
-          finalChance: chance,
-          weaponsBonus: spyWeaponsBonusPercent(spyPower),
+          attackerIntel,
+          defenderIntel,
           guildBonus: guildSpyBonusPct,
           turnsSpent: SPY_TURN_COST,
           ...(success
@@ -945,6 +951,20 @@ export async function attackEmpire(
         }
       }
 
+      /* ---- wheel-of-fortune spin: a winning attack has a wheel-luck chance ---- */
+      let wonWheelSpin = false;
+      if (attackerWins) {
+        const wheelLuckLevel =
+          attacker.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1;
+        wonWheelSpin = Math.random() < wheelLuckBonus(wheelLuckLevel);
+        if (wonWheelSpin) {
+          await tx.empire.update({
+            where: { id: empireId },
+            data: { wheelSpins: { increment: 1 } },
+          });
+        }
+      }
+
       const report = await tx.battleReport.create({
         data: {
           attackerEmpireId: empireId,
@@ -970,6 +990,7 @@ export async function attackEmpire(
           defenderGuildBonusPct,
           attackerHeroXp,
           defenderHeroXp,
+          wonWheelSpin,
           ...(droppedItem
             ? {
                 droppedItemSlot: droppedItem.slot,
@@ -1287,7 +1308,6 @@ export async function withdrawAllFromStorage(
 
 const empireUpgradeTypeSchema = z.enum([
   "CITIZEN_GROWTH",
-  "DIAMOND_YIELD",
   "INTELLIGENCE",
   "BANK_DEPOSIT_COUNT",
   "BANK_DAILY_INTEREST",
@@ -1314,7 +1334,7 @@ export async function upgradeEmpireUpgrade(
           data: { empireId, type: upgradeType, level: 1 },
         }));
 
-      const maxLevel = EMPIRE_UPGRADE_META[upgradeType].maxLevel;
+      const maxLevel = empireUpgradeMaxLevel(upgradeType, empire.cities);
       if (maxLevel !== undefined && upgrade.level >= maxLevel) {
         return { error: "רמה מקסימלית" };
       }

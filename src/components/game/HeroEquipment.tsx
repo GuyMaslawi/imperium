@@ -16,10 +16,13 @@ export function HeroEquipment({
   equipped,
   heroLevel,
   gold,
+  wheelSpinBonus = 0,
 }: {
   equipped: HeroItemView[];
   heroLevel: number;
   gold: number;
+  /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
+  wheelSpinBonus?: number;
 }) {
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
   const bySlot = new Map(equipped.map((item) => [item.slot, item]));
@@ -83,6 +86,7 @@ export function HeroEquipment({
           heroLevel={heroLevel}
           gold={gold}
           equipped
+          wheelSpinBonus={wheelSpinBonus}
           onClose={() => setOpenItem(null)}
         />
       )}

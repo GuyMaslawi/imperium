@@ -175,7 +175,7 @@ export function PowerSummary({
             { label: "מרגלים", value: spyUnitsPower },
             { label: "נשקי ריגול", value: spyWeaponsPower },
           ]}
-          helper="משפיע על סיכויי הצלחה בריגול."
+          helper="שדרוג מודיעין מכפיל אותו — ריגול מצליח כשהוא גדול מזה של היעד."
           links={[
             { href: "/game/weapons?tab=spy", label: "ניהול נשקי ריגול" },
             { href: "/game/army", label: "אימון מרגלים" },

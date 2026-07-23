@@ -105,6 +105,8 @@ export default async function BattleResultPage({
           rarity: report.droppedItemRarity,
         }
       : null;
+  // A winning attack can also award a wheel-of-fortune spin (wheel-luck upgrade).
+  const wonWheelSpin = iAmAttacker && report.wonWheelSpin;
 
   return (
     <div className="space-y-6">
@@ -204,7 +206,7 @@ export default async function BattleResultPage({
       </div>
 
       {/* -------- hero rewards -------- */}
-      {(myHeroXp > 0 || capturedItem) && (
+      {(myHeroXp > 0 || capturedItem || wonWheelSpin) && (
         <div className="panel rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך</h3>
           <div className="flex flex-wrap items-center gap-4">
@@ -216,6 +218,17 @@ export default async function BattleResultPage({
                 </p>
               </div>
             </Tip>
+            {wonWheelSpin && (
+              <Link
+                href="/game/base"
+                className="panel-inset rounded-lg p-3 text-center transition hover:border-gold/50"
+              >
+                <p className="text-[11px] text-zinc-400">🎡 גלגל המזל</p>
+                <p className="mt-0.5 text-sm font-black text-gold-bright">
+                  זכית בסיבוב גלגל מזל!
+                </p>
+              </Link>
+            )}
             {capturedItem && (
               <div className="flex items-center gap-3">
                 <div className="w-20">

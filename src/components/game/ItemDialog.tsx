@@ -37,6 +37,7 @@ export function ItemDialog({
   heroLevel,
   gold,
   equipped,
+  wheelSpinBonus = 0,
   onClose,
 }: {
   item: HeroItemView;
@@ -44,6 +45,8 @@ export function ItemDialog({
   gold: number;
   /** Whether this item is currently worn (shows "remove" instead of "wear"). */
   equipped: boolean;
+  /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
+  wheelSpinBonus?: number;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -297,8 +300,8 @@ export function ItemDialog({
 
       {confirmDiscard && (
         <p className="mt-2 text-center text-xs text-amber-300/80">
-          🎡 סיכוי {Math.round(discardWheelSpinChance(level) * 100)}% לזכות בסיבוב
-          גלגל מזל מהזריקה
+          🎡 סיכוי {Math.round((discardWheelSpinChance(level) + wheelSpinBonus) * 100)}% לזכות
+          בסיבוב גלגל מזל מהזריקה
         </p>
       )}
     </Dialog>

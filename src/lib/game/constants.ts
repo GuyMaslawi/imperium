@@ -260,14 +260,41 @@ export function citizensPerDailyUpdate(citizenGrowthLevel: number): number {
   return 20 + citizenGrowthLevel * 5;
 }
 
-/** Diamonds received on each daily update. */
-export function diamondsPerDailyUpdate(diamondYieldLevel: number): number {
-  return diamondYieldLevel;
+/** Citizen-intake upgrade levels unlocked per city. */
+export const CITIZEN_GROWTH_LEVELS_PER_CITY = 10;
+
+/**
+ * Highest CITIZEN_GROWTH level for an empire holding `cities` cities: 10 levels
+ * per city. The upgrade locks once it reaches this ceiling and founding a new
+ * city unlocks another 10 levels — so growth resumes after each city upgrade.
+ */
+export function citizenGrowthMaxLevel(cities: number): number {
+  return cities * CITIZEN_GROWTH_LEVELS_PER_CITY;
 }
 
-/** Spy mission success chance, capped at 90%. */
-export function spySuccessChance(intelligenceLevel: number): number {
-  return Math.min(0.9, 0.6 + intelligenceLevel * 0.03);
+/** Top level of the intelligence upgrade. */
+export const INTELLIGENCE_MAX_LEVEL = 15;
+
+/**
+ * The intelligence upgrade multiplies an empire's raw spy power (spies + spy
+ * weapons) by +10% per level. Spy missions are resolved deterministically by
+ * comparing the attacker's intelligence power against the defender's — no dice
+ * roll — so every level directly widens the gap in your favour.
+ */
+export function intelligencePowerMultiplier(intelligenceLevel: number): number {
+  return 1 + intelligenceLevel * 0.1;
+}
+
+/** Top level of the wheel-luck upgrade — each level adds 1%, capped at 10%. */
+export const WHEEL_LUCK_MAX_LEVEL = 10;
+
+/**
+ * Extra chance (as a fraction, e.g. 0.1 = +10%) the wheel-luck upgrade adds to
+ * winning a wheel-of-fortune spin — both from throwing away an item and from a
+ * winning attack. +1% per level, capped at +10% at level 10.
+ */
+export function wheelLuckBonus(level: number): number {
+  return Math.min(WHEEL_LUCK_MAX_LEVEL, level) * 0.01;
 }
 
 /** Highest number of deposits the upgrade can reach. */
@@ -280,9 +307,16 @@ export function allowedDepositsPerDailyPeriod(level: number): number {
   return Math.min(BANK_DEPOSIT_MAX, 1 + level);
 }
 
-/** Bank interest per daily update, capped at 15%. */
+/** Top level of the interest upgrade — each level adds 1%, capped at 15%. */
+export const BANK_DAILY_INTEREST_MAX_LEVEL = 15;
+
+/**
+ * Bank interest per daily update: 1% per upgrade level, capped at 15% (reached at
+ * level 15). The upgrade is also blocked once it hits `BANK_DAILY_INTEREST_MAX_LEVEL`,
+ * so the rate never plateaus with wasted upgrades.
+ */
 export function bankInterestRate(level: number): number {
-  return Math.min(0.15, 0.01 + level * 0.0025);
+  return Math.min(0.15, level * 0.01);
 }
 
 /* ------------------------------ cities ------------------------------ */
@@ -361,24 +395,29 @@ export function turnsPerRegularUpdate(turnsUpgradeLevel: number): number {
   return turnsUpgradeLevel;
 }
 
-export const EMPIRE_UPGRADE_META: Record<EmpireUpgradeType, EmpireUpgradeMeta> = {
+// DIAMOND_YIELD is a retired upgrade: the enum value is kept in the DB for
+// existing rows, but it is no longer offered on the upgrades page or granted on
+// daily updates, so it is excluded from the metadata that drives the UI.
+export type ActiveEmpireUpgradeType = Exclude<EmpireUpgradeType, "DIAMOND_YIELD">;
+
+export const EMPIRE_UPGRADE_META: Record<
+  ActiveEmpireUpgradeType,
+  EmpireUpgradeMeta
+> = {
   CITIZEN_GROWTH: {
     label: "קבלת אזרחים",
     icon: "👥",
     description: "מגדיל את כמות האזרחים שמתקבלת בכל עדכון יומי.",
     effectLabel: (level) => `${citizensPerDailyUpdate(level)} אזרחים בכל עדכון יומי`,
   },
-  DIAMOND_YIELD: {
-    label: "מכרה יהלומים",
-    icon: "💎",
-    description: "מגדיל את כמות היהלומים שמתקבלת בכל עדכון יומי.",
-    effectLabel: (level) => `${diamondsPerDailyUpdate(level)} יהלומים בכל עדכון יומי`,
-  },
   INTELLIGENCE: {
     label: "מודיעין",
     icon: "🕵️",
-    description: "מגדיל את סיכויי ההצלחה בריגול ואת איכות המידע שנחשף.",
-    effectLabel: (level) => `${Math.round(spySuccessChance(level) * 100)}% סיכוי הצלחה בריגול`,
+    description:
+      "מגדיל את כח המודיעין שלך. ריגול מצליח כשכח המודיעין שלך גדול מזה של היעד — בלי הגרלה.",
+    effectLabel: (level) =>
+      `+${Math.round((intelligencePowerMultiplier(level) - 1) * 100)}% כח מודיעין`,
+    maxLevel: INTELLIGENCE_MAX_LEVEL,
   },
   BANK_DEPOSIT_COUNT: {
     label: "כמות הפקדות בבנק",
@@ -392,7 +431,8 @@ export const EMPIRE_UPGRADE_META: Record<EmpireUpgradeType, EmpireUpgradeMeta> =
     label: "ריבית בנק",
     icon: "💰",
     description: "מגדיל את הריבית שמתקבלת בבנק בכל עדכון יומי.",
-    effectLabel: (level) => `${(bankInterestRate(level) * 100).toFixed(2)}% ריבית בכל עדכון יומי`,
+    effectLabel: (level) => `${Math.round(bankInterestRate(level) * 100)}% ריבית בכל עדכון יומי`,
+    maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
   },
   TURNS_PER_REGULAR_UPDATE: {
     label: "קבלת תורות",
@@ -401,11 +441,33 @@ export const EMPIRE_UPGRADE_META: Record<EmpireUpgradeType, EmpireUpgradeMeta> =
     effectLabel: (level) => `+${turnsPerRegularUpdate(level)} תורות לעדכון רגיל`,
     maxLevel: TURNS_UPGRADE_MAX_LEVEL,
   },
+  WHEEL_LUCK: {
+    label: "מזל הגלגל",
+    icon: "🎡",
+    description:
+      "מגדיל את הסיכוי לזכות בסיבוב גלגל מזל מזריקת חפץ ומתקיפה מנצחת.",
+    effectLabel: (level) => `+${Math.round(wheelLuckBonus(level) * 100)}% סיכוי לסיבוב גלגל מזל`,
+    maxLevel: WHEEL_LUCK_MAX_LEVEL,
+  },
 };
 
 export const EMPIRE_UPGRADE_TYPES = Object.keys(
   EMPIRE_UPGRADE_META
-) as EmpireUpgradeType[];
+) as ActiveEmpireUpgradeType[];
+
+/**
+ * Effective max level for an upgrade given the empire's city count. Most upgrades
+ * use the static `maxLevel` in their metadata; CITIZEN_GROWTH is capped
+ * dynamically at 10 levels per city, so founding a new city unlocks 10 more.
+ * Returns `undefined` for uncapped upgrades.
+ */
+export function empireUpgradeMaxLevel(
+  type: ActiveEmpireUpgradeType,
+  cities: number
+): number | undefined {
+  if (type === "CITIZEN_GROWTH") return citizenGrowthMaxLevel(cities);
+  return EMPIRE_UPGRADE_META[type].maxLevel;
+}
 
 export function empireUpgradeCost(level: number) {
   return {

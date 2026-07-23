@@ -21,7 +21,13 @@ import { requireAdmin, logAdmin } from "@/lib/admin";
 import { weaponByKey } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
-import { DEFAULT_TUNABLES, mergeTunables, type GameTunables } from "@/lib/game/config";
+import {
+  DEFAULT_TUNABLES,
+  getTunables,
+  mergeTunables,
+  type GameTunables,
+} from "@/lib/game/config";
+import { newEmpireData } from "@/lib/game/createEmpire";
 
 export interface AdminActionState {
   error?: string;
@@ -919,6 +925,76 @@ export async function deleteSeason(
     });
     revalidatePath("/admin/seasons");
     return { success: "העונה נמחקה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Nuke-and-reboot the whole game — a full season reset. EVERY empire is deleted
+ * and recreated from scratch (fresh buildings, army, upgrades, storages,
+ * weapons, hero and bank — identical to a brand-new registration), and ALL
+ * guilds are wiped. What survives:
+ *   • user accounts, roles and bans (User rows are untouched)
+ *   • each player's current DIAMOND balance — carried over so paying customers
+ *     never lose what they bought
+ *   • the real-money purchase audit trail (DiamondPurchase → onDelete: SetNull,
+ *     with userId/email/empireName snapshots)
+ * Every other empire record cascades away with the empire it belonged to.
+ *
+ * This is irreversible and hits all players, so it fires only when the admin
+ * types the confirmation phrase. The whole wipe-and-rebuild runs in one
+ * transaction: it either resets everyone or no one — never half the players.
+ */
+export async function resetSeason(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    if (str(formData, "confirm") !== "אפס") {
+      return { error: 'כדי לאפס, הקלד "אפס" בשדה האישור' };
+    }
+
+    const tunables = await getTunables();
+    // Carry over only the identity + diamond balance of each empire.
+    const empires = await prisma.empire.findMany({
+      select: { userId: true, name: true, seasonId: true, diamonds: true },
+    });
+
+    await prisma.$transaction(
+      async (tx) => {
+        // Guilds first: members, spells and treasury transactions cascade off.
+        await tx.guild.deleteMany({});
+        // Then every empire — all per-empire records cascade, and diamond
+        // purchases detach (SetNull) rather than disappear.
+        await tx.empire.deleteMany({});
+        // Rebuild a pristine empire for each player, preserving only the name,
+        // season assignment and diamond balance.
+        for (const e of empires) {
+          const data = newEmpireData(
+            e.userId,
+            e.name,
+            e.seasonId ?? undefined,
+            tunables.starting
+          );
+          data.diamonds = e.diamonds;
+          await tx.empire.create({ data });
+        }
+      },
+      { timeout: 120_000 }
+    );
+
+    await logAdmin(admin, {
+      action: "season.reset",
+      targetType: "season",
+      summary: `אופסה העונה — ${empires.length} אימפריות אותחלו, כל הגילדות נמחקו`,
+      details: { empiresReset: empires.length },
+    });
+
+    revalidatePath("/admin/seasons");
+    revalidatePath("/game", "layout");
+    return { success: `העונה אופסה — ${empires.length} שחקנים התחילו מחדש` };
   } catch (e) {
     return toErr(e);
   }

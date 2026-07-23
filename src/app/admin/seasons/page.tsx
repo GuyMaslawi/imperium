@@ -8,6 +8,7 @@ import {
   updateSeason,
   activateSeason,
   deleteSeason,
+  resetSeason,
 } from "@/server/actions/admin";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function AdminSeasonsPage() {
     prisma.empire.groupBy({ by: ["seasonId"], _count: { _all: true } }),
   ]);
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c._count._all]));
+  const totalEmpires = counts.reduce((sum, c) => sum + c._count._all, 0);
 
   return (
     <div className="space-y-6">
@@ -88,6 +90,32 @@ export default async function AdminSeasonsPage() {
         {seasons.length === 0 && (
           <p className="panel-inset rounded-xl p-6 text-center text-zinc-500">אין עונות עדיין</p>
         )}
+      </div>
+
+      {/* Danger zone — full season reset. */}
+      <div className="rounded-xl border border-red-500/40 bg-red-950/20 p-4 sm:p-5">
+        <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-red-300">
+          💥 איפוס עונה
+        </h3>
+        <p className="mb-3 text-[12px] leading-relaxed text-zinc-400">
+          מאפס את <strong className="text-red-300">כל {totalEmpires} השחקנים</strong> ומתחיל עונה
+          מחדש: כל אימפריה נבנית מאפס (משאבים, מבנים, צבא, שדרוגים, נשק, גיבור ובנק), וכל הגילדות
+          נמחקות. חשבונות המשתמשים נשמרים, וכל שחקן <strong className="text-emerald-300">שומר את
+          יתרת היהלומים</strong> שלו. פעולה זו בלתי הפיכה.
+        </p>
+        <ActionForm
+          action={resetSeason}
+          submitLabel="אפס את העונה"
+          submitVariant="danger"
+          confirm={`לאפס את כל ${totalEmpires} השחקנים ולהתחיל עונה מחדש? פעולה בלתי הפיכה!`}
+        >
+          <LabeledInput
+            label='להקלדת אישור, כתוב "אפס"'
+            name="confirm"
+            required
+            placeholder="אפס"
+          />
+        </ActionForm>
       </div>
     </div>
   );

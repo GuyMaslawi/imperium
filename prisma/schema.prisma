@@ -518,6 +518,7 @@ enum EmpireUpgradeType {
   BANK_DEPOSIT_COUNT
   BANK_DAILY_INTEREST
   TURNS_PER_REGULAR_UPDATE
+  WHEEL_LUCK
 }
 
 model EmpireUpgrade {
@@ -614,6 +615,10 @@ model SpyReport {
   weaponsBonus       Float?
   /// Percentage points the attacker's guild spy buff added to the chance.
   guildBonus         Float?
+  /// Attacker's effective intelligence power at resolution (deterministic spy).
+  attackerIntel      Float?
+  /// Defender's effective intelligence power at resolution (deterministic spy).
+  defenderIntel      Float?
   turnsSpent         Int      @default(5)
   createdAt          DateTime @default(now())
 
@@ -659,6 +664,9 @@ model BattleReport {
   droppedItemSlot   HeroItemSlot?
   droppedItemLevel  Int?
   droppedItemRarity HeroRarity?
+
+  // A winning attack can also award a wheel-of-fortune spin (wheel-luck upgrade).
+  wonWheelSpin      Boolean  @default(false)
 
   attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)

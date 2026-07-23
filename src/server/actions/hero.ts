@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
+import { wheelLuckBonus } from "@/lib/game/constants";
 import {
   HERO_BAG_CAPACITY,
   HERO_MAX_LEVEL,
@@ -256,8 +257,12 @@ export async function discardHeroItem(
       await tx.heroItem.deleteMany({ where: { id: item.id, heroId: hero.id } });
 
       // The fates may reward parting with gear — rarer items pay far more often
-      // (אגדי pays 1-in-10). The server owns the roll.
-      const wonSpin = rollDiscardWheelSpin(item.level);
+      // (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to +10% on top.
+      // The server owns the roll.
+      const luckBonus = wheelLuckBonus(
+        empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
+      );
+      const wonSpin = rollDiscardWheelSpin(item.level, luckBonus);
       if (wonSpin) {
         await tx.empire.update({
           where: { id: empireId },
@@ -314,9 +319,14 @@ export async function discardHeroItems(
       });
 
       // Roll each thrown item independently — rarer gear pays a wheel spin far
-      // more often (אגדי pays 1-in-10). The server owns every roll.
+      // more often (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to
+      // +10% on top of every roll. The server owns every roll.
+      const luckBonus = wheelLuckBonus(
+        empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
+      );
       let spinsWon = 0;
-      for (const item of owned) if (rollDiscardWheelSpin(item.level)) spinsWon += 1;
+      for (const item of owned)
+        if (rollDiscardWheelSpin(item.level, luckBonus)) spinsWon += 1;
       if (spinsWon > 0) {
         await tx.empire.update({
           where: { id: empireId },

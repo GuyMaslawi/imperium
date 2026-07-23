@@ -32,7 +32,6 @@ export interface GameTunables {
   daily: {
     citizensBase: number;
     citizensPerLevel: number;
-    diamondsPerLevel: number;
     wheelSpins: number;
     wheelSpinsCap: number;
   };
@@ -74,7 +73,6 @@ export const DEFAULT_TUNABLES: GameTunables = {
   daily: {
     citizensBase: 20,
     citizensPerLevel: 5,
-    diamondsPerLevel: 1,
     wheelSpins: 4,
     wheelSpinsCap: 20,
   },
@@ -123,7 +121,6 @@ export const TUNABLE_META: Record<
     fields: {
       citizensBase: { label: "אזרחים בסיס לעדכון יומי" },
       citizensPerLevel: { label: "אזרחים נוספים לכל רמת שדרוג" },
-      diamondsPerLevel: { label: "יהלומים לכל רמת שדרוג" },
       wheelSpins: { label: "סיבובי גלגל לעדכון יומי" },
       wheelSpinsCap: { label: "מקסימום סיבובי גלגל שנצברים" },
     },

@@ -6,8 +6,11 @@ import { spinWheel } from "@/server/actions/wheel";
 import { formatNumber } from "@/lib/game/format";
 import { Icon } from "@/components/ui/Icon";
 
-/** One line in a batch reveal: a prize totalled across the whole batch. */
-type HaulEntry = { prize: WheelPrizeDef; total: number };
+/**
+ * One line in a batch reveal: a prize totalled across the whole batch.
+ * `count` is how many times this prize came up (shown as ×N when repeated).
+ */
+type HaulEntry = { prize: WheelPrizeDef; total: number; count: number };
 
 const SEG = 360 / WHEEL_PRIZES.length;
 const SPIN_MS = 4200;
@@ -135,8 +138,12 @@ export function WheelOfFortune({
         const prize = wheelPrizeByKey(grant.key);
         if (!prize) continue;
         const existing = haul.find((h) => h.prize.key === prize.key);
-        if (existing) existing.total += grant.amount;
-        else haul.push({ prize, total: grant.amount });
+        if (existing) {
+          existing.total += grant.amount;
+          existing.count += 1;
+        } else {
+          haul.push({ prize, total: grant.amount, count: 1 });
+        }
       }
     }
     setSpinsLeft(left);
@@ -292,6 +299,11 @@ export function WheelOfFortune({
                   >
                     <span className="text-sm">{h.prize.icon}</span>
                     {h.prize.label}
+                    {h.count >= 2 && (
+                      <span className="nums rounded bg-gold/25 px-1 text-[10px] font-black text-gold-bright" dir="ltr">
+                        ×{h.count}
+                      </span>
+                    )}
                     <span className="nums rounded bg-emerald-400/25 px-1 text-[10px] text-gold-bright" dir="ltr">
                       {h.prize.kind === "unit" ? `x${h.total}` : `+${formatNumber(h.total)}`}
                     </span>

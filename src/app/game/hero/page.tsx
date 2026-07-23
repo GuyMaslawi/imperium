@@ -10,6 +10,7 @@ import { HeroPowerSummary } from "@/components/game/HeroPowerSummary";
 import { HeroResetButton } from "@/components/game/HeroResetButton";
 import type { HeroItemView } from "@/components/game/heroItemView";
 import { formatNumber } from "@/lib/game/format";
+import { wheelLuckBonus } from "@/lib/game/constants";
 import {
   HERO_MAX_LEVEL,
   heroBonuses,
@@ -35,6 +36,10 @@ export default async function HeroPage() {
     items.map(({ id, slot, level }) => ({ id, slot, level, rarity: tierForLevel(level) }));
   const bagItems = toView(hero.items.filter((i) => !i.equipped));
   const equippedItems = toView(hero.items.filter((i) => i.equipped));
+  // Wheel-luck upgrade raises the chance a thrown item pays a wheel spin.
+  const wheelSpinBonus = wheelLuckBonus(
+    empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
+  );
 
   return (
     <div className="space-y-6">
@@ -54,7 +59,12 @@ export default async function HeroPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {/* -------- inventory (right in RTL) -------- */}
-        <HeroBag items={bagItems} heroLevel={hero.level} gold={empire.gold} />
+        <HeroBag
+          items={bagItems}
+          heroLevel={hero.level}
+          gold={empire.gold}
+          wheelSpinBonus={wheelSpinBonus}
+        />
 
         {/* -------- hero (left in RTL) -------- */}
         <div className="panel rounded-xl p-4">
@@ -141,6 +151,7 @@ export default async function HeroPage() {
               equipped={equippedItems}
               heroLevel={hero.level}
               gold={empire.gold}
+              wheelSpinBonus={wheelSpinBonus}
             />
 
             {/* stat cards + point allocation (points only — items excluded) */}

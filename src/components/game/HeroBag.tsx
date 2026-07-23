@@ -40,10 +40,13 @@ export function HeroBag({
   items,
   heroLevel,
   gold,
+  wheelSpinBonus = 0,
 }: {
   items: HeroItemView[];
   heroLevel: number;
   gold: number;
+  /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
+  wheelSpinBonus?: number;
 }) {
   const [filter, setFilter] = useState<HeroRarity | null>(null);
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
@@ -333,6 +336,7 @@ export function HeroBag({
           heroLevel={heroLevel}
           gold={gold}
           equipped={false}
+          wheelSpinBonus={wheelSpinBonus}
           onClose={() => setOpenItem(null)}
         />
       )}

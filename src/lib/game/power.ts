@@ -1,5 +1,10 @@
 import type { Army } from "@prisma/client";
-import { DEFENSE_BONUS, SOLDIER_POWER, SPY_POWER } from "./constants";
+import {
+  DEFENSE_BONUS,
+  intelligencePowerMultiplier,
+  SOLDIER_POWER,
+  SPY_POWER,
+} from "./constants";
 import { bonusMultiplier } from "./hero";
 import { weaponsPower, type WeaponQuantityRow } from "./weapons";
 
@@ -46,6 +51,23 @@ export function getEmpireSpyPower(
   weapons: readonly WeaponQuantityRow[]
 ): number {
   return spiesPower(army) + weaponsPower(weapons, "SPY");
+}
+
+/**
+ * Effective intelligence power used to resolve spy missions: the raw spy power
+ * (spies + spy weapons) scaled by the intelligence upgrade (+10%/level) plus any
+ * extra percentage-point bonuses (e.g. an attacker's hero spy % and active guild
+ * spy spell). A mission succeeds when the attacker's value strictly exceeds the
+ * defender's.
+ */
+export function getEmpireIntelPower(
+  army: Pick<Army, "spies"> | null,
+  weapons: readonly WeaponQuantityRow[],
+  intelligenceLevel: number,
+  extraBonusPct = 0
+): number {
+  const base = getEmpireSpyPower(army, weapons);
+  return base * (intelligencePowerMultiplier(intelligenceLevel) + extraBonusPct / 100);
 }
 
 /**

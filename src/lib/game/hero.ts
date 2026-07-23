@@ -601,11 +601,14 @@ export function discardWheelSpinChance(level: number): number {
 
 /**
  * Roll whether throwing away an item of the given level grants a wheel spin.
- * The server owns this roll, exactly like item drops.
+ * `bonus` is the empire's wheel-luck upgrade bonus (a fraction, e.g. 0.1 = +10%)
+ * added on top of the item's rarity-based chance. The server owns this roll,
+ * exactly like item drops.
  */
 export function rollDiscardWheelSpin(
   level: number,
+  bonus = 0,
   random: () => number = Math.random
 ): boolean {
-  return random() < discardWheelSpinChance(level);
+  return random() < discardWheelSpinChance(level) + bonus;
 }

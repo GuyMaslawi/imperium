@@ -7,6 +7,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
+import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
 import type { AvailableResources } from "@/components/game/WeaponCard";
 
 const COST_RESOURCES = [
@@ -17,13 +18,7 @@ const COST_RESOURCES = [
 ] as const;
 
 export interface UpgradeCardProps {
-  upgradeType:
-    | "CITIZEN_GROWTH"
-    | "DIAMOND_YIELD"
-    | "INTELLIGENCE"
-    | "BANK_DEPOSIT_COUNT"
-    | "BANK_DAILY_INTEREST"
-    | "TURNS_PER_REGULAR_UPDATE";
+  upgradeType: ActiveEmpireUpgradeType;
   label: string;
   icon: string;
   description: string;

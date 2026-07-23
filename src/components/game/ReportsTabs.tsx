@@ -38,6 +38,8 @@ export type SpyRow = {
   turnsSpent: number;
   finalChance: number | null;
   weaponsBonus: number | null;
+  attackerIntel: number | null;
+  defenderIntel: number | null;
   revealedGold: number;
   revealedWood: number;
   revealedIron: number;
@@ -247,14 +249,25 @@ export function ReportsTabs({
                       </span>
                       <p className="mt-1 text-xs text-zinc-500">
                         עלות: {num(r.turnsSpent)} תורות
-                        {r.finalChance !== null && (
+                        {r.attackerIntel !== null && r.defenderIntel !== null ? (
                           <>
                             {" "}
-                            · סיכוי:{" "}
+                            · כח מודיעין:{" "}
                             <span className="nums" dir="ltr">
-                              {Math.round((r.finalChance ?? 0) * 100)}%
+                              {num(Math.round(r.attackerIntel))} מול{" "}
+                              {num(Math.round(r.defenderIntel))}
                             </span>
                           </>
+                        ) : (
+                          r.finalChance !== null && (
+                            <>
+                              {" "}
+                              · סיכוי:{" "}
+                              <span className="nums" dir="ltr">
+                                {Math.round((r.finalChance ?? 0) * 100)}%
+                              </span>
+                            </>
+                          )
                         )}
                       </p>
                     </td>

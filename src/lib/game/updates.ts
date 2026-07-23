@@ -117,11 +117,9 @@ export async function applyPendingUpdates(
     const capacity = citizenCapacity(empire.cities);
     citizensGained = Math.max(0, Math.min(citizensGained, capacity - empire.citizens));
 
-    const diamondLevel =
-      empire.upgrades.find((u) => u.type === "DIAMOND_YIELD")?.level ?? 1;
-    diamondsGained =
-      Math.round(diamondLevel * tunables.daily.diamondsPerLevel * missedDailies.length) +
-      heroBonus.itemsFlat.diamonds * missedDailies.length;
+    // Diamonds now come only from hero items on the daily update; the retired
+    // DIAMOND_YIELD upgrade no longer contributes.
+    diamondsGained = heroBonus.itemsFlat.diamonds * missedDailies.length;
   }
 
   // Top up wheel spins once per missed daily update, capped so they can't bank

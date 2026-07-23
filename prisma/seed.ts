@@ -36,7 +36,6 @@ const STORAGE_TYPES: ResourceStorageType[] = ["GOLD", "WOOD", "IRON", "STONE"];
 
 const UPGRADE_TYPES: EmpireUpgradeType[] = [
   "CITIZEN_GROWTH",
-  "DIAMOND_YIELD",
   "INTELLIGENCE",
   "BANK_DEPOSIT_COUNT",
   "BANK_DAILY_INTEREST",

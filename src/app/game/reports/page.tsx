@@ -84,6 +84,8 @@ export default async function ReportsPage() {
     turnsSpent: report.turnsSpent,
     finalChance: report.finalChance,
     weaponsBonus: report.weaponsBonus,
+    attackerIntel: report.attackerIntel,
+    defenderIntel: report.defenderIntel,
     revealedGold: report.revealedGold ?? 0,
     revealedWood: report.revealedWood ?? 0,
     revealedIron: report.revealedIron ?? 0,
