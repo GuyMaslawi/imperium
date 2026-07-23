@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import {
   BUILDING_TYPES,
   EMPIRE_UPGRADE_TYPES,
+  NEWBIE_PROTECTION_MS,
   STORAGE_TYPES,
   isProductionBuilding,
 } from "./constants";
@@ -46,6 +47,8 @@ export function newEmpireData(
     // CURRENT_TIMESTAMP default, which follows the server timezone and can
     // land "in the future" relative to Prisma-written UTC timestamps.
     reportsSeenAt: new Date(),
+    // New-player shield — see NEWBIE_PROTECTION_MS. Cleared early on first attack/spy.
+    protectedUntil: new Date(Date.now() + NEWBIE_PROTECTION_MS),
     buildings: {
       create: BUILDING_TYPES.map((type) => ({
         type,

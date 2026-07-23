@@ -9,7 +9,6 @@ import {
   buyShopDiscount,
   buyTurns,
   castBankInterestSpell,
-  castCitySiegeSpell,
   resetHeroPointsWithDiamonds,
 } from "@/server/actions/diamondShop";
 import {
@@ -17,7 +16,6 @@ import {
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
   BANK_INTEREST_SPELL_COST,
-  CITY_SPELL_COST,
   HERO_POINTS_RESET_COST,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_PCT,
@@ -347,87 +345,6 @@ function BankInterestCard({
   );
 }
 
-/* ------------------------------ city siege spell ------------------------------ */
-
-export interface SiegeTarget {
-  id: string;
-  name: string;
-  cities: number;
-}
-
-function CitySiegeCard({
-  targets,
-  readyAt,
-  diamonds,
-  casterCities,
-}: {
-  targets: SiegeTarget[];
-  readyAt: string | null;
-  diamonds: number;
-  casterCities: number;
-}) {
-  const [state, action] = useActionState<ActionState, FormData>(castCitySiegeSpell, {});
-  const locked = casterCities <= 1;
-  const noTargets = targets.length === 0;
-
-  return (
-    <div className="panel-inset flex flex-col gap-1.5 rounded-lg p-3">
-      <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-        <span aria-hidden className="text-lg">🏙️</span>
-        קסם ירידת עיר
-      </p>
-      <p className="text-[11px] text-zinc-500">
-        מוריד ליריב עיר אחת (ומקטין את קיבולת האזרחים שלו בהתאם). ניתן להטיל אחת
-        לשעה. לא ניתן לפגוע ביריב שנותרה לו עיר אחת בלבד. נפתח מעיר 2 ומעלה.
-      </p>
-
-      <form className="mt-auto grid gap-1.5">
-        {locked ? (
-          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            נפתח מעיר 2 ומעלה
-          </span>
-        ) : readyAt ? (
-          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            בקירור · זמין ב־{whenLabel(readyAt)}
-          </span>
-        ) : noTargets ? (
-          <span className="rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            אין יעדים זמינים
-          </span>
-        ) : (
-          <>
-            <select
-              name="targetEmpireId"
-              required
-              defaultValue=""
-              dir="rtl"
-              className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-xs text-zinc-100 focus:border-gold/60 focus:outline-none"
-            >
-              <option value="" disabled>
-                בחר יעד…
-              </option>
-              {targets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name} · {t.cities} ערים
-                </option>
-              ))}
-            </select>
-            <SubmitButton
-              className="btn btn-gold w-full"
-              formAction={action}
-              disabled={diamonds < CITY_SPELL_COST}
-              pendingText="מוריד עיר..."
-            >
-              הורד עיר · {CITY_SPELL_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
-            </SubmitButton>
-          </>
-        )}
-      </form>
-      <FormMessage error={state.error} success={state.success} />
-    </div>
-  );
-}
-
 /* ------------------------------ shop shell ------------------------------ */
 
 export interface DiamondShopProps {
@@ -439,9 +356,6 @@ export interface DiamondShopProps {
   pointsResetUsed: boolean;
   interestPreview: number;
   bankReadyAt: string | null;
-  citySiegeReadyAt: string | null;
-  siegeTargets: SiegeTarget[];
-  casterCities: number;
 }
 
 export function DiamondShop({
@@ -453,9 +367,6 @@ export function DiamondShop({
   pointsResetUsed,
   interestPreview,
   bankReadyAt,
-  citySiegeReadyAt,
-  siegeTargets,
-  casterCities,
 }: DiamondShopProps) {
   return (
     <div className="space-y-8">
@@ -489,12 +400,6 @@ export function DiamondShop({
             allocatedPoints={allocatedPoints}
             used={pointsResetUsed}
             diamonds={diamonds}
-          />
-          <CitySiegeCard
-            targets={siegeTargets}
-            readyAt={citySiegeReadyAt}
-            diamonds={diamonds}
-            casterCities={casterCities}
           />
         </div>
       </section>

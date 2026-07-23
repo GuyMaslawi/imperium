@@ -2,8 +2,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { getEmpireMilitaryPower } from "@/lib/game/power";
-import { applyPendingUpdates } from "@/lib/game/updates";
-import { lastDailyUpdate } from "@/lib/game/time";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -18,25 +16,14 @@ export default async function RankingsPage() {
   // spy) empires that hold the same number of cities as you.
   const myCity = myEmpire.cities;
 
-  // The game clock is lazy (applied when an empire is loaded), so empires of
-  // players who haven't logged in since the last daily update would show
-  // stale numbers here. Settle just those — at most twice a day per empire.
-  const staleDaily = await prisma.empire.findMany({
-    where: {
-      id: { not: myEmpire.id },
-      cities: myCity,
-      lastDailyUpdateAt: { lt: lastDailyUpdate(new Date()) },
-    },
-    select: { id: true },
-  });
-  await Promise.all(
-    staleDaily.map((empire) =>
-      applyPendingUpdates(empire.id).catch(() => {
-        // Best-effort: a failed settle must never block the rankings.
-      })
-    )
-  );
-
+  // The game clock is lazy — every empire settles its own backlog when its owner
+  // loads a page or acts. We deliberately do NOT settle other empires here:
+  // doing so meant one rankings view could fire a heavy multi-query settle for
+  // every stale empire in the city at once (a thundering herd right after each
+  // 07:30 / 19:30 daily boundary, when all of them are stale), which could
+  // exhaust the connection pool and stall the whole app. Offline players show
+  // their last-settled gold until they next log in — it self-heals on their next
+  // load, and the numbers shown here (gold/soldiers) drift only slowly anyway.
   const empires = await prisma.empire.findMany({
     where: { cities: myCity },
     include: { army: true, weapons: true, hero: true },

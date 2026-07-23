@@ -92,13 +92,3 @@ export const HERO_POINTS_RESET_COST = 100;
 export const BANK_INTEREST_SPELL_COST = 60;
 export const BANK_INTEREST_COOLDOWN_HOURS = 24;
 export const BANK_INTEREST_COOLDOWN_MS = BANK_INTEREST_COOLDOWN_HOURS * 3_600_000;
-
-/* ------------------------------ city downgrade spell ------------------------------ */
-
-/** DiamondEffectKind that stores the city-downgrade cooldown for the caster. */
-export const CITY_SPELL_KIND: DiamondEffectKind = "CITY_SIEGE";
-/** Diamonds to downgrade an enemy by one city. */
-export const CITY_SPELL_COST = 120;
-/** The spell recharges once per hour. */
-export const CITY_SPELL_COOLDOWN_HOURS = 1;
-export const CITY_SPELL_COOLDOWN_MS = CITY_SPELL_COOLDOWN_HOURS * 3_600_000;

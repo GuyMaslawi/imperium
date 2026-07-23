@@ -451,6 +451,12 @@ export async function withdrawGuildGold(
   const amount = parsed.data;
 
   return runMemberAction(async (membership, tx, empireId) => {
+    // Withdrawing spends the shared treasury — restrict to leadership so a plain
+    // member can't join, drain the whole bank, and leave. Mirrors the same block
+    // on the capacity/aid upgrades that also spend the treasury.
+    if (membership.role === "MEMBER") {
+      return { error: "רק מנהיג או סגן יכולים למשוך מקופת הברית." };
+    }
     // Guarded debit against the shared treasury.
     const withdrawn = await tx.guild.updateMany({
       where: { id: membership.guildId, goldBalance: { gte: amount } },

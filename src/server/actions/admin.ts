@@ -957,9 +957,16 @@ export async function resetSeason(
     }
 
     const tunables = await getTunables();
+    // The game runs a single active season for everyone; a reset re-homes every
+    // rebuilt empire onto it (matching what fresh registrations get), rather
+    // than preserving each empire's stale prior seasonId.
+    const activeSeason = await prisma.gameSeason.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
     // Carry over only the identity + diamond balance of each empire.
     const empires = await prisma.empire.findMany({
-      select: { userId: true, name: true, seasonId: true, diamonds: true },
+      select: { userId: true, name: true, diamonds: true },
     });
 
     await prisma.$transaction(
@@ -975,10 +982,14 @@ export async function resetSeason(
           const data = newEmpireData(
             e.userId,
             e.name,
-            e.seasonId ?? undefined,
+            activeSeason?.id,
             tunables.starting
           );
           data.diamonds = e.diamonds;
+          // No new-player shield on a season reset: everyone restarts equal and
+          // may compete immediately. The shield is only for genuine mid-season
+          // registrations joining among established players.
+          data.protectedUntil = null;
           await tx.empire.create({ data });
         }
       },

@@ -42,6 +42,9 @@ export async function applyPendingUpdates(
   const empire = await tx.empire.findUniqueOrThrow({
     where: { id: empireId },
     include: FULL_EMPIRE_INCLUDE,
+    // One JOINed query instead of ~10 (one per relation). This runs on every
+    // /game page load via requireEmpire, so it's the app's hottest read.
+    relationLoadStrategy: "join",
   });
 
   // Empires created before the hero system get their hero lazily.
@@ -198,11 +201,18 @@ export async function applyPendingUpdates(
       interestEntries.push({ amount: interest, balanceAfter: balance, createdAt: dailyAt });
     }
 
-    // Every daily update opens a new deposit period.
+    // Every daily update opens a new deposit period. Credit the accrued
+    // interest as an *increment*, never an absolute set: this settle can run
+    // without an outer transaction (see requireEmpire / the rankings page), so a
+    // concurrent deposit/withdraw may commit between the read at the top of this
+    // function and this write. An absolute `goldBalance: balance` would clobber
+    // that concurrent bank action (lost update — duplicating or destroying
+    // gold); the delta form composes with it. Matches castBankInterestSpell.
+    const accruedInterest = balance - bankAccount.goldBalance;
     await tx.bankAccount.update({
       where: { id: bankAccount.id },
       data: {
-        goldBalance: balance,
+        goldBalance: { increment: accruedInterest },
         depositsUsedInCurrentPeriod: 0,
         depositPeriodStartedAt: missedDailies[missedDailies.length - 1],
       },
@@ -224,5 +234,6 @@ export async function applyPendingUpdates(
   return tx.empire.findUniqueOrThrow({
     where: { id: empireId },
     include: FULL_EMPIRE_INCLUDE,
+    relationLoadStrategy: "join",
   });
 }

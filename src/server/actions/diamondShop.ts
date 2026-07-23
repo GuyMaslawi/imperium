@@ -6,7 +6,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
-import { bankInterestRate, citizenCapacity } from "@/lib/game/constants";
+import { bankInterestRate } from "@/lib/game/constants";
 import {
   BANK_INTEREST_COOLDOWN_MS,
   BANK_INTEREST_SPELL_COST,
@@ -14,9 +14,6 @@ import {
   BOOST_MAX_PCT,
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
-  CITY_SPELL_COOLDOWN_MS,
-  CITY_SPELL_COST,
-  CITY_SPELL_KIND,
   HERO_POINTS_RESET_COST,
   RESOURCE_BOOST_KIND,
   SHOP_DISCOUNT_COST,
@@ -349,96 +346,3 @@ export async function castBankInterestSpell(
   }
 }
 
-/* ------------------------------ city downgrade spell ------------------------------ */
-
-const citySiegeSchema = z.object({ targetEmpireId: z.string().min(1) });
-
-/**
- * Downgrade an enemy empire by one city: the target loses a city (and its
- * citizen count is clamped down to the reduced capacity). Costs diamonds and
- * recharges once per hour. A target holding a single city — its founding city —
- * cannot be downgraded. All debits are guarded so concurrent casts can never
- * over-spend diamonds or push the target below one city.
- */
-export async function castCitySiegeSpell(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = citySiegeSchema.safeParse({
-    targetEmpireId: formData.get("targetEmpireId"),
-  });
-  if (!parsed.success) return { error: "יעד לא תקין" };
-  const { targetEmpireId } = parsed.data;
-
-  try {
-    const empireId = await requireOwnEmpireId();
-    if (empireId === targetEmpireId) {
-      return { error: "לא ניתן להטיל על האימפריה שלך" };
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-      await lockEmpire(tx, empireId);
-      const caster = await applyPendingUpdates(empireId, tx);
-      const now = new Date();
-
-      // The spell is only unlocked once the caster holds a second city — an
-      // empire still on its founding city cannot besiege anyone.
-      if (caster.cities <= 1) {
-        return { error: "הקסם נפתח רק מעיר 2 ומעלה" };
-      }
-
-      // Cooldown lives on the caster.
-      const cd = await tx.diamondEffect.findUnique({
-        where: { empireId_kind: { empireId, kind: CITY_SPELL_KIND } },
-      });
-      if (cd?.readyAt && cd.readyAt > now) {
-        const mins = Math.ceil((cd.readyAt.getTime() - now.getTime()) / 60_000);
-        return { error: `הקסם בקירור — זמין בעוד כ־${mins} דקות` };
-      }
-
-      // Settle the target's clock so its city/citizen counts are current.
-      const target = await applyPendingUpdates(targetEmpireId, tx).catch(() => null);
-      if (!target) return { error: "האימפריה המבוקשת לא נמצאה" };
-      if (target.cities <= 1) {
-        return { error: "ליריב נותרה עיר אחת בלבד — אין מה להוריד" };
-      }
-
-      if (!(await spendDiamonds(tx, empireId, CITY_SPELL_COST))) {
-        return { error: "אין מספיק יהלומים" };
-      }
-
-      // Remove one city, guarded on the exact count we read: if a concurrent
-      // cast already changed it, this hits nothing and we throw to refund diamonds.
-      const before = target.cities;
-      const razed = await tx.empire.updateMany({
-        where: { id: targetEmpireId, cities: before },
-        data: { cities: { decrement: 1 } },
-      });
-      if (razed.count === 0) throw new Error("city count changed");
-
-      // Clamp the target's citizens down to the smaller capacity (never up).
-      const after = before - 1;
-      const cap = citizenCapacity(after);
-      await tx.empire.updateMany({
-        where: { id: targetEmpireId, citizens: { gt: cap } },
-        data: { citizens: cap },
-      });
-
-      const readyAt = new Date(now.getTime() + CITY_SPELL_COOLDOWN_MS);
-      await tx.diamondEffect.upsert({
-        where: { empireId_kind: { empireId, kind: CITY_SPELL_KIND } },
-        create: { empireId, kind: CITY_SPELL_KIND, readyAt },
-        update: { readyAt, activeUntil: null },
-      });
-
-      return {
-        success: `הקסם הוטל! ${target.name} ירד עיר אחת — נותרו לו ${after} ערים.`,
-      };
-    });
-
-    revalidateGame();
-    return result;
-  } catch {
-    return { error: "אירעה שגיאה, נסה שוב" };
-  }
-}

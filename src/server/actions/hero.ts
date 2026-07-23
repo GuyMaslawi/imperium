@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
@@ -22,6 +23,21 @@ import {
   tierForLevel,
 } from "@/lib/game/hero";
 import type { ActionState } from "./game";
+
+/**
+ * Serialize concurrent hero mutations by taking a row lock on the hero.
+ * Equip/unequip do a read-check-write on the item set; under Postgres READ
+ * COMMITTED two parallel requests would otherwise both pass their checks and
+ * commit — letting several items occupy one slot (stacking bonuses) or the bag
+ * overflow its cap. Callers acquire this before mutating item state and must
+ * re-read any count they gate on *after* the lock. Mirrors lockEmpire.
+ */
+async function lockHero(
+  tx: Prisma.TransactionClient,
+  heroId: string
+): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM "Hero" WHERE id = ${heroId} FOR UPDATE`;
+}
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -172,6 +188,13 @@ export async function equipHeroItem(
         };
       }
 
+      // Serialize concurrent equips before touching the slot: the unequip-slot
+      // updateMany below clears whatever is equipped *under this lock*, so even
+      // two racing equips of same-slot items end with exactly one equipped
+      // (the second waits, then unequips the first's item before equipping its
+      // own). Without this both would set equipped=true and stack the bonus.
+      await lockHero(tx, hero.id);
+
       // Swap: the currently equipped item in that slot returns to the bag.
       await tx.heroItem.updateMany({
         where: { heroId: hero.id, slot: item.slot, equipped: true },
@@ -211,7 +234,15 @@ export async function unequipHeroItem(
       const item = hero.items.find((i) => i.id === itemId);
       if (!item || !item.equipped) return { error: "הפריט אינו לבוש" };
 
-      const bagCount = hero.items.filter((i) => !i.equipped).length;
+      // Serialize with other hero item mutations, then re-count the bag *under
+      // the lock* — the snapshot count from applyPendingUpdates was read before
+      // the lock, so two racing unequips could both pass a stale check and
+      // overflow the cap. The live count reflects any equip/unequip that
+      // committed while we waited for the lock.
+      await lockHero(tx, hero.id);
+      const bagCount = await tx.heroItem.count({
+        where: { heroId: hero.id, equipped: false },
+      });
       if (bagCount >= HERO_BAG_CAPACITY) {
         return { error: "התיק מלא — לא ניתן להסיר את הפריט" };
       }

@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession } from "@/lib/auth";
+import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
 
@@ -16,13 +17,20 @@ const registerSchema = z.object({
   name: z.string().trim().min(2, "שם חייב להכיל לפחות 2 תווים").max(40),
   empireName: z.string().trim().min(2, "שם האימפריה חייב להכיל לפחות 2 תווים").max(40),
   email: z.string().trim().toLowerCase().email("כתובת אימייל לא תקינה"),
-  password: z.string().min(6, "סיסמה חייבת להכיל לפחות 6 תווים").max(100),
+  password: z.string().min(8, "סיסמה חייבת להכיל לפחות 8 תווים").max(100),
 });
 
 export async function register(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  // Throttle mass account/empire creation from one origin (resource exhaustion,
+  // empire-name squatting). Generous enough not to hinder a real person.
+  const ip = await clientIp();
+  if (!rateLimit(`register:${ip}`, 5, 60 * 60 * 1000).ok) {
+    return { error: "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר." };
+  }
+
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     empireName: formData.get("empireName"),
@@ -91,6 +99,15 @@ export async function login(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  // Two-axis throttle against online brute force: a broad per-IP cap (a single
+  // origin hammering many accounts) and a tighter per-email cap (many origins
+  // targeting one account). Either tripping refuses the attempt without a DB or
+  // bcrypt round, so throttled traffic stays cheap.
+  const ip = await clientIp();
+  if (!rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000).ok) {
+    return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
+  }
+
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
     password: formData.get("password"),
@@ -99,6 +116,10 @@ export async function login(
     return { error: parsed.error.issues[0].message };
   }
   const { email, password } = parsed.data;
+
+  if (!rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000).ok) {
+    return { error: "יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר." };
+  }
 
   const user = await prisma.user.findUnique({ where: { email } });
   // Always run a bcrypt.compare (against a dummy hash when the user is missing)

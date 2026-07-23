@@ -351,8 +351,8 @@ export function citizenCapacity(cities: number): number {
 /**
  * Mine-production multiplier granted by the empire's cities: output scales
  * linearly with the current city count (×1 at one city, ×10 at ten). Because it
- * is derived from the live `cities` value on every tick, losing a city — e.g. to
- * an enemy CITY_SIEGE spell — lowers production automatically.
+ * is derived from the live `cities` value on every tick, losing a city lowers
+ * production automatically.
  */
 export function cityProductionMultiplier(cities: number): number {
   return cities;
@@ -387,6 +387,14 @@ export const ATTACK_TURN_COST = 10;
 
 /** Turns spent per spy mission. */
 export const SPY_TURN_COST = 5;
+
+/**
+ * New-player protection window: a fresh empire can't be attacked or spied for
+ * this long after registration, so newcomers aren't farmed the moment they join.
+ * It ends early the instant the player launches their own first attack/spy —
+ * you can't hide behind the shield while acting aggressively.
+ */
+export const NEWBIE_PROTECTION_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 export const TURNS_UPGRADE_MAX_LEVEL = 5;
 

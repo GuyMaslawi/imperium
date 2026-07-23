@@ -1,5 +1,9 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // relationJoins lets hot reads (FULL_EMPIRE_INCLUDE, run on every /game page
+  // load) fetch all relations in one JOINed query via relationLoadStrategy:
+  // "join", instead of Prisma's default one-query-per-relation (~10 round-trips).
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -146,6 +150,10 @@ model Empire {
   lastDailyUpdateAt   DateTime @default(now())
   /// Last time the player opened the reports page — drives the "new reports" badge.
   reportsSeenAt       DateTime @default(now())
+  /// New-player shield: while this is in the future the empire cannot be
+  /// attacked or spied. Set at registration; cleared early the moment the
+  /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).
+  protectedUntil      DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
@@ -169,6 +177,12 @@ model Empire {
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
   diamondPurchases   DiamondPurchase[]
+
+  // Rankings filters empires by city; admin broadcast/gift/reset scope by
+  // season. Without these, both are full-table scans that grow with the player
+  // base. The composite also serves the (now-removed) stale-daily settle query.
+  @@index([cities, lastDailyUpdateAt])
+  @@index([seasonId])
 }
 
 /* --------------------------- diamond store (real money) --------------------------- */
@@ -252,7 +266,6 @@ enum DiamondEffectKind {
   RESOURCE_BOOST_STONE
   SHOP_DISCOUNT
   BANK_INTEREST
-  CITY_SIEGE
   TURN_PACK_1
   TURN_PACK_2
   TURN_PACK_3
@@ -624,6 +637,12 @@ model SpyReport {
 
   attackerEmpire Empire @relation("SpyAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("SpyDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)
+
+  // Reports/base pages query "my spies sent" and "spies against me" newest-first;
+  // the empire profile looks up the latest spy on a target. Unindexed these scan
+  // the whole (ever-growing) report table.
+  @@index([attackerEmpireId, createdAt])
+  @@index([defenderEmpireId, createdAt])
 }
 
 model BattleReport {
@@ -670,4 +689,11 @@ model BattleReport {
 
   attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)
+
+  // Reports/base pages query battles by attacker and by defender newest-first;
+  // the leaderboards "biggest theft" board groups by createdAt window. All three
+  // are hot paths that would otherwise scan the whole battle-report table.
+  @@index([attackerEmpireId, createdAt])
+  @@index([defenderEmpireId, createdAt])
+  @@index([createdAt])
 }

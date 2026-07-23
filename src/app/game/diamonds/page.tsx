@@ -66,20 +66,6 @@ export default async function DiamondsPage() {
       ? bankEffect.readyAt.toISOString()
       : null;
 
-  // City-downgrade spell: cooldown lives on the caster, and only empires holding
-  // more than their founding city can be targeted.
-  const citySiegeEffect = byKind.get("CITY_SIEGE");
-  const citySiegeReadyAt =
-    citySiegeEffect?.readyAt != null && citySiegeEffect.readyAt > now
-      ? citySiegeEffect.readyAt.toISOString()
-      : null;
-  const siegeTargets = await prisma.empire.findMany({
-    where: { id: { not: empire.id }, cities: { gt: 1 } },
-    select: { id: true, name: true, cities: true },
-    orderBy: [{ cities: "desc" }, { name: "asc" }],
-    take: 100,
-  });
-
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -122,9 +108,6 @@ export default async function DiamondsPage() {
         pointsResetUsed={pointsResetUsed}
         interestPreview={interestPreview}
         bankReadyAt={bankReadyAt}
-        citySiegeReadyAt={citySiegeReadyAt}
-        siegeTargets={siegeTargets}
-        casterCities={empire.cities}
       />
     </div>
   );

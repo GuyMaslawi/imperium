@@ -526,6 +526,45 @@ async function spendTurns(
   return updated.count > 0;
 }
 
+/**
+ * Why a target may not be attacked or spied: it still holds a new-player shield,
+ * or its owner is banned (a banned/dormant account must not be farmable). Returns
+ * a user-facing reason, or null when the target is fair game.
+ */
+async function targetBlockedReason(
+  tx: Prisma.TransactionClient,
+  target: { id: string; protectedUntil: Date | null },
+  now: Date
+): Promise<string | null> {
+  if (target.protectedUntil && target.protectedUntil > now) {
+    return "האימפריה הזו מוגנת (שחקן חדש) — לא ניתן לתקוף או לרגל אותה עדיין.";
+  }
+  const owner = await tx.empire.findUnique({
+    where: { id: target.id },
+    select: { user: { select: { bannedAt: true } } },
+  });
+  if (owner?.user.bannedAt) return "האימפריה הזו אינה זמינה.";
+  return null;
+}
+
+/**
+ * Launching an offensive action (attack or spy) ends the actor's own new-player
+ * shield — you can't scout or raid from behind protection. No-op once expired.
+ */
+async function dropOwnShield(
+  tx: Prisma.TransactionClient,
+  empireId: string,
+  attacker: { protectedUntil: Date | null },
+  now: Date
+): Promise<void> {
+  if (attacker.protectedUntil && attacker.protectedUntil > now) {
+    await tx.empire.update({
+      where: { id: empireId },
+      data: { protectedUntil: null },
+    });
+  }
+}
+
 export async function spyOnEmpire(
   _prev: ActionState,
   formData: FormData
@@ -564,11 +603,18 @@ export async function spyOnEmpire(
         return { error: "לא ניתן לרגל אחר אימפריה שאינה בעיר שלך." };
       }
 
+      // Shielded newcomers and banned accounts are off-limits.
+      const now = new Date();
+      const blocked = await targetBlockedReason(tx, defender, now);
+      if (blocked) return { error: blocked };
+
       // All validations passed — the mission launches, so it costs turns
       // whether the spy succeeds or fails.
       if (!(await spendTurns(tx, empireId, SPY_TURN_COST))) {
         return { error: "אין לך מספיק תורות לביצוע ריגול." };
       }
+      // Acting aggressively drops your own new-player shield.
+      await dropOwnShield(tx, empireId, attacker, now);
 
       // Spy missions resolve deterministically: the attacker's intelligence
       // power against the defender's. Both sides scale their raw spy power
@@ -703,6 +749,11 @@ export async function attackEmpire(
         return { error: "לא ניתן לתקוף אימפריה שאינה בעיר שלך." };
       }
 
+      // Shielded newcomers and banned accounts can't be attacked.
+      const now = new Date();
+      const blocked = await targetBlockedReason(tx, defender, now);
+      if (blocked) return { error: blocked };
+
       const attackerArmy = attacker.army;
       const defenderArmy = defender.army;
 
@@ -715,6 +766,8 @@ export async function attackEmpire(
       if (!(await spendTurns(tx, empireId, ATTACK_TURN_COST))) {
         return { error: "אין לך מספיק תורות לביצוע תקיפה." };
       }
+      // Acting aggressively drops your own new-player shield.
+      await dropOwnShield(tx, empireId, attacker, now);
 
       // Soldiers plus weapons fight: attack weapons boost the attacker,
       // defense weapons boost the defender, and the defender still gets
