@@ -29,31 +29,24 @@ function sweep(now: number): void {
   }
 }
 
-export interface RateLimitResult {
-  ok: boolean;
-  /** Seconds until the window resets (only meaningful when `ok` is false). */
-  retryAfterSec: number;
-}
-
 /**
  * Consume one hit against `key`. Allows up to `limit` hits per `windowMs`;
- * further hits in the same window are rejected until it rolls over.
+ * returns `true` while under the limit and `false` once the window is exhausted,
+ * until it rolls over.
  */
-export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+export function rateLimit(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   const existing = buckets.get(key);
 
   if (!existing || existing.resetAt <= now) {
     if (buckets.size >= MAX_BUCKETS) sweep(now);
     buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return { ok: true, retryAfterSec: 0 };
+    return true;
   }
 
-  if (existing.count >= limit) {
-    return { ok: false, retryAfterSec: Math.ceil((existing.resetAt - now) / 1000) };
-  }
+  if (existing.count >= limit) return false;
   existing.count += 1;
-  return { ok: true, retryAfterSec: 0 };
+  return true;
 }
 
 /**

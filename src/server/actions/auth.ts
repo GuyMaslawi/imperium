@@ -27,7 +27,7 @@ export async function register(
   // Throttle mass account/empire creation from one origin (resource exhaustion,
   // empire-name squatting). Generous enough not to hinder a real person.
   const ip = await clientIp();
-  if (!rateLimit(`register:${ip}`, 5, 60 * 60 * 1000).ok) {
+  if (!rateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
     return { error: "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר." };
   }
 
@@ -104,7 +104,7 @@ export async function login(
   // targeting one account). Either tripping refuses the attempt without a DB or
   // bcrypt round, so throttled traffic stays cheap.
   const ip = await clientIp();
-  if (!rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000).ok) {
+  if (!rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000)) {
     return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
   }
 
@@ -117,7 +117,7 @@ export async function login(
   }
   const { email, password } = parsed.data;
 
-  if (!rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000).ok) {
+  if (!rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000)) {
     return { error: "יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר." };
   }
 
