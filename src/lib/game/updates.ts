@@ -126,17 +126,22 @@ export async function applyPendingUpdates(
   }
 
   // Top up wheel spins once per missed daily update, capped so they can't bank
-  // forever. Never lowers a balance already above the cap.
-  const wheelSpins =
+  // forever. Credited as a bounded *delta* (never an absolute set): this claim
+  // can win the race even when a concurrent grant path — minigame prize, item
+  // discard, battle reward — has incremented wheelSpins without advancing
+  // lastDailyUpdateAt. An absolute `wheelSpins: value` would clobber that grant
+  // (lost update, destroying the won spins); the increment composes with it.
+  // A concurrent grant may push the total slightly past the cap, which is fine.
+  const wheelSpinsDelta =
     missedDailies.length > 0
       ? Math.max(
-          empire.wheelSpins,
+          0,
           Math.min(
-            tunables.daily.wheelSpinsCap,
-            empire.wheelSpins + tunables.daily.wheelSpins * missedDailies.length
+            tunables.daily.wheelSpinsCap - empire.wheelSpins,
+            tunables.daily.wheelSpins * missedDailies.length
           )
         )
-      : empire.wheelSpins;
+      : 0;
 
   if (ticks === 0 && missedDailies.length === 0) return empire;
 
@@ -164,7 +169,9 @@ export async function applyPendingUpdates(
       diamonds: { increment: diamondsGained },
       citizens: { increment: citizensGained },
       turns: { increment: turnsGained },
-      ...(missedDailies.length > 0 ? { wheelSpins } : {}),
+      ...(missedDailies.length > 0 && wheelSpinsDelta > 0
+        ? { wheelSpins: { increment: wheelSpinsDelta } }
+        : {}),
       // Snap to the global boundary that was just settled, so every empire
       // ticks together on round wall-clock times (XX:00, XX:05, …).
       ...(ticks > 0 ? { lastRegularUpdateAt: lastTickBoundary(now) } : {}),

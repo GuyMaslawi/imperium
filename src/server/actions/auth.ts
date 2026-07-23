@@ -42,12 +42,14 @@ export async function register(
   }
   const { name, empireName, email, password } = parsed.data;
 
-  const existingEmail = await prisma.user.findUnique({ where: { email } });
-  if (existingEmail) return { error: "כתובת האימייל כבר רשומה במערכת" };
-
-  const existingEmpire = await prisma.empire.findUnique({ where: { name: empireName } });
-  if (existingEmpire) return { error: "שם האימפריה כבר תפוס, בחר שם אחר" };
-
+  // No pre-flight "does this email exist?" query: it was both a TOCTOU race with
+  // the insert and an enumeration oracle (a fast email-taken reply, returned
+  // before the bcrypt hash below, told an attacker which emails are registered
+  // purely from latency). We always hash and attempt the insert, letting the
+  // unique constraints be the single source of truth (P2002 handling below), so
+  // both the taken and free paths do the same work. (The friendly "email taken"
+  // message is still returned on the constraint hit — full enumeration hardening
+  // would need out-of-band email verification, which the app has no infra for.)
   const passwordHash = await bcrypt.hash(password, 10);
 
   const [activeSeason, tunables] = await Promise.all([
@@ -78,7 +80,7 @@ export async function register(
     return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
   }
 
-  await createSession(user.id);
+  await createSession(user.id, user.tokenVersion);
   redirect("/game/base");
 }
 
@@ -135,7 +137,7 @@ export async function login(
     return { error: "החשבון נחסם על ידי ההנהלה" };
   }
 
-  await createSession(user.id);
+  await createSession(user.id, user.tokenVersion);
   redirect("/game/base");
 }
 

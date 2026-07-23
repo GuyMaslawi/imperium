@@ -291,6 +291,15 @@ async function applyAssignments(
   ) => Map<BuildingType, number> | { error: string }
 ): Promise<ActionState & { assigned?: Map<BuildingType, number> }> {
   return prisma.$transaction(async (tx) => {
+    // Serialize concurrent assignments for this empire. Each mine's slave count
+    // is read here and written unguarded below; a single-mine assignment keeps
+    // the *stale* read of the other three mines. Without this lock, two
+    // overlapping assignments to different mines each validate sum≤total against
+    // stale siblings and both commit — leaving sum(slavesAssigned) > mineSlaves,
+    // i.e. permanent free production. The row lock forces the second to re-read
+    // fresh values after the first commits (mirrors attackEmpire's lock).
+    await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
+
     const empire = await applyPendingUpdates(empireId, tx);
     const totalSlaves = empire.army?.mineSlaves ?? 0;
 

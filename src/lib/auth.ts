@@ -15,8 +15,14 @@ function secretKey(): Uint8Array {
   return new TextEncoder().encode(secret);
 }
 
-export async function createSession(userId: string): Promise<void> {
-  const token = await new SignJWT({ sub: userId })
+export async function createSession(
+  userId: string,
+  tokenVersion: number
+): Promise<void> {
+  // `ver` pins the session to the user's current tokenVersion. Bumping the
+  // column (e.g. on password reset) invalidates every token issued before it,
+  // so a leaked cookie can be revoked even though the JWT itself is stateless.
+  const token = await new SignJWT({ sub: userId, ver: tokenVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION_SECONDS}s`)
@@ -47,7 +53,22 @@ export const getSessionUserId = cache(async (): Promise<string | null> => {
     const { payload } = await jwtVerify(token, secretKey(), {
       algorithms: ["HS256"],
     });
-    return typeof payload.sub === "string" ? payload.sub : null;
+    const userId = typeof payload.sub === "string" ? payload.sub : null;
+    if (!userId) return null;
+
+    // Reject tokens whose version no longer matches the account's — this is how
+    // a stateless JWT gets revoked (password reset bumps tokenVersion). Tokens
+    // predating the `ver` claim read as 0, matching the column default, so they
+    // stay valid until their own reset. One indexed PK lookup, cached per request.
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { tokenVersion: true },
+    });
+    if (!user) return null;
+    const tokenVer = typeof payload.ver === "number" ? payload.ver : 0;
+    if (tokenVer !== user.tokenVersion) return null;
+
+    return userId;
   } catch {
     return null;
   }

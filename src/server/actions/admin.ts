@@ -36,6 +36,15 @@ export interface AdminActionState {
 
 /* ------------------------------ helpers ------------------------------ */
 
+/**
+ * A user-facing admin error whose message is safe to return to the client.
+ * Anything thrown that is NOT an AdminError (Prisma/DB errors, ZodError from a
+ * tampered enum field, unexpected runtime failures) is treated as internal and
+ * replaced with a generic message by `toErr`, so DB schema/column names and
+ * other internals never leak to the admin client.
+ */
+class AdminError extends Error {}
+
 function toErr(e: unknown): AdminActionState {
   // Next.js control-flow signals (redirect / notFound) are thrown as errors
   // carrying a `digest`. They must propagate so the framework can act on them —
@@ -51,8 +60,12 @@ function toErr(e: unknown): AdminActionState {
   ) {
     throw e;
   }
-  const message = e instanceof Error ? e.message : "אירעה שגיאה";
-  return { error: message };
+  // Only our own AdminError messages are safe to surface. Everything else is
+  // an internal failure — log it server-side and return a generic message so
+  // no DB/stack internals reach the client.
+  if (e instanceof AdminError) return { error: e.message };
+  console.error("[admin action]", e);
+  return { error: "אירעה שגיאה, נסה שוב" };
 }
 
 // Upper bound for any admin-entered number. Prevents a fat-fingered or hostile
@@ -70,7 +83,7 @@ function num(formData: FormData, key: string): number {
   const raw = formData.get(key);
   const n = Number(raw);
   if (raw == null || raw === "" || !Number.isFinite(n)) {
-    throw new Error(`ערך לא תקין בשדה ${key}`);
+    throw new AdminError(`ערך לא תקין בשדה ${key}`);
   }
   return clampNum(n);
 }
@@ -100,7 +113,7 @@ async function assertNotPeerAdmin(
     select: { role: true },
   });
   if (target?.role === "ADMIN") {
-    throw new Error("אין הרשאה לפעול על חשבון אדמין אחר");
+    throw new AdminError("אין הרשאה לפעול על חשבון אדמין אחר");
   }
 }
 
@@ -233,10 +246,15 @@ export async function resetUserPassword(
     const userId = str(formData, "userId");
     await assertNotPeerAdmin(admin, userId);
     const password = String(formData.get("password") ?? "");
-    if (password.length < 6) return { error: "סיסמה חייבת להכיל לפחות 6 תווים" };
+    if (password.length < 8) return { error: "סיסמה חייבת להכיל לפחות 8 תווים" };
 
     const passwordHash = await bcrypt.hash(password, 10);
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    // Bump tokenVersion so every session issued under the old password is
+    // revoked — a reset must lock out anyone holding a stale/leaked cookie.
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, tokenVersion: { increment: 1 } },
+    });
     await logAdmin(admin, {
       action: "user.reset_password",
       targetType: "user",
@@ -827,7 +845,7 @@ export async function sendGift(
 function parseDate(formData: FormData, key: string): Date {
   const raw = str(formData, key);
   const d = new Date(raw);
-  if (Number.isNaN(d.getTime())) throw new Error(`תאריך לא תקין בשדה ${key}`);
+  if (Number.isNaN(d.getTime())) throw new AdminError(`תאריך לא תקין בשדה ${key}`);
   return d;
 }
 

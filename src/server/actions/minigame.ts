@@ -131,43 +131,55 @@ export async function submitMiniGameGuess(
           tone: "info" as const,
         };
       }
-      if (entry.attempts >= event.maxAttempts) {
+
+      // Atomically claim one attempt slot. The `entry.attempts` read above is
+      // not a safe gate on its own: without a row lock, N parallel guesses all
+      // read attempts=0, all pass a check-then-act limit, and the one holding
+      // the answer reaches the solve branch — bypassing maxAttempts entirely
+      // (solve any mini-game on demand and drain the prize). This guarded
+      // updateMany serializes the spend on the entry row, so at most
+      // maxAttempts submissions ever proceed past here.
+      const attemptClaim = await tx.miniGameEntry.updateMany({
+        where: { id: entry.id, solved: false, attempts: { lt: event.maxAttempts } },
+        data: { attempts: { increment: 1 } },
+      });
+      if (attemptClaim.count === 0) {
+        const current = await tx.miniGameEntry.findUniqueOrThrow({
+          where: { id: entry.id },
+        });
         return {
-          state: toState(event, entry),
-          feedback: "נגמרו הניסיונות",
-          tone: "lose" as const,
+          state: toState(event, current),
+          feedback: current.solved ? "כבר פתרת את המשחק 🎉" : "נגמרו הניסיונות",
+          tone: current.solved ? ("info" as const) : ("lose" as const),
         };
       }
 
+      // We hold an attempt slot (attempts already incremented by 1 above).
+      const attempts = entry.attempts + 1;
       const correct = guess === answer;
 
       if (!correct) {
-        const updated = await tx.miniGameEntry.update({
-          where: { id: entry.id },
-          data: { attempts: { increment: 1 } },
-        });
         let feedback = "❌ לא נכון";
         if (event.type === "GUESS_NUMBER") {
           feedback = guess < answer ? HINT_TOO_LOW : HINT_TOO_HIGH;
         }
-        const finished = updated.attempts >= event.maxAttempts;
+        const finished = attempts >= event.maxAttempts;
         return {
-          state: toState(event, updated),
+          state: toState(event, { attempts, solved: false, won: false }),
           feedback: finished ? "😔 נגמרו הניסיונות — נסה בפעם הבאה" : feedback,
           tone: finished ? ("lose" as const) : ("hint" as const),
         };
       }
 
-      // Correct! First claim *this player's* single solve atomically. The
-      // read-check on `entry.solved` above is not enough on its own: two
-      // concurrent correct submissions both read solved=false. The guarded
-      // updateMany takes a row lock and re-checks `solved:false` after it, so
-      // only one of them flips the entry — the loser matches zero rows and skips
-      // the prize entirely. Without this the unlimited-winner (maxWinners===0)
-      // path, which has no other atomic guard, would grant the prize twice.
+      // Correct! Claim *this player's* single solve atomically. Two concurrent
+      // correct submissions both passed the attempt claim with solved=false;
+      // this guarded updateMany takes the row lock and re-checks solved:false,
+      // so only one flips the entry — the loser matches zero rows and skips the
+      // prize. Without it the unlimited-winner (maxWinners===0) path, which has
+      // no other atomic guard, would grant the prize twice.
       const solveClaim = await tx.miniGameEntry.updateMany({
         where: { id: entry.id, solved: false },
-        data: { attempts: { increment: 1 }, solved: true },
+        data: { solved: true },
       });
       if (solveClaim.count === 0) {
         const current = await tx.miniGameEntry.findUniqueOrThrow({

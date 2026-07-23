@@ -24,6 +24,11 @@ model User {
   role         Role      @default(USER)
   /// When set, the user is banned — login is refused and game access blocked.
   bannedAt     DateTime?
+  /// Bumped to invalidate every previously-issued session JWT (stateless, so a
+  /// token stays valid until expiry otherwise). Embedded as the `ver` claim at
+  /// sign time and re-checked on every request; a password reset increments it,
+  /// logging out all existing sessions. See src/lib/auth.ts.
+  tokenVersion Int       @default(0)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 

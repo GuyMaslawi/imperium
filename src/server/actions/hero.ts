@@ -285,7 +285,14 @@ export async function discardHeroItem(
       if (!item) return { error: "הפריט לא נמצא בתיק שלך" };
 
       // Scope the delete to this hero so a stale id can't touch another's gear.
-      await tx.heroItem.deleteMany({ where: { id: item.id, heroId: hero.id } });
+      // Gate the reward on an *actual* deletion: two concurrent discards of the
+      // same item both snapshot it as present, but only one deleteMany removes a
+      // row — the loser matches zero rows and must not roll the wheel, else one
+      // item prints up to N wheel spins under concurrency.
+      const { count: deleted } = await tx.heroItem.deleteMany({
+        where: { id: item.id, heroId: hero.id },
+      });
+      if (deleted === 0) return { error: "הפריט לא נמצא בתיק שלך" };
 
       // The fates may reward parting with gear — rarer items pay far more often
       // (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to +10% on top.
@@ -345,19 +352,27 @@ export async function discardHeroItems(
       const owned = hero.items.filter((i) => ids.has(i.id));
       if (owned.length === 0) return { error: "הפריטים לא נמצאו בתיק שלך" };
 
-      const { count } = await tx.heroItem.deleteMany({
-        where: { id: { in: owned.map((i) => i.id) }, heroId: hero.id },
-      });
-
       // Roll each thrown item independently — rarer gear pays a wheel spin far
       // more often (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to
       // +10% on top of every roll. The server owns every roll.
       const luckBonus = wheelLuckBonus(
         empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
       );
+      // Delete each item under its own guard and roll only for the ones THIS
+      // transaction actually removed. Rolling over the pre-delete `owned`
+      // snapshot would let two concurrent bulk discards of the same ids each
+      // roll a full set of spins for a single real deletion (spin duplication).
+      let count = 0;
       let spinsWon = 0;
-      for (const item of owned)
+      for (const item of owned) {
+        const del = await tx.heroItem.deleteMany({
+          where: { id: item.id, heroId: hero.id },
+        });
+        if (del.count === 0) continue;
+        count += del.count;
         if (rollDiscardWheelSpin(item.level, luckBonus)) spinsWon += 1;
+      }
+      if (count === 0) return { error: "הפריטים לא נמצאו בתיק שלך" };
       if (spinsWon > 0) {
         await tx.empire.update({
           where: { id: empireId },
@@ -494,10 +509,10 @@ export async function upgradeHeroItems(
       // when the guarded payment fails under a concurrent gold spend.
       let budget = empire.gold;
       let spent = 0;
-      const plan: { itemId: string; targetLevel: number }[] = [];
+      const plan: { itemId: string; fromLevel: number; targetLevel: number }[] = [];
       for (const { item, targetLevel, cost } of upgradeable) {
         if (cost > budget) break;
-        plan.push({ itemId: item.id, targetLevel });
+        plan.push({ itemId: item.id, fromLevel: item.level, targetLevel });
         budget -= cost;
         spent += cost;
       }
@@ -518,11 +533,16 @@ export async function upgradeHeroItems(
       });
       if (paid.count === 0) return { error: "אין מספיק זהב לשדרוג" };
 
-      for (const { itemId, targetLevel } of plan) {
-        await tx.heroItem.update({
-          where: { id: itemId },
+      // Guard each write on the level we read and paid for. If a concurrent
+      // upgrade already advanced an item, throw to roll back the whole batch
+      // (including the gold debit above) rather than clobbering it with a stale
+      // target — mirrors the single-item upgrade guard.
+      for (const { itemId, fromLevel, targetLevel } of plan) {
+        const res = await tx.heroItem.updateMany({
+          where: { id: itemId, level: fromLevel },
           data: { level: targetLevel, rarity: tierForLevel(targetLevel) },
         });
+        if (res.count === 0) throw new Error("bulk item upgrade conflict");
       }
 
       const upgraded = plan.length;
