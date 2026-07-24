@@ -104,7 +104,7 @@ export default async function SpyResultPage({
       {/* actions */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt)}</p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`/game/empires/${foe.id}`} className="btn btn-gold px-5 py-2 text-sm">
             <Icon name="attack" size={16} className="inline-block align-middle" /> תקוף את {foe.name}
           </Link>

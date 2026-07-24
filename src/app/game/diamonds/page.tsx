@@ -75,12 +75,12 @@ export default async function DiamondsPage() {
       />
 
       {/* -------- balance -------- */}
-      <div className="panel-gold flex items-center justify-between rounded-xl p-4">
+      <div className="panel-gold flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
           <Icon name="diamond" size={18} className="text-sky-300" />
           חנות יהלומים
         </h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link
             href="/game/diamonds/buy"
             className="flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1.5 text-sm font-black text-black transition-colors hover:bg-sky-400"

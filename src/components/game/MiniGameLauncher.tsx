@@ -134,7 +134,7 @@ export function MiniGameLauncher({ initial }: { initial: MiniGameState | null })
             className="absolute inset-0 bg-black/70 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
-          <div className="ornate-shell relative z-10 w-full max-w-md rounded-xl p-5 shadow-2xl">
+          <div className="ornate-shell relative z-10 max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl p-5 shadow-2xl">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 text-lg font-black text-gold-bright">

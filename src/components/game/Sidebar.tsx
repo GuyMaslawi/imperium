@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/actions/auth";
@@ -20,22 +21,7 @@ type NavSection = {
   items: NavItem[];
 };
 
-export function Sidebar({
-  empireName,
-  heroClass,
-  heroLevel,
-  heroResets = 0,
-  heroPoints = 0,
-  heroAttackPct = 0,
-  heroDefensePct = 0,
-  heroHealthPct,
-  heroXp,
-  heroXpMax,
-  recruits,
-  unreadMessages = 0,
-  newReports = 0,
-  isAdmin = false,
-}: {
+export type SidebarProps = {
   empireName: string;
   heroClass: string;
   heroLevel: number;
@@ -56,9 +42,116 @@ export function Sidebar({
   newReports?: number;
   /** Show the admin control-center link (admins only). */
   isAdmin?: boolean;
-}) {
-  const pathname = usePathname();
+};
 
+/** Desktop-only static sidebar column (hidden below the lg breakpoint). */
+export function Sidebar(props: SidebarProps) {
+  const pathname = usePathname();
+  return (
+    <aside className="ornate-shell hidden w-full shrink-0 flex-col gap-4 rounded-lg p-3 lg:flex lg:w-72">
+      <SidebarContent {...props} pathname={pathname} />
+    </aside>
+  );
+}
+
+/**
+ * Mobile navigation: a hamburger trigger (rendered inside the sticky command
+ * bar) plus a slide-in drawer holding the full sidebar. Hidden at lg+, where
+ * the static <Sidebar> takes over.
+ */
+export function MobileMenu(props: SidebarProps) {
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
+
+  // Lock background scroll while the drawer is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  const badgeCount = (props.unreadMessages ?? 0) + (props.newReports ?? 0);
+
+  return (
+    <div className="lg:hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="פתיחת תפריט"
+        aria-expanded={open}
+        className="relative flex h-10 w-10 items-center justify-center rounded-md border border-border-gold-strong bg-black/30 text-gold-bright transition-colors hover:border-gold"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        {badgeCount > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
+            {badgeCount}
+          </span>
+        )}
+      </button>
+
+      {/* backdrop + drawer */}
+      <div
+        className={`fixed inset-0 z-[60] ${open ? "" : "pointer-events-none"}`}
+        aria-hidden={!open}
+      >
+        <div
+          onClick={() => setOpen(false)}
+          className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-200 ${
+            open ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <aside
+          dir="rtl"
+          // Any nav link tapped inside the drawer closes it (delegated click).
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("a")) setOpen(false);
+          }}
+          className={`ornate-shell absolute inset-y-0 right-0 flex w-[86vw] max-w-xs flex-col gap-4 overflow-y-auto rounded-l-lg p-3 transition-transform duration-200 ${
+            open ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="סגירת תפריט"
+              className="flex h-9 w-9 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-crimson/50 hover:text-crimson-bright"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          <SidebarContent {...props} pathname={pathname} />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/** The full sidebar body — shared by the desktop column and the mobile drawer. */
+function SidebarContent({
+  empireName,
+  heroClass,
+  heroLevel,
+  heroResets = 0,
+  heroPoints = 0,
+  heroAttackPct = 0,
+  heroDefensePct = 0,
+  heroHealthPct,
+  heroXp,
+  heroXpMax,
+  recruits,
+  unreadMessages = 0,
+  newReports = 0,
+  isAdmin = false,
+  pathname,
+}: SidebarProps & { pathname: string }) {
   const sections: NavSection[] = [
     {
       title: "פעולות",
@@ -88,7 +181,7 @@ export function Sidebar({
   const xpPct = heroXpMax > 0 ? Math.round((heroXp / heroXpMax) * 100) : 0;
 
   return (
-    <aside className="ornate-shell flex w-full shrink-0 flex-col gap-4 rounded-lg p-3 lg:w-72">
+    <>
       {/* header: logout + settings + welcome */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
@@ -281,6 +374,6 @@ export function Sidebar({
           );
         })}
       </nav>
-    </aside>
+    </>
   );
 }

@@ -62,7 +62,7 @@ export default async function ProductionPage() {
           <Icon name="mine" size={20} className="text-crimson-bright" />
           מפעלים ותעשייה
         </h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {summary.map(({ label, value }) => (
             <div key={label} className="panel-inset rounded-lg p-3 text-center">
               <p className="text-xs text-gold-dim">{label}</p>

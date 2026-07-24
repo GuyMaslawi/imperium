@@ -47,7 +47,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={labelledBy}
         dir="rtl"
-        className="panel-gold relative z-10 w-full max-w-sm rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.85)]"
+        className="panel-gold relative z-10 max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.85)]"
         onClick={(e) => e.stopPropagation()}
       >
         {children}

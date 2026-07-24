@@ -18,7 +18,7 @@ const LINKS = [
 export function AdminNav() {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1">
+    <nav className="-mx-1 flex flex-row gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
       {LINKS.map((link) => {
         const active = link.exact
           ? pathname === link.href
@@ -27,13 +27,13 @@ export function AdminNav() {
           <Link
             key={link.href}
             href={link.href}
-            className={`flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+            className={`flex shrink-0 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors lg:justify-between lg:gap-3 ${
               active
                 ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"
                 : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
             }`}
           >
-            <span>{link.label}</span>
+            <span className="whitespace-nowrap">{link.label}</span>
             <span aria-hidden className="text-base opacity-90">
               {link.icon}
             </span>

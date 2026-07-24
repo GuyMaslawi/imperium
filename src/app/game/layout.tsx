@@ -7,7 +7,7 @@ import { HERO_MAX_LEVEL, heroBonuses, xpToNextLevel } from "@/lib/game/hero";
 import { ResourceBar } from "@/components/game/ResourceBar";
 import { UpdateTimers } from "@/components/game/UpdateTimers";
 import { SeasonPassButton } from "@/components/game/SeasonPass";
-import { Sidebar } from "@/components/game/Sidebar";
+import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sidebar";
 import { WarAlerts } from "@/components/game/WarAlerts";
 import { MiniGameLauncher } from "@/components/game/MiniGameLauncher";
 import { getMiniGameState } from "@/server/actions/minigame";
@@ -51,6 +51,23 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     }),
   ]);
 
+  const sidebarProps: SidebarProps = {
+    empireName: empire.name,
+    heroClass: "קשת",
+    heroLevel,
+    heroResets: hero?.resets ?? 0,
+    heroPoints: hero?.unspentPoints ?? 0,
+    heroAttackPct: bonuses.totalPct.attack,
+    heroDefensePct: bonuses.totalPct.defense,
+    heroHealthPct: 100,
+    heroXp,
+    heroXpMax,
+    recruits: empire.citizens,
+    unreadMessages,
+    newReports: newBattleReports + newSpyReports,
+    isAdmin: admin,
+  };
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Live toasts for incoming attacks / spies / messages. */}
@@ -66,28 +83,14 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           turns: empire.turns,
         }}
         miniGame={<MiniGameLauncher initial={miniGame} />}
+        mobileMenu={<MobileMenu {...sidebarProps} />}
       />
 
       <div
         dir="rtl"
-        className="mx-auto flex w-full max-w-[1900px] flex-1 flex-col-reverse gap-4 px-3 py-4 lg:flex-row lg:px-5"
+        className="mx-auto flex w-full max-w-[1900px] flex-1 flex-col gap-4 px-3 py-4 lg:flex-row lg:px-5"
       >
-        <Sidebar
-          empireName={empire.name}
-          heroClass="קשת"
-          heroLevel={heroLevel}
-          heroResets={hero?.resets ?? 0}
-          heroPoints={hero?.unspentPoints ?? 0}
-          heroAttackPct={bonuses.totalPct.attack}
-          heroDefensePct={bonuses.totalPct.defense}
-          heroHealthPct={100}
-          heroXp={heroXp}
-          heroXpMax={heroXpMax}
-          recruits={empire.citizens}
-          unreadMessages={unreadMessages}
-          newReports={newBattleReports + newSpyReports}
-          isAdmin={admin}
-        />
+        <Sidebar {...sidebarProps} />
 
         <main className="min-w-0 flex-1">
           <OrnateFrame className="flex min-h-full flex-col overflow-hidden p-3 sm:p-4 md:p-6">

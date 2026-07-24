@@ -13,7 +13,7 @@ function StatCard({ label, value, icon }: { label: string; value: string | numbe
       <div className="text-2xl" aria-hidden>
         {icon}
       </div>
-      <div className="nums mt-1 text-2xl font-black text-gold-bright" dir="ltr">
+      <div className="nums mt-1 truncate text-2xl font-black text-gold-bright" dir="ltr">
         {typeof value === "number" ? value.toLocaleString("he-IL") : value}
       </div>
       <div className="text-xs text-zinc-400">{label}</div>

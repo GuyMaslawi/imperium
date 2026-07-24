@@ -208,7 +208,7 @@ function CheckoutModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-sky-400/30 bg-panel p-6 shadow-2xl"
+        className="relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-sky-400/30 bg-panel p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div

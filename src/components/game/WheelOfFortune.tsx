@@ -172,7 +172,7 @@ export function WheelOfFortune({
       <div
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
-        className="ornate-shell relative my-6 w-full max-w-lg rounded-xl p-6 text-center"
+        className="ornate-shell relative my-6 w-full max-w-lg rounded-xl p-4 text-center sm:p-6"
       >
         <button
           onClick={onClose}
@@ -193,8 +193,9 @@ export function WheelOfFortune({
           פרס &quot;חפץ&quot; דורש לפחות מקום פנוי אחד בתיק הגיבור.
         </p>
 
-        {/* wheel */}
-        <div className="relative mx-auto mt-5 h-[340px] w-[340px]">
+        {/* wheel — fixed 340px geometry, scaled down to fit narrow phones */}
+        <div className="mx-auto mt-5 flex h-[288px] w-[288px] items-center justify-center sm:h-[340px] sm:w-[340px]">
+        <div className="relative h-[340px] w-[340px] shrink-0 scale-[0.847] sm:scale-100">
           {/* pointer */}
           <div className="absolute left-1/2 top-[-6px] z-20 -translate-x-1/2">
             <div
@@ -284,6 +285,7 @@ export function WheelOfFortune({
               {c.icon}
             </span>
           ))}
+        </div>
         </div>
 
         {/* result */}
