@@ -6,13 +6,17 @@ import { login, type AuthState } from "@/server/actions/auth";
 import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { GoogleSignInButton, AuthDivider } from "@/components/auth/GoogleSignInButton";
 
 export function LoginForm() {
   const [state, action] = useActionState<AuthState, FormData>(login, {});
 
   return (
-    <form action={action} className="space-y-4">
+    <div className="space-y-4">
       <h2 className="text-xl font-bold text-zinc-100">התחברות</h2>
+      <GoogleSignInButton />
+      <AuthDivider />
+      <form action={action} className="space-y-4">
       <Input
         label="אימייל"
         name="email"
@@ -32,15 +36,16 @@ export function LoginForm() {
         dir="ltr"
       />
       <FormMessage error={state.error} />
-      <SubmitButton className="w-full" pendingText="מתחבר...">
-        התחבר למשחק
-      </SubmitButton>
+        <SubmitButton className="w-full" pendingText="מתחבר...">
+          התחבר למשחק
+        </SubmitButton>
+      </form>
       <p className="text-center text-sm text-zinc-400">
         עדיין אין לך אימפריה?{" "}
         <Link href="/register" className="font-semibold text-gold hover:text-gold-bright">
           הירשם עכשיו
         </Link>
       </p>
-    </form>
+    </div>
   );
 }

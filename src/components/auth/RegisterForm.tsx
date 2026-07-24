@@ -7,13 +7,17 @@ import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { GoogleSignInButton, AuthDivider } from "@/components/auth/GoogleSignInButton";
 
 export function RegisterForm() {
   const [state, action] = useActionState<AuthState, FormData>(register, {});
 
   return (
-    <form action={action} className="space-y-4">
+    <div className="space-y-4">
       <h2 className="text-xl font-bold text-zinc-100">הקמת אימפריה חדשה</h2>
+      <GoogleSignInButton />
+      <AuthDivider />
+      <form action={action} className="space-y-4">
       <Input
         label="השם שלך"
         name="name"
@@ -52,15 +56,16 @@ export function RegisterForm() {
         dir="ltr"
       />
       <FormMessage error={state.error} />
-      <SubmitButton className="w-full" pendingText="מקים אימפריה...">
-        הקם אימפריה <Icon name="crown" size={16} className="inline-block align-text-bottom" />
-      </SubmitButton>
+        <SubmitButton className="w-full" pendingText="מקים אימפריה...">
+          הקם אימפריה <Icon name="crown" size={16} className="inline-block align-text-bottom" />
+        </SubmitButton>
+      </form>
       <p className="text-center text-sm text-zinc-400">
         כבר יש לך אימפריה?{" "}
         <Link href="/login" className="font-semibold text-gold hover:text-gold-bright">
           התחבר
         </Link>
       </p>
-    </form>
+    </div>
   );
 }
