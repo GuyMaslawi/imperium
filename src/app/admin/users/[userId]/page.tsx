@@ -15,7 +15,12 @@ import {
   STORAGE_TYPES,
 } from "@/lib/game/constants";
 import { WEAPONS, WEAPON_CATEGORIES, WEAPON_CATEGORY_META, weaponByKey } from "@/lib/game/weapons";
-import { SLOT_ORDER, SLOT_META } from "@/lib/game/hero";
+import {
+  HERO_CLASS_META,
+  HERO_CLASS_ORDER,
+  SLOT_META,
+  SLOT_ORDER,
+} from "@/lib/game/hero";
 import {
   updateUserAccount,
   toggleUserBan,
@@ -372,7 +377,16 @@ export default async function AdminUserDetail({
             <ActionForm action={updateHero} submitLabel="שמור גיבור" className="mb-4">
               <input type="hidden" name="empireId" value={empire.id} />
               <input type="hidden" name="userId" value={user.id} />
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+                <LabeledSelect
+                  label="דמות"
+                  name="heroClass"
+                  defaultValue={empire.hero?.heroClass ?? "WARLORD"}
+                  options={HERO_CLASS_ORDER.map((c) => ({
+                    value: c,
+                    label: HERO_CLASS_META[c].label,
+                  }))}
+                />
                 <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={empire.hero?.level ?? 1} />
                 <LabeledInput label="XP" name="xp" type="number" min={0} defaultValue={empire.hero?.xp ?? 0} />
                 <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} defaultValue={empire.hero?.unspentPoints ?? 0} />

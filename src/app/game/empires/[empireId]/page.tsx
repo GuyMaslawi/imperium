@@ -16,7 +16,12 @@ import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
 import { ItemTile } from "@/components/game/ItemTile";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
-import { SLOT_META, SLOT_ORDER } from "@/lib/game/hero";
+import {
+  HERO_CLASS_META,
+  SLOT_META,
+  SLOT_ORDER,
+  heroClassImage,
+} from "@/lib/game/hero";
 
 export const metadata = { title: "פרופיל אימפריה | אימפריום" };
 
@@ -51,6 +56,7 @@ export default async function EmpireProfilePage({
   const hero = empire.hero;
   const heroLevel = hero?.level ?? 1;
   const heroResets = hero?.resets ?? 0;
+  const heroClassKey = hero?.heroClass ?? "WARLORD";
   const equippedBySlot = new Map((hero?.items ?? []).map((item) => [item.slot, item]));
 
   const isMe = empire.id === myEmpire.id;
@@ -165,8 +171,13 @@ export default async function EmpireProfilePage({
       <div className="panel-gold rounded-xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
-            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-xl border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black text-4xl">
-              <Icon name="crown" size={36} className="text-bone" />
+            <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black text-4xl">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={heroClassImage(heroClassKey)}
+                alt={HERO_CLASS_META[heroClassKey].label}
+                className="h-full w-full object-cover object-top"
+              />
               <span
                 className="nums absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-gold/50 bg-black px-2 text-[10px] font-bold text-gold-bright"
                 dir="ltr"
@@ -183,7 +194,9 @@ export default async function EmpireProfilePage({
                   </span>
                 )}
               </h2>
-              <p className="mt-0.5 text-sm text-zinc-400">קשת</p>
+              <p className="mt-0.5 text-sm text-zinc-400">
+                {HERO_CLASS_META[heroClassKey].label}
+              </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 {showDetails && (
                   <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">

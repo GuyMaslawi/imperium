@@ -12,8 +12,11 @@ import type { HeroItemView } from "@/components/game/heroItemView";
 import { formatNumber } from "@/lib/game/format";
 import { wheelLuckBonus } from "@/lib/game/constants";
 import {
+  HERO_CLASS_META,
   HERO_MAX_LEVEL,
   heroBonuses,
+  heroClassBonusLines,
+  heroClassImage,
   tierForLevel,
   xpToNextLevel,
 } from "@/lib/game/hero";
@@ -30,6 +33,8 @@ export default async function HeroPage() {
   const xpPct = atCap ? 100 : Math.round((hero.xp / xpMax) * 100);
 
   const bonuses = heroBonuses(hero);
+  const classMeta = HERO_CLASS_META[hero.heroClass];
+  const classLines = heroClassBonusLines(hero.heroClass);
   // The tier ("rarity") is always derived from level, so two items of the same
   // slot+level look and perform identically regardless of what's stored.
   const toView = (items: typeof hero.items): HeroItemView[] =>
@@ -49,12 +54,113 @@ export default async function HeroPage() {
         ornament={<Icon name="attack" size={22} className="text-crimson" />}
       />
 
-      <div className="flex justify-center">
-        <Tip tip="חנות פריטים וחיזוקים לגיבור — בקרוב" side="bottom">
-          <button className="btn btn-ghost px-4 py-2 text-sm">
-            <Icon name="shop" size={16} className="inline align-[-2px]" /> חנות גיבור
-          </button>
-        </Tip>
+      {/* -------- character showcase -------- */}
+      <div className="panel relative overflow-hidden rounded-2xl border border-border-gold-strong">
+        <div className="grid md:grid-cols-[minmax(0,340px)_1fr]">
+          {/* portrait (right in RTL) */}
+          <div className="relative min-h-[340px] md:min-h-[420px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={heroClassImage(hero.heroClass)}
+              alt={classMeta.label}
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
+            {/* seam into the panel + bottom label gradient */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
+            <div className="absolute inset-y-0 left-0 hidden w-24 bg-gradient-to-l from-transparent to-[var(--panel)] md:block" />
+
+            <div className="absolute inset-x-0 bottom-0 p-4 text-center">
+              <p className="text-2xl font-black text-gold-bright drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+                {classMeta.label}
+              </p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-bone-dim">
+                {classMeta.title}
+              </p>
+            </div>
+
+            {/* level + resets badge */}
+            <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <Tip tip="רמת הגיבור — עולה מניסיון שנצבר בקרבות">
+                <span className="rounded-md border border-gold/60 bg-black/80 px-2 py-0.5 text-xs font-black text-gold-bright nums">
+                  רמה {hero.level}
+                </span>
+              </Tip>
+              {hero.resets > 0 && (
+                <Tip
+                  tip={`תג איפוס: הגיבור הגיע לרמה 100 ואופס ${hero.resets === 1 ? "פעם אחת" : `${hero.resets} פעמים`}. כל איפוס העניק 2,500 אזרחים ו-25 נקודות גיבור.`}
+                >
+                  <span className="rounded-md border border-purple-400/60 bg-purple-950/80 px-1.5 py-0.5 text-xs font-black text-purple-300">
+                    ↻ ×{hero.resets}
+                  </span>
+                </Tip>
+              )}
+            </div>
+
+            {/* health */}
+            <div className="absolute left-3 top-3">
+              <Tip tip="בריאות הגיבור — כרגע תמיד מלאה; אינה נפגעת בקרבות">
+                <span className="flex items-center gap-1 rounded-md border border-red-500/40 bg-black/80 px-2 py-0.5 text-xs font-bold text-red-400">
+                  <Icon name="heart" size={14} />
+                  <span className="nums" dir="ltr">100%</span>
+                </span>
+              </Tip>
+            </div>
+          </div>
+
+          {/* identity + class bonuses + xp (left in RTL) */}
+          <div className="flex flex-col justify-center gap-4 p-5 md:p-6">
+            <div>
+              <p className="text-sm text-zinc-400">{classMeta.tagline}</p>
+              <p className="mt-1 text-base text-zinc-300">{classMeta.description}</p>
+            </div>
+
+            {/* permanent class bonuses */}
+            <div className="flex flex-wrap gap-2">
+              {classLines.map((line) => (
+                <Tip key={line.label} tip="יתרון המחלקה — בונוס קבוע שנבחר בעת ההרשמה">
+                  <span className="flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-950/40 px-2.5 py-1 text-sm font-bold text-emerald-300">
+                    <span aria-hidden>{line.icon}</span>
+                    {line.label}
+                    <span className="nums" dir="ltr">+{line.pct}%</span>
+                  </span>
+                </Tip>
+              ))}
+              <Tip tip="נקודות גיבור שטרם הוקצו — מתקבלת נקודה בכל עליית רמה. הקצה אותן בכרטיסי ההתקפה/הגנה/משאבים למטה (כל נקודה = +1% לצמיתות).">
+                <span className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-panel-inset px-2.5 py-1 text-sm font-bold text-gold">
+                  נקודות פנויות
+                  <span className="nums" dir="ltr">{hero.unspentPoints}</span>
+                </span>
+              </Tip>
+            </div>
+
+            {/* xp */}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-xs text-zinc-400">
+                <span className="nums" dir="ltr">
+                  {atCap ? "MAX" : `${formatNumber(hero.xp)}/${formatNumber(xpMax)}`}
+                </span>
+                <span className="nums text-gold" dir="ltr">
+                  {xpPct}%
+                </span>
+              </div>
+              <Meter tone="xp" value={atCap ? 1 : hero.xp} max={atCap ? 1 : xpMax} />
+              <p className="mt-1.5 text-[11px] text-zinc-500">
+                ניסיון מצטבר מקרבות — ניצחון בתקיפה מעניק הכי הרבה, וגם הגנה
+                מוצלחת מזכה. כל עליית רמה מעניקה נקודת גיבור.
+              </p>
+            </div>
+
+            {atCap && <HeroResetButton />}
+
+            <div className="flex justify-start">
+              <Tip tip="חנות פריטים וחיזוקים לגיבור — בקרוב" side="bottom">
+                <button className="btn btn-ghost px-4 py-2 text-sm">
+                  <Icon name="shop" size={16} className="inline align-[-2px]" /> חנות גיבור
+                </button>
+              </Tip>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -66,85 +172,8 @@ export default async function HeroPage() {
           wheelSpinBonus={wheelSpinBonus}
         />
 
-        {/* -------- hero (left in RTL) -------- */}
+        {/* -------- equipment + point allocation (left in RTL) -------- */}
         <div className="panel rounded-xl p-4">
-          {/* identity row */}
-          <div className="flex items-center justify-between gap-4">
-            <Tip tip="בריאות הגיבור — כרגע תמיד מלאה; אינה נפגעת בקרבות">
-              <div className="flex flex-col items-center">
-                <span className="text-red-500" aria-hidden>
-                  <Icon name="heart" size={36} />
-                </span>
-                <span className="nums mt-1 text-sm font-bold text-red-400" dir="ltr">
-                  100%
-                </span>
-              </div>
-            </Tip>
-
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="flex items-center justify-end gap-2 text-lg font-black text-gold-bright">
-                  {hero.resets > 0 && (
-                    <Tip
-                      tip={`תג איפוס: הגיבור הגיע לרמה 100 ואופס ${hero.resets === 1 ? "פעם אחת" : `${hero.resets} פעמים`}. כל איפוס העניק 2,500 אזרחים ו-25 נקודות גיבור.`}
-                    >
-                      <span className="rounded-md border border-purple-400/60 bg-purple-950/60 px-1.5 py-0.5 text-[10px] font-black text-purple-300">
-                        ↻ ×{hero.resets}
-                      </span>
-                    </Tip>
-                  )}
-                  גיבור ({hero.level})
-                </p>
-                <Tip tip="מקצוע הגיבור">
-                  <p className="text-sm text-zinc-400">קשת</p>
-                </Tip>
-                <Tip tip="נקודות גיבור שטרם הוקצו — מתקבלת נקודה בכל עליית רמה. הקצה אותן בכרטיסי ההתקפה/הגנה/משאבים משמאל (כל נקודה = +1% לצמיתות).">
-                  <span className="mt-1 inline-block rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 text-xs font-bold text-gold">
-                    נקודות פנויות{" "}
-                    <span className="nums" dir="ltr">
-                      {hero.unspentPoints}
-                    </span>
-                  </span>
-                </Tip>
-              </div>
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-lg border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black text-3xl">
-                <Icon name="hero" size={32} className="text-bone" aria-hidden />
-                <span
-                  className="nums absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-gold/50 bg-black px-2 text-[10px] font-bold text-gold-bright"
-                  dir="rtl"
-                >
-                  רמה {hero.level}
-                  {hero.resets > 0 && <span className="text-purple-300"> ↻{hero.resets}</span>}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* xp */}
-          <div className="mt-5">
-            <div className="mb-1.5 flex items-center justify-between text-xs text-zinc-400">
-              <span className="nums" dir="ltr">
-                {atCap ? "MAX" : `${formatNumber(hero.xp)}/${formatNumber(xpMax)}`}
-              </span>
-              <span className="nums text-gold" dir="ltr">
-                {xpPct}%
-              </span>
-            </div>
-            <Meter tone="xp" value={atCap ? 1 : hero.xp} max={atCap ? 1 : xpMax} />
-            <p className="mt-1.5 text-[11px] text-zinc-500">
-              ניסיון מצטבר מקרבות — ניצחון בתקיפה מעניק הכי הרבה, וגם הגנה
-              מוצלחת מזכה. כל עליית רמה מעניקה נקודת גיבור.
-            </p>
-          </div>
-
-          {atCap && (
-            <div className="mt-4">
-              <HeroResetButton />
-            </div>
-          )}
-
-          <div className="rule-gold my-4" />
-
           <div className="grid items-start gap-5 sm:grid-cols-2">
             {/* active equipment */}
             <HeroEquipment

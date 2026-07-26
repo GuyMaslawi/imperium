@@ -491,7 +491,7 @@ export interface HeroClassMeta {
   label: string;
   /** English caps subtitle, matching the SectionHeading convention. */
   title: string;
-  /** Portrait art at /hero/classes/<slug>.png. */
+  /** Portrait art at /hero/classes/<slug>.jpg. */
   slug: string;
   tagline: string;
   description: string;
@@ -538,7 +538,7 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
 
 /** Portrait art path for a class. */
 export function heroClassImage(heroClass: HeroClass): string {
-  return `/hero/classes/${HERO_CLASS_META[heroClass].slug}.png`;
+  return `/hero/classes/${HERO_CLASS_META[heroClass].slug}.jpg`;
 }
 
 /** The class bonuses, zeroed for a missing hero. */

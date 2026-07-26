@@ -670,7 +670,11 @@ export async function updateHero(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    const heroClass = z
+      .enum(["WARLORD", "GUARDIAN", "MERCHANT", "SHADOW"])
+      .parse(formData.get("heroClass"));
     const data = {
+      heroClass,
       level: Math.max(1, Math.round(num(formData, "level"))),
       xp: Math.max(0, Math.round(num(formData, "xp"))),
       unspentPoints: Math.max(0, Math.round(num(formData, "unspentPoints"))),

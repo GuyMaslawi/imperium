@@ -24,6 +24,8 @@ type NavSection = {
 export type SidebarProps = {
   empireName: string;
   heroClass: string;
+  /** Portrait art of the chosen hero class (see heroClassImage). */
+  heroImage?: string;
   heroLevel: number;
   /** Prestige count — how many times the hero was reset at level 100. */
   heroResets?: number;
@@ -138,6 +140,7 @@ export function MobileMenu(props: SidebarProps) {
 function SidebarContent({
   empireName,
   heroClass,
+  heroImage,
   heroLevel,
   heroResets = 0,
   heroPoints = 0,
@@ -258,8 +261,17 @@ function SidebarContent({
       <div className="panel-gold rounded-lg p-3">
         <div className="flex items-center justify-between gap-3">
           <span className="relative">
-            <span className="flex h-14 w-14 items-center justify-center rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
-              <Icon name="hero" size={30} className="text-crimson-bright" />
+            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
+              {heroImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={heroImage}
+                  alt={heroClass}
+                  className="h-full w-full object-cover object-top"
+                />
+              ) : (
+                <Icon name="hero" size={30} className="text-crimson-bright" />
+              )}
             </span>
             <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap">
               <Tip tip="רמת הגיבור — עולה מ-XP שנצבר בקרבות">

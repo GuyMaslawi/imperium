@@ -66,18 +66,22 @@ function StatRow({
  */
 function ResourcesRow({
   pointsPct,
+  classPct = 0,
   itemFlat,
   itemNote,
 }: {
   /** % from allocated resource points — multiplies mine production. */
   pointsPct: number;
+  /** % from the chosen hero class (הסוחר) — multiplies mine production too. */
+  classPct?: number;
   /** Flat resource units the equipped relic conjures each regular tick. */
   itemFlat: number;
   /** Which resources the relic feeds (or a waiting hint when none equipped). */
   itemNote: string;
 }) {
   const meta = HERO_STAT_META.resources;
-  const active = pointsPct > 0 || itemFlat > 0;
+  const totalPctValue = pointsPct + classPct;
+  const active = totalPctValue > 0 || itemFlat > 0;
   return (
     <Tip
       tip={
@@ -103,24 +107,25 @@ function ResourcesRow({
                 נקודות +{pointsPct}% — מכפיל תפוקת מכרות
               </p>
             )}
+            {classPct > 0 && <p>דמות +{classPct}% — יתרון הסוחר</p>}
             {itemFlat > 0 ? (
               <p>פרי שטן +{formatNumber(itemFlat)} — {itemNote}</p>
             ) : (
-              pointsPct === 0 && <p>{itemNote}</p>
+              totalPctValue === 0 && <p>{itemNote}</p>
             )}
           </div>
         </div>
         <div className="shrink-0 text-left" dir="ltr">
-          {pointsPct > 0 && (
+          {totalPctValue > 0 && (
             <p className={`nums whitespace-nowrap text-xl font-black ${meta.tone}`}>
-              +{pointsPct}
+              +{totalPctValue}
               <span className="ms-0.5 text-xs font-bold opacity-70">%</span>
             </p>
           )}
           {itemFlat > 0 && (
             <p
               className={`nums whitespace-nowrap font-black ${
-                pointsPct > 0 ? "text-sm" : "text-xl"
+                totalPctValue > 0 ? "text-sm" : "text-xl"
               } ${meta.tone}`}
             >
               +{formatNumber(itemFlat)}
@@ -142,7 +147,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
-  const { points, itemsPct, itemsFlat, itemsFlatByResource, totalPct } = bonuses;
+  const { points, itemsPct, itemsFlat, itemsFlatByResource, classPct, totalPct } = bonuses;
+
+  /** "· דמות +X%" appended only when the class actually contributes. */
+  const classNote = (pct: number) => (pct > 0 ? ` · דמות +${pct}%` : "");
 
   // A resource item (relic) feeds only the specific resources its tier covers —
   // gold only for a פשוט relic, up to all four for an אגדי. Name exactly those,
@@ -160,17 +168,20 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
     {
       stat: "attack",
       value: totalPct.attack,
-      note: `נקודות +${points.attack}% · חפצים +${itemsPct.attack}%`,
+      note: `נקודות +${points.attack}% · חפצים +${itemsPct.attack}%${classNote(classPct.attack)}`,
     },
     {
       stat: "defense",
       value: totalPct.defense,
-      note: `נקודות +${points.defense}% · חפצים +${itemsPct.defense}%`,
+      note: `נקודות +${points.defense}% · חפצים +${itemsPct.defense}%${classNote(classPct.defense)}`,
     },
     {
       stat: "spy",
       value: totalPct.spy,
-      note: "מחפצי ריגול לבושים בלבד",
+      note:
+        classPct.spy > 0
+          ? `חפצים +${itemsPct.spy}%${classNote(classPct.spy)}`
+          : "מחפצי ריגול לבושים בלבד",
     },
   ];
 
@@ -232,6 +243,7 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
           <SectionLabel>תפוקת משאבים · נקודות + חפץ</SectionLabel>
           <ResourcesRow
             pointsPct={points.resources}
+            classPct={classPct.resources}
             itemFlat={itemsFlat.resources}
             itemNote={resourcesNote}
           />

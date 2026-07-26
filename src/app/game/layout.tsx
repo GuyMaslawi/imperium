@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { nextDailyUpdate, nextRegularUpdate, formatGameTime } from "@/lib/game/time";
-import { HERO_MAX_LEVEL, heroBonuses, xpToNextLevel } from "@/lib/game/hero";
+import {
+  HERO_CLASS_META,
+  HERO_MAX_LEVEL,
+  heroBonuses,
+  heroClassImage,
+  xpToNextLevel,
+} from "@/lib/game/hero";
 import { ResourceBar } from "@/components/game/ResourceBar";
 import { UpdateTimers } from "@/components/game/UpdateTimers";
 import { SeasonPassButton } from "@/components/game/SeasonPass";
@@ -54,7 +60,8 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
 
   const sidebarProps: SidebarProps = {
     empireName: empire.name,
-    heroClass: "קשת",
+    heroClass: HERO_CLASS_META[hero?.heroClass ?? "WARLORD"].label,
+    heroImage: heroClassImage(hero?.heroClass ?? "WARLORD"),
     heroLevel,
     heroResets: hero?.resets ?? 0,
     heroPoints: hero?.unspentPoints ?? 0,
