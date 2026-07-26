@@ -8,6 +8,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { GoogleSignInButton, AuthDivider } from "@/components/auth/GoogleSignInButton";
+import { HeroClassPicker } from "@/components/auth/HeroClassPicker";
 
 export function RegisterForm() {
   const [state, action] = useActionState<AuthState, FormData>(register, {});
@@ -50,11 +51,12 @@ export function RegisterForm() {
         name="password"
         type="password"
         required
-        minLength={6}
+        minLength={8}
         autoComplete="new-password"
-        placeholder="לפחות 6 תווים"
+        placeholder="לפחות 8 תווים"
         dir="ltr"
       />
+      <HeroClassPicker />
       <FormMessage error={state.error} />
         <SubmitButton className="w-full" pendingText="מקים אימפריה...">
           הקם אימפריה <Icon name="crown" size={16} className="inline-block align-text-bottom" />

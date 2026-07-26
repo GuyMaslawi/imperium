@@ -18,8 +18,8 @@ import type { GameSeason } from "@prisma/client";
  *    itself changes.
  *
  * Deliberately absent: diamonds and hero gear. At two cycles a day for a whole
- * season even a 3-diamond tier would pay out hundreds of diamonds against a
- * 10-diamond pass price, undercutting the real-money store (see
+ * season even a 3-diamond tier would pay out hundreds of diamonds, chipping
+ * away at the pass price and undercutting the real-money store (see
  * DiamondPurchase); hero items belong to attacks and the hero shop, where
  * rarity gates how often they appear. Resources, turns and citizens carry the
  * ladder instead.
@@ -34,7 +34,7 @@ export const SEASON_PASS_XP_PER_TIER = 50;
 export const SEASON_PASS_TIER_COUNT = 8;
 
 /** Diamond cost of the premium track. Charged once per season. */
-export const SEASON_PASS_PREMIUM_PRICE = 10;
+export const SEASON_PASS_PREMIUM_PRICE = 2000;
 
 /* ------------------------------ XP sources ------------------------------ */
 

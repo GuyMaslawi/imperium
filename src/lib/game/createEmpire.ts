@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "@prisma/client";
+import type { HeroClass, Prisma } from "@prisma/client";
 import {
   BUILDING_TYPES,
   EMPIRE_UPGRADE_TYPES,
@@ -30,7 +30,8 @@ export function newEmpireData(
   userId: string,
   name: string,
   seasonId?: string,
-  starting: GameTunables["starting"] = DEFAULT_TUNABLES.starting
+  starting: GameTunables["starting"] = DEFAULT_TUNABLES.starting,
+  heroClass: HeroClass = "WARLORD"
 ): Prisma.EmpireCreateInput {
   return {
     user: { connect: { id: userId } },
@@ -73,7 +74,7 @@ export function newEmpireData(
       create: EMPIRE_UPGRADE_TYPES.map((type) => ({ type, level: 1 })),
     },
     bankAccount: { create: { goldBalance: 0 } },
-    hero: { create: {} },
+    hero: { create: { heroClass } },
     weaponUnlocks: {
       create: WEAPON_CATEGORIES.map((category) => ({
         category,

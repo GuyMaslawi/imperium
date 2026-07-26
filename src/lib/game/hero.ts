@@ -1,4 +1,4 @@
-import type { Hero, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
+import type { Hero, HeroClass, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
 import { RESOURCE_META, type StorableResource } from "./constants";
 import { secureRandom } from "./random";
 
@@ -472,6 +472,101 @@ export function canUpgradeItem(heroLevel: number, itemLevel: number): boolean {
   return target !== null && heroLevel >= target;
 }
 
+/* ------------------------------ hero classes ------------------------------ */
+
+/**
+ * The permanent % bonuses a class grants. attack/defense/spy stack with the
+ * point and item percentages; resources multiplies mine production alongside
+ * the resource points; xp scales every battle-XP gain (Shadow only).
+ */
+export interface HeroClassBonuses {
+  attack: number;
+  defense: number;
+  resources: number;
+  spy: number;
+  xp: number;
+}
+
+export interface HeroClassMeta {
+  label: string;
+  /** English caps subtitle, matching the SectionHeading convention. */
+  title: string;
+  /** Portrait art at /hero/classes/<slug>.png. */
+  slug: string;
+  tagline: string;
+  description: string;
+  bonuses: HeroClassBonuses;
+}
+
+/** Display order for pickers and galleries. */
+export const HERO_CLASS_ORDER: HeroClass[] = ["WARLORD", "GUARDIAN", "MERCHANT", "SHADOW"];
+
+export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
+  WARLORD: {
+    label: "המצביא",
+    title: "WARLORD",
+    slug: "warlord",
+    tagline: "כוח הוא הטיעון היחיד",
+    description: "מפקד קרבות מלידה — צבאותיו מכים חזק יותר בכל תקיפה.",
+    bonuses: { attack: 10, defense: 0, resources: 0, spy: 0, xp: 0 },
+  },
+  GUARDIAN: {
+    label: "המגן",
+    title: "GUARDIAN",
+    slug: "guardian",
+    tagline: "החומה שלא נפלה מעולם",
+    description: "שומר הסף של האימפריה — הגנתו עומדת גם מול המתקפות הקשות.",
+    bonuses: { attack: 0, defense: 10, resources: 0, spy: 0, xp: 0 },
+  },
+  MERCHANT: {
+    label: "הסוחר",
+    title: "MERCHANT",
+    slug: "merchant",
+    tagline: "כל מלחמה מתחילה באוצר",
+    description: "אשף כלכלה ערמומי — המכרות שלו מפיקים יותר מכל אחד אחר.",
+    bonuses: { attack: 0, defense: 0, resources: 10, spy: 0, xp: 0 },
+  },
+  SHADOW: {
+    label: "הצל",
+    title: "SHADOW",
+    slug: "shadow",
+    tagline: "מה שלא רואים — מנצח",
+    description: "מרגל־מתנקש הלומד מכל קרב — ריגול חד יותר וניסיון נצבר מהר.",
+    bonuses: { attack: 0, defense: 0, resources: 0, spy: 15, xp: 10 },
+  },
+};
+
+/** Portrait art path for a class. */
+export function heroClassImage(heroClass: HeroClass): string {
+  return `/hero/classes/${HERO_CLASS_META[heroClass].slug}.png`;
+}
+
+/** The class bonuses, zeroed for a missing hero. */
+export function heroClassBonuses(heroClass: HeroClass | null | undefined): HeroClassBonuses {
+  return heroClass
+    ? HERO_CLASS_META[heroClass].bonuses
+    : { attack: 0, defense: 0, resources: 0, spy: 0, xp: 0 };
+}
+
+/** Battle-XP multiplier from the class (e.g. הצל earns +10% XP). */
+export function classXpMultiplier(heroClass: HeroClass | null | undefined): number {
+  return bonusMultiplier(heroClassBonuses(heroClass).xp);
+}
+
+/** The non-zero bonus lines of a class, for badges/tooltips. */
+export function heroClassBonusLines(
+  heroClass: HeroClass
+): { label: string; icon: string; pct: number }[] {
+  const b = HERO_CLASS_META[heroClass].bonuses;
+  const lines: { label: string; icon: string; pct: number }[] = [];
+  if (b.attack) lines.push({ label: "התקפה", icon: "⚔️", pct: b.attack });
+  if (b.defense) lines.push({ label: "הגנה", icon: "🛡️", pct: b.defense });
+  if (b.resources) lines.push({ label: "תפוקת משאבים", icon: "⛏️", pct: b.resources });
+  if (b.spy) lines.push({ label: "ריגול", icon: "🕵️", pct: b.spy });
+  if (b.xp) lines.push({ label: "ניסיון גיבור", icon: "✨", pct: b.xp });
+  return lines;
+}
+
 /* ------------------------------ combined bonuses ------------------------------ */
 
 export type HeroWithItems = Hero & { items: HeroItem[] };
@@ -490,9 +585,16 @@ export interface HeroBonuses {
    */
   itemsFlatByResource: Record<StorableResource, number>;
   /**
-   * Combined percentage per percentage stat = allocated points + item %.
-   * (spy has no point allocation, so its total is item-only.) These drive
-   * battle/spy power; the flat item counts drive production directly.
+   * The permanent % the chosen class contributes (zero for a missing hero).
+   * attack/defense/spy are already folded into `totalPct`; resources must be
+   * added wherever `points.resources` multiplies production.
+   */
+  classPct: { attack: number; defense: number; resources: number; spy: number };
+  /**
+   * Combined percentage per percentage stat = allocated points + item % +
+   * class %. (spy has no point allocation, so its total is items + class.)
+   * These drive battle/spy power; the flat item counts drive production
+   * directly.
    */
   totalPct: Record<HeroPercentStat, number>;
 }
@@ -534,14 +636,22 @@ export function heroBonuses(hero: HeroWithItems | null): HeroBonuses {
       }
     } else itemsPct[stat] += itemBonusPct(item.slot, item.level);
   }
+  const cls = heroClassBonuses(hero?.heroClass);
+  const classPct = {
+    attack: cls.attack,
+    defense: cls.defense,
+    resources: cls.resources,
+    spy: cls.spy,
+  };
   const totalPct: Record<HeroPercentStat, number> = {
     // Wearing items no longer changes the point cards, but the *combined* hero
-    // power (shown in the summary and used in battle) does add both together.
-    attack: points.attack + itemsPct.attack,
-    defense: points.defense + itemsPct.defense,
-    spy: itemsPct.spy,
+    // power (shown in the summary and used in battle) adds points, items and
+    // the class bonus together.
+    attack: points.attack + itemsPct.attack + classPct.attack,
+    defense: points.defense + itemsPct.defense + classPct.defense,
+    spy: itemsPct.spy + classPct.spy,
   };
-  return { points, itemsPct, itemsFlat, itemsFlatByResource, totalPct };
+  return { points, itemsPct, itemsFlat, itemsFlatByResource, classPct, totalPct };
 }
 
 /** Multiplier form of a % bonus (e.g. 25 → 1.25). */

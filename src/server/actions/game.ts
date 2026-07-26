@@ -42,6 +42,7 @@ import {
   CITIZENS_PER_LEVEL,
   HERO_BAG_CAPACITY,
   applyHeroXp,
+  classXpMultiplier,
   attackWinXp,
   bonusMultiplier,
   defenseLossXp,
@@ -998,7 +999,11 @@ export async function attackEmpire(
           );
 
       if (attackerHero && attackerHeroXp > 0) {
-        const next = applyHeroXp(attackerHero, attackerHeroXp);
+        // The class XP bonus (הצל) scales every battle-XP gain.
+        const next = applyHeroXp(
+          attackerHero,
+          Math.round(attackerHeroXp * classXpMultiplier(attackerHero.heroClass))
+        );
         await tx.hero.update({
           where: { id: attackerHero.id },
           data: {
@@ -1018,7 +1023,10 @@ export async function attackEmpire(
         }
       }
       if (defenderHero) {
-        const next = applyHeroXp(defenderHero, defenderHeroXp);
+        const next = applyHeroXp(
+          defenderHero,
+          Math.round(defenderHeroXp * classXpMultiplier(defenderHero.heroClass))
+        );
         await tx.hero.update({
           where: { id: defenderHero.id },
           data: {

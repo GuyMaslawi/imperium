@@ -8,7 +8,7 @@ export const metadata = { title: "הרשמה | אימפריום" };
 export default async function RegisterPage() {
   if (await getSessionUserId()) redirect("/game/base");
   return (
-    <AuthShell>
+    <AuthShell wide>
       <RegisterForm />
     </AuthShell>
   );

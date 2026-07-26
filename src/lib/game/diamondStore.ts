@@ -23,11 +23,11 @@ export interface DiamondPackage {
 }
 
 export const DIAMOND_PACKAGES: readonly DiamondPackage[] = [
-  { id: "spark", emoji: "✨", diamonds: 50, bonus: 0, priceIls: 9.9 },
-  { id: "pouch", emoji: "💠", diamonds: 150, bonus: 15, priceIls: 24.9 },
-  { id: "chest", emoji: "🧰", diamonds: 350, bonus: 60, priceIls: 49.9, tag: "popular" },
-  { id: "vault", emoji: "🏆", diamonds: 800, bonus: 180, priceIls: 99.9, tag: "best" },
-  { id: "hoard", emoji: "👑", diamonds: 2000, bonus: 600, priceIls: 199.9 },
+  { id: "spark", emoji: "✨", diamonds: 400, bonus: 0, priceIls: 9.9 },
+  { id: "pouch", emoji: "💠", diamonds: 1200, bonus: 100, priceIls: 24.9 },
+  { id: "chest", emoji: "🧰", diamonds: 3000, bonus: 500, priceIls: 49.9, tag: "popular" },
+  { id: "vault", emoji: "🏆", diamonds: 7500, bonus: 1500, priceIls: 99.9, tag: "best" },
+  { id: "hoard", emoji: "👑", diamonds: 24000, bonus: 6000, priceIls: 199.9 },
 ];
 
 /** Total diamonds a package grants (base + bonus). */

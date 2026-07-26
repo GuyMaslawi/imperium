@@ -235,7 +235,7 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
         select: { id: true, startsAt: true, endsAt: true },
       });
       // The pass is sold *per season*, so selling one when no season is active
-      // charges 10 diamonds for a row that the next activation legitimately
+      // charges the full pass price for a row that the next activation legitimately
       // clears as a season rollover — a silent confiscation with no refund and
       // no ledger entry. Refuse the sale instead.
       if (!season) {

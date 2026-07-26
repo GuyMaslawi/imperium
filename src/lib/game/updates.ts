@@ -77,7 +77,7 @@ export async function applyPendingUpdates(
     // Cities multiply raw mine output: ×1 at one city, ×10 at ten. Derived from
     // the live count, so a city lost to siege drops production on the next tick.
     const baseMultiplier =
-      bonusMultiplier(heroBonus.points.resources) *
+      bonusMultiplier(heroBonus.points.resources + heroBonus.classPct.resources) *
       bonusMultiplier(guildResourcesPct) *
       tunables.economy.mineProductionMultiplier *
       cityProductionMultiplier(empire.cities);

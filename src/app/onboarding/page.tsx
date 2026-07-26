@@ -21,7 +21,7 @@ export default async function OnboardingPage() {
   if (user.empire) redirect("/game/base");
 
   return (
-    <AuthShell>
+    <AuthShell wide>
       <OnboardingForm userName={user.name} />
     </AuthShell>
   );

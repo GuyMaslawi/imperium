@@ -7,7 +7,8 @@ import { secureRandom } from "./random";
  * day-1 base that grows by WHEEL_CYCLE_GROWTH of that base on **every daily
  * update** — the same cadence the season pass refreshes on, so both ladders
  * step up together twice a day rather than once. Unit prizes (item, all
- * weapons) are always a single grant.
+ * weapons) are always a single grant, and `fixed` prizes (diamonds) never
+ * grow — see the WheelPrizeDef.fixed doc for why.
  */
 export const WHEEL_CYCLE_GROWTH = 0.1;
 
@@ -29,6 +30,15 @@ export interface WheelPrizeDef {
   kind: WheelPrizeKind;
   /** Day-1 amount for `kind: "amount"` prizes; ignored for unit prizes. */
   base: number;
+  /**
+   * Amount prizes normally grow with the daily-update cycle; `fixed: true`
+   * pins the payout to `base` for the whole season. Diamonds are fixed because
+   * they price the real-money store and the premium season pass — those prices
+   * don't inflate with the economy, so a growing wedge would flood the game
+   * with free diamonds by mid-season. Same rule that keeps diamonds off the
+   * season-pass ladder.
+   */
+  fixed?: boolean;
   /** Round the grown amount to a clean, readable step. */
   step: number;
   /** Extra requirement text shown in the wheel modal, if any. */
@@ -37,7 +47,7 @@ export interface WheelPrizeDef {
 
 /** 10 wedges (36° each), going clockwise from the top pointer. */
 export const WHEEL_PRIZES: WheelPrizeDef[] = [
-  { key: "diamonds", label: "יהלומים", icon: "💎", color: "#6d1f1f", kind: "amount", base: 3, step: 1 },
+  { key: "diamonds", label: "יהלומים", icon: "💎", color: "#6d1f1f", kind: "amount", base: 3, step: 1, fixed: true },
   { key: "turns", label: "תורות", icon: "🔄", color: "#141414", kind: "amount", base: 30, step: 5 },
   { key: "gold", label: "זהב", icon: "🪙", color: "#6d1f1f", kind: "amount", base: 800, step: 50 },
   { key: "iron", label: "ברזל", icon: "⚙️", color: "#141414", kind: "amount", base: 400, step: 50 },
@@ -91,6 +101,7 @@ export function seasonCycle(
  */
 export function wheelPrizeAmount(prize: WheelPrizeDef, cycle: number): number {
   if (prize.kind === "unit") return 1;
+  if (prize.fixed) return prize.base;
   const grown = prize.base * (1 + WHEEL_CYCLE_GROWTH * (Math.max(cycle, 1) - 1));
   return Math.max(prize.step, Math.round(grown / prize.step) * prize.step);
 }

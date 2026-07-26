@@ -4,6 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import type { HeroClass } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
@@ -114,7 +115,8 @@ function escapeHtml(s: string): string {
  */
 async function createEmpireForUser(
   userId: string,
-  empireName: string
+  empireName: string,
+  heroClass: HeroClass
 ): Promise<AuthState | null> {
   const [activeSeason, tunables] = await Promise.all([
     prisma.gameSeason.findFirst({ where: { isActive: true }, select: { id: true } }),
@@ -122,7 +124,7 @@ async function createEmpireForUser(
   ]);
   try {
     await prisma.empire.create({
-      data: newEmpireData(userId, empireName, activeSeason?.id, tunables.starting),
+      data: newEmpireData(userId, empireName, activeSeason?.id, tunables.starting, heroClass),
     });
   } catch (e) {
     if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
@@ -133,9 +135,15 @@ async function createEmpireForUser(
   return null;
 }
 
+/** The character chosen at signup — must be one of the four playable classes. */
+const heroClassSchema = z.enum(["WARLORD", "GUARDIAN", "MERCHANT", "SHADOW"], {
+  message: "בחר דמות גיבור",
+});
+
 const registerSchema = z.object({
   name: z.string().trim().min(2, "שם חייב להכיל לפחות 2 תווים").max(40),
   empireName: z.string().trim().min(2, "שם האימפריה חייב להכיל לפחות 2 תווים").max(40),
+  heroClass: heroClassSchema,
   // .max(254) is the RFC 5321 address limit. Without it Zod's email check passes
   // a megabyte-long local part, which reaches both an unbounded Postgres text
   // column and — on login — a Map key in the in-process rate limiter.
@@ -157,13 +165,14 @@ export async function register(
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
     empireName: formData.get("empireName"),
+    heroClass: formData.get("heroClass"),
     email: formData.get("email"),
     password: formData.get("password"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
-  const { name, empireName, email, password } = parsed.data;
+  const { name, empireName, heroClass, email, password } = parsed.data;
 
   // No pre-flight "does this email exist?" query: it was both a TOCTOU race with
   // the insert and an enumeration oracle (a fast email-taken reply, returned
@@ -187,7 +196,13 @@ export async function register(
         data: { email, passwordHash, name },
       });
       await tx.empire.create({
-        data: newEmpireData(created.id, empireName, activeSeason?.id, tunables.starting),
+        data: newEmpireData(
+          created.id,
+          empireName,
+          activeSeason?.id,
+          tunables.starting,
+          heroClass
+        ),
       });
       return created;
     });
@@ -659,6 +674,7 @@ export async function resendVerificationEmail(
 
 const onboardingSchema = z.object({
   empireName: z.string().trim().min(2, "שם האימפריה חייב להכיל לפחות 2 תווים").max(40),
+  heroClass: heroClassSchema,
 });
 
 /**
@@ -692,12 +708,19 @@ export async function createEmpireForCurrentUser(
   });
   if (existing) redirect("/game/base");
 
-  const parsed = onboardingSchema.safeParse({ empireName: formData.get("empireName") });
+  const parsed = onboardingSchema.safeParse({
+    empireName: formData.get("empireName"),
+    heroClass: formData.get("heroClass"),
+  });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
 
-  const err = await createEmpireForUser(userId, parsed.data.empireName);
+  const err = await createEmpireForUser(
+    userId,
+    parsed.data.empireName,
+    parsed.data.heroClass
+  );
   if (err) return err;
 
   redirect("/game/base");

@@ -84,7 +84,7 @@ export default async function ProductionPage() {
             level: mine.level,
             assignedSlaves: mine.assignedSlaves,
             cities: empire.cities,
-            heroResourcesPct: heroBonus.points.resources,
+            heroResourcesPct: heroBonus.points.resources + heroBonus.classPct.resources,
             guildResourcesPct,
             diamondBoostPct: resourceBoosts[resource],
             heroItemFlat: heroBonus.itemsFlatByResource[resource],

@@ -508,6 +508,15 @@ enum HeroRarity {
   LEGENDARY
 }
 
+/// The character archetype chosen at signup — each carries its own passive
+/// bonus (see HERO_CLASS_META in src/lib/game/hero.ts).
+enum HeroClass {
+  WARLORD
+  GUARDIAN
+  MERCHANT
+  SHADOW
+}
+
 enum HeroItemSlot {
   SWORD
   GAUNTLETS
@@ -521,8 +530,9 @@ enum HeroItemSlot {
 }
 
 model Hero {
-  id             String   @id @default(cuid())
-  empireId       String   @unique
+  id             String    @id @default(cuid())
+  empireId       String    @unique
+  heroClass      HeroClass @default(WARLORD)
   level          Int      @default(1)
   xp             Int      @default(0)
   unspentPoints  Int      @default(0)

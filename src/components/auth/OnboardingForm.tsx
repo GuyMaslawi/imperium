@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { HeroClassPicker } from "@/components/auth/HeroClassPicker";
 
 export function OnboardingForm({ userName }: { userName: string }) {
   const [state, action] = useActionState<AuthState, FormData>(
@@ -22,7 +23,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
         ברוך הבא, {userName}
       </h2>
       <p className="text-sm text-zinc-400">
-        עוד צעד אחד — בחר שם לאימפריה שלך כדי להתחיל לשחק.
+        עוד צעד אחד — בחר שם לאימפריה ואת הגיבור שיוביל אותה לקרב.
       </p>
       <Input
         label="שם האימפריה"
@@ -34,6 +35,7 @@ export function OnboardingForm({ userName }: { userName: string }) {
         placeholder="למשל: ממלכת הברזל"
         autoFocus
       />
+      <HeroClassPicker />
       <FormMessage error={state.error} />
       <SubmitButton className="w-full" pendingText="מקים אימפריה...">
         הקם אימפריה{" "}
