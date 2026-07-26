@@ -50,10 +50,34 @@ model User {
   failedLogins Int       @default(0)
   /// Set while the account is locked out; login is refused until it passes.
   lockedUntil  DateTime?
+  /// When the user proved control of this address. Null = unverified, which
+  /// blocks all gameplay (see requireEmpire / getActiveEmpireId). Google
+  /// sign-ins are verified on arrival via the provider's email_verified claim.
+  emailVerified DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  empire Empire?
+  empire             Empire?
+  verificationTokens EmailVerificationToken[]
+}
+
+/// One outstanding "confirm your email" link.
+model EmailVerificationToken {
+  id String @id @default(cuid())
+
+  userId String
+  /// SHA-256 of the token that was emailed — the raw value is never stored, so
+  /// read access to this table cannot be replayed into an account takeover.
+  /// Unique so a lookup by hash is a single indexed read.
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  /// Set the moment the link is used; a consumed token is never accepted again.
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /// Single-row (`id = "singleton"`) table holding admin-editable global game

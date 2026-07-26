@@ -20,7 +20,7 @@ import {
   WEAPON_CATEGORIES,
   weaponsOfCategory,
 } from "@/lib/game/weapons";
-import { HERO_BAG_CAPACITY, itemDisplayName, rollItemDrop } from "@/lib/game/hero";
+import { HERO_BAG_CAPACITY, itemDisplayName, rollGuaranteedItem } from "@/lib/game/hero";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { FullEmpire } from "@/lib/game/updates";
 
@@ -131,22 +131,15 @@ async function grantPrize(
       const hero = empire.hero;
       const bagCount = hero ? hero.items.filter((i) => !i.equipped).length : 0;
       if (hero && bagCount < HERO_BAG_CAPACITY) {
-        // Force a guaranteed drop (bypass the item-drop chance gate).
-        let first = true;
-        const drop = rollItemDrop(hero.level, () => {
-          if (first) {
-            first = false;
-            return 0;
-          }
-          return secureRandom();
-        });
-        if (drop) {
-          await tx.heroItem.create({ data: { heroId: hero.id, ...drop } });
-          return {
-            message: `זכית ב־✨ ${itemDisplayName(drop.slot, drop.level)} לתיק הגיבור!`,
-            grants: [{ key: "item", amount: 1 }],
-          };
-        }
+        // The wedge already decided an item is won, so roll one that always
+        // drops but keeps the relative rarity odds — forcing the drop gate to
+        // zero would have handed out the commonest tier every single time.
+        const drop = rollGuaranteedItem(hero.level);
+        await tx.heroItem.create({ data: { heroId: hero.id, ...drop } });
+        return {
+          message: `זכית ב־✨ ${itemDisplayName(drop.slot, drop.level)} לתיק הגיבור!`,
+          grants: [{ key: "item", amount: 1 }],
+        };
       }
       // No room / no hero — pay a gold consolation so the spin isn't wasted.
       const consolation = wheelPrizeAmount(

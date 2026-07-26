@@ -7,14 +7,12 @@ import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { lastDailyUpdate, nextDailyUpdate } from "@/lib/game/time";
-import { HERO_BAG_CAPACITY, itemDisplayName } from "@/lib/game/hero";
 import {
   SEASON_PASS_PREMIUM_PRICE,
   SEASON_PASS_REWARD_LABEL,
   SEASON_PASS_TIERS,
   SEASON_PASS_XP_MAX,
   seasonPassDay,
-  seasonPassItemGrant,
   seasonPassRewardAmount,
   tierForXp,
   type SeasonPassReward,
@@ -122,7 +120,6 @@ export interface SeasonPassState {
 
 /** Human label for a reward at a given season day, e.g. "12,500 זהב". */
 function rewardLabel(reward: SeasonPassReward, day: number): string {
-  if (reward.kind === "heroItem") return "פריט גיבור אגדי";
   const amount = seasonPassRewardAmount(reward, day);
   return `${heNum(amount)} ${SEASON_PASS_REWARD_LABEL[reward.kind]}`;
 }
@@ -289,53 +286,12 @@ class InsufficientDiamonds extends Error {}
 /* ------------------------------ claiming ------------------------------ */
 
 /** Credit one reward to the empire. Returns the text for the claim summary. */
-/**
- * Whether `reward` can actually be delivered right now.
- *
- * Only hero items can fail: they need a hero and a free bag slot. Resource,
- * turn and citizen rewards always land. Callers use this to avoid marking a
- * tier claimed for a reward that would then be dropped on the floor.
- */
-async function canGrant(
-  tx: Prisma.TransactionClient,
-  empireId: string,
-  reward: SeasonPassReward
-): Promise<boolean> {
-  if (reward.kind !== "heroItem") return true;
-  const hero = await tx.hero.findUnique({
-    where: { empireId },
-    select: { items: { select: { equipped: true } } },
-  });
-  if (!hero) return false;
-  return hero.items.filter((i) => !i.equipped).length < HERO_BAG_CAPACITY;
-}
-
 async function grantReward(
   tx: Prisma.TransactionClient,
   empireId: string,
   reward: SeasonPassReward,
   day: number
 ): Promise<string> {
-  if (reward.kind === "heroItem") {
-    const hero = await tx.hero.findUnique({
-      where: { empireId },
-      select: { id: true, level: true, items: { select: { equipped: true } } },
-    });
-    if (!hero) return "";
-    const bagCount = hero.items.filter((i) => !i.equipped).length;
-    if (bagCount >= HERO_BAG_CAPACITY) return "תיק הגיבור מלא — הפריט לא נוצר";
-    const drop = seasonPassItemGrant(hero.level);
-    await tx.heroItem.create({
-      data: {
-        heroId: hero.id,
-        slot: drop.slot,
-        level: drop.level,
-        rarity: drop.rarity,
-      },
-    });
-    return itemDisplayName(drop.slot, drop.level);
-  }
-
   const amount = seasonPassRewardAmount(reward, day);
   const field = reward.kind; // gold | wood | iron | stone | turns | citizens
   if (field === "citizens") {
@@ -379,33 +335,23 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
       }
 
       const granted: string[] = [];
-      let blocked = false;
       for (const t of SEASON_PASS_TIERS) {
         if (t.tier > level) break;
 
-        // Check deliverability BEFORE taking the claim. The claim flag is what
-        // makes collection idempotent, so marking a tier claimed and only then
-        // discovering there is no hero or no bag space burned the tier for the
-        // whole cycle and handed the player nothing. Leaving it unclaimed lets
-        // them free a bag slot and collect it later in the same cycle.
-        if (!(await canGrant(tx, empireId, t.free))) {
-          blocked = true;
-        } else {
-          const tookFree = await tx.seasonPassProgress.updateMany({
-            where: { empireId, NOT: { claimedFree: { has: t.tier } } },
-            data: { claimedFree: { push: t.tier } },
-          });
-          if (tookFree.count > 0) {
-            const text = await grantReward(tx, empireId, t.free, day);
-            if (text) granted.push(text);
-          }
+        // Every reward kind on the ladder is a plain resource/turn/citizen
+        // credit that cannot fail to land, so taking the claim flag first is
+        // safe — there is no case left where a tier is marked collected and
+        // then delivers nothing.
+        const tookFree = await tx.seasonPassProgress.updateMany({
+          where: { empireId, NOT: { claimedFree: { has: t.tier } } },
+          data: { claimedFree: { push: t.tier } },
+        });
+        if (tookFree.count > 0) {
+          const text = await grantReward(tx, empireId, t.free, day);
+          if (text) granted.push(text);
         }
 
         if (!progress.premium) continue;
-        if (!(await canGrant(tx, empireId, t.premium))) {
-          blocked = true;
-          continue;
-        }
         const tookPremium = await tx.seasonPassProgress.updateMany({
           where: { empireId, NOT: { claimedPremium: { has: t.tier } } },
           data: { claimedPremium: { push: t.tier } },
@@ -419,9 +365,7 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
       if (granted.length === 0) {
         return {
           ok: false as const,
-          error: blocked
-            ? "תיק הגיבור מלא — פנה מקום כדי לאסוף את פריטי הגיבור"
-            : "אין תגמולים חדשים לאיסוף",
+          error: "אין תגמולים חדשים לאיסוף",
         };
       }
 

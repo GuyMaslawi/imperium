@@ -5,6 +5,7 @@ import { catalogKey, itemDetails, uiRarityForLevel } from "@/components/game/her
 import {
   HERO_STAT_META,
   ITEM_DROP_CHANCE,
+  ITEM_DROP_CHANCE_BY_RARITY,
   ITEM_LEVELS,
   RARITY_META,
   RARITY_ORDER,
@@ -12,6 +13,12 @@ import {
   SLOT_ORDER,
   itemBonusValue,
 } from "@/lib/game/hero";
+
+/** "27%" / "1%" — one decimal only when the odds are below a whole percent. */
+function formatDropChance(chance: number): string {
+  const pct = chance * 100;
+  return `${pct < 1 ? pct.toFixed(1) : Math.round(pct)}%`;
+}
 
 /**
  * The complete item catalog: every slot at every tier level (1,3,8,10,…,100).
@@ -42,11 +49,15 @@ export function ItemCatalog({
           <span className="nums text-gold" dir="ltr">
             {Math.round(ITEM_DROP_CHANCE * 100)}%
           </span>{" "}
-          ללכידה). דרגת החפץ נקבעת לפי הרמה, וחוזרת בכל עשור:{" "}
+          ללכידה). ככל שהדרגה נדירה יותר, כך היא נופלת לעיתים רחוקות יותר —
+          הסיכוי בכל תקיפה מנצחת:{" "}
           {RARITY_ORDER.map((r, i) => (
             <span key={r}>
               {i > 0 && " · "}
-              <span className={RARITY_META[r].tone}>{RARITY_META[r].label}</span>
+              <span className={RARITY_META[r].tone}>{RARITY_META[r].label}</span>{" "}
+              <span className="nums text-zinc-300" dir="ltr">
+                {formatDropChance(ITEM_DROP_CHANCE_BY_RARITY[r])}
+              </span>
             </span>
           ))}
         </p>

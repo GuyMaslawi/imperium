@@ -551,29 +551,101 @@ export function bonusMultiplier(pct: number): number {
 
 /* ------------------------------ item drops ------------------------------ */
 
-/** Chance that winning an attack captures an item from the defender. */
-export const ITEM_DROP_CHANCE = 0.45;
+/**
+ * Chance that winning an attack captures an item **of each rarity**.
+ *
+ * Rarity drives frequency directly, rather than falling out of a uniform level
+ * roll. Under the old model the level was uniform across a ±12 window and the
+ * tier was read off it, which made אגדי roughly 1-in-10 of all drops — far too
+ * common for the top of the ladder. Now an אגדי is a flat 1% of winning
+ * attacks and each step down is several times more likely.
+ *
+ * These are per-winning-attack probabilities and are mutually exclusive; the
+ * remainder (1 − ITEM_DROP_CHANCE) is no drop at all.
+ */
+export const ITEM_DROP_CHANCE_BY_RARITY: Record<HeroRarity, number> = {
+  COMMON: 0.27, // פשוט — 27%
+  RARE: 0.13, // מתקדם — 13%
+  EPIC: 0.04, // אליט — 4%
+  LEGENDARY: 0.01, // אגדי — 1%
+};
+
+/** Chance a won attack yields any item at all — the sum of the table above. */
+export const ITEM_DROP_CHANCE = RARITY_ORDER.reduce(
+  (sum, r) => sum + ITEM_DROP_CHANCE_BY_RARITY[r],
+  0
+);
+
+/** The level at which each tier band opens inside a decade. */
+const RARITY_BAND_OFFSET: Record<HeroRarity, number> = {
+  COMMON: 1,
+  RARE: 3,
+  EPIC: 8,
+  LEGENDARY: 10,
+};
 
 /**
- * Roll a captured item after a won attack. The item level lands near the
- * attacker's hero level (±12) — loot you can actually use soon — and its tier
- * follows from that level. Rarer tiers are naturally scarcer because fewer
- * levels map to them (only 1 in 10 is legendary).
+ * A concrete level for a dropped item of the given rarity, in a decade near the
+ * hero's own so the loot is roughly wearable. Drops land exactly on a band-start
+ * level (an UPGRADE_LEVELS rung), which is what makes the rolled rarity and
+ * `tierForLevel` agree by construction.
+ */
+export function itemLevelForRarity(
+  heroLevel: number,
+  rarity: HeroRarity,
+  random: () => number = secureRandom
+): number {
+  const decades = HERO_MAX_LEVEL / 10;
+  const heroDecade = Math.floor((Math.max(1, heroLevel) - 1) / 10);
+  const jitter = Math.floor(random() * 3) - 1; // one decade either side
+  const decade = Math.min(decades - 1, Math.max(0, heroDecade + jitter));
+  return Math.min(HERO_MAX_LEVEL, decade * 10 + RARITY_BAND_OFFSET[rarity]);
+}
+
+function itemOfRarity(
+  attackerHeroLevel: number,
+  rarity: HeroRarity,
+  random: () => number
+): { slot: HeroItemSlot; level: number; rarity: HeroRarity } {
+  const slot = SLOT_ORDER[Math.floor(random() * SLOT_ORDER.length)];
+  const level = itemLevelForRarity(attackerHeroLevel, rarity, random);
+  return { slot, level, rarity };
+}
+
+/**
+ * Roll a captured item after a won attack, or null for no drop. One roll walks
+ * the cumulative rarity table, so the odds are exactly ITEM_DROP_CHANCE_BY_RARITY.
  */
 export function rollItemDrop(
   attackerHeroLevel: number,
   random: () => number = secureRandom
 ): { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null {
-  if (random() >= ITEM_DROP_CHANCE) return null;
+  const roll = random();
+  let acc = 0;
+  for (const rarity of RARITY_ORDER) {
+    acc += ITEM_DROP_CHANCE_BY_RARITY[rarity];
+    if (roll < acc) return itemOfRarity(attackerHeroLevel, rarity, random);
+  }
+  return null;
+}
 
-  // Uniform slot.
-  const slot = SLOT_ORDER[Math.floor(random() * SLOT_ORDER.length)];
-
-  // Level near the attacker's hero level (±12); the tier is derived from it.
-  const jitter = Math.round((random() * 2 - 1) * 12);
-  const level = Math.min(HERO_MAX_LEVEL, Math.max(1, attackerHeroLevel + jitter));
-
-  return { slot, level, rarity: tierForLevel(level) };
+/**
+ * Roll an item that is guaranteed to drop, keeping the *relative* rarity odds
+ * intact — the wheel's "חפץ" wedge already decided that something is won, so
+ * only the rarity split matters. Renormalising beats forcing the drop roll to
+ * zero, which would always hand out the most common tier.
+ */
+export function rollGuaranteedItem(
+  attackerHeroLevel: number,
+  random: () => number = secureRandom
+): { slot: HeroItemSlot; level: number; rarity: HeroRarity } {
+  const roll = random() * ITEM_DROP_CHANCE;
+  let acc = 0;
+  for (const rarity of RARITY_ORDER) {
+    acc += ITEM_DROP_CHANCE_BY_RARITY[rarity];
+    if (roll < acc) return itemOfRarity(attackerHeroLevel, rarity, random);
+  }
+  return itemOfRarity(attackerHeroLevel, "COMMON", random);
 }
 
 /** Display name, e.g. "חרב מתקדם" — the tier follows from the item's level. */

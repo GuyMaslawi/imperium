@@ -112,9 +112,16 @@ export const getActiveEmpireId = cache(async (): Promise<string | null> => {
   if (!userId) return null;
   const empire = await prisma.empire.findUnique({
     where: { userId },
-    select: { id: true, user: { select: { bannedAt: true } } },
+    select: {
+      id: true,
+      user: { select: { bannedAt: true, emailVerified: true } },
+    },
   });
-  if (!empire || empire.user.bannedAt) return null;
+  // Unverified accounts are gated here as well as at requireEmpire: page loads
+  // are not the only way in, and every server action resolves its empire
+  // through this function. Gating only the pages would leave the whole
+  // mutation surface reachable by POST from an unverified account.
+  if (!empire || empire.user.bannedAt || !empire.user.emailVerified) return null;
   return empire.id;
 });
 
@@ -137,6 +144,9 @@ export const requireEmpire = cache(async () => {
     await destroySession();
     redirect("/login");
   }
+  // Unverified accounts keep their session (so they can resend the link) but
+  // reach no part of the game until they confirm the address.
+  if (!existing.user.emailVerified) redirect("/verify-email");
 
   const empire = await applyPendingUpdates(existing.id);
   return { ...empire, user: existing.user };

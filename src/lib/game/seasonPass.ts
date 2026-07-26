@@ -1,5 +1,4 @@
-import type { GameSeason, HeroRarity, HeroItemSlot } from "@prisma/client";
-import { tierForLevel } from "./hero";
+import type { GameSeason } from "@prisma/client";
 
 /**
  * Season pass: a two-track (free / premium) reward ladder that refills on
@@ -18,10 +17,12 @@ import { tierForLevel } from "./hero";
  *    lives on the progress row and survives every reset until the season
  *    itself changes.
  *
- * Deliberately absent: diamonds. At two cycles a day for a whole season even a
- * 3-diamond tier would pay out hundreds of diamonds against a 10-diamond pass
- * price, which would undercut the real-money store (see DiamondPurchase).
- * Resources, turns, citizens and hero gear carry the ladder instead.
+ * Deliberately absent: diamonds and hero gear. At two cycles a day for a whole
+ * season even a 3-diamond tier would pay out hundreds of diamonds against a
+ * 10-diamond pass price, undercutting the real-money store (see
+ * DiamondPurchase); hero items belong to attacks and the hero shop, where
+ * rarity gates how often they appear. Resources, turns and citizens carry the
+ * ladder instead.
  */
 
 /** Fraction of the base amount added for each day elapsed in the season. */
@@ -118,24 +119,19 @@ export const SEASON_PASS_XP_MAX = xpForTier(SEASON_PASS_TIER_COUNT);
 
 /* ------------------------------ reward table ------------------------------ */
 
-/**
- * `amount` rewards scale with the season day. `heroItem` is a unit grant whose
- * level and rarity follow the hero's own level, so the capstone is always
- * something the hero can actually equip (see `seasonPassItemGrant`).
- */
+/** Every reward kind the ladder can pay. All of them scale with the season day. */
 export type SeasonPassRewardKind =
   | "gold"
   | "wood"
   | "iron"
   | "stone"
   | "turns"
-  | "citizens"
-  | "heroItem";
+  | "citizens";
 
 export interface SeasonPassReward {
   kind: SeasonPassRewardKind;
   icon: string;
-  /** Day-1 quantity. Ignored for `heroItem`. */
+  /** Day-1 quantity. */
   base: number;
   /** Round the grown amount to a clean, readable step. */
   step: number;
@@ -149,8 +145,12 @@ export interface SeasonPassTier {
 
 /**
  * Eight tiers, premium paying 3× the free track — which is exactly what the
- * upsell in the modal promises ("פי 3 שלל"). Tier 8 premium breaks the pattern
- * and grants hero gear as the capstone for clearing the whole ladder.
+ * upsell in the modal promises ("פי 3 שלל").
+ *
+ * No hero gear here on purpose. Hero items are meant to be won by fighting (a
+ * captured drop from a won attack) or bought in the hero shop; handing a
+ * guaranteed one out twice a day for clearing a ladder made the rarest tier
+ * routine and undercut both sources.
  */
 export const SEASON_PASS_TIERS: SeasonPassTier[] = [
   {
@@ -191,7 +191,7 @@ export const SEASON_PASS_TIERS: SeasonPassTier[] = [
   {
     tier: 8,
     free: { kind: "wood", icon: "🌲", base: 4000, step: 100 },
-    premium: { kind: "heroItem", icon: "⚔️", base: 1, step: 1 },
+    premium: { kind: "wood", icon: "🌲", base: 12000, step: 100 },
   },
 ];
 
@@ -203,7 +203,6 @@ export const SEASON_PASS_REWARD_LABEL: Record<SeasonPassRewardKind, string> = {
   stone: "אבן",
   turns: "תורות",
   citizens: "אזרחים",
-  heroItem: "פריט גיבור",
 };
 
 /**
@@ -229,33 +228,12 @@ export function seasonPassDay(
   return Math.min(Math.max(elapsed, 1), total);
 }
 
-/** Quantity a reward pays on a given season day. Hero gear always grants one. */
+/** Quantity a reward pays on a given season day. */
 export function seasonPassRewardAmount(
   reward: SeasonPassReward,
   day: number
 ): number {
-  if (reward.kind === "heroItem") return 1;
   const grown =
     reward.base * (1 + SEASON_PASS_DAILY_GROWTH * (Math.max(day, 1) - 1));
   return Math.max(reward.step, Math.round(grown / reward.step) * reward.step);
-}
-
-/**
- * The gear the tier-8 capstone hands out.
- *
- * Item level must not exceed the hero's own level or the item can never be
- * equipped (see `canEquipItem`). Rarity is a function of level that peaks at
- * every multiple of 10, so we drop to the highest such level the hero can
- * carry — a level-27 hero gets a level-20 LEGENDARY. Heroes under level 10
- * cannot hold a legendary at all, so they get the best tier their own level
- * supports instead.
- */
-export function seasonPassItemGrant(heroLevel: number): {
-  slot: HeroItemSlot;
-  level: number;
-  rarity: HeroRarity;
-} {
-  const level =
-    heroLevel >= 10 ? Math.floor(heroLevel / 10) * 10 : Math.max(1, heroLevel);
-  return { slot: "SWORD", level, rarity: tierForLevel(level) };
 }

@@ -60,8 +60,15 @@ export const requireAdmin = cache(async (): Promise<SessionUser> => {
     // unique constraint on User.email is not a defence — it only holds while
     // that address already has an account, so the hole reopens whenever an
     // ADMIN_EMAILS entry is rotated, added, or its user row deleted.
+    // Belt and braces alongside the zero-admin check: the bootstrap is the one
+    // place where merely *claiming* an address grants privilege, so require
+    // that the claim has actually been proved.
+    const claimant = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { emailVerified: true },
+    });
     const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
-    if (adminCount === 0) {
+    if (adminCount === 0 && claimant?.emailVerified) {
       await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
       await logAdmin(user, {
         action: "admin.bootstrap",

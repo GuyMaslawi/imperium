@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -9,9 +10,82 @@ import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { verifyGoogleIdToken } from "@/lib/google";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
+import { appBaseUrl, sendMail } from "@/server/mailer";
 
 export interface AuthState {
   error?: string;
+}
+
+/* --------------------------- email verification --------------------------- */
+
+/** How long a verification link stays usable. */
+const VERIFY_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Hash a verification token for storage/lookup.
+ *
+ * SHA-256 with no salt is correct here precisely because it would be wrong for
+ * a password: the token is 256 bits of CSPRNG output, so there is no dictionary
+ * to attack and the hash must be deterministic to be looked up by index. What
+ * this buys is that a dump of the token table cannot be replayed into anyone's
+ * account, because the raw values only ever existed in the emails.
+ */
+function hashToken(raw: string): string {
+  return createHash("sha256").update(raw).digest("hex");
+}
+
+/**
+ * Issue a fresh verification link and email it.
+ *
+ * Any earlier outstanding token for the user is consumed first, so a link only
+ * stays live until the next one is requested — a leaked older link (forwarded
+ * mail, a shared screenshot) stops working as soon as the user asks again.
+ */
+async function sendVerificationEmail(user: {
+  id: string;
+  email: string;
+  name: string;
+}): Promise<boolean> {
+  const raw = randomBytes(32).toString("base64url");
+  const now = new Date();
+
+  await prisma.$transaction([
+    prisma.emailVerificationToken.updateMany({
+      where: { userId: user.id, consumedAt: null },
+      data: { consumedAt: now },
+    }),
+    prisma.emailVerificationToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(now.getTime() + VERIFY_TOKEN_TTL_MS),
+      },
+    }),
+  ]);
+
+  const link = `${appBaseUrl()}/verify-email?token=${encodeURIComponent(raw)}`;
+  return sendMail({
+    to: user.email,
+    subject: "אימות כתובת האימייל שלך באימפריום",
+    text: `שלום ${user.name},\n\nכדי להפעיל את החשבון שלך באימפריום, פתח את הקישור:\n${link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.`,
+    html: `<div dir="rtl" style="font-family:system-ui,sans-serif;line-height:1.6">
+      <h2>ברוך הבא לאימפריום, ${escapeHtml(user.name)}</h2>
+      <p>כדי להפעיל את החשבון ולהתחיל לשחק, אשר את כתובת האימייל שלך:</p>
+      <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#b8892b;color:#fff;border-radius:8px;text-decoration:none">אימות האימייל</a></p>
+      <p style="color:#666;font-size:13px">הקישור תקף ל-24 שעות. אם לא נרשמת לאימפריום, אפשר להתעלם מההודעה.</p>
+    </div>`,
+  });
+}
+
+/** Minimal escaping for the one user-controlled value in the email body. */
+function escapeHtml(s: string): string {
+  return s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ]!
+  );
 }
 
 /**
@@ -111,8 +185,12 @@ export async function register(
     return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
   }
 
+  // Best-effort: a mail hiccup must not undo a completed registration. The
+  // user lands on /verify-email either way and can resend from there.
+  await sendVerificationEmail({ id: user.id, email: user.email, name: user.name });
+
   await createSession(user.id, user.tokenVersion);
-  redirect("/game/base");
+  redirect("/verify-email");
 }
 
 const loginSchema = z.object({
@@ -395,6 +473,9 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
         data: {
           googleId: identity.googleId,
           image: byEmail.image ?? identity.picture ?? null,
+          // Google asserted email_verified above (checked before we got here),
+          // which is exactly the proof our own link asks for.
+          emailVerified: byEmail.emailVerified ?? new Date(),
         },
       });
     }
@@ -409,6 +490,8 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
           name,
           googleId: identity.googleId,
           image: identity.picture ?? null,
+          // Verified by Google — no confirmation link needed.
+          emailVerified: new Date(),
         },
       });
     } catch (e) {
@@ -440,6 +523,85 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
     select: { id: true },
   });
   redirect(empire ? "/game/base" : "/onboarding");
+}
+
+/**
+ * Consume a verification link. Returns whether the address is now verified.
+ *
+ * Called from the /verify-email page with the raw token from the query string.
+ * The claim is a guarded `updateMany` on `consumedAt: null`, so a link that is
+ * opened twice (mail scanners prefetch links routinely) verifies once and the
+ * second attempt is reported as already-used rather than crashing.
+ */
+export async function verifyEmailToken(
+  rawToken: string
+): Promise<{ ok: boolean; error?: string }> {
+  if (typeof rawToken !== "string" || !rawToken) {
+    return { ok: false, error: "קישור אימות לא תקין" };
+  }
+
+  const record = await prisma.emailVerificationToken.findUnique({
+    where: { tokenHash: hashToken(rawToken) },
+    select: { id: true, userId: true, expiresAt: true, consumedAt: true },
+  });
+  if (!record) return { ok: false, error: "קישור האימות אינו תקין" };
+
+  const now = new Date();
+  if (record.expiresAt < now) {
+    return { ok: false, error: "פג תוקף הקישור — שלח לעצמך קישור חדש" };
+  }
+
+  const claimed = await prisma.emailVerificationToken.updateMany({
+    where: { id: record.id, consumedAt: null },
+    data: { consumedAt: now },
+  });
+  if (claimed.count === 0) {
+    // Already used. If that use verified the account, treat this as success so
+    // a prefetched link doesn't show the real user an error.
+    const user = await prisma.user.findUnique({
+      where: { id: record.userId },
+      select: { emailVerified: true },
+    });
+    return user?.emailVerified
+      ? { ok: true }
+      : { ok: false, error: "הקישור כבר נוצל — שלח לעצמך קישור חדש" };
+  }
+
+  await prisma.user.update({
+    where: { id: record.userId },
+    data: { emailVerified: now },
+  });
+  return { ok: true };
+}
+
+/** Send the signed-in user a fresh verification link. */
+export async function resendVerificationEmail(
+  _prev: AccountActionState,
+  _formData: FormData
+): Promise<AccountActionState> {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  // Mail costs money and inboxes are abusable; cap resends hard.
+  const ip = await clientIp();
+  if (!rateLimit(`verify-resend:${userId}`, 5, 60 * 60 * 1000)) {
+    return { error: "נשלחו יותר מדי קישורים. נסה שוב בעוד שעה." };
+  }
+  if (!rateLimit(`verify-resend-ip:${ip}`, 20, 60 * 60 * 1000)) {
+    return { error: "נשלחו יותר מדי קישורים. נסה שוב מאוחר יותר." };
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true, emailVerified: true },
+  });
+  if (!user) redirect("/login");
+  if (user.emailVerified) return { success: "האימייל שלך כבר מאומת" };
+
+  const sent = await sendVerificationEmail(user);
+  return sent
+    ? { success: "שלחנו קישור אימות חדש. בדוק את תיבת הדואר." }
+    : { error: "שליחת המייל נכשלה. נסה שוב בעוד רגע." };
 }
 
 const onboardingSchema = z.object({
