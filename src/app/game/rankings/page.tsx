@@ -4,6 +4,8 @@ import { requireEmpire } from "@/lib/auth";
 import { getEmpireMilitaryPower } from "@/lib/game/power";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
+import { CityBossBanner } from "@/components/game/CityBossBanner";
+import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 
@@ -37,6 +39,10 @@ export default async function RankingsPage() {
   // This is a mitigation, not the real fix: ranking is by a power figure
   // computed in JS, so the sort cannot move into SQL until a denormalised power
   // column exists on Empire. Until then the row count is still O(bucket).
+  // The city boss headlines this screen — it is the one target on the page
+  // that everyone in the city shares, so it belongs above the ladder.
+  const bossState = await getCityBossState(myEmpire);
+
   const empires = await prisma.empire.findMany({
     where: { cities: myCity },
     select: {
@@ -71,6 +77,9 @@ export default async function RankingsPage() {
       {/* Other players train, attack and rise in rank — keep the table live. */}
       <AutoRefresh intervalMs={30_000} />
       <SectionHeading title="דירוג" subtitle="LEADERBOARD" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
+
+      {/* -------- city boss -------- */}
+      <CityBossBanner state={bossState} cities={myCity} />
 
       {/* -------- status strip -------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">

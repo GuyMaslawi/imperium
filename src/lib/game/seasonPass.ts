@@ -55,6 +55,12 @@ export const SEASON_PASS_XP = {
   wheelSpin: 5,
   miniGame: 20,
   foundCity: 40,
+  /**
+   * A city-boss run costs 300+ turns — 30 ordinary attacks' worth — so it pays
+   * well above `attack`. It stays far short of the 400 XP that clears the whole
+   * ladder: the boss is the cycle's centrepiece, not a way to skip the cycle.
+   */
+  bossFight: 120,
 } as const;
 
 export type SeasonPassAction = keyof typeof SEASON_PASS_XP;

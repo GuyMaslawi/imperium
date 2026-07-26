@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
+import { BOSS_VICTORIES_PER_CYCLE } from "./bosses";
 
 /**
  * Admin-editable global game balance. These are the *server-authoritative*
@@ -47,6 +48,16 @@ export interface GameTunables {
   economy: {
     mineProductionMultiplier: number;
   };
+  /**
+   * City-boss balance. The shape of the curves lives in game/bosses.ts; these
+   * are the two global scalars on top of it plus the per-cycle victory cap, so
+   * the boss can be softened or sharpened without a deploy.
+   */
+  boss: {
+    powerMultiplier: number;
+    rewardMultiplier: number;
+    victoriesPerCycle: number;
+  };
   /** Diamond store (real-money purchase page) tunables. */
   diamondStore: {
     /** Percent off every diamond package price (0 = full price). */
@@ -84,6 +95,11 @@ export const DEFAULT_TUNABLES: GameTunables = {
   },
   economy: {
     mineProductionMultiplier: 1,
+  },
+  boss: {
+    powerMultiplier: 1,
+    rewardMultiplier: 1,
+    victoriesPerCycle: BOSS_VICTORIES_PER_CYCLE,
   },
   diamondStore: {
     purchaseDiscountPct: 0,
@@ -141,6 +157,15 @@ export const TUNABLE_META: Record<
       mineProductionMultiplier: { label: "מכפיל תפוקת מכרות גלובלי", step: 0.1 },
     },
   },
+  boss: {
+    label: "בוס העיר",
+    icon: "👹",
+    fields: {
+      powerMultiplier: { label: "מכפיל כוח הבוס (1 = ברירת מחדל)", step: 0.05 },
+      rewardMultiplier: { label: "מכפיל שלל הבוס (1 = ברירת מחדל)", step: 0.05 },
+      victoriesPerCycle: { label: "ניצחונות מותרים בין עדכון יומי לעדכון יומי" },
+    },
+  },
   diamondStore: {
     label: "חנות יהלומים — רכישה",
     icon: "💎",
@@ -195,6 +220,13 @@ const TUNABLE_BOUNDS: {
   economy: {
     mineProductionMultiplier: [0, 1e3],
   },
+  boss: {
+    // A zero power multiplier would make every boss free to farm; keep a floor.
+    powerMultiplier: [0.01, 1e3],
+    rewardMultiplier: [0, 1e3],
+    // 0 closes the boss entirely, which is a legitimate kill switch.
+    victoriesPerCycle: [0, 1e3],
+  },
   diamondStore: {
     purchaseDiscountPct: [0, 100],
   },
@@ -225,6 +257,7 @@ export function mergeTunables(overlay: unknown): GameTunables {
     daily: mergeGroup(DEFAULT_TUNABLES.daily, o.daily, TUNABLE_BOUNDS.daily),
     battle: mergeGroup(DEFAULT_TUNABLES.battle, o.battle, TUNABLE_BOUNDS.battle),
     economy: mergeGroup(DEFAULT_TUNABLES.economy, o.economy, TUNABLE_BOUNDS.economy),
+    boss: mergeGroup(DEFAULT_TUNABLES.boss, o.boss, TUNABLE_BOUNDS.boss),
     diamondStore: mergeGroup(
       DEFAULT_TUNABLES.diamondStore,
       o.diamondStore,
