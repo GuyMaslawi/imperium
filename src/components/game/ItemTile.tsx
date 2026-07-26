@@ -117,6 +117,7 @@ export function ItemTile({
   size = "md",
   details,
   tooltipBelow = false,
+  tooltipAnchor = "center",
 }: {
   slug?: string;
   icon: string;
@@ -127,6 +128,12 @@ export function ItemTile({
   details?: ItemTileDetails;
   /** Open the tooltip under the tile (for tiles near the top of the screen). */
   tooltipBelow?: boolean;
+  /**
+   * Which edge of the tile the tooltip hangs from. Centred by default; use
+   * "left"/"right" for tiles hugging a container edge so the tooltip grows
+   * inwards instead of spilling out of the frame.
+   */
+  tooltipAnchor?: "center" | "left" | "right";
 }) {
   const [imgOk, setImgOk] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -232,8 +239,14 @@ export function ItemTile({
       {details && (
         <div
           role="tooltip"
-          className={`pointer-events-none invisible absolute right-1/2 z-40 w-48 translate-x-1/2 rounded-lg border border-gold/40 bg-[#100d08]/97 p-3 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
+          className={`pointer-events-none invisible absolute z-40 w-48 rounded-lg border border-gold/40 bg-[#100d08]/97 p-3 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
             tooltipBelow ? "top-full mt-2" : "bottom-full mb-2"
+          } ${
+            tooltipAnchor === "left"
+              ? "left-0"
+              : tooltipAnchor === "right"
+                ? "right-0"
+                : "right-1/2 translate-x-1/2"
           }`}
           dir="rtl"
         >

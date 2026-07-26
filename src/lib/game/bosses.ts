@@ -134,9 +134,17 @@ export function bossByKey(key: string): CityBoss | undefined {
   return CITY_BOSSES.find((b) => b.key === key);
 }
 
-/** Portrait path for a boss. Falls back to a CSS crest when the file is absent. */
+/**
+ * Portrait path for a boss. JPEG, not PNG, for the same reason the hero class
+ * portraits are: the raw 768×1024 renders are ~1.2 MB each, and ten of them
+ * would put over 11 MB of art on a page every player loads.
+ *
+ * The banner draws a crest underlay behind this image, so a boss whose art has
+ * not been generated yet degrades to a deliberate-looking plate rather than a
+ * broken image.
+ */
 export function bossImage(key: string): string {
-  return `/boss/${key}.png`;
+  return `/boss/${key}.jpg`;
 }
 
 /* ------------------------------ turn cost ------------------------------ */

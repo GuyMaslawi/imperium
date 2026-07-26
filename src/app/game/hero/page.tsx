@@ -4,7 +4,7 @@ import { Icon } from "@/components/ui/Icon";
 import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { HeroBag } from "@/components/game/HeroBag";
-import { HeroEquipment } from "@/components/game/HeroEquipment";
+import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
 import { HeroStatsCards } from "@/components/game/HeroStatsCards";
 import { HeroPowerSummary } from "@/components/game/HeroPowerSummary";
 import { HeroResetButton } from "@/components/game/HeroResetButton";
@@ -54,29 +54,20 @@ export default async function HeroPage() {
         ornament={<Icon name="attack" size={22} className="text-crimson" />}
       />
 
-      {/* -------- character showcase -------- */}
-      <div className="panel relative overflow-hidden rounded-2xl border border-border-gold-strong">
-        <div className="grid md:grid-cols-[minmax(0,340px)_1fr]">
-          {/* portrait (right in RTL) */}
-          <div className="relative min-h-[340px] md:min-h-[420px]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={heroClassImage(hero.heroClass)}
-              alt={classMeta.label}
-              className="absolute inset-0 h-full w-full object-cover object-top"
+      {/* -------- character showcase: the hero wearing his own gear -------- */}
+      <div className="panel relative rounded-2xl border border-border-gold-strong">
+        <div className="grid md:grid-cols-[minmax(0,400px)_1fr]">
+          {/* paperdoll (right in RTL) — the 9 pieces sit on the figure itself */}
+          <div className="relative">
+            <HeroPaperdoll
+              portrait={heroClassImage(hero.heroClass)}
+              portraitAlt={classMeta.label}
+              equipped={equippedItems}
+              bag={bagItems}
+              heroLevel={hero.level}
+              gold={empire.gold}
+              wheelSpinBonus={wheelSpinBonus}
             />
-            {/* seam into the panel + bottom label gradient */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/30" />
-            <div className="absolute inset-y-0 left-0 hidden w-24 bg-gradient-to-l from-transparent to-[var(--panel)] md:block" />
-
-            <div className="absolute inset-x-0 bottom-0 p-4 text-center">
-              <p className="text-2xl font-black text-gold-bright drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
-                {classMeta.label}
-              </p>
-              <p className="text-[11px] font-bold uppercase tracking-[0.35em] text-bone-dim">
-                {classMeta.title}
-              </p>
-            </div>
 
             {/* level + resets badge */}
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
@@ -110,6 +101,11 @@ export default async function HeroPage() {
           {/* identity + class bonuses + xp (left in RTL) */}
           <div className="flex flex-col justify-center gap-4 p-5 md:p-6">
             <div>
+              {/* the class name lives here now — the portrait is pure visual */}
+              <p className="text-2xl font-black text-gold-bright">{classMeta.label}</p>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.35em] text-bone-dim">
+                {classMeta.title}
+              </p>
               <p className="text-sm text-zinc-400">{classMeta.tagline}</p>
               <p className="mt-1 text-base text-zinc-300">{classMeta.description}</p>
             </div>
@@ -172,20 +168,15 @@ export default async function HeroPage() {
           wheelSpinBonus={wheelSpinBonus}
         />
 
-        {/* -------- equipment + point allocation (left in RTL) -------- */}
+        {/* -------- point allocation (left in RTL) -------- */}
         <div className="panel rounded-xl p-4">
-          <div className="grid items-start gap-5 sm:grid-cols-2">
-            {/* active equipment */}
-            <HeroEquipment
-              equipped={equippedItems}
-              heroLevel={hero.level}
-              gold={empire.gold}
-              wheelSpinBonus={wheelSpinBonus}
-            />
-
-            {/* stat cards + point allocation (points only — items excluded) */}
-            <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
-          </div>
+          <Tip tip="שלוש התכונות שנקודות הגיבור מחזקות. חפצי הגיבור אינם משנים אחוזים אלה — התרומה שלהם מרוכזת ב'סך הכל מהגיבור' שלמטה.">
+            <h2 className="mb-3 cursor-help text-base font-bold tracking-wide text-gold-bright">
+              נקודות גיבור
+            </h2>
+          </Tip>
+          {/* stat cards + point allocation (points only — items excluded) */}
+          <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
         </div>
       </div>
 

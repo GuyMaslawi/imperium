@@ -48,64 +48,67 @@ export function HeroStatsCards({
         </Tip>
       )}
 
-      {HERO_POINT_STATS.map((stat) => {
-        const meta = HERO_STAT_META[stat];
-        const pointsPct = points[stat];
-        return (
-          <div key={stat} className="panel-inset relative rounded-lg p-3">
-            <Tip
-              tip={
-                <>
-                  {meta.description}
-                  <br />
-                  אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}%).
-                  חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל מהגיבור&quot;
-                  למטה.
-                </>
-              }
-            >
-              <p className="cursor-help text-xs text-zinc-400">
-                {meta.icon} {meta.label}
+      {/* one card per point stat — three across when there's room for them */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {HERO_POINT_STATS.map((stat) => {
+          const meta = HERO_STAT_META[stat];
+          const pointsPct = points[stat];
+          return (
+            <div key={stat} className="panel-inset relative rounded-lg p-3">
+              <Tip
+                tip={
+                  <>
+                    {meta.description}
+                    <br />
+                    אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}%).
+                    חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל מהגיבור&quot;
+                    למטה.
+                  </>
+                }
+              >
+                <p className="cursor-help text-xs text-zinc-400">
+                  {meta.icon} {meta.label}
+                </p>
+              </Tip>
+              <p className={`nums mt-0.5 text-lg font-bold ${meta.tone}`} dir="ltr">
+                +{formatBonus(pointsPct)}%
               </p>
-            </Tip>
-            <p className={`nums mt-0.5 text-lg font-bold ${meta.tone}`} dir="ltr">
-              +{formatBonus(pointsPct)}%
-            </p>
-            {unspentPoints > 0 && (
-              <div className="mt-2 flex flex-col gap-1.5">
-                <div className="flex gap-1.5">
-                  <form action={formAction} className="flex-1">
-                    <input type="hidden" name="stat" value={stat} />
-                    <input type="hidden" name="amount" value={1} />
-                    <button type="submit" className="btn btn-gold w-full px-2 py-1 text-xs">
-                      +1
-                    </button>
-                  </form>
-                  {unspentPoints >= 5 && (
+              {unspentPoints > 0 && (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <div className="flex gap-1.5">
                     <form action={formAction} className="flex-1">
                       <input type="hidden" name="stat" value={stat} />
-                      <input type="hidden" name="amount" value={5} />
-                      <button type="submit" className="btn btn-ghost w-full px-2 py-1 text-xs">
-                        +5
+                      <input type="hidden" name="amount" value={1} />
+                      <button type="submit" className="btn btn-gold w-full px-2 py-1 text-xs">
+                        +1
                       </button>
                     </form>
-                  )}
+                    {unspentPoints >= 5 && (
+                      <form action={formAction} className="flex-1">
+                        <input type="hidden" name="stat" value={stat} />
+                        <input type="hidden" name="amount" value={5} />
+                        <button type="submit" className="btn btn-ghost w-full px-2 py-1 text-xs">
+                          +5
+                        </button>
+                      </form>
+                    )}
+                  </div>
+                  <form action={formAction}>
+                    <input type="hidden" name="stat" value={stat} />
+                    <input type="hidden" name="amount" value={unspentPoints} />
+                    <button
+                      type="submit"
+                      className="btn btn-ghost w-full px-2 py-1 text-[11px]"
+                    >
+                      שים את כל הנקודות ({unspentPoints})
+                    </button>
+                  </form>
                 </div>
-                <form action={formAction}>
-                  <input type="hidden" name="stat" value={stat} />
-                  <input type="hidden" name="amount" value={unspentPoints} />
-                  <button
-                    type="submit"
-                    className="btn btn-ghost w-full px-2 py-1 text-[11px]"
-                  >
-                    שים את כל הנקודות ({unspentPoints})
-                  </button>
-                </form>
-              </div>
-            )}
-          </div>
-        );
-      })}
+              )}
+            </div>
+          );
+        })}
+      </div>
 
       {(state.error || state.success) && (
         <p
