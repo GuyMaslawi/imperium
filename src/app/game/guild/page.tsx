@@ -29,11 +29,18 @@ import { GuildLeaveButton } from "@/components/game/GuildLeaveButton";
 
 export const metadata = { title: "הברית שלי | WARZONE" };
 
+/** How many guilds the recruitment browser lists. */
+const GUILD_BROWSE_LIMIT = 100;
+
 /* -------- no guild yet: create + browse open guilds -------- */
 
 async function NoGuildView({ diamonds }: { diamonds: number }) {
+  // Bounded: this is a recruitment browser, not a directory. Unbounded it grew
+  // with the player count and carried a nested per-guild join, reachable by any
+  // guildless player on every page load.
   const guilds = await prisma.guild.findMany({
     orderBy: { createdAt: "asc" },
+    take: GUILD_BROWSE_LIMIT,
     include: {
       _count: { select: { members: true } },
       members: {

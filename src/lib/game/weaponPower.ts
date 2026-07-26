@@ -1,3 +1,4 @@
+import "server-only";
 import type { Prisma, WeaponCategory } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { weaponsPower } from "./weapons";

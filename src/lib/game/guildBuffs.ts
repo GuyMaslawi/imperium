@@ -1,3 +1,4 @@
+import "server-only";
 import type { GuildSpellType, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 

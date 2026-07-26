@@ -32,6 +32,7 @@ import {
 } from "@/lib/game/constants";
 import { getTunables } from "@/lib/game/config";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
+import { grantCitizens } from "@/lib/game/grants";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
@@ -153,10 +154,25 @@ export async function upgradeMine(
           error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
         };
       }
-      await tx.building.update({
-        where: { id: building.id },
+      // Guarded on the exact level the price was quoted from, so two concurrent
+      // upgrades cannot both buy the same level; throwing rolls the payment back.
+      //
+      // The resource debit above only serialises racers on the Empire row — it
+      // does not stop each of them applying an unconditional `increment: 1`
+      // here. Because mineUpgradeCost rises with the level, N concurrent calls
+      // used to buy N levels at the snapshot price (50 racers took a mine from
+      // level 0 to 50 for 37.5k gold instead of 956k), and the `MINE_MAX_LEVEL`
+      // check above — read from the same snapshot — could be raced straight
+      // past. Nothing downstream clamps `mineProductionValue`, so overshooting
+      // the cap was a permanent uncapped resource faucet.
+      const upgraded = await tx.building.updateMany({
+        where: {
+          id: building.id,
+          level: building.level,
+        },
         data: { level: { increment: 1 } },
       });
+      if (upgraded.count === 0) throw new Error("mine upgrade conflict");
       await awardSeasonPassXp(tx, empireId, "mineUpgrade");
 
       return {
@@ -264,10 +280,17 @@ export async function upgradeMineToMax(
           error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
         };
       }
-      await tx.building.update({
-        where: { id: building.id },
+      // Guarded on the level the whole plan was costed from — see upgradeMine
+      // for why the resource debit alone is not enough. Throwing rolls back the
+      // payment so a losing racer is charged nothing.
+      const upgraded = await tx.building.updateMany({
+        where: {
+          id: building.id,
+          level: building.level,
+        },
         data: { level: { increment: levels } },
       });
+      if (upgraded.count === 0) throw new Error("mine upgrade conflict");
       // Pay per level so bulk-upgrading isn't worse than clicking one at a
       // time, but cap it — an unbounded run to MINE_MAX_LEVEL would clear the
       // whole season-pass ladder in a single click.
@@ -984,13 +1007,14 @@ export async function attackEmpire(
             unspentPoints: { increment: next.pointsGained },
           },
         });
-        // Each hero level gained hands the empire fresh citizens.
+        // Each hero level gained hands the empire fresh citizens — through
+        // grantCitizens so the city ceiling holds. Note both empires can level
+        // from one battle (a losing defender still earns defence XP), so a raw
+        // increment here minted citizens rather than moving them: farming a
+        // controlled alt was a net population faucet on both sides.
         const levelsGained = next.level - attackerHero.level;
         if (levelsGained > 0) {
-          await tx.empire.update({
-            where: { id: empireId },
-            data: { citizens: { increment: levelsGained * CITIZENS_PER_LEVEL } },
-          });
+          await grantCitizens(tx, empireId, levelsGained * CITIZENS_PER_LEVEL);
         }
       }
       if (defenderHero) {
@@ -1005,10 +1029,7 @@ export async function attackEmpire(
         });
         const levelsGained = next.level - defenderHero.level;
         if (levelsGained > 0) {
-          await tx.empire.update({
-            where: { id: targetEmpireId },
-            data: { citizens: { increment: levelsGained * CITIZENS_PER_LEVEL } },
-          });
+          await grantCitizens(tx, targetEmpireId, levelsGained * CITIZENS_PER_LEVEL);
         }
       }
 
@@ -1176,10 +1197,17 @@ export async function upgradeStorage(
           ),
         };
       }
-      await tx.resourceStorage.update({
-        where: { id: storage.id },
+      // Guarded on the level the price came from — see upgradeMine. Storage
+      // capacity is the pool attackEmpire cannot plunder, so buying levels at a
+      // stale price converted directly into plunder immunity.
+      const upgraded = await tx.resourceStorage.updateMany({
+        where: {
+          id: storage.id,
+          level: storage.level,
+        },
         data: { level: { increment: 1 } },
       });
+      if (upgraded.count === 0) throw new Error("storage upgrade conflict");
 
       await awardSeasonPassXp(tx, empireId, "storageUpgrade");
 
@@ -1458,10 +1486,25 @@ export async function upgradeEmpireUpgrade(
           error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
         };
       }
-      await tx.empireUpgrade.update({
-        where: { id: upgrade.id },
+      // Guarded on the level that was both max-checked and priced above.
+      //
+      // Without the pin the `maxLevel` check was a stale read and the increment
+      // unconditional, so N concurrent calls pushed the level N past its cap at
+      // the snapshot price. On TURNS_PER_REGULAR_UPDATE (cap 5) that was the
+      // worst exploit in the game after foundCity: 20 parallel POSTs at level 1
+      // cost ~54k gold and produced level 21, i.e. +21 turns every 5-minute tick
+      // (6,048/day against a designed 1,440). Turns are the only rate limit on
+      // attacking, and attacks are the source of plunder, hero XP, item drops
+      // and wheel spins — so uncapping them uncapped the whole PvP economy.
+      // INTELLIGENCE (cap 15) was equally raceable into guaranteed spy success.
+      const upgraded = await tx.empireUpgrade.updateMany({
+        where: {
+          id: upgrade.id,
+          level: upgrade.level,
+        },
         data: { level: { increment: 1 } },
       });
+      if (upgraded.count === 0) throw new Error("empire upgrade conflict");
       await awardSeasonPassXp(tx, empireId, "empireUpgrade");
 
       return {
@@ -1528,10 +1571,22 @@ export async function foundCity(
       }
 
       // Guarded resource debit + city increment, atomic against concurrent calls.
+      //
+      // `cities: empire.cities` pins the tier the price was quoted from, and is
+      // the load-bearing part of this guard. Guarding only the balances (plus a
+      // loose `cities: { lt: MAX_CITIES }`) let N concurrent calls each pay the
+      // price of the *snapshot* tier while each incrementing `cities`: since
+      // cityCost is 1M × 2.5^(cities-1), racing 9 requests from one city bought
+      // cities 2..10 at the city-2 price — ~9M gold instead of ~2.54B, a ~280×
+      // discount — and every racer also cleared the hero-level gate at the
+      // tier-1 requirement of 10 instead of 90. `cities` is the game's top-line
+      // multiplier (mine output, population ceiling, PvP bracket), so this was
+      // the single highest-value exploit in the economy. Pinning the exact value
+      // means only one racer can win per tier; the losers match zero rows.
       const paid = await tx.empire.updateMany({
         where: {
           id: empireId,
-          cities: { lt: MAX_CITIES },
+          cities: empire.cities,
           gold: { gte: cost.gold },
           wood: { gte: cost.wood },
           iron: { gte: cost.iron },

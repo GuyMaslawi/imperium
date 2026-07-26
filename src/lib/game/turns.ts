@@ -1,3 +1,4 @@
+import "server-only";
 import type { EmpireUpgrade, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { turnsPerRegularUpdate } from "./constants";

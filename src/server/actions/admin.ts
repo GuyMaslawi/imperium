@@ -138,16 +138,51 @@ function str(formData: FormData, key: string, maxLen = 500): string {
  * Every legitimate value in the codebase is a relative route ("/game/..."), and
  * an admin-authored absolute URL rendered as a trusted in-game link is a
  * broadcast-scale phishing primitive — the message UI presents it as the game's
- * own "view full report" affordance to every player at once. `//evil.tld` is
- * rejected alongside absolute URLs because browsers read it as protocol-relative.
+ * own "view full report" affordance to every player at once.
+ *
+ * Rather than blocklisting prefixes, resolve the value against a sentinel origin
+ * and require that the origin survives. Prefix checks kept missing forms that
+ * browsers treat as protocol-relative: `//evil.tld` was caught, but per the
+ * WHATWG URL spec a special-scheme URL treats `/\` exactly like `//`, so
+ * `/\evil.tld/x` passed the old guard and resolved to `https://evil.tld/x`.
+ * `next/link` does not save us there — it classifies the value as local and
+ * renders it verbatim, so a ctrl/middle-click hands it straight to the browser.
  */
+const HREF_SENTINEL_ORIGIN = "https://href-check.invalid";
+
 function optHref(formData: FormData, key: string): string | null {
   const raw = str(formData, key, 500);
   if (!raw) return null;
-  if (!raw.startsWith("/") || raw.startsWith("//")) {
+  const reject = () => {
     throw new AdminError("קישור חייב להיות נתיב פנימי שמתחיל ב-/");
+  };
+  if (!raw.startsWith("/")) reject();
+  let resolved: URL;
+  try {
+    resolved = new URL(raw, HREF_SENTINEL_ORIGIN);
+  } catch {
+    return reject();
   }
+  // Anything that steered off the sentinel origin was not an internal path.
+  if (resolved.origin !== HREF_SENTINEL_ORIGIN) reject();
   return raw;
+}
+
+/**
+ * Rows per statement for the broadcast/gift fan-out.
+ *
+ * These target every empire in the game. As one statement that is a single
+ * `IN (…)` list and a single `createMany` with one row per player, which runs
+ * into Postgres bind-parameter limits and holds the whole payload in memory
+ * once the player count is large. Admin-only, so this is a scaling limit rather
+ * than an attacker-reachable one.
+ */
+const BULK_BATCH_SIZE = 1000;
+
+function chunk<T>(items: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
+  return out;
 }
 
 function revalidateEmpire(userId?: string) {
@@ -216,7 +251,28 @@ export async function updateUserAccount(
     });
     if (clash) return { error: "האימייל כבר תפוס על ידי משתמש אחר" };
 
-    await prisma.user.update({ where: { id: userId }, data: { name, email, role } });
+    // Moving an account to a different address invalidates the proof of
+    // ownership that was taken for the old one, so re-gate verification and
+    // revoke every live session. Otherwise the row stays "verified" for an
+    // address nobody has ever confirmed, and whoever was signed in keeps their
+    // session across the identity change. This is the only email-mutation path
+    // in the app, so it is the only place that invariant can be broken.
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    const emailChanged = target != null && target.email !== email;
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name,
+        email,
+        role,
+        ...(emailChanged
+          ? { emailVerified: null, tokenVersion: { increment: 1 } }
+          : {}),
+      },
+    });
     await logAdmin(admin, {
       action: "user.update",
       targetType: "user",
@@ -789,9 +845,11 @@ export async function broadcastMessage(
     const empireIds = await resolveTargetEmpireIds(scope, scopeId);
     if (empireIds.length === 0) return { error: "אין נמענים בקבוצה שנבחרה" };
 
-    await prisma.message.createMany({
-      data: empireIds.map((empireId) => ({ empireId, kind, title, body, href })),
-    });
+    for (const batch of chunk(empireIds, BULK_BATCH_SIZE)) {
+      await prisma.message.createMany({
+        data: batch.map((empireId) => ({ empireId, kind, title, body, href })),
+      });
+    }
     await logAdmin(admin, {
       action: "message.broadcast",
       targetType: "broadcast",
@@ -854,18 +912,20 @@ export async function sendGift(
     if (bundle.wheelSpins) increments.wheelSpins = { increment: bundle.wheelSpins };
 
     await prisma.$transaction(async (tx) => {
-      if (anyResource) {
-        await tx.empire.updateMany({ where: { id: { in: empireIds } }, data: increments });
-      }
-      if (title) {
-        await tx.message.createMany({
-          data: empireIds.map((empireId) => ({
-            empireId,
-            kind: "SYSTEM" as const,
-            title,
-            body: body || "קיבלת מתנה מההנהלה!",
-          })),
-        });
+      for (const batch of chunk(empireIds, BULK_BATCH_SIZE)) {
+        if (anyResource) {
+          await tx.empire.updateMany({ where: { id: { in: batch } }, data: increments });
+        }
+        if (title) {
+          await tx.message.createMany({
+            data: batch.map((empireId) => ({
+              empireId,
+              kind: "SYSTEM" as const,
+              title,
+              body: body || "קיבלת מתנה מההנהלה!",
+            })),
+          });
+        }
       }
     });
     await logAdmin(admin, {

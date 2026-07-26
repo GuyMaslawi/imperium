@@ -23,9 +23,26 @@ const buckets = new Map<string, Window>();
 // without limit. When the cap is hit we drop already-expired windows first.
 const MAX_BUCKETS = 10_000;
 
+/**
+ * Drop expired windows; if that frees nothing, evict the oldest entries anyway.
+ *
+ * The unconditional eviction is the part that makes MAX_BUCKETS a real bound.
+ * Sweeping only expired windows left the map free to grow past the cap whenever
+ * every entry was still live (a flood of distinct keys inside one window), while
+ * paying an O(n) scan on every insert once at the cap — so the "bound" cost
+ * time without ever bounding memory. Map preserves insertion order, so taking
+ * from the front evicts the least recently created window.
+ */
 function sweep(now: number): void {
   for (const [key, win] of buckets) {
     if (win.resetAt <= now) buckets.delete(key);
+  }
+  if (buckets.size < MAX_BUCKETS) return;
+  const excess = buckets.size - MAX_BUCKETS + 1;
+  let dropped = 0;
+  for (const key of buckets.keys()) {
+    buckets.delete(key);
+    if (++dropped >= excess) break;
   }
 }
 

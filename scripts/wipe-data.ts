@@ -24,9 +24,9 @@
  *   npx tsx scripts/wipe-data.ts --email you@example.com                # dry run
  *   npx tsx scripts/wipe-data.ts --email you@example.com --confirm      # execute
  *
- * Reads DATABASE_URL from the environment. To target production, run it with
- * that environment's URL explicitly — do not rely on whichever .env happens to
- * load first (the Prisma CLI reads .env, the Next app reads .env.local).
+ * Reads PRISMA_DATABASE_URL from the environment. To target production, run it
+ * with that environment's URL explicitly — do not rely on whichever .env happens
+ * to load first (the Prisma CLI reads .env, the Next app reads .env.local).
  */
 import { PrismaClient } from "@prisma/client";
 
@@ -39,9 +39,11 @@ function arg(name: string): string | undefined {
 const has = (name: string) => process.argv.includes(`--${name}`);
 
 function dbHost(): string {
-  const url = process.env.DATABASE_URL ?? "";
+  // Must match the datasource in prisma/schema.prisma, otherwise this banner
+  // reports a different database than the one the script is about to wipe.
+  const url = process.env.PRISMA_DATABASE_URL ?? "";
   const m = url.match(/@([^/?]+)/);
-  return m ? m[1]! : "(DATABASE_URL not set)";
+  return m ? m[1]! : "(PRISMA_DATABASE_URL not set)";
 }
 
 async function main(): Promise<void> {

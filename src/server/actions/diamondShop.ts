@@ -164,8 +164,16 @@ export async function buyShopDiscount(
 
 /* ------------------------------ turn packages ------------------------------ */
 
+// `z.coerce.number()` alone treated a *missing* field as valid: FormData.get
+// returns null for an absent key, Number(null) is 0, and 0 is a legal index —
+// so a POST with no `packageIndex` at all silently bought package 0. Requiring
+// a non-empty string first makes an omitted field a parse failure.
 const packageSchema = z.object({
-  packageIndex: z.coerce.number().int().min(0).max(TURN_PACKAGES.length - 1),
+  packageIndex: z
+    .string()
+    .min(1)
+    .transform((s) => Number(s))
+    .pipe(z.number().int().min(0).max(TURN_PACKAGES.length - 1)),
 });
 
 /** Buy a package of turns for diamonds. */

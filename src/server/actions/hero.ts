@@ -6,6 +6,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
+import { grantCitizens } from "@/lib/game/grants";
 import { wheelLuckBonus } from "@/lib/game/constants";
 import {
   HERO_BAG_CAPACITY,
@@ -14,6 +15,7 @@ import {
   HERO_RESET_POINTS,
   HERO_STAT_META,
   RARITY_META,
+  SLOT_ORDER,
   canEquipItem,
   canUpgradeItem,
   itemDisplayName,
@@ -142,10 +144,12 @@ export async function resetHero(): Promise<ActionState> {
         data: { equipped: false },
       });
 
-      await tx.empire.update({
-        where: { id: empireId },
-        data: { citizens: { increment: HERO_RESET_CITIZENS } },
-      });
+      // Routed through grantCitizens so the city population ceiling holds. A raw
+      // increment here delivered HERO_RESET_CITIZENS (2,500) in one write — 2.5×
+      // the ceiling of even a ten-city empire, and 25× a one-city empire's —
+      // which `trainUnits` then converts one-for-one into mine slaves, i.e. an
+      // uncapped resource faucet one step downstream.
+      await grantCitizens(tx, empireId, HERO_RESET_CITIZENS);
 
       return {
         success: `הגיבור אופס! קיבלת ${HERO_RESET_CITIZENS.toLocaleString("he-IL")} אזרחים ו-${HERO_RESET_POINTS} נקודות גיבור`,
@@ -323,11 +327,21 @@ export async function discardHeroItem(
   }
 }
 
+// The bag holds HERO_BAG_CAPACITY items plus at most one equipped item per
+// slot, so no legitimate bulk selection exceeds that. Bounding both the raw
+// string and the parsed array matters because the only other limit is the 1 MB
+// Server Action body cap — which allows ~40k ids per POST, each of which is
+// walked against the hero's items. Ownership was always enforced, so this was
+// wasted work rather than a privilege issue, but it is unbounded wasted work.
+const MAX_BULK_ITEM_IDS = HERO_BAG_CAPACITY + SLOT_ORDER.length;
+
 const itemIdsSchema = z.object({
   itemIds: z
     .string()
     .min(1)
-    .transform((s) => s.split(",").map((id) => id.trim()).filter(Boolean)),
+    .max(MAX_BULK_ITEM_IDS * 40)
+    .transform((s) => s.split(",").map((id) => id.trim()).filter(Boolean))
+    .refine((ids) => ids.length <= MAX_BULK_ITEM_IDS, "נבחרו יותר מדי פריטים"),
 });
 
 /** Permanently throw away many owned items at once (bulk from the bag). */

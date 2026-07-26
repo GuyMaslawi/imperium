@@ -79,8 +79,20 @@ async function loadCycle(
   const cycleChanged = existing.cycleStartedAt.getTime() < cycleStart.getTime();
   if (!seasonChanged && !cycleChanged && !adoptSeason) return existing;
 
-  const updated = await tx.seasonPassProgress.update({
-    where: { empireId },
+  // Guarded on the snapshot this decision was made from, so a stale caller
+  // cannot apply a reset that a concurrent one already applied.
+  //
+  // `getSeasonPassState` calls this on the bare prisma client with no outer
+  // transaction, so a page render that read a pre-boundary row could commit its
+  // reset arbitrarily later — after the player had already rolled into the new
+  // cycle, earned XP and claimed tiers — wiping `xp` and both claim lists
+  // together. Losing the race is correct here: the other writer already did it.
+  await tx.seasonPassProgress.updateMany({
+    where: {
+      empireId,
+      cycleStartedAt: existing.cycleStartedAt,
+      seasonId: existing.seasonId,
+    },
     data: {
       ...(seasonChanged || cycleChanged
         ? { cycleStartedAt: cycleStart, xp: 0, claimedFree: [], claimedPremium: [] }
@@ -91,7 +103,9 @@ async function loadCycle(
       ...(adoptSeason ? { seasonId: activeSeasonId } : {}),
     },
   });
-  return updated;
+  // Re-read either way: on a win to pick up what we just wrote, on a loss to
+  // pick up what the winner wrote.
+  return tx.seasonPassProgress.findUniqueOrThrow({ where: { empireId } });
 }
 
 /* ------------------------------ read model ------------------------------ */

@@ -368,7 +368,17 @@ export default async function EmpireProfilePage({
         )}
       </div>
 
-      {/* -------- hero equipment (live) -------- */}
+      {/* -------- hero equipment -------- */}
+      {/*
+        Behind the same intel gate as the power breakdown above. Each ItemTile
+        publishes the item's rarity, level and exact bonus value, so the nine
+        slots together give the item component of the target's attack/defence
+        multiplier — the figure `spyOnEmpire` charges turns for and can fail to
+        obtain. Rendered ungated it was readable for any enumerable empire id,
+        including empires in another city that cannot be spied on or attacked
+        at all, which made the paid spy mission partly redundant.
+      */}
+      {showDetails && (
       <div className="panel rounded-xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
@@ -432,6 +442,7 @@ export default async function EmpireProfilePage({
           </Link>
         )}
       </div>
+      )}
 
       {/* -------- player description -------- */}
       <div className="panel rounded-xl p-4">

@@ -8,12 +8,28 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // Pooled connection (Neon's -pooler host in prod) used by the running app.
-  url      = env("DATABASE_URL")
+
+  // These deliberately do NOT use the names `DATABASE_URL` / `DIRECT_URL`.
+  //
+  // The database is provisioned through the Vercel↔Neon marketplace
+  // integration, which owns and re-syncs its own `DATABASE_URL`,
+  // `DATABASE_URL_UNPOOLED`, `POSTGRES_*`, `PG*` and `NEON_PROJECT_ID` vars in
+  // the Vercel project. A hand-edited `DATABASE_URL` therefore collides with
+  // the integration's copy, and any manual edit to it — notably the
+  // `pgbouncer=true` below — is liable to be silently overwritten on the next
+  // sync. Reading names the integration does not manage makes the app's
+  // connection config ours alone.
+  //
+  // Pooled connection (Neon's -pooler host in prod), used by the running app.
+  // MUST carry `?pgbouncer=true`: the pooler is PgBouncer in transaction mode,
+  // where Prisma's prepared statements collide across sessions and surface as
+  // `prepared statement "s0" already exists` under concurrency only.
+  url = env("PRISMA_DATABASE_URL")
+
   // Unpooled connection used by `prisma migrate` — migrations take advisory
-  // locks, which a transaction-mode pooler (PgBouncer) cannot hold. Locally
-  // this is just the same URL as DATABASE_URL.
-  directUrl = env("DIRECT_URL")
+  // locks, which a transaction-mode pooler cannot hold. No `pgbouncer=true`
+  // here. Locally this is just the same URL as PRISMA_DATABASE_URL.
+  directUrl = env("PRISMA_DIRECT_URL")
 }
 
 enum Role {

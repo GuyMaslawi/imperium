@@ -129,7 +129,19 @@ async function grantPrize(
     }
     case "item": {
       const hero = empire.hero;
-      const bagCount = hero ? hero.items.filter((i) => !i.equipped).length : 0;
+      // Take the hero row lock and re-count the bag *under* it. `empire.hero.items`
+      // is the snapshot from applyPendingUpdates, taken before the spin was even
+      // consumed: two concurrent spins that both rolled this wedge each read the
+      // same pre-spin count, both passed the capacity check, and both created an
+      // item — overflowing HERO_BAG_CAPACITY. Mirrors lockHero in hero.ts, which
+      // exists for exactly this on equip/unequip.
+      let bagCount = 0;
+      if (hero) {
+        await tx.$queryRaw`SELECT id FROM "Hero" WHERE id = ${hero.id} FOR UPDATE`;
+        bagCount = await tx.heroItem.count({
+          where: { heroId: hero.id, equipped: false },
+        });
+      }
       if (hero && bagCount < HERO_BAG_CAPACITY) {
         // The wedge already decided an item is won, so roll one that always
         // drops but keeps the relative rarity odds — forcing the drop gate to

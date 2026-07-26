@@ -34,8 +34,16 @@ export default async function WeaponsPage({
 }) {
   const empire = await requireEmpire();
   const { tab } = await searchParams;
+  // `Object.hasOwn` guard, not a bare index: TAB_PARAM_TO_CATEGORY is a plain
+  // object literal, so `?tab=constructor` (or toString / valueOf / hasOwnProperty)
+  // resolved off Object.prototype and yielded a *function*. That value was then
+  // handed to <WeaponsTabs>, a client component, and RSC serialisation threw
+  // "Functions cannot be passed directly to Client Components" — a 500 any
+  // visitor could trigger from the query string.
   const initialCategory =
-    typeof tab === "string" ? TAB_PARAM_TO_CATEGORY[tab] : undefined;
+    typeof tab === "string" && Object.hasOwn(TAB_PARAM_TO_CATEGORY, tab)
+      ? TAB_PARAM_TO_CATEGORY[tab]
+      : undefined;
 
   const ownedByKey = new Map(
     empire.weapons.map((w) => [w.weaponKey, w.quantity])

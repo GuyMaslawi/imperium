@@ -120,6 +120,22 @@ export async function submitMiniGameGuess(
       const cfg = (event.config ?? {}) as Record<string, unknown>;
       const answer = Number(cfg.answer);
 
+      // Reject a guess outside the event's own domain *before* claiming an
+      // attempt slot. `Number.isFinite` alone let `1e308`, `-1` or a fractional
+      // value through — none of which can ever match the answer, so the only
+      // effect was that a malformed submission silently burned one of the
+      // player's limited attempts.
+      const pub = publicConfig(event);
+      const lo = pub.min ?? 0;
+      const hi = pub.max ?? (pub.cups != null ? pub.cups - 1 : null);
+      if (
+        !Number.isInteger(guess) ||
+        guess < lo ||
+        (hi != null && guess > hi)
+      ) {
+        return { state: null, feedback: "בחר ניחוש תקין", tone: "error" as const };
+      }
+
       const entry = await tx.miniGameEntry.upsert({
         where: { eventId_empireId: { eventId: event.id, empireId } },
         create: { eventId: event.id, empireId },

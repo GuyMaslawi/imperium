@@ -107,8 +107,26 @@ export default async function LeaderboardsPage({
 
   // Every board here is GLOBAL — ranked across the whole game, not scoped to a
   // single city like the /game/rankings list.
+  //
+  // Narrowed to the columns the four boards read. `include: { army, weapons,
+  // bankAccount }` loaded every column of four tables for every empire in the
+  // game, mapped them, then discarded all but the top 10 — re-run on every page
+  // load and again every 30s by <AutoRefresh> below, with no rate limit on RSC
+  // GETs. That made this the cheapest way for any logged-in player to put the
+  // database under sustained full-scan load.
+  //
+  // Still O(total empires): `spy` and `power` are computed in JS, so the top-10
+  // cut cannot move into SQL without a denormalised power column on Empire.
+  // `slaves` and `bank` could be ordered in SQL today; they are left here so all
+  // four boards stay consistent with one read.
   const empires = await prisma.empire.findMany({
-    include: { army: true, weapons: true, bankAccount: true },
+    select: {
+      id: true,
+      name: true,
+      army: { select: { soldiers: true, spies: true, mineSlaves: true } },
+      weapons: { select: { weaponKey: true, quantity: true } },
+      bankAccount: { select: { goldBalance: true } },
+    },
   });
 
   const named = empires.map((e) => ({

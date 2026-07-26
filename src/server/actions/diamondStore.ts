@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, logAdmin } from "@/lib/admin";
+import { rateLimit } from "@/lib/rateLimit";
 import { getTunables } from "@/lib/game/config";
 import {
   DIAMOND_PACKAGES,
@@ -46,6 +47,23 @@ export async function purchaseDiamondPackage(
     const user = await getSessionUser();
     if (!user) return { status: "error", message: "יש להתחבר כדי לרכוש" };
     if (user.bannedAt) return { status: "error", message: "החשבון חסום" };
+    // Every other player-facing action resolves its actor through
+    // `getActiveEmpireId`, which refuses unverified accounts. This one resolves
+    // the empire itself, so it has to repeat the check — without it, an account
+    // created seconds ago against an address nobody owns could reach the
+    // real-money checkout the moment a live provider is wired, and the
+    // `userEmail` snapshot written to the DiamondPurchase audit row (the record
+    // a chargeback is argued from) would name an unproven address.
+    if (!user.emailVerified) {
+      return { status: "error", message: "יש לאמת את כתובת האימייל לפני רכישה" };
+    }
+
+    // Rate-limit the checkout itself: every attempt writes a PENDING
+    // DiamondPurchase row before the charge is attempted, so an unthrottled
+    // caller can inflate the audit table indefinitely.
+    if (!rateLimit(`purchase:${user.id}`, 10, 15 * 60 * 1000)) {
+      return { status: "error", message: "יותר מדי נסיונות רכישה. נסה שוב מאוחר יותר." };
+    }
 
     const empire = await prisma.empire.findUnique({
       where: { userId: user.id },

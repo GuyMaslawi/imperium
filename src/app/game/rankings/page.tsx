@@ -9,6 +9,9 @@ import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "דירוג | אימפריום" };
 
+/** How many ranked rows the table renders. Your own rank is still exact. */
+const RANKINGS_VISIBLE_ROWS = 100;
+
 export default async function RankingsPage() {
   const myEmpire = await requireEmpire();
 
@@ -24,9 +27,27 @@ export default async function RankingsPage() {
   // exhaust the connection pool and stall the whole app. Offline players show
   // their last-settled gold until they next log in — it self-heals on their next
   // load, and the numbers shown here (gold/soldiers) drift only slowly anyway.
+  // Only the columns this page actually renders, and only the relation fields
+  // `getEmpireMilitaryPower` reads. The previous `include: { army, weapons, hero }`
+  // pulled every column of four tables for every empire in the bucket — and
+  // because `Empire.cities` defaults to 1, for the whole early game that bucket
+  // IS the entire table. With <AutoRefresh intervalMs={30_000} /> below, each
+  // open tab re-ran that scan twice a minute.
+  //
+  // This is a mitigation, not the real fix: ranking is by a power figure
+  // computed in JS, so the sort cannot move into SQL until a denormalised power
+  // column exists on Empire. Until then the row count is still O(bucket).
   const empires = await prisma.empire.findMany({
     where: { cities: myCity },
-    include: { army: true, weapons: true, hero: true },
+    select: {
+      id: true,
+      name: true,
+      level: true,
+      gold: true,
+      army: { select: { soldiers: true } },
+      weapons: { select: { weaponKey: true, quantity: true } },
+      hero: { select: { level: true, resets: true } },
+    },
   });
 
   const ranked = empires
@@ -36,9 +57,14 @@ export default async function RankingsPage() {
     }))
     .sort((a, b) => b.power - a.power || b.level - a.level);
 
+  // Exact, and computed before the display slice below.
   const myRank = ranked.findIndex((e) => e.id === myEmpire.id) + 1;
 
   const podium = ranked.slice(0, 3);
+
+  // Cap the rendered table. Rendering every row made both the HTML payload and
+  // the render cost O(bucket) on top of the query.
+  const visible = ranked.slice(0, RANKINGS_VISIBLE_ROWS);
 
   return (
     <div className="space-y-6">
@@ -96,7 +122,7 @@ export default async function RankingsPage() {
             </tr>
           </thead>
           <tbody>
-            {ranked.map((empire, index) => {
+            {visible.map((empire, index) => {
               const isMe = empire.id === myEmpire.id;
               const medal =
                 index === 0

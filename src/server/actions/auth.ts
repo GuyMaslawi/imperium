@@ -46,6 +46,24 @@ async function sendVerificationEmail(user: {
   email: string;
   name: string;
 }): Promise<boolean> {
+  // Throttle on the RECIPIENT, not just the sender.
+  //
+  // The other limiters here are keyed on the calling user id and the caller's
+  // IP, neither of which is the party who receives the mail — and because
+  // registration never proves ownership of the address, the caller chooses
+  // whose inbox that is. Registering a victim's address from a handful of IPs,
+  // each with its own fresh per-IP budget, aimed an unbounded number of
+  // "verify your account" mails at a third party. Keying on the address itself
+  // is the only limit the attacker cannot rotate around. It also protects the
+  // provider's daily send quota, which a bomb would otherwise exhaust and take
+  // real signups down with it.
+  const recipientKey = createHash("sha256")
+    .update(user.email.trim().toLowerCase())
+    .digest("hex");
+  if (!rateLimit(`verify-mail-to:${recipientKey}`, 5, 60 * 60 * 1000)) {
+    return false;
+  }
+
   const raw = randomBytes(32).toString("base64url");
   const now = new Date();
 
@@ -206,6 +224,13 @@ const loginSchema = z.object({
 const LOGIN_TIMING_DUMMY_HASH =
   "$2b$10$e3STZXV8u3ZN76vG9DTWbOdwJq4HByWmLRugxd/ULnd.vXxy/R2V2";
 
+/**
+ * An id no row can hold (cuids never contain a colon), used to spend one cheap
+ * indexed round trip on the unknown-email login path so it costs the same
+ * number of DB hits as the known-email one. See the failure branch in `login`.
+ */
+const LOGIN_TIMING_EQUALIZER_ID = "timing:equalizer";
+
 /** Consecutive wrong passwords that lock an account. */
 const LOGIN_MAX_FAILURES = 10;
 /** How long a locked account stays locked. */
@@ -239,21 +264,24 @@ export async function login(
 
   const user = await prisma.user.findUnique({ where: { email } });
 
-  // Durable lockout. The two rate limits above live in one instance's memory,
-  // which on a serverless fleet means they multiply by the instance count and
-  // vanish on every cold start — an attacker with a handful of parallel
-  // connections is effectively unthrottled. This counter is on the row, so it
-  // survives instance churn and actually bounds per-account guessing.
   const now = new Date();
-  if (user?.lockedUntil && user.lockedUntil > now) {
-    const minutes = Math.max(
-      1,
-      Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60_000)
-    );
-    return {
-      error: `החשבון נעול זמנית בעקבות נסיונות התחברות כושלים. נסה שוב בעוד ${minutes} דקות.`,
-    };
-  }
+  // Durable lockout, applied as a *soft* lock: it is evaluated only against a
+  // WRONG password, never against a correct one.
+  //
+  // A hard lock (refusing every attempt while `lockedUntil` is in the future,
+  // before the password is even checked) turned this endpoint into a targeted
+  // denial-of-service: knowing only a victim's address, an attacker sent 10
+  // garbage passwords and locked the real owner out of their own account for 15
+  // minutes — repeatable indefinitely from a single IP, since 10 attempts per
+  // 15 minutes sits inside the 30-per-15-minutes per-IP budget above. In a PvP
+  // game that means farming a player who cannot log in to defend, with no
+  // self-service recovery (only an admin password reset clears the lock).
+  //
+  // Refusing only wrong passwords costs nothing in brute-force resistance —
+  // an attacker who already has the correct password has won regardless — while
+  // removing the DoS entirely. This is also why NIST SP 800-63B recommends
+  // throttling over account lockout.
+  const isLocked = user?.lockedUntil != null && user.lockedUntil > now;
 
   // Always run a bcrypt.compare (against a dummy hash when the user is missing)
   // so both branches cost the same — no account-enumeration timing side-channel.
@@ -265,13 +293,15 @@ export async function login(
     if (user) {
       // Count the miss and lock once the threshold is crossed. The increment is
       // unconditional so concurrent guesses all register; `lockedUntil` is set
-      // from the post-increment value in the same statement's result.
+      // from the post-increment value in the same statement's result. While
+      // already locked, a further miss slides the window forward — safe to do
+      // precisely because the lock never blocks the account's real owner.
       const failed = await prisma.user.update({
         where: { id: user.id },
         data: { failedLogins: { increment: 1 } },
         select: { failedLogins: true },
       });
-      if (failed.failedLogins >= LOGIN_MAX_FAILURES) {
+      if (isLocked || failed.failedLogins >= LOGIN_MAX_FAILURES) {
         await prisma.user.update({
           where: { id: user.id },
           data: {
@@ -280,9 +310,18 @@ export async function login(
           },
         });
       }
+    } else {
+      // Equalise the round-trip count with the branch above. Without this, a
+      // miss on a *known* address costs one extra DB write and a miss on an
+      // unknown one costs none — a latency difference that survives the bcrypt
+      // equalisation and re-opens account enumeration over enough samples.
+      await prisma.user.count({ where: { id: LOGIN_TIMING_EQUALIZER_ID } });
     }
     // Deliberately the same message and shape whether or not the account
-    // exists — the lockout must not become an enumeration oracle.
+    // exists, and whether or not it is locked. Reporting the lock (or the
+    // minutes remaining) was itself an enumeration oracle: only a real account
+    // can ever be locked, so the distinctive lockout message answered "does
+    // this address have an account?" with certainty.
     return { error: "אימייל או סיסמה שגויים" };
   }
   if (user.bannedAt) {
@@ -377,6 +416,11 @@ export async function changePassword(
     data: {
       passwordHash: await bcrypt.hash(newPassword, 10),
       tokenVersion: { increment: 1 },
+      // Rotating your own password clears the failure streak and any lock, the
+      // same way an admin reset does. Otherwise a user who was being guessed at
+      // stays locked on every *other* device even after proving ownership here.
+      failedLogins: 0,
+      lockedUntil: null,
     },
     select: { tokenVersion: true },
   });
@@ -538,6 +582,15 @@ export async function verifyEmailToken(
 ): Promise<{ ok: boolean; error?: string }> {
   if (typeof rawToken !== "string" || !rawToken) {
     return { ok: false, error: "קישור אימות לא תקין" };
+  }
+
+  // Unauthenticated and directly callable, like every other export of a
+  // `"use server"` module — so it needs the same throttle the other public auth
+  // actions carry. The 256-bit token itself is not guessable; this bounds the
+  // unauthenticated DB lookups an anonymous caller can drive.
+  const ip = await clientIp();
+  if (!rateLimit(`verify-token:${ip}`, 30, 60 * 60 * 1000)) {
+    return { ok: false, error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
   }
 
   const record = await prisma.emailVerificationToken.findUnique({

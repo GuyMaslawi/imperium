@@ -11,6 +11,8 @@ export interface SessionUser {
   name: string;
   role: Role;
   bannedAt: Date | null;
+  /** Null until the address is confirmed. See `purchaseDiamondPackage`. */
+  emailVerified: Date | null;
 }
 
 /** Emails that are auto-promoted to ADMIN (comma-separated ADMIN_EMAILS env). */
@@ -29,7 +31,14 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   if (!userId) return null;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, name: true, role: true, bannedAt: true },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      role: true,
+      bannedAt: true,
+      emailVerified: true,
+    },
   });
   return user ?? null;
 });
