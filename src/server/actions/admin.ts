@@ -1,5 +1,6 @@
 "use server";
 
+import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
@@ -117,8 +118,36 @@ async function assertNotPeerAdmin(
   }
 }
 
-function str(formData: FormData, key: string): string {
-  return String(formData.get(key) ?? "").trim();
+/**
+ * Read a trimmed string field, truncated to `maxLen`.
+ *
+ * Numbers here are carefully clamped but strings used to be unbounded, so a
+ * multi-megabyte broadcast body was `createMany`'d onto every empire in the
+ * game in a single call. The default is generous enough for every real field;
+ * pass a larger cap explicitly for message bodies.
+ */
+function str(formData: FormData, key: string, maxLen = 500): string {
+  return String(formData.get(key) ?? "")
+    .trim()
+    .slice(0, maxLen);
+}
+
+/**
+ * Validate an optional message link. Only internal paths are allowed.
+ *
+ * Every legitimate value in the codebase is a relative route ("/game/..."), and
+ * an admin-authored absolute URL rendered as a trusted in-game link is a
+ * broadcast-scale phishing primitive — the message UI presents it as the game's
+ * own "view full report" affordance to every player at once. `//evil.tld` is
+ * rejected alongside absolute URLs because browsers read it as protocol-relative.
+ */
+function optHref(formData: FormData, key: string): string | null {
+  const raw = str(formData, key, 500);
+  if (!raw) return null;
+  if (!raw.startsWith("/") || raw.startsWith("//")) {
+    throw new AdminError("קישור חייב להיות נתיב פנימי שמתחיל ב-/");
+  }
+  return raw;
 }
 
 function revalidateEmpire(userId?: string) {
@@ -221,7 +250,15 @@ export async function toggleUserBan(
     const banned = user.bannedAt == null;
     await prisma.user.update({
       where: { id: userId },
-      data: { bannedAt: banned ? new Date() : null },
+      data: {
+        bannedAt: banned ? new Date() : null,
+        // Bumping tokenVersion invalidates every JWT already issued to this
+        // account, so the ban takes effect on the next request instead of
+        // relying on each call site to re-read bannedAt. Sessions are stateless
+        // and last 30 days; any path that checks only the signature would
+        // otherwise keep serving a banned user until the token expired.
+        ...(banned ? { tokenVersion: { increment: 1 } } : {}),
+      },
     });
     await logAdmin(admin, {
       action: banned ? "user.ban" : "user.unban",
@@ -253,7 +290,14 @@ export async function resetUserPassword(
     // revoked — a reset must lock out anyone holding a stale/leaked cookie.
     await prisma.user.update({
       where: { id: userId },
-      data: { passwordHash, tokenVersion: { increment: 1 } },
+      // Clearing the lockout is what makes this the support path for a player
+      // locked out by someone else guessing at their account.
+      data: {
+        passwordHash,
+        tokenVersion: { increment: 1 },
+        failedLogins: 0,
+        lockedUntil: null,
+      },
     });
     await logAdmin(admin, {
       action: "user.reset_password",
@@ -704,9 +748,9 @@ export async function sendMessageToEmpire(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
-    const title = str(formData, "title");
-    const body = str(formData, "body");
-    const href = str(formData, "href") || null;
+    const title = str(formData, "title", 200);
+    const body = str(formData, "body", 4000);
+    const href = optHref(formData, "href");
     if (!title || !body) return { error: "יש למלא כותרת ותוכן" };
 
     await prisma.message.create({
@@ -736,9 +780,9 @@ export async function broadcastMessage(
     const admin = await requireAdmin();
     const scope = str(formData, "scope") || "all";
     const scopeId = str(formData, "scopeId");
-    const title = str(formData, "title");
-    const body = str(formData, "body");
-    const href = str(formData, "href") || null;
+    const title = str(formData, "title", 200);
+    const body = str(formData, "body", 4000);
+    const href = optHref(formData, "href");
     const kind = (kindSchema.safeParse(formData.get("kind")).data ?? "SYSTEM") as MessageKind;
     if (!title || !body) return { error: "יש למלא כותרת ותוכן" };
 
@@ -790,8 +834,8 @@ export async function sendGift(
       wheelSpins: Math.max(0, Math.round(optNum(formData, "wheelSpins"))),
     };
     const anyResource = Object.values(bundle).some((v) => v > 0);
-    const title = str(formData, "title");
-    const body = str(formData, "body");
+    const title = str(formData, "title", 200);
+    const body = str(formData, "body", 4000);
     if (!anyResource && !title) {
       return { error: "יש להזין לפחות משאב אחד או הודעה" };
     }
@@ -1042,7 +1086,6 @@ export async function updateGuild(
     const id = str(formData, "id");
     const name = str(formData, "name");
     if (name.length < 2) return { error: "שם ברית קצר מדי" };
-    const goldBalance = Math.max(0, num(formData, "goldBalance"));
     const capacityLevel = Math.min(
       GUILD_CAPACITY_MAX_LEVEL,
       Math.max(1, Math.round(num(formData, "capacityLevel")))
@@ -1060,7 +1103,7 @@ export async function updateGuild(
 
     await prisma.guild.update({
       where: { id },
-      data: { name, goldBalance, capacityLevel, aidLevel },
+      data: { name, capacityLevel, aidLevel },
     });
     await logAdmin(admin, {
       action: "guild.update",
@@ -1170,7 +1213,12 @@ const miniTypeSchema = z.enum(["GUESS_NUMBER", "FIND_BALL"]);
 
 /** Random integer in [min, max] (inclusive). */
 function randInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+  // These pick the mini-game's *secret answer*, so the generator has to be
+  // unpredictable. V8's Math.random is xorshift128+ — fast, but its internal
+  // state is recoverable from a modest run of observed outputs, and every
+  // created game leaks one. randomInt draws from the CSPRNG and is also free of
+  // the modulo bias a hand-rolled `% range` would introduce.
+  return randomInt(min, max + 1);
 }
 
 /** Build a fresh secret config (with a new random answer) for a mini-game. */

@@ -12,13 +12,13 @@ import { GUILD_AID_MAX_LEVEL } from "@/lib/game/guild";
 export interface GuildAidCardProps {
   /** Current aid percent (= aid level). */
   aidPct: number;
-  /** Treasury gold to raise the aid by 1%; null when maxed. */
+  /** Own gold needed to raise the aid by 1%; null when maxed. */
   upgradeCost: number | null;
-  /** Gold in the guild treasury (the upgrade is paid from it). */
-  guildGold: number;
+  /** The viewer's available gold — the upgrade is paid from it. */
+  availableGold: number;
 }
 
-export function GuildAidCard({ aidPct, upgradeCost, guildGold }: GuildAidCardProps) {
+export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCardProps) {
   const [state, action] = useActionState<ActionState, FormData>(
     upgradeGuildAid,
     {}
@@ -37,17 +37,20 @@ export function GuildAidCard({ aidPct, upgradeCost, guildGold }: GuildAidCardPro
       </div>
 
       <p className="text-xs leading-relaxed text-zinc-400">
-        כל חבר נלחם עם תוספת כוח בקרב.
+        כל חבר נלחם עם תוספת כוח בקרב — גם כשהוא תוקף וגם כשתוקפים אותו.
       </p>
       <p className="text-[11px] text-gold-dim">
         +{aidPct}% מסך הכוח הכולל של הברית להתקפה ולהגנה
+      </p>
+      <p className="text-[11px] text-zinc-500">
+        כל חבר יכול לשדרג — משולם מהזהב הזמין שלך.
       </p>
 
       <form action={action} className="mt-auto">
         {upgradeCost != null ? (
           <SubmitButton
             className="btn btn-dark w-full"
-            disabled={guildGold < upgradeCost}
+            disabled={availableGold < upgradeCost}
             pendingText="משדרג..."
           >
             שדרג ל־{aidPct + 1}% · {formatNumber(upgradeCost)}{" "}

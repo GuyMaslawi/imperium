@@ -125,22 +125,16 @@ export async function applyPendingUpdates(
     diamondsGained = heroBonus.itemsFlat.diamonds * missedDailies.length;
   }
 
-  // Top up wheel spins once per missed daily update, capped so they can't bank
-  // forever. Credited as a bounded *delta* (never an absolute set): this claim
-  // can win the race even when a concurrent grant path — minigame prize, item
-  // discard, battle reward — has incremented wheelSpins without advancing
-  // lastDailyUpdateAt. An absolute `wheelSpins: value` would clobber that grant
-  // (lost update, destroying the won spins); the increment composes with it.
-  // A concurrent grant may push the total slightly past the cap, which is fine.
+  // Top up wheel spins once per missed daily update. Spins bank without limit
+  // — a player who is away for a week comes back to the whole backlog.
+  // Credited as a *delta* (never an absolute set): this claim can win the race
+  // even when a concurrent grant path — minigame prize, item discard, battle
+  // reward — has incremented wheelSpins without advancing lastDailyUpdateAt.
+  // An absolute `wheelSpins: value` would clobber that grant (lost update,
+  // destroying the won spins); the increment composes with it.
   const wheelSpinsDelta =
     missedDailies.length > 0
-      ? Math.max(
-          0,
-          Math.min(
-            tunables.daily.wheelSpinsCap - empire.wheelSpins,
-            tunables.daily.wheelSpins * missedDailies.length
-          )
-        )
+      ? Math.max(0, tunables.daily.wheelSpins * missedDailies.length)
       : 0;
 
   if (ticks === 0 && missedDailies.length === 0) return empire;

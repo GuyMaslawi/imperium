@@ -6,6 +6,9 @@ import { z } from "zod";
 import type { BuildingType, Prisma, ResourceStorageType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { awardSeasonPassXp } from "@/server/seasonPassXp";
+import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
+import { secureRandom } from "@/lib/game/random";
 import {
   BUILDING_META,
   cityHeroLevelRequired,
@@ -154,6 +157,7 @@ export async function upgradeMine(
         where: { id: building.id },
         data: { level: { increment: 1 } },
       });
+      await awardSeasonPassXp(tx, empireId, "mineUpgrade");
 
       return {
         success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + 1}!`,
@@ -264,6 +268,10 @@ export async function upgradeMineToMax(
         where: { id: building.id },
         data: { level: { increment: levels } },
       });
+      // Pay per level so bulk-upgrading isn't worse than clicking one at a
+      // time, but cap it — an unbounded run to MINE_MAX_LEVEL would clear the
+      // whole season-pass ladder in a single click.
+      await awardSeasonPassXp(tx, empireId, "mineUpgrade", Math.min(levels, 5));
 
       return {
         success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + levels}!`,
@@ -503,6 +511,12 @@ export async function trainUnits(
         create: { empireId, [unit]: quantity },
         update: { [unit]: { increment: quantity } },
       });
+      await awardSeasonPassXp(
+        tx,
+        empireId,
+        "trainUnits",
+        seasonPassSpendUnits("trainUnits", citizensNeeded)
+      );
 
       return { success: `אומנו ${quantity} ${meta.labelPlural} בהצלחה!` };
     });
@@ -691,7 +705,8 @@ export async function spyOnEmpire(
       }
 
       // The mission ran — go to the full result page whether it succeeded
-      // or the spy was caught.
+      // or the spy was caught. Either way it cost turns, so it earns pass XP.
+      await awardSeasonPassXp(tx, empireId, "spy");
       return { reportId: report.id };
     });
 
@@ -1018,7 +1033,7 @@ export async function attackEmpire(
       if (attackerWins) {
         const wheelLuckLevel =
           attacker.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1;
-        wonWheelSpin = Math.random() < wheelLuckBonus(wheelLuckLevel);
+        wonWheelSpin = secureRandom() < wheelLuckBonus(wheelLuckLevel);
         if (wonWheelSpin) {
           await tx.empire.update({
             where: { id: empireId },
@@ -1083,6 +1098,9 @@ export async function attackEmpire(
       });
 
       // The battle resolved — go to the full WIN/LOSE result page either way.
+      // XP is paid for launching the attack, win or lose; the turns are spent
+      // regardless and the pass should not punish a failed raid.
+      await awardSeasonPassXp(tx, empireId, "attack");
       return { reportId: report.id };
     });
 
@@ -1162,6 +1180,8 @@ export async function upgradeStorage(
         where: { id: storage.id },
         data: { level: { increment: 1 } },
       });
+
+      await awardSeasonPassXp(tx, empireId, "storageUpgrade");
 
       const newCapacity = storageCapacityForLevel(storage.level + 1);
       return {
@@ -1442,6 +1462,7 @@ export async function upgradeEmpireUpgrade(
         where: { id: upgrade.id },
         data: { level: { increment: 1 } },
       });
+      await awardSeasonPassXp(tx, empireId, "empireUpgrade");
 
       return {
         success: `${EMPIRE_UPGRADE_META[upgradeType].label} שודרג לרמה ${
@@ -1531,6 +1552,7 @@ export async function foundCity(
       }
 
       // Soldiers are a gate, not a currency — the garrison is left untouched.
+      await awardSeasonPassXp(tx, empireId, "foundCity");
 
       return {
         success: `עלית לעיר ${empire.cities + 1}! התפוקה שלך גדלה בהתאם.`,
@@ -1644,6 +1666,15 @@ export async function buyWeapon(
         create: { empireId, weaponKey, quantity },
         update: { quantity: { increment: quantity } },
       });
+      await awardSeasonPassXp(
+        tx,
+        empireId,
+        "buyWeapon",
+        seasonPassSpendUnits(
+          "buyWeapon",
+          cost.gold + cost.wood + cost.iron + cost.stone
+        )
+      );
 
       return {
         success: `נקנו ${quantity.toLocaleString("he-IL")} ${weapon.name} בהצלחה!`,

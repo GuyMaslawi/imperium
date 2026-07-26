@@ -1,5 +1,6 @@
 import type { Hero, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
 import { RESOURCE_META, type StorableResource } from "./constants";
+import { secureRandom } from "./random";
 
 /* ------------------------------ hero progression ------------------------------ */
 
@@ -561,7 +562,7 @@ export const ITEM_DROP_CHANCE = 0.45;
  */
 export function rollItemDrop(
   attackerHeroLevel: number,
-  random: () => number = Math.random
+  random: () => number = secureRandom
 ): { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null {
   if (random() >= ITEM_DROP_CHANCE) return null;
 
@@ -608,7 +609,7 @@ export function discardWheelSpinChance(level: number): number {
 export function rollDiscardWheelSpin(
   level: number,
   bonus = 0,
-  random: () => number = Math.random
+  random: () => number = secureRandom
 ): boolean {
   return random() < discardWheelSpinChance(level) + bonus;
 }

@@ -20,7 +20,7 @@ import {
 } from "@/lib/game/guild";
 import { GuildCreateForm } from "@/components/game/GuildCreateForm";
 import { GuildJoinButton } from "@/components/game/GuildJoinButton";
-import { GuildBankPanel } from "@/components/game/GuildBankPanel";
+import { GuildAddMemberForm } from "@/components/game/GuildAddMemberForm";
 import { GuildShopCard } from "@/components/game/GuildShopCard";
 import { GuildCapacityCard } from "@/components/game/GuildCapacityCard";
 import { GuildAidCard } from "@/components/game/GuildAidCard";
@@ -28,14 +28,6 @@ import { GuildMemberActions } from "@/components/game/GuildMemberActions";
 import { GuildLeaveButton } from "@/components/game/GuildLeaveButton";
 
 export const metadata = { title: "הברית שלי | WARZONE" };
-
-const formatTime = (date: Date) =>
-  date.toLocaleString("he-IL", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 /* -------- no guild yet: create + browse open guilds -------- */
 
@@ -144,7 +136,6 @@ export default async function GuildPage() {
             include: { empire: { select: { id: true, name: true, level: true } } },
           },
           spells: true,
-          transactions: { orderBy: { createdAt: "desc" }, take: 10 },
         },
       },
     },
@@ -167,7 +158,8 @@ export default async function GuildPage() {
 
   const { guild } = membership;
   const capacity = guildCapacity(guild.capacityLevel);
-  const treasuryGold = Math.floor(guild.goldBalance);
+  const availableGold = Math.floor(empire.gold);
+  const isLeadership = membership.role !== "MEMBER";
   const members = [...guild.members].sort(
     (a, b) =>
       GUILD_ROLE_META[a.role].order - GUILD_ROLE_META[b.role].order ||
@@ -205,7 +197,7 @@ export default async function GuildPage() {
         />
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4">
         {/* -------- members -------- */}
         <div className="panel rounded-xl p-4">
           <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
@@ -250,57 +242,15 @@ export default async function GuildPage() {
               );
             })}
           </ul>
-        </div>
 
-        {/* -------- guild bank -------- */}
-        <div className="panel-gold rounded-xl p-4">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <Icon name="bank" size={18} className="text-crimson" />
-            בנק הברית
-          </h2>
-
-          <GuildBankPanel
-            availableGold={Math.floor(empire.gold)}
-            guildGold={Math.floor(guild.goldBalance)}
-          />
-
-          {guild.transactions.length > 0 && (
-            <div className="mt-4">
-              <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-gold-dim">
-                יומן הקופה
-              </h3>
-              <ul className="space-y-1">
-                {guild.transactions.map((entry) => (
-                  <li
-                    key={entry.id}
-                    className="flex items-center justify-between gap-2 border-b border-border-subtle pb-1 text-xs last:border-0"
-                  >
-                    <span className="text-zinc-300">
-                      {entry.type === "DEPOSIT" ? "⬇️" : "⬆️"} {entry.empireName}
-                    </span>
-                    <span
-                      className={`nums font-bold ${
-                        entry.type === "DEPOSIT"
-                          ? "text-emerald-400"
-                          : "text-red-400"
-                      }`}
-                      dir="ltr"
-                    >
-                      {entry.type === "DEPOSIT" ? "+" : "-"}
-                      {formatNumber(entry.amount)}
-                    </span>
-                    <span className="nums text-zinc-500" dir="ltr">
-                      {formatTime(entry.createdAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {/* Leader and deputy recruit straight into the roster. */}
+          {isLeadership && (
+            <GuildAddMemberForm full={members.length >= capacity} />
           )}
         </div>
       </div>
 
-      {/* -------- gold treasury upgrades -------- */}
+      {/* -------- gold upgrades, paid personally (no guild bank) -------- */}
       <div className="panel rounded-xl p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
@@ -308,12 +258,13 @@ export default async function GuildPage() {
             שדרוגי זהב הברית
           </h2>
           <span className="nums flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-3 py-1 text-xs font-bold text-gold-bright" dir="ltr">
-            {formatNumber(treasuryGold)}{" "}
+            {formatNumber(availableGold)}{" "}
             <Icon name="gold" size={13} className="text-gold-bright" />
           </span>
         </div>
         <p className="mb-4 text-xs text-zinc-500">
-          שדרוגים לכל הברית — משולמים מ<span className="font-semibold text-gold-dim">קופת הזהב</span> המשותפת, לא מיהלומים.
+          לברית אין בנק — שדרוגים לכל הברית משולמים מ
+          <span className="font-semibold text-gold-dim">הזהב הזמין שלך</span>, לא מיהלומים.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -325,7 +276,8 @@ export default async function GuildPage() {
                 ? null
                 : capacityUpgradeCostGold(guild.capacityLevel)
             }
-            guildGold={treasuryGold}
+            availableGold={availableGold}
+            mayUpgrade={isLeadership}
           />
           <GuildAidCard
             aidPct={guildAidPct(guild.aidLevel)}
@@ -334,7 +286,7 @@ export default async function GuildPage() {
                 ? null
                 : aidUpgradeCostGold(guild.aidLevel)
             }
-            guildGold={treasuryGold}
+            availableGold={availableGold}
           />
         </div>
       </div>
@@ -352,8 +304,9 @@ export default async function GuildPage() {
           </span>
         </div>
         <p className="mb-4 text-xs text-zinc-500">
-          קסמים נקנים ב<span className="font-semibold text-cyan-300">יהלומים</span> אישיים. שדרוג קסם מעלה את עזרת הקסם לכל החברים —
-          עד {GUILD_SPELL_MAX_LEVEL}% — והטלה מעניקה לך באפ אישי ל־24 שעות.
+          קסמי התקפה, הגנה, משאבים וריגול נקנים ב
+          <span className="font-semibold text-cyan-300">יהלומים</span> אישיים. שדרוג קסם מעלה את עזרת הקסם לכל החברים —
+          כל אחד עד {GUILD_SPELL_MAX_LEVEL}% — והטלה מעניקה לך באפ אישי ל־24 שעות.
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

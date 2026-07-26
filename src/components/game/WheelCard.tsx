@@ -6,12 +6,12 @@ import { Icon } from "@/components/ui/Icon";
 
 /** The base-screen "גלגל המזל" card that opens the wheel modal. */
 export function WheelCard({
-  spinsAvailable = 4,
-  seasonDay = 1,
+  spinsAvailable = 3,
+  seasonCycle = 1,
 }: {
   spinsAvailable?: number;
-  /** Current day of the season — wheel prize amounts grow with it. */
-  seasonDay?: number;
+  /** Daily-update cycle of the season — wheel prize amounts grow with it. */
+  seasonCycle?: number;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -36,7 +36,7 @@ export function WheelCard({
       {open && (
         <WheelOfFortune
           spinsAvailable={spinsAvailable}
-          seasonDay={seasonDay}
+          seasonCycle={seasonCycle}
           onClose={() => setOpen(false)}
         />
       )}

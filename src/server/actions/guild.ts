@@ -54,18 +54,19 @@ async function spendDiamonds(
 }
 
 /**
- * Spend gold from the guild treasury. The guarded update means concurrent
- * guild-wide upgrades can never drive the treasury negative; returns false
- * when the treasury lacks enough gold.
+ * Spend the member's own available gold. Guilds have no treasury, so guild-wide
+ * upgrades are funded personally by whoever buys them. The guarded update means
+ * concurrent spends can never drive the balance negative; returns false when the
+ * empire lacks enough gold.
  */
-async function spendGuildGold(
+async function spendOwnGold(
   tx: Prisma.TransactionClient,
-  guildId: string,
+  empireId: string,
   cost: number
 ): Promise<boolean> {
-  const updated = await tx.guild.updateMany({
-    where: { id: guildId, goldBalance: { gte: cost } },
-    data: { goldBalance: { decrement: cost } },
+  const updated = await tx.empire.updateMany({
+    where: { id: empireId, gold: { gte: cost } },
+    data: { gold: { decrement: cost } },
   });
   return updated.count > 0;
 }
@@ -236,16 +237,9 @@ export async function leaveGuild(): Promise<ActionState> {
       if (memberCount > 1) {
         return { error: "מנהיג לא יכול לעזוב — העבר קודם את ההנהגה." };
       }
-      // Last member out disbands the guild; leftover treasury gold is
-      // returned so it can never be lost.
-      if (guild.goldBalance > 0) {
-        await tx.empire.update({
-          where: { id: empireId },
-          data: { gold: { increment: guild.goldBalance } },
-        });
-      }
+      // Last member out disbands the guild.
       await tx.guild.delete({ where: { id: guild.id } });
-      return { success: `הברית "${guild.name}" פורקה והזהב שנותר הוחזר אליך.` };
+      return { success: `הברית "${guild.name}" פורקה.` };
     }
 
     await tx.guildMember.delete({ where: { empireId } });
@@ -253,7 +247,75 @@ export async function leaveGuild(): Promise<ActionState> {
   });
 }
 
-/* ------------------------------ roles & kicks ------------------------------ */
+/* ------------------------------ roster: add / kick / roles ------------------------------ */
+
+const addMemberSchema = z.object({
+  name: z.string().trim().min(1, "הזן שם אימפריה").max(60),
+});
+
+/**
+ * Leadership recruitment: a leader or deputy adds a guildless player straight
+ * into the guild by empire name. The newcomer gets a system message and can
+ * leave at any time, so this is a shortcut for the open join — not a lock-in.
+ */
+export async function addGuildMember(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = addMemberSchema.safeParse({ name: formData.get("name") });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "שם לא תקין" };
+  }
+  const { name } = parsed.data;
+
+  return runMemberAction(async (membership, tx, empireId) => {
+    if (membership.role === "MEMBER") {
+      return { error: "רק מנהיג או סגן יכולים לצרף שחקנים לברית." };
+    }
+
+    // Case-insensitive so leaders don't have to match capitalization exactly;
+    // empire names are unique, so at most one row can match.
+    const target = await tx.empire.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+      select: { id: true, name: true, guildMembership: { select: { id: true } } },
+    });
+    if (!target) return { error: `לא נמצאה אימפריה בשם "${name}".` };
+    if (target.id === empireId) return { error: "אתה כבר חבר בברית." };
+    if (target.guildMembership) {
+      return { error: `${target.name} כבר חבר בברית אחרת.` };
+    }
+
+    // Lock the guild row so concurrent adds/joins serialize — see joinGuild for
+    // why an unlocked capacity check can overfill the guild.
+    await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${membership.guildId} FOR UPDATE`;
+
+    const guild = await tx.guild.findUniqueOrThrow({
+      where: { id: membership.guildId },
+      select: { name: true, capacityLevel: true },
+    });
+    const memberCount = await tx.guildMember.count({
+      where: { guildId: membership.guildId },
+    });
+    if (memberCount >= guildCapacity(guild.capacityLevel)) {
+      return { error: "הברית מלאה — הרחב את הקיבולת קודם." };
+    }
+
+    await tx.guildMember.create({
+      data: { guildId: membership.guildId, empireId: target.id },
+    });
+    await tx.message.create({
+      data: {
+        empireId: target.id,
+        kind: "SYSTEM",
+        title: "🏰 צורפת לברית",
+        body: `צורפת לברית "${guild.name}".`,
+        href: "/game/guild",
+      },
+    });
+
+    return { success: `${target.name} צורף לברית.` };
+  });
+}
 
 const targetMemberSchema = z.object({ targetEmpireId: z.string().min(1) });
 
@@ -389,109 +451,6 @@ export async function transferGuildLeadership(
   });
 }
 
-/* ------------------------------ guild bank ------------------------------ */
-
-// Empire and guild gold are Float columns, so a "deposit/withdraw all" button
-// can submit a fractional amount (e.g. 1234.56). Floor first, then validate,
-// so those amounts aren't rejected by an int-only check.
-const amountSchema = z.coerce
-  .number()
-  .finite()
-  .transform((n) => Math.floor(n))
-  .pipe(z.number().int().min(1).max(1_000_000_000));
-
-export async function depositGuildGold(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = amountSchema.safeParse(formData.get("amount"));
-  if (!parsed.success) return { error: "כמות לא תקינה" };
-  const amount = parsed.data;
-
-  return runMemberAction(async (membership, tx, empireId) => {
-    // Guarded debit — concurrent actions can never drive gold negative.
-    const debited = await tx.empire.updateMany({
-      where: { id: empireId, gold: { gte: amount } },
-      data: { gold: { decrement: amount } },
-    });
-    if (debited.count === 0) return { error: "אין מספיק זהב זמין להפקדה." };
-
-    const guild = await tx.guild.update({
-      where: { id: membership.guildId },
-      data: { goldBalance: { increment: amount } },
-    });
-
-    const empire = await tx.empire.findUniqueOrThrow({
-      where: { id: empireId },
-      select: { name: true },
-    });
-    await tx.guildBankTransaction.create({
-      data: {
-        guildId: membership.guildId,
-        empireId,
-        empireName: empire.name,
-        type: "DEPOSIT",
-        amount,
-        balanceAfter: guild.goldBalance,
-      },
-    });
-
-    return {
-      success: `הופקדו ${amount.toLocaleString("he-IL")} זהב בבנק הברית`,
-    };
-  });
-}
-
-export async function withdrawGuildGold(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = amountSchema.safeParse(formData.get("amount"));
-  if (!parsed.success) return { error: "כמות לא תקינה" };
-  const amount = parsed.data;
-
-  return runMemberAction(async (membership, tx, empireId) => {
-    // Withdrawing spends the shared treasury — restrict to leadership so a plain
-    // member can't join, drain the whole bank, and leave. Mirrors the same block
-    // on the capacity/aid upgrades that also spend the treasury.
-    if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים למשוך מקופת הברית." };
-    }
-    // Guarded debit against the shared treasury.
-    const withdrawn = await tx.guild.updateMany({
-      where: { id: membership.guildId, goldBalance: { gte: amount } },
-      data: { goldBalance: { decrement: amount } },
-    });
-    if (withdrawn.count === 0) {
-      return { error: "אין מספיק זהב בבנק הברית למשיכה." };
-    }
-
-    const empire = await tx.empire.update({
-      where: { id: empireId },
-      data: { gold: { increment: amount } },
-      select: { name: true },
-    });
-    const guild = await tx.guild.findUniqueOrThrow({
-      where: { id: membership.guildId },
-      select: { goldBalance: true },
-    });
-    await tx.guildBankTransaction.create({
-      data: {
-        guildId: membership.guildId,
-        empireId,
-        empireName: empire.name,
-        type: "WITHDRAW",
-        amount,
-        balanceAfter: guild.goldBalance,
-      },
-    });
-
-    return {
-      success: `נמשכו ${amount.toLocaleString("he-IL")} זהב מבנק הברית`,
-    };
-  });
-}
-
 /* ------------------------------ guild shop ------------------------------ */
 
 const spellTypeSchema = z.object({
@@ -536,12 +495,12 @@ export async function upgradeGuildSpell(
 }
 
 export async function upgradeGuildCapacity(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx) => {
+  return runMemberAction(async (membership, tx, empireId) => {
     const { guild } = membership;
-    // Spends the shared treasury — restrict to leadership so a plain member
-    // can't drain the guild bank on capacity upgrades.
+    // Roster size is a leadership call, so only a leader or deputy may buy a
+    // seat — out of their own pocket, since the guild has no treasury.
     if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים לשדרג מקופת הברית." };
+      return { error: "רק מנהיג או סגן יכולים להרחיב את הברית." };
     }
     if (guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL) {
       return {
@@ -549,11 +508,12 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
       };
     }
 
-    // Paid from the shared treasury — the guarded debit also guards the
-    // capacity increment, so two concurrent upgrades can't both go through.
+    // Paid from the buyer's own gold with a guarded debit, so concurrent spends
+    // can never overdraw; the level guard below then rolls it back if another
+    // member bought the same level first.
     const cost = capacityUpgradeCostGold(guild.capacityLevel);
-    if (!(await spendGuildGold(tx, guild.id, cost))) {
-      return { error: `ההרחבה עולה ${cost.toLocaleString("he-IL")} זהב מקופת הברית — אין מספיק.` };
+    if (!(await spendOwnGold(tx, empireId, cost))) {
+      return { error: `ההרחבה עולה ${cost.toLocaleString("he-IL")} זהב מהזהב הזמין שלך — אין לך מספיק.` };
     }
 
     const upgraded = await tx.guild.updateMany({
@@ -569,12 +529,10 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
 }
 
 export async function upgradeGuildAid(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx) => {
+  return runMemberAction(async (membership, tx, empireId) => {
     const { guild } = membership;
-    // Spends the shared treasury — restrict to leadership (see upgradeGuildCapacity).
-    if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים לשדרג מקופת הברית." };
-    }
+    // Open to every member: whoever wants more aid pays for it from their own
+    // available gold — there is no treasury to drain, so no role gate.
     if (guild.aidLevel >= GUILD_AID_MAX_LEVEL) {
       return {
         error: `עזרת הברית כבר ברמה המקסימלית (${GUILD_AID_MAX_LEVEL}%).`,
@@ -582,8 +540,8 @@ export async function upgradeGuildAid(): Promise<ActionState> {
     }
 
     const cost = aidUpgradeCostGold(guild.aidLevel);
-    if (!(await spendGuildGold(tx, guild.id, cost))) {
-      return { error: `השדרוג עולה ${cost.toLocaleString("he-IL")} זהב מקופת הברית — אין מספיק.` };
+    if (!(await spendOwnGold(tx, empireId, cost))) {
+      return { error: `השדרוג עולה ${cost.toLocaleString("he-IL")} זהב מהזהב הזמין שלך — אין לך מספיק.` };
     }
 
     const upgraded = await tx.guild.updateMany({

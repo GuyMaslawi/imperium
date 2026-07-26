@@ -4,6 +4,7 @@ import { CardTitle } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { logout } from "@/server/actions/auth";
+import { AccountSecurity } from "@/components/game/AccountSecurity";
 
 export const metadata = { title: "הגדרות | אימפריום" };
 
@@ -50,6 +51,9 @@ export default async function SettingsPage() {
             </div>
           </dl>
         </div>
+
+        {/* Only a boolean crosses the client boundary — never the hash itself. */}
+        <AccountSecurity hasPassword={empire.user.passwordHash != null} />
 
         <div className="panel-gold rounded-xl p-4">
           <CardTitle icon="🚪">התנתקות</CardTitle>

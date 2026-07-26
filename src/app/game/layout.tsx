@@ -11,6 +11,7 @@ import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sideba
 import { WarAlerts } from "@/components/game/WarAlerts";
 import { MiniGameLauncher } from "@/components/game/MiniGameLauncher";
 import { getMiniGameState } from "@/server/actions/minigame";
+import { getSeasonPassState } from "@/server/actions/seasonPass";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
@@ -22,9 +23,9 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const nextRegular = nextRegularUpdate(now);
   const nextDaily = nextDailyUpdate(now);
 
-  // Season-pass progression is still presentational (derived from turns).
-  const seasonXpMax = 1000;
-  const seasonXp = Math.floor(empire.turns) % seasonXpMax;
+  // Real season-pass progression: XP earned by gameplay actions this cycle,
+  // rewards priced at the current season day. See src/lib/game/seasonPass.ts.
+  const seasonPass = await getSeasonPassState();
 
   // Real hero progression (battles grant XP; see src/lib/game/hero.ts).
   const hero = empire.hero;
@@ -95,12 +96,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
         <main className="min-w-0 flex-1">
           <OrnateFrame className="flex min-h-full flex-col overflow-hidden p-3 sm:p-4 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border-subtle pb-3">
-              <SeasonPassButton
-                level={empire.level}
-                xp={seasonXp}
-                xpMax={seasonXpMax}
-                diamonds={empire.diamonds}
-              />
+              {seasonPass && <SeasonPassButton initial={seasonPass} />}
               <UpdateTimers
                 serverNow={now.getTime()}
                 nextRegularAt={nextRegular.getTime()}

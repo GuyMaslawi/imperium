@@ -51,8 +51,26 @@ export const requireAdmin = cache(async (): Promise<SessionUser> => {
   if (user.bannedAt) redirect("/login");
 
   if (user.role !== "ADMIN" && bootstrapAdminEmails().has(user.email.toLowerCase())) {
-    await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
-    return { ...user, role: "ADMIN" };
+    // Strictly one-shot: promote only while the system has NO admin at all.
+    //
+    // Registration never verifies that the registrant owns the address, so
+    // without this guard anyone who signs up with an ADMIN_EMAILS address (the
+    // owner's is guessable, and ADMIN_EMAILS stays set in the deployed env
+    // forever) would be promoted the moment they touched any admin action. The
+    // unique constraint on User.email is not a defence — it only holds while
+    // that address already has an account, so the hole reopens whenever an
+    // ADMIN_EMAILS entry is rotated, added, or its user row deleted.
+    const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
+    if (adminCount === 0) {
+      await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+      await logAdmin(user, {
+        action: "admin.bootstrap",
+        targetType: "user",
+        targetId: user.id,
+        summary: `Bootstrapped first admin from ADMIN_EMAILS (${user.email})`,
+      });
+      return { ...user, role: "ADMIN" };
+    }
   }
 
   if (user.role !== "ADMIN") redirect("/game/base");
@@ -82,7 +100,11 @@ export async function logAdmin(
         details: entry.details,
       },
     });
-  } catch {
-    // Losing an audit row must never block the actual admin action.
+  } catch (e) {
+    // Losing an audit row must never block the actual admin action — but a
+    // silently dropped row means destructive operations (resetSeason wipes every
+    // empire, deleteUser, saveTunables) can complete with no trace at all, so
+    // the failure has to be observable somewhere.
+    console.error("[admin-audit] failed to record entry", entry.action, e);
   }
 }

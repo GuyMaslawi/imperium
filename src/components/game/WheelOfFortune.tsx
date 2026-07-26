@@ -42,12 +42,12 @@ function makeConfetti(): ConfettiPiece[] {
 
 export function WheelOfFortune({
   spinsAvailable,
-  seasonDay,
+  seasonCycle,
   onClose,
 }: {
   spinsAvailable: number;
-  /** Current day of the season — prize amounts grow with it. */
-  seasonDay: number;
+  /** Daily-update cycle of the season — prize amounts grow with it. */
+  seasonCycle: number;
   onClose: () => void;
 }) {
   const [rotation, setRotation] = useState(0);
@@ -187,7 +187,7 @@ export function WheelOfFortune({
           <span className="nums font-black text-gold-bright" dir="ltr">{spinsLeft}</span>
         </div>
         <p className="mt-3 text-xs font-semibold text-gold">
-          יום <span className="nums" dir="ltr">{seasonDay}</span> לעונה — הפרסים גדלים בכל יום של העונה!
+          מחזור <span className="nums" dir="ltr">{seasonCycle}</span> לעונה — הפרסים גדלים בכל עדכון יומי!
         </p>
         <p className="mt-1 text-xs font-semibold text-zinc-400">
           פרס &quot;חפץ&quot; דורש לפחות מקום פנוי אחד בתיק הגיבור.

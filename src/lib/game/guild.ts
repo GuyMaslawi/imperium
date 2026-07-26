@@ -20,8 +20,8 @@ export function guildCapacity(capacityLevel: number): number {
 export const GUILD_CAPACITY_MAX_LEVEL = 9;
 
 /**
- * Gold cost (from the guild treasury) to expand from `level` to `level + 1`.
- * Capacity is a guild-wide, in-game-gold upgrade — not a diamond one.
+ * Gold cost to expand from `level` to `level + 1`. Guilds have no treasury, so
+ * the leader or deputy who buys the seat pays it from their own available gold.
  */
 export function capacityUpgradeCostGold(level: number): number {
   return 50_000 * (level + 1);
@@ -31,8 +31,9 @@ export function capacityUpgradeCostGold(level: number): number {
 
 /**
  * Guild aid pools the whole guild's strength: every member fights with a flat
- * power bonus equal to `aidLevel`% of the guild's total military power, up to
- * a 10% cap. Bought with treasury gold, level starts at 0 (no aid).
+ * power bonus equal to `aidLevel`% of the guild's total military power — both
+ * when attacking and when being attacked — up to a 10% cap. Level starts at 0
+ * (no aid) and any member can raise it by paying from their own gold.
  */
 export const GUILD_AID_MAX_LEVEL = 10;
 
@@ -40,7 +41,10 @@ export function guildAidPct(level: number): number {
   return Math.min(GUILD_AID_MAX_LEVEL, Math.max(0, level));
 }
 
-/** Gold cost (from the guild treasury) to raise aid from `level` to `level + 1`. */
+/**
+ * Gold cost to raise aid from `level` to `level + 1`. There is no guild bank —
+ * the member who wants the upgrade pays it from their own available gold.
+ */
 export function aidUpgradeCostGold(level: number): number {
   return 75_000 * (level + 1);
 }
@@ -49,9 +53,9 @@ export function aidUpgradeCostGold(level: number): number {
 
 /**
  * Guild help is measured in power: each spell's level IS its bonus percent.
- * It starts at 1% and the shop upgrades it up to the 20% help cap.
+ * It starts at 1% and the shop upgrades it up to the 30% help cap.
  */
-export const GUILD_SPELL_MAX_LEVEL = 20;
+export const GUILD_SPELL_MAX_LEVEL = 30;
 
 export function guildSpellBonusPct(level: number): number {
   return Math.min(GUILD_SPELL_MAX_LEVEL, Math.max(0, level));

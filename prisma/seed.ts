@@ -183,7 +183,37 @@ function demoHero(empireLevel: number) {
   };
 }
 
+/**
+ * Refuse to seed a production database.
+ *
+ * The demo empires below share one well-known password, and their addresses are
+ * on a `.imperium` pseudo-TLD that nobody can ever receive mail at — so a demo
+ * row in production is an unauthenticated login for anyone who reads this file,
+ * and (while such an address sits in ADMIN_EMAILS) a route to ADMIN. The build
+ * command runs `prisma migrate deploy` against the production database, so a
+ * seed step added next to it would land there silently.
+ *
+ * Set SEED_ALLOW_PRODUCTION=true only for a deliberate staging fixture load.
+ */
+function assertNotProduction(): void {
+  if (process.env.SEED_ALLOW_PRODUCTION === "true") return;
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production") {
+    throw new Error(
+      "Refusing to seed demo accounts into a production environment. " +
+        "Set SEED_ALLOW_PRODUCTION=true if this is really what you want."
+    );
+  }
+}
+
+/**
+ * Password for the demo empires. Overridable so a shared staging box doesn't
+ * have to run on the value published in this repo.
+ */
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? "demo1234";
+
 async function main() {
+  assertNotProduction();
+
   /* ---- active season ---- */
   let season = await prisma.gameSeason.findFirst({ where: { isActive: true } });
   if (!season) {
@@ -254,7 +284,7 @@ async function main() {
   }
 
   /* ---- demo empires ---- */
-  const passwordHash = await bcrypt.hash("demo1234", 10);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   for (const demo of DEMO_EMPIRES) {
     const existing = await prisma.user.findUnique({

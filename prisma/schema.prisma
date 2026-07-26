@@ -42,6 +42,14 @@ model User {
   /// sign time and re-checked on every request; a password reset increments it,
   /// logging out all existing sessions. See src/lib/auth.ts.
   tokenVersion Int       @default(0)
+  /// Consecutive failed password attempts since the last success. Reset to 0 on
+  /// a successful login. Backs the account lockout in src/server/actions/auth.ts
+  /// — the in-process rate limiter cannot throttle brute force on a serverless
+  /// fleet, because each instance keeps its own counters and loses them on cold
+  /// start, so the durable counter lives here instead.
+  failedLogins Int       @default(0)
+  /// Set while the account is locked out; login is refused until it passes.
+  lockedUntil  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -195,12 +203,50 @@ model Empire {
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
   diamondPurchases   DiamondPurchase[]
+  seasonPass         SeasonPassProgress?
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
   // season. Without these, both are full-table scans that grow with the player
   // base. The composite also serves the (now-removed) stale-daily settle query.
   @@index([cities, lastDailyUpdateAt])
   @@index([seasonId])
+}
+
+/// Per-empire season-pass state. Exactly one row per empire, reset in place on
+/// each daily-update boundary rather than re-created — see
+/// src/server/actions/seasonPass.ts.
+model SeasonPassProgress {
+  id       String @id @default(cuid())
+  empireId String @unique
+
+  /// Season the `premium` flag and progress belong to. When the active season
+  /// changes, the row is wiped back to a free, zeroed ladder — premium is
+  /// bought per season, so a new season means buying again.
+  seasonId String?
+
+  /// Premium track purchased. Survives every cycle reset within the season, so
+  /// the player is charged once and keeps the gold track open all season.
+  premium   Boolean   @default(false)
+  premiumAt DateTime?
+
+  /// The daily-update boundary this ladder belongs to. Once
+  /// `lastDailyUpdate(now)` moves past it, `xp` and both claimed lists reset
+  /// and the payouts grow with the new season day.
+  cycleStartedAt DateTime
+
+  /// XP earned in the current cycle only. Tier N unlocks at N × 50.
+  xp Int @default(0)
+
+  /// Tiers already collected in the current cycle, per track. Claiming pushes
+  /// onto these under a `NOT has` guard, which is what makes a double-claim
+  /// impossible without a row lock.
+  claimedFree    Int[]
+  claimedPremium Int[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
 }
 
 /* --------------------------- diamond store (real money) --------------------------- */
@@ -252,8 +298,13 @@ model DiamondPurchase {
   currency     String         @default("ILS")
   /// Payment provider that handled the charge ("mock" until a real one is wired).
   provider     String
-  /// Provider-side transaction reference, once charged.
-  providerRef  String?
+  /// Provider-side transaction reference, once charged. Unique so the same
+  /// reference can never settle twice: today's in-process flow is idempotent on
+  /// the internal purchase id, but the documented go-live path is a provider
+  /// webhook, and a replayed webhook carrying a reference we have already
+  /// credited would otherwise settle a second row and double-credit diamonds.
+  /// The future webhook handler must look the purchase up BY THIS FIELD.
+  providerRef  String?        @unique
   /// True when no real money moved (mock provider / admin test purchase).
   isTest       Boolean        @default(false)
   status       PurchaseStatus @default(PENDING)
@@ -318,7 +369,7 @@ enum GuildRole {
 }
 
 /// The four guild spells sold in the guild shop. Each has a per-guild level
-/// (level = bonus %, starts at 1, capped at 20) that members upgrade with
+/// (level = bonus %, starts at 1, capped at 30) that members upgrade with
 /// diamonds; casting one grants the caster a 24h personal buff.
 enum GuildSpellType {
   ATTACK
@@ -330,20 +381,17 @@ enum GuildSpellType {
 model Guild {
   id            String   @id @default(cuid())
   name          String   @unique
-  /// Shared gold treasury — members deposit and withdraw freely.
-  goldBalance   Float    @default(0)
   /// Member capacity = 1 + level, so a fresh guild (level 1) holds 2 members.
   capacityLevel Int      @default(1)
   /// Guild aid level — each level adds 1% of the guild's total military power
-  /// as flat combat power for every member in battle, up to 10%. Bought with
-  /// treasury gold.
+  /// as flat combat power for every member in battle, up to 10%. Guilds have no
+  /// treasury: whoever wants the upgrade pays for it from their own gold.
   aidLevel      Int      @default(0)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  members      GuildMember[]
-  spells       GuildSpell[]
-  transactions GuildBankTransaction[]
+  members GuildMember[]
+  spells  GuildSpell[]
 }
 
 model GuildMember {
@@ -386,27 +434,6 @@ model GuildSpellBuff {
   empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
 
   @@index([empireId, expiresAt])
-}
-
-enum GuildBankTransactionType {
-  DEPOSIT
-  WITHDRAW
-}
-
-model GuildBankTransaction {
-  id           String                   @id @default(cuid())
-  guildId      String
-  empireId     String
-  /// Denormalized so the ledger stays readable if the member leaves.
-  empireName   String
-  type         GuildBankTransactionType
-  amount       Float
-  balanceAfter Float
-  createdAt    DateTime                 @default(now())
-
-  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
-
-  @@index([guildId, createdAt])
 }
 
 enum MessageKind {

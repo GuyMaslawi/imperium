@@ -9,9 +9,32 @@ import { applyPendingUpdates } from "@/lib/game/updates";
 const SESSION_COOKIE = "imperium_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
+/**
+ * Session-signing key. Fails closed on a weak value rather than issuing tokens
+ * an attacker could forge.
+ *
+ * This is the whole ballgame for the session layer: anyone holding AUTH_SECRET
+ * can mint `{sub: <any user id>, ver: 0}` and sign in as any account, admins
+ * included, without touching the database. A short or placeholder key is
+ * therefore not a lint issue — it is a total authentication bypass, so a
+ * misconfigured deploy must crash instead of quietly running on a guessable
+ * secret. 32 chars is the floor for the 256-bit HMAC below.
+ */
+const MIN_SECRET_LENGTH = 32;
+
 function secretKey(): Uint8Array {
   const secret = process.env.AUTH_SECRET;
   if (!secret) throw new Error("AUTH_SECRET is not set");
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters of random data`
+    );
+  }
+  if (/change-?me|placeholder|your-secret|dev-secret|example/i.test(secret)) {
+    throw new Error(
+      "AUTH_SECRET is a placeholder value — generate one with `openssl rand -base64 48`"
+    );
+  }
   return new TextEncoder().encode(secret);
 }
 

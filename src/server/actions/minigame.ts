@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import type { MiniGameEvent, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { grantCitizens } from "@/lib/game/grants";
+import { awardSeasonPassXp } from "../seasonPassXp";
 import {
   prizeText,
   publicConfig,
@@ -218,9 +220,15 @@ export async function submitMiniGameGuess(
 
       if (won) {
         const inc = prizeIncrements(event);
+        // Citizens are capped by city count, so they go through grantCitizens
+        // instead of riding along in the bulk increment — a raw increment here
+        // breached the ceiling the daily update enforces.
+        const citizenPrize = Math.max(0, Math.round(Number(event.prizeCitizens ?? 0)));
+        delete (inc as Record<string, unknown>).citizens;
         if (Object.keys(inc).length > 0) {
           await tx.empire.update({ where: { id: empireId }, data: inc });
         }
+        await grantCitizens(tx, empireId, citizenPrize);
         await tx.message.create({
           data: {
             empireId,
@@ -230,6 +238,10 @@ export async function submitMiniGameGuess(
           },
         });
       }
+
+      // Solving is once-per-event (guarded by the solve claim above), so this
+      // pays pass XP exactly once whether or not a prize slot was left.
+      await awardSeasonPassXp(tx, empireId, "miniGame");
 
       // Re-read the event so winnersCount/prizesLeft are fresh in the response.
       const freshEvent = (await tx.miniGameEvent.findUnique({ where: { id: event.id } }))!;

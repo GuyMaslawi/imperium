@@ -7,6 +7,8 @@ import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { allowedDepositsPerDailyPeriod } from "@/lib/game/constants";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
+import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
+import { awardSeasonPassXp } from "../seasonPassXp";
 import type { ActionState } from "./game";
 
 async function requireOwnEmpireId(): Promise<string> {
@@ -121,6 +123,16 @@ async function performDeposit(
       balanceAfter: ctx.bankGold + amount,
     },
   });
+  // Deposits are already rate-limited by depositsUsedInCurrentPeriod, so this
+  // cannot be farmed for pass XP by depositing 1 gold in a loop. The spend gate
+  // is applied anyway so the deposit allowance can be raised later without
+  // quietly reopening a farm.
+  await awardSeasonPassXp(
+    tx,
+    empireId,
+    "bankDeposit",
+    seasonPassSpendUnits("bankDeposit", amount)
+  );
 
   return {
     success: `הופקדו ${amount.toLocaleString("he-IL")} זהב בבנק`,

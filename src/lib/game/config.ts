@@ -33,7 +33,6 @@ export interface GameTunables {
     citizensBase: number;
     citizensPerLevel: number;
     wheelSpins: number;
-    wheelSpinsCap: number;
   };
   /** Battle & spy resolution parameters. */
   battle: {
@@ -73,8 +72,7 @@ export const DEFAULT_TUNABLES: GameTunables = {
   daily: {
     citizensBase: 20,
     citizensPerLevel: 5,
-    wheelSpins: 4,
-    wheelSpinsCap: 20,
+    wheelSpins: 3,
   },
   battle: {
     defenseBonus: 1.2,
@@ -122,7 +120,6 @@ export const TUNABLE_META: Record<
       citizensBase: { label: "אזרחים בסיס לעדכון יומי" },
       citizensPerLevel: { label: "אזרחים נוספים לכל רמת שדרוג" },
       wheelSpins: { label: "סיבובי גלגל לעדכון יומי" },
-      wheelSpinsCap: { label: "מקסימום סיבובי גלגל שנצברים" },
     },
   },
   battle: {
@@ -153,13 +150,68 @@ export const TUNABLE_META: Record<
   },
 };
 
-function mergeGroup<T extends Record<string, number>>(base: T, overlay: unknown): T {
+/**
+ * Hard bounds for every tunable, enforced on both the write and the read path.
+ *
+ * These are safety rails, not balance opinions — they only rule out values that
+ * break a game invariant outright. The costs in particular must stay >= 1: the
+ * spend sites test `if (empire.turns < ATTACK_TURN_COST)` and then decrement by
+ * that same figure, so a negative cost passes the affordability check and the
+ * decrement *adds* turns, minting them without limit for every player at once.
+ * Rates that feed multiplications are kept non-negative so resources can never
+ * be driven below zero by a sign flip.
+ */
+const TUNABLE_BOUNDS: {
+  [G in keyof GameTunables]: { [F in keyof GameTunables[G]]: [number, number] };
+} = {
+  starting: {
+    gold: [0, 1e12],
+    wood: [0, 1e12],
+    iron: [0, 1e12],
+    stone: [0, 1e12],
+    diamonds: [0, 1e9],
+    citizens: [0, 1e9],
+    turns: [0, 1e9],
+    soldiers: [0, 1e9],
+    spies: [0, 1e9],
+    mineSlaves: [0, 1e9],
+    slavesPerMine: [0, 1e6],
+    wheelSpins: [0, 1e4],
+  },
+  daily: {
+    citizensBase: [0, 1e6],
+    citizensPerLevel: [0, 1e6],
+    wheelSpins: [0, 1e4],
+  },
+  battle: {
+    defenseBonus: [0, 1e3],
+    plunderRate: [0, 1],
+    enslaveRate: [0, 1],
+    enslaveMinSoldiers: [0, 1e9],
+    // Must be >= 1 — see the note above; 0 would also make attacks free.
+    attackTurnCost: [1, 1e6],
+    spyTurnCost: [1, 1e6],
+  },
+  economy: {
+    mineProductionMultiplier: [0, 1e3],
+  },
+  diamondStore: {
+    purchaseDiscountPct: [0, 100],
+  },
+};
+
+function mergeGroup<T extends Record<string, number>>(
+  base: T,
+  overlay: unknown,
+  bounds: Record<string, [number, number]>
+): T {
   if (!overlay || typeof overlay !== "object") return { ...base };
   const result = { ...base };
   for (const key of Object.keys(base) as (keyof T)[]) {
     const value = (overlay as Record<string, unknown>)[key as string];
     if (typeof value === "number" && Number.isFinite(value)) {
-      result[key] = value as T[keyof T];
+      const [min, max] = bounds[key as string] ?? [-Infinity, Infinity];
+      result[key] = Math.min(max, Math.max(min, value)) as T[keyof T];
     }
   }
   return result;
@@ -169,11 +221,15 @@ function mergeGroup<T extends Record<string, number>>(base: T, overlay: unknown)
 export function mergeTunables(overlay: unknown): GameTunables {
   const o = (overlay ?? {}) as Record<string, unknown>;
   return {
-    starting: mergeGroup(DEFAULT_TUNABLES.starting, o.starting),
-    daily: mergeGroup(DEFAULT_TUNABLES.daily, o.daily),
-    battle: mergeGroup(DEFAULT_TUNABLES.battle, o.battle),
-    economy: mergeGroup(DEFAULT_TUNABLES.economy, o.economy),
-    diamondStore: mergeGroup(DEFAULT_TUNABLES.diamondStore, o.diamondStore),
+    starting: mergeGroup(DEFAULT_TUNABLES.starting, o.starting, TUNABLE_BOUNDS.starting),
+    daily: mergeGroup(DEFAULT_TUNABLES.daily, o.daily, TUNABLE_BOUNDS.daily),
+    battle: mergeGroup(DEFAULT_TUNABLES.battle, o.battle, TUNABLE_BOUNDS.battle),
+    economy: mergeGroup(DEFAULT_TUNABLES.economy, o.economy, TUNABLE_BOUNDS.economy),
+    diamondStore: mergeGroup(
+      DEFAULT_TUNABLES.diamondStore,
+      o.diamondStore,
+      TUNABLE_BOUNDS.diamondStore
+    ),
   };
 }
 

@@ -5,10 +5,12 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
+import { grantCitizens } from "@/lib/game/grants";
+import { secureRandom } from "@/lib/game/random";
 import {
   WHEEL_PRIZES,
   pickWheelPrizeIndex,
-  seasonDay,
+  seasonCycle,
   wheelPrizeAmount,
   type WheelGrant,
   type WheelPrizeDef,
@@ -19,6 +21,7 @@ import {
   weaponsOfCategory,
 } from "@/lib/game/weapons";
 import { HERO_BAG_CAPACITY, itemDisplayName, rollItemDrop } from "@/lib/game/hero";
+import { awardSeasonPassXp } from "../seasonPassXp";
 import type { FullEmpire } from "@/lib/game/updates";
 
 /** What a spin returns to the client so it can animate to the right wedge. */
@@ -45,16 +48,16 @@ const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
 /**
  * Grant a won prize to the empire and return the reveal message. Every branch
  * writes to the DB — the wheel actually pays out. Amount prizes grow with the
- * season day; unit prizes (all weapons, hero item) are concrete grants.
+ * daily-update cycle; unit prizes (all weapons, hero item) are concrete grants.
  */
 async function grantPrize(
   tx: Prisma.TransactionClient,
   empire: FullEmpire,
   prize: WheelPrizeDef,
-  day: number
+  cycle: number
 ): Promise<{ message: string; grants: WheelGrant[] }> {
   const empireId = empire.id;
-  const amount = wheelPrizeAmount(prize, day);
+  const amount = wheelPrizeAmount(prize, cycle);
 
   switch (prize.key) {
     case "diamonds":
@@ -76,7 +79,8 @@ async function grantPrize(
       await tx.empire.update({ where: { id: empireId }, data: { wood: { increment: amount } } });
       return { message: `זכית ב־🪵 ${heNum(amount)} עץ!`, grants: [{ key: "wood", amount }] };
     case "citizens":
-      await tx.empire.update({ where: { id: empireId }, data: { citizens: { increment: amount } } });
+      // Capped by city count — see grantCitizens.
+      await grantCitizens(tx, empireId, amount);
       return { message: `זכית ב־👥 ${heNum(amount)} אזרחים!`, grants: [{ key: "citizens", amount }] };
     case "loot": {
       // Mixed resource pack: split the gold-value evenly across all four.
@@ -134,7 +138,7 @@ async function grantPrize(
             first = false;
             return 0;
           }
-          return Math.random();
+          return secureRandom();
         });
         if (drop) {
           await tx.heroItem.create({ data: { heroId: hero.id, ...drop } });
@@ -147,7 +151,7 @@ async function grantPrize(
       // No room / no hero — pay a gold consolation so the spin isn't wasted.
       const consolation = wheelPrizeAmount(
         WHEEL_PRIZES.find((p) => p.key === "gold")!,
-        day
+        cycle
       );
       await tx.empire.update({
         where: { id: empireId },
@@ -183,10 +187,11 @@ export async function spinWheel(): Promise<SpinResult> {
       const season = empire.seasonId
         ? await tx.gameSeason.findUnique({ where: { id: empire.seasonId } })
         : null;
-      const day = seasonDay(season, Date.now());
+      const cycle = seasonCycle(season, Date.now());
 
       const prizeIndex = pickWheelPrizeIndex();
-      const { message, grants } = await grantPrize(tx, empire, WHEEL_PRIZES[prizeIndex], day);
+      const { message, grants } = await grantPrize(tx, empire, WHEEL_PRIZES[prizeIndex], cycle);
+      await awardSeasonPassXp(tx, empireId, "wheelSpin");
 
       return { ok: true, prizeIndex, message, grants, spinsLeft: empire.wheelSpins - 1 };
     });

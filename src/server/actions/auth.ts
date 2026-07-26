@@ -44,7 +44,10 @@ async function createEmpireForUser(
 const registerSchema = z.object({
   name: z.string().trim().min(2, "שם חייב להכיל לפחות 2 תווים").max(40),
   empireName: z.string().trim().min(2, "שם האימפריה חייב להכיל לפחות 2 תווים").max(40),
-  email: z.string().trim().toLowerCase().email("כתובת אימייל לא תקינה"),
+  // .max(254) is the RFC 5321 address limit. Without it Zod's email check passes
+  // a megabyte-long local part, which reaches both an unbounded Postgres text
+  // column and — on login — a Map key in the in-process rate limiter.
+  email: z.string().trim().toLowerCase().max(254).email("כתובת אימייל לא תקינה"),
   password: z.string().min(8, "סיסמה חייבת להכיל לפחות 8 תווים").max(100),
 });
 
@@ -113,7 +116,7 @@ export async function register(
 }
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("כתובת אימייל לא תקינה"),
+  email: z.string().trim().toLowerCase().max(254).email("כתובת אימייל לא תקינה"),
   password: z.string().min(1, "יש להזין סיסמה"),
 });
 
@@ -124,6 +127,11 @@ const loginSchema = z.object({
 // missing user via short-circuit).
 const LOGIN_TIMING_DUMMY_HASH =
   "$2b$10$e3STZXV8u3ZN76vG9DTWbOdwJq4HByWmLRugxd/ULnd.vXxy/R2V2";
+
+/** Consecutive wrong passwords that lock an account. */
+const LOGIN_MAX_FAILURES = 10;
+/** How long a locked account stays locked. */
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
 
 export async function login(
   _prev: AuthState,
@@ -152,6 +160,23 @@ export async function login(
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
+
+  // Durable lockout. The two rate limits above live in one instance's memory,
+  // which on a serverless fleet means they multiply by the instance count and
+  // vanish on every cold start — an attacker with a handful of parallel
+  // connections is effectively unthrottled. This counter is on the row, so it
+  // survives instance churn and actually bounds per-account guessing.
+  const now = new Date();
+  if (user?.lockedUntil && user.lockedUntil > now) {
+    const minutes = Math.max(
+      1,
+      Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60_000)
+    );
+    return {
+      error: `החשבון נעול זמנית בעקבות נסיונות התחברות כושלים. נסה שוב בעוד ${minutes} דקות.`,
+    };
+  }
+
   // Always run a bcrypt.compare (against a dummy hash when the user is missing)
   // so both branches cost the same — no account-enumeration timing side-channel.
   const passwordOk = await bcrypt.compare(
@@ -159,10 +184,39 @@ export async function login(
     user?.passwordHash ?? LOGIN_TIMING_DUMMY_HASH
   );
   if (!user || !passwordOk) {
+    if (user) {
+      // Count the miss and lock once the threshold is crossed. The increment is
+      // unconditional so concurrent guesses all register; `lockedUntil` is set
+      // from the post-increment value in the same statement's result.
+      const failed = await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLogins: { increment: 1 } },
+        select: { failedLogins: true },
+      });
+      if (failed.failedLogins >= LOGIN_MAX_FAILURES) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            lockedUntil: new Date(now.getTime() + LOGIN_LOCKOUT_MS),
+            failedLogins: 0,
+          },
+        });
+      }
+    }
+    // Deliberately the same message and shape whether or not the account
+    // exists — the lockout must not become an enumeration oracle.
     return { error: "אימייל או סיסמה שגויים" };
   }
   if (user.bannedAt) {
     return { error: "החשבון נחסם על ידי ההנהלה" };
+  }
+
+  // Successful sign-in clears the streak (and any expired lock).
+  if (user.failedLogins !== 0 || user.lockedUntil) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { failedLogins: 0, lockedUntil: null },
+    });
   }
 
   await createSession(user.id, user.tokenVersion);
@@ -170,6 +224,105 @@ export async function login(
 }
 
 export async function logout(): Promise<void> {
+  await destroySession();
+  redirect("/login");
+}
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "יש להזין את הסיסמה הנוכחית"),
+  newPassword: z.string().min(8, "סיסמה חדשה חייבת להכיל לפחות 8 תווים").max(100),
+});
+
+export interface AccountActionState {
+  error?: string;
+  success?: string;
+}
+
+/**
+ * Change the signed-in user's password.
+ *
+ * Bumps `tokenVersion`, which invalidates every session token issued before
+ * this moment, and then re-issues one for the caller so they stay signed in
+ * here while every other device is signed out. Sessions are stateless 30-day
+ * JWTs — before this action existed, a user whose password leaked (or whose
+ * cookie was copied on a shared machine) had no way at all to evict the
+ * attacker, because `tokenVersion` was only ever bumped by an admin reset.
+ *
+ * The current password is required: without it, anyone holding a stolen cookie
+ * could rotate the password and lock the real owner out permanently.
+ */
+export async function changePassword(
+  _prev: AccountActionState,
+  formData: FormData
+): Promise<AccountActionState> {
+  const userId = await getSessionUserId();
+  if (!userId) redirect("/login");
+
+  // Password checks are expensive by design; throttle so a stolen session can't
+  // be used to brute-force the current password from inside the account.
+  const ip = await clientIp();
+  if (!rateLimit(`chpw:${userId}:${ip}`, 10, 15 * 60 * 1000)) {
+    return { error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
+  }
+
+  const parsed = changePasswordSchema.safeParse({
+    currentPassword: formData.get("currentPassword"),
+    newPassword: formData.get("newPassword"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  const { currentPassword, newPassword } = parsed.data;
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) redirect("/login");
+  if (user.bannedAt) {
+    await destroySession();
+    redirect("/login");
+  }
+
+  // Google-only accounts have no password to verify against, so there is
+  // nothing here that proves ownership — refuse rather than let a stolen
+  // session mint a password and take the account over permanently.
+  if (!user.passwordHash) {
+    return {
+      error: "החשבון הזה מחובר דרך Google בלבד ואין לו סיסמה לשינוי.",
+    };
+  }
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return { error: "הסיסמה הנוכחית שגויה" };
+  }
+  if (await bcrypt.compare(newPassword, user.passwordHash)) {
+    return { error: "הסיסמה החדשה זהה לנוכחית" };
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: await bcrypt.hash(newPassword, 10),
+      tokenVersion: { increment: 1 },
+    },
+    select: { tokenVersion: true },
+  });
+
+  // Re-issue with the new version so this device survives its own revocation.
+  await createSession(userId, updated.tokenVersion);
+  return { success: "הסיסמה שונתה. כל המכשירים האחרים נותקו." };
+}
+
+/**
+ * Revoke every session for the signed-in user, including this one.
+ *
+ * The counterpart to `logout`, which only deletes the local cookie: anyone who
+ * copied that cookie beforehand keeps a working session for up to 30 days.
+ * Bumping `tokenVersion` invalidates all of them at once.
+ */
+export async function signOutEverywhere(): Promise<void> {
+  const userId = await getSessionUserId();
+  if (userId) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+  }
   await destroySession();
   redirect("/login");
 }
@@ -209,11 +362,34 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
   // 1) Known Google account → straight login.
   let user = await prisma.user.findUnique({ where: { googleId: identity.googleId } });
 
-  // 2) No Google link yet, but a (password) account owns this verified email →
-  //    link the Google identity onto it so both sign-in methods reach one empire.
+  // 2) No Google link yet, but an account already owns this verified email.
+  //
+  //    Auto-linking here used to be unconditional, which was a pre-hijack
+  //    account takeover: `register` never proves the registrant owns the
+  //    address, so an attacker could sign up as victim@gmail.com with a password
+  //    only they know, wait for the real owner to arrive and click "Continue
+  //    with Google" (silently grafting their Google sub onto the attacker's
+  //    row), and then log in with that password at any later date — same
+  //    account, same empire. Google verifying its side says nothing about who
+  //    owns the *password* account.
+  //
+  //    So we only adopt an email-matched row that has no other credential of its
+  //    own. A row with a passwordHash must prove ownership by signing in with
+  //    it; a row already bound to a different Google sub is never rebound (that
+  //    would hand the account to whoever next controls a recycled or reassigned
+  //    address, since Google mints a fresh sub for the same email in that case).
   if (!user) {
     const byEmail = await prisma.user.findUnique({ where: { email: identity.email } });
     if (byEmail) {
+      if (byEmail.passwordHash) {
+        return {
+          error:
+            "כתובת האימייל הזו כבר רשומה עם סיסמה. התחבר עם האימייל והסיסמה שלך.",
+        };
+      }
+      if (byEmail.googleId && byEmail.googleId !== identity.googleId) {
+        return { error: "כתובת האימייל הזו כבר משויכת לחשבון Google אחר." };
+      }
       user = await prisma.user.update({
         where: { id: byEmail.id },
         data: {
@@ -238,10 +414,15 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
     } catch (e) {
       // A concurrent Google sign-in for the same email/sub can still trip the
       // unique constraints; re-resolve rather than crash.
+      // Re-resolve by googleId only. Falling back to an email lookup here would
+      // reintroduce the takeover closed in step 2 by the back door: reaching this
+      // point means step 2 saw no row for the address, so an email match now can
+      // only be an account created concurrently — which has proved nothing about
+      // owning this Google identity.
       if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
-        user =
-          (await prisma.user.findUnique({ where: { googleId: identity.googleId } })) ??
-          (await prisma.user.findUnique({ where: { email: identity.email } }));
+        user = await prisma.user.findUnique({
+          where: { googleId: identity.googleId },
+        });
       }
       if (!user) return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
     }
@@ -276,6 +457,19 @@ export async function createEmpireForCurrentUser(
 ): Promise<AuthState> {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
+
+  // getSessionUserId only proves the JWT is valid — it does not read bannedAt,
+  // and the /game guards this action bypasses are the ones that normally do.
+  // Without this check a user banned before onboarding (a Google sign-up has no
+  // empire yet) could still create one and squat an empire name.
+  const account = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { bannedAt: true },
+  });
+  if (!account || account.bannedAt) {
+    await destroySession();
+    redirect("/login");
+  }
 
   const existing = await prisma.empire.findUnique({
     where: { userId },

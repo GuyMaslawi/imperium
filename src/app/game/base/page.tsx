@@ -17,7 +17,7 @@ import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { attackPowerBreakdown, defensePowerBreakdown } from "@/lib/game/power";
 import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
-import { seasonDay } from "@/lib/game/wheel";
+import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
 
 export const metadata = { title: "בסיס | WARZONE" };
@@ -131,7 +131,7 @@ export default async function BasePage() {
     Math.ceil((nowMs - new Date(empire.createdAt).getTime()) / 86_400_000)
   );
   // Wheel prizes grow with the season — day 1 pays base amounts, each day adds more.
-  const wheelSeasonDay = seasonDay(season, nowMs);
+  const wheelCycle = seasonCycle(season, nowMs);
 
   return (
     <div className="space-y-6">
@@ -162,7 +162,7 @@ export default async function BasePage() {
 
       {/* wheel + season events */}
       <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
-        <WheelCard spinsAvailable={empire.wheelSpins} seasonDay={wheelSeasonDay} />
+        <WheelCard spinsAvailable={empire.wheelSpins} seasonCycle={wheelCycle} />
 
         <Card>
           <div className="mb-4 flex items-center justify-between">
