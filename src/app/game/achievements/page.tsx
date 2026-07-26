@@ -1,94 +1,28 @@
-import type { ReactNode } from "react";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon } from "@/components/ui/Icon";
+import { AchievementList } from "@/components/game/AchievementList";
+import { getAchievementsState } from "@/server/actions/achievements";
 
 export const metadata = { title: "הישגים | IMPERIUM" };
 
-type Achievement = {
-  name: string;
-  reward: string;
-  rewardIcon: ReactNode;
-  collected: boolean;
-};
-
-const rewardIcon = (name: IconName) => (
-  <Icon name={name} size={14} className="inline-block align-middle" />
-);
-
-const ACHIEVEMENTS: Achievement[] = [
-  { name: "תקיפה ראשונה", reward: "35+", rewardIcon: rewardIcon("citizens"), collected: true },
-  { name: "ריגול ראשון", reward: "35+", rewardIcon: rewardIcon("citizens"), collected: true },
-  { name: "למצוא חפץ ראשון", reward: "250+", rewardIcon: rewardIcon("diamond"), collected: true },
-  { name: "לקנות נשק התקפה", reward: "25+", rewardIcon: rewardIcon("attack"), collected: true },
-  { name: "לקנות נשק הגנה", reward: "25+", rewardIcon: rewardIcon("shield"), collected: true },
-  { name: "לקנות נשק ריגול", reward: "25+", rewardIcon: rewardIcon("spy"), collected: true },
-  { name: "לשדרג קבלת מגויסים", reward: "45+", rewardIcon: rewardIcon("citizens"), collected: true },
-  { name: "לעלות עיר", reward: "1,000+", rewardIcon: rewardIcon("base"), collected: true },
-  { name: "מיליונר ראשון", reward: "500+", rewardIcon: rewardIcon("gold"), collected: true },
-  { name: "לבנות מכרה", reward: "30+", rewardIcon: rewardIcon("mine"), collected: true },
-  { name: "צבא של 1000", reward: "60+", rewardIcon: rewardIcon("citizens"), collected: true },
-  { name: "10 ניצחונות", reward: "120+", rewardIcon: rewardIcon("rankings"), collected: true },
-  { name: "הפקדה ראשונה בבנק", reward: "20+", rewardIcon: rewardIcon("bank"), collected: true },
-  {
-    name: "לכבוש מקום ראשון בדירוג",
-    reward: "5,000+",
-    rewardIcon: rewardIcon("crown"),
-    collected: false,
-  },
-];
-
 export default async function AchievementsPage() {
+  // Settles the empire's pending updates before the conditions are evaluated,
+  // so a milestone crossed by an update the player has not "collected" yet
+  // (citizens, production) counts on this very load.
   await requireEmpire();
 
-  const collected = ACHIEVEMENTS.filter((a) => a.collected).length;
-  const total = ACHIEVEMENTS.length + 5; // presentational total
+  const state = await getAchievementsState();
+  if (!state) return null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col items-center gap-2">
-        <SectionHeading title="הישגים" subtitle="ACHIEVEMENTS" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
-        <span
-          className="nums rounded-full border border-gold/40 bg-panel-inset px-3 py-0.5 text-sm font-bold text-gold"
-          dir="ltr"
-        >
-          {collected}/{total}
-        </span>
-      </div>
-
-      <div className="mx-auto max-w-2xl space-y-2.5">
-        {ACHIEVEMENTS.map((a) => (
-          <div
-            key={a.name}
-            className="panel flex items-center justify-between gap-3 rounded-xl p-3.5"
-          >
-            {/* right: medallion + name */}
-            <div className="flex items-center gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-gold/50 bg-panel-inset text-xl">
-                <Icon name="achievements" size={22} className="text-bone" />
-              </span>
-              <span className="font-bold text-zinc-100">{a.name}</span>
-            </div>
-
-            {/* left: reward + collected state */}
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="nums flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-1 text-sm font-bold text-emerald-300">
-                <span dir="ltr">{a.reward}</span>
-                <span aria-hidden>{a.rewardIcon}</span>
-              </span>
-              {a.collected ? (
-                <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400">
-                  <span aria-hidden>✓</span> נאסף
-                </span>
-              ) : (
-                <span className="text-xs font-semibold text-gold-dim">
-                  לא נאסף
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <SectionHeading
+        title="הישגים"
+        subtitle="ACHIEVEMENTS"
+        ornament={<Icon name="rankings" size={22} className="text-crimson" />}
+      />
+      <AchievementList initial={state} />
     </div>
   );
 }

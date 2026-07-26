@@ -8,6 +8,7 @@ import {
   heroClassBonusLines,
   heroClassImage,
 } from "@/lib/game/hero";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 
 /**
  * Visual character picker for signup/onboarding: one card per hero class with
@@ -27,7 +28,7 @@ export function HeroClassPicker() {
         לכל דמות יתרון קבוע משלה — הבחירה מלווה את האימפריה שלך לאורך הדרך.
       </p>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-        {HERO_CLASS_ORDER.map((key) => {
+        {HERO_CLASS_ORDER.map((key, i) => {
           const meta = HERO_CLASS_META[key];
           const isSelected = selected === key;
           return (
@@ -48,16 +49,22 @@ export function HeroClassPicker() {
                 onChange={() => setSelected(key)}
                 className="sr-only"
               />
-              <span className="block aspect-[2/3] w-full bg-panel-inset">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={heroClassImage(key)}
-                  alt={meta.label}
-                  className={`h-full w-full object-cover object-top transition-transform duration-300 ${
-                    isSelected ? "scale-105" : "group-hover:scale-105"
-                  }`}
-                />
-              </span>
+              {/* All four breathe, on deliberately mismatched cycles so the row
+                  never pulses in unison. The rest — embers, the pointer lean,
+                  the depth upgrade — is held back for the card being chosen,
+                  which keeps the signup page to one GL context instead of four
+                  and makes the selection itself read as the portrait waking. */}
+              <LivingPortrait
+                src={heroClassImage(key)}
+                alt={meta.label}
+                className="block aspect-[2/3] w-full bg-panel-inset"
+                accent={meta.accent}
+                embers={isSelected ? 5 : 0}
+                tilt={isSelected ? 7 : 0}
+                drift={27 + i * 4}
+                halo={isSelected}
+                rich={isSelected}
+              />
               {/* bottom gradient with name + bonus */}
               <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/80 to-transparent px-2 pb-1.5 pt-6 text-center">
                 <span className="block text-sm font-black text-gold-bright">

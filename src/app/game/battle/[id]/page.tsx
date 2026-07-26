@@ -238,7 +238,6 @@ export default async function BattleResultPage({
                     level={capturedItem.level}
                     rarity={uiRarityForLevel(capturedItem.level)}
                     details={itemDetails(capturedItem, me.hero?.level ?? 1)}
-                    tooltipBelow
                   />
                 </div>
                 <div>

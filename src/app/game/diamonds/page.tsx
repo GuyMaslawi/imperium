@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
-import { formatNumber } from "@/lib/game/format";
 import { bankInterestRate } from "@/lib/game/constants";
 import { DiamondShop } from "@/components/game/DiamondShop";
+import { DiamondsHeader } from "@/components/game/DiamondsHeader";
 import {
   BOOSTABLE_RESOURCES,
   RESOURCE_BOOST_KIND,
@@ -74,30 +73,11 @@ export default async function DiamondsPage() {
         ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
-      {/* -------- balance -------- */}
-      <div className="panel-gold flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="diamond" size={18} className="text-cyan-300" />
-          חנות יהלומים
-        </h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/game/diamonds/buy"
-            className="flex items-center gap-1.5 rounded-full bg-sky-500 px-3 py-1.5 text-sm font-black text-black transition-colors hover:bg-sky-400"
-          >
-            <Icon name="shop" size={16} /> רכישת יהלומים
-          </Link>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-zinc-400">היתרה שלך:</span>
-            <span className="nums text-2xl font-black text-sky-300" dir="ltr">
-              {formatNumber(diamonds)}
-            </span>
-            <span className="flex items-center rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
-              <Icon name="diamond" size={16} className="text-cyan-300" />
-            </span>
-          </div>
-        </div>
-      </div>
+      <DiamondsHeader
+        diamonds={diamonds}
+        active="spend"
+        note="הוצא יהלומים על האצות ייצור, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה."
+      />
 
       <DiamondShop
         diamonds={diamonds}

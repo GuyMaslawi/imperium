@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
+import { useTip } from "@/components/ui/Tip";
 
 export type Rarity = "legendary" | "epic" | "rare" | "common";
 
@@ -107,7 +108,8 @@ export function formatBonus(pct: number): string {
  * `/hero/<slug>.png` when it exists, otherwise falls back to the emoji.
  * With `details`, hovering (or focusing) the tile opens a tooltip with the
  * item's stats and its equip requirement; an unmet requirement renders the
- * tile locked (dimmed + 🔒).
+ * tile locked (dimmed + 🔒). The tooltip floats in a portal, so it survives
+ * scrolling grids and screen edges without being clipped.
  */
 export function ItemTile({
   slug,
@@ -117,8 +119,6 @@ export function ItemTile({
   rarity,
   size = "md",
   details,
-  tooltipBelow = false,
-  tooltipAnchor = "center",
 }: {
   slug?: string;
   icon: string;
@@ -127,14 +127,6 @@ export function ItemTile({
   rarity: Rarity;
   size?: "md" | "lg";
   details?: ItemTileDetails;
-  /** Open the tooltip under the tile (for tiles near the top of the screen). */
-  tooltipBelow?: boolean;
-  /**
-   * Which edge of the tile the tooltip hangs from. Centred by default; use
-   * "left"/"right" for tiles hugging a container edge so the tooltip grows
-   * inwards instead of spilling out of the frame.
-   */
-  tooltipAnchor?: "center" | "left" | "right";
 }) {
   const [imgOk, setImgOk] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -153,8 +145,82 @@ export function ItemTile({
     if (el && el.complete && el.naturalWidth > 0) setImgOk(true);
   }, []);
 
+  const tip = details && (
+    <>
+      <p className={`text-sm font-black ${r.text}`}>{details.name}</p>
+      <p className="mt-0.5 text-[10px] text-zinc-500">
+        דרגה: <span className={r.text}>{details.rarityLabel}</span>
+        {level != null && (
+          <>
+            {" · "}רמת פריט: <span className="nums text-zinc-300">{level}</span>
+          </>
+        )}
+      </p>
+
+      <div className="rule-gold my-2" />
+
+      {/* what the item grants */}
+      {details.resourceLines && details.resourceLines.length > 0 ? (
+        <div className="space-y-0.5 text-xs text-zinc-300">
+          {details.resourceLines.map((line) => (
+            <p key={line.label} className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1">
+                <Icon
+                  name={RESOURCE_ICON[line.resource]}
+                  size={13}
+                  className={RESOURCE_ICON_COLOR[line.resource]}
+                />
+                {line.label}
+              </span>
+              <span className="nums font-black text-emerald-400" dir="ltr">
+                +{formatBonus(line.value)}
+              </span>
+            </p>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-zinc-300">
+          <Icon name={details.statIcon} size={13} className="inline align-[-2px]" />{" "}
+          <span className="nums font-black text-emerald-400" dir="ltr">
+            +{formatBonus(details.bonusValue)}
+            {details.bonusIsFlat ? "" : "%"}
+          </span>{" "}
+          {details.statLabel}
+        </p>
+      )}
+
+      {/* requirement */}
+      <p
+        className={`mt-1 text-[11px] ${
+          details.meetsRequirement === false ? "text-red-400" : "text-emerald-400"
+        }`}
+      >
+        {details.meetsRequirement === false ? "✗" : "✓"} דרישה: גיבור רמה{" "}
+        <span className="nums">{details.requiredLevel}</span>
+      </p>
+
+      {details.equipped && (
+        <p className="mt-1 text-[11px] font-bold text-emerald-300">✔ לבוש כעת</p>
+      )}
+      {details.owned && !details.equipped && (
+        <p className="mt-1 text-[11px] text-zinc-400">נמצא ברשותך</p>
+      )}
+      {details.hint && (
+        <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
+          {details.hint}
+        </p>
+      )}
+    </>
+  );
+
+  const { triggerProps, node: tipNode } = useTip(tip, {
+    className: "w-48 p-3",
+    bare: true,
+    disabled: !details,
+  });
+
   return (
-    <div className="group relative flex flex-col items-center gap-1.5">
+    <div className="relative flex flex-col items-center gap-1.5" {...triggerProps}>
       <div
         className={`relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-xl border-2 bg-gradient-to-b ${r.ring} ${r.glow} ${r.bg} ${
           sparkle ? "item-shine" : ""
@@ -236,86 +302,7 @@ export function ItemTile({
       </div>
       {name && <span className="text-xs font-semibold text-zinc-300">{name}</span>}
 
-      {/* -------- hover / focus tooltip -------- */}
-      {details && (
-        <div
-          role="tooltip"
-          className={`pointer-events-none invisible absolute z-40 w-48 rounded-lg border border-gold/40 bg-[#100d08]/97 p-3 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${
-            tooltipBelow ? "top-full mt-2" : "bottom-full mb-2"
-          } ${
-            tooltipAnchor === "left"
-              ? "left-0"
-              : tooltipAnchor === "right"
-                ? "right-0"
-                : "right-1/2 translate-x-1/2"
-          }`}
-          dir="rtl"
-        >
-          <p className={`text-sm font-black ${r.text}`}>{details.name}</p>
-          <p className="mt-0.5 text-[10px] text-zinc-500">
-            דרגה: <span className={r.text}>{details.rarityLabel}</span>
-            {level != null && (
-              <>
-                {" · "}רמת פריט: <span className="nums text-zinc-300">{level}</span>
-              </>
-            )}
-          </p>
-
-          <div className="rule-gold my-2" />
-
-          {/* what the item grants */}
-          {details.resourceLines && details.resourceLines.length > 0 ? (
-            <div className="space-y-0.5 text-xs text-zinc-300">
-              {details.resourceLines.map((line) => (
-                <p key={line.label} className="flex items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1">
-                    <Icon
-                      name={RESOURCE_ICON[line.resource]}
-                      size={13}
-                      className={RESOURCE_ICON_COLOR[line.resource]}
-                    />
-                    {line.label}
-                  </span>
-                  <span className="nums font-black text-emerald-400" dir="ltr">
-                    +{formatBonus(line.value)}
-                  </span>
-                </p>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-zinc-300">
-              <Icon name={details.statIcon} size={13} className="inline align-[-2px]" />{" "}
-              <span className="nums font-black text-emerald-400" dir="ltr">
-                +{formatBonus(details.bonusValue)}
-                {details.bonusIsFlat ? "" : "%"}
-              </span>{" "}
-              {details.statLabel}
-            </p>
-          )}
-
-          {/* requirement */}
-          <p
-            className={`mt-1 text-[11px] ${
-              details.meetsRequirement === false ? "text-red-400" : "text-emerald-400"
-            }`}
-          >
-            {details.meetsRequirement === false ? "✗" : "✓"} דרישה: גיבור רמה{" "}
-            <span className="nums">{details.requiredLevel}</span>
-          </p>
-
-          {details.equipped && (
-            <p className="mt-1 text-[11px] font-bold text-emerald-300">✔ לבוש כעת</p>
-          )}
-          {details.owned && !details.equipped && (
-            <p className="mt-1 text-[11px] text-zinc-400">נמצא ברשותך</p>
-          )}
-          {details.hint && (
-            <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
-              {details.hint}
-            </p>
-          )}
-        </div>
-      )}
+      {tipNode}
     </div>
   );
 }

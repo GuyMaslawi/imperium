@@ -13,6 +13,10 @@ const STATUS_META: Record<PurchaseStatus, { label: string; className: string }> 
   PAID: { label: "שולם", className: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300" },
   PENDING: { label: "ממתין", className: "border-amber-500/40 bg-amber-500/10 text-amber-300" },
   FAILED: { label: "נכשל", className: "border-red-500/40 bg-red-500/10 text-red-300" },
+  REFUNDED: {
+    label: "הוחזר",
+    className: "border-fuchsia-500/40 bg-fuchsia-500/10 text-fuchsia-300",
+  },
 };
 
 function StatCard({

@@ -496,6 +496,9 @@ export interface HeroClassMeta {
   title: string;
   /** Portrait art at /hero/classes/<slug>.jpg. */
   slug: string;
+  /** rgb triple tinting the portrait's embers and halo — the class's own
+   *  light, the way each boss carries its accent. */
+  accent: string;
   tagline: string;
   description: string;
   bonuses: HeroClassBonuses;
@@ -509,6 +512,7 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
     label: "המצביא",
     title: "WARLORD",
     slug: "warlord",
+    accent: "214 84 62",
     tagline: "כוח הוא הטיעון היחיד",
     description: "מפקד קרבות מלידה — צבאותיו מכים חזק יותר בכל תקיפה.",
     bonuses: { attack: 10, defense: 0, resources: 0, spy: 0, xp: 0 },
@@ -517,6 +521,7 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
     label: "המגן",
     title: "GUARDIAN",
     slug: "guardian",
+    accent: "96 156 224",
     tagline: "החומה שלא נפלה מעולם",
     description: "שומר הסף של האימפריה — הגנתו עומדת גם מול המתקפות הקשות.",
     bonuses: { attack: 0, defense: 10, resources: 0, spy: 0, xp: 0 },
@@ -525,6 +530,7 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
     label: "הסוחר",
     title: "MERCHANT",
     slug: "merchant",
+    accent: "228 195 90",
     tagline: "כל מלחמה מתחילה באוצר",
     description: "אשף כלכלה ערמומי — המכרות שלו מפיקים יותר מכל אחד אחר.",
     bonuses: { attack: 0, defense: 0, resources: 10, spy: 0, xp: 0 },
@@ -533,6 +539,7 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
     label: "הצל",
     title: "SHADOW",
     slug: "shadow",
+    accent: "150 96 232",
     tagline: "מה שלא רואים — מנצח",
     description: "מרגל־מתנקש הלומד מכל קרב — ריגול חד יותר וניסיון נצבר מהר.",
     bonuses: { attack: 0, defense: 0, resources: 0, spy: 15, xp: 10 },

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Army } from "@prisma/client";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { Tip } from "@/components/ui/Tip";
 import { weaponsPower, type WeaponQuantityRow } from "@/lib/game/weapons";
 import {
   armyPower,
@@ -62,13 +63,13 @@ function PowerCard({
       ) : (
         // The breakdown floats over the card on hover so a longer list of
         // active bonuses never stretches the card — the tile stays compact.
-        <span className="group/breakdown relative mt-2 inline-flex w-fit cursor-help items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-gold" tabIndex={0}>
-          מהרכב הכוח
-          <span aria-hidden className="text-[9px] leading-none">▾</span>
-          <span
-            role="tooltip"
-            className="pointer-events-none invisible absolute right-0 top-full z-50 mt-1.5 w-max min-w-[10rem] max-w-[16rem] rounded-lg border border-gold/40 bg-[#100d08]/97 px-3 py-2 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover/breakdown:visible group-hover/breakdown:opacity-100 group-focus-within/breakdown:visible group-focus-within/breakdown:opacity-100"
-          >
+        <Tip
+          side="bottom"
+          focusable
+          maxWidth={256}
+          className="mt-2 w-fit cursor-help items-center gap-1 text-[11px] font-semibold text-zinc-400 hover:text-gold"
+          tipClassName="min-w-[10rem]"
+          tip={
             <dl className="space-y-1 text-xs">
               {breakdown.map((row) => (
                 <div key={row.label} className="flex justify-between gap-4">
@@ -79,8 +80,11 @@ function PowerCard({
                 </div>
               ))}
             </dl>
-          </span>
-        </span>
+          }
+        >
+          מהרכב הכוח
+          <span aria-hidden className="text-[9px] leading-none">▾</span>
+        </Tip>
       )}
       {helper && <p className="mt-2 text-[11px] leading-snug text-zinc-500">{helper}</p>}
       {links && links.length > 0 && (

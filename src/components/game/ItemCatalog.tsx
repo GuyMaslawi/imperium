@@ -112,7 +112,6 @@ export function ItemCatalog({
                           ? undefined
                           : "נלכד בניצחון בתקיפה על שחקן אחר",
                       })}
-                      tooltipBelow={level <= ITEM_LEVELS[3]}
                     />
                   </div>
                 );

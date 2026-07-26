@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import type { HeroItemSlot, HeroRarity } from "@prisma/client";
 import { ItemTile, formatBonus } from "@/components/game/ItemTile";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { ItemDialog } from "@/components/game/ItemDialog";
 import { Dialog } from "@/components/ui/Dialog";
-import { Tip } from "@/components/ui/Tip";
-import { Icon } from "@/components/ui/Icon";
+import { Tip, useTip } from "@/components/ui/Tip";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { equipHeroItem } from "@/server/actions/hero";
 import type { ActionState } from "@/server/actions/game";
 import {
@@ -26,30 +27,28 @@ import {
  * Where every slot's medallion sits on the portrait — percentages of the frame,
  * measured to the node's centre. The pieces the hero *wears* run down one rail
  * at their body height (helmet at the head, boots at the feet) and the gear he
- * *carries* down the other; the relic floats above the head. `align`/`below`
- * steer the hover tooltip inwards so it never spills out of the frame.
+ * *carries* down the other; the relic floats above the head. Tooltips float in
+ * a portal and place themselves, so anchors only describe geometry.
  */
 type Anchor = {
   x: number;
   y: number;
-  align: "left" | "right" | "center";
-  below?: boolean;
   /** Which way the hairline connector reaches towards the body. */
   reach: "left" | "right" | "down";
 };
 
 const SLOT_ANCHORS: Record<HeroItemSlot, Anchor> = {
-  RELIC: { x: 50, y: 7, align: "center", below: true, reach: "down" },
+  RELIC: { x: 50, y: 7, reach: "down" },
   // worn pieces (right rail in the artwork, head → feet)
-  HELMET: { x: 86, y: 22, align: "right", below: true, reach: "left" },
-  ARMOR: { x: 86, y: 43, align: "right", reach: "left" },
-  PANTS: { x: 86, y: 64, align: "right", reach: "left" },
-  BOOTS: { x: 86, y: 85, align: "right", reach: "left" },
+  HELMET: { x: 86, y: 22, reach: "left" },
+  ARMOR: { x: 86, y: 43, reach: "left" },
+  PANTS: { x: 86, y: 64, reach: "left" },
+  BOOTS: { x: 86, y: 85, reach: "left" },
   // carried gear (left rail)
-  WINGS: { x: 14, y: 22, align: "left", below: true, reach: "right" },
-  SWORD: { x: 14, y: 43, align: "left", reach: "right" },
-  SHIELD: { x: 14, y: 64, align: "left", reach: "right" },
-  GAUNTLETS: { x: 14, y: 85, align: "left", reach: "right" },
+  WINGS: { x: 14, y: 22, reach: "right" },
+  SWORD: { x: 14, y: 43, reach: "right" },
+  SHIELD: { x: 14, y: 64, reach: "right" },
+  GAUNTLETS: { x: 14, y: 85, reach: "right" },
 };
 
 const PAPERDOLL_SLOTS = Object.keys(SLOT_ANCHORS) as HeroItemSlot[];
@@ -60,18 +59,6 @@ const CONNECTOR: Record<Anchor["reach"], string> = {
     "top-1/2 left-full ml-1 h-px w-[50%] bg-gradient-to-r from-gold/45 to-transparent",
   down: "top-full left-1/2 mt-1 h-[45%] w-px -translate-x-1/2 bg-gradient-to-b from-gold/45 to-transparent",
 };
-
-/** Tooltip placement classes for a node's anchor. */
-function tipPosition(a: Anchor): string {
-  const vertical = a.below ? "top-full mt-2" : "bottom-full mb-2";
-  const horizontal =
-    a.align === "center"
-      ? "right-1/2 translate-x-1/2"
-      : a.align === "left"
-        ? "left-0"
-        : "right-0";
-  return `${vertical} ${horizontal}`;
-}
 
 /** Identical bag items (same slot+level) merged into one pickable stack. */
 type PickStack = {
@@ -90,6 +77,7 @@ type PickStack = {
 export function HeroPaperdoll({
   portrait,
   portraitAlt,
+  portraitAccent,
   equipped,
   bag,
   heroLevel,
@@ -99,6 +87,8 @@ export function HeroPaperdoll({
   /** Class artwork src (832×1216, so the frame keeps a 13/19 ratio). */
   portrait: string;
   portraitAlt: string;
+  /** rgb triple — the class's own light on the embers and halo. */
+  portraitAccent?: string;
   equipped: HeroItemView[];
   /** Unequipped items — the pool the socket picker offers. */
   bag: HeroItemView[];
@@ -115,18 +105,22 @@ export function HeroPaperdoll({
   return (
     <div className="relative aspect-[13/19] w-full">
       {/* ---- artwork layer (clipped; the nodes above it are not) ---- */}
-      <div className="absolute inset-0 overflow-hidden rounded-2xl">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={portrait}
-          alt={portraitAlt}
-          className="h-full w-full object-cover object-top"
-        />
+      <LivingPortrait
+        src={portrait}
+        alt={portraitAlt}
+        className="absolute inset-0 rounded-2xl"
+        accent={portraitAccent}
+        embers={7}
+        tilt={10}
+        drift={28}
+        sheen
+        rich
+      >
         {/* darken the edges so the medallions read against the art */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/45" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.65)_100%)]" />
         <div className="absolute inset-y-0 left-0 hidden w-20 bg-gradient-to-l from-transparent to-[var(--panel)] md:block" />
-      </div>
+      </LivingPortrait>
 
       {/* ---- the nine sockets, worn on the figure ---- */}
       {PAPERDOLL_SLOTS.map((slot) => {
@@ -156,8 +150,6 @@ export function HeroPaperdoll({
                   icon={meta.icon}
                   level={item.level}
                   rarity={uiRarity(item.rarity)}
-                  tooltipBelow={a.below}
-                  tooltipAnchor={a.align}
                   details={itemDetails(item, heroLevel, {
                     equipped: true,
                     hint: "לחץ לפרטים",
@@ -179,48 +171,14 @@ export function HeroPaperdoll({
                 )}
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => setPickSlot(slot)}
-                className="group relative block w-full"
-                aria-label={`סלוט ${meta.label} ריק — בחר חפץ`}
-              >
-                <div className="relative flex aspect-square w-full items-center justify-center rounded-xl border-2 border-dashed border-gold/25 bg-black/55 backdrop-blur-[2px] transition group-hover:border-gold/70 group-hover:bg-black/75">
-                  <span aria-hidden className="text-3xl opacity-30 grayscale">
-                    {meta.icon}
-                  </span>
-                  {waiting > 0 && (
-                    <span
-                      className="nums absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] font-black text-black shadow-[0_0_10px_rgba(212,168,67,0.7)]"
-                      dir="ltr"
-                    >
-                      {waiting}
-                    </span>
-                  )}
-                </div>
-
-                {/* empty-socket tooltip */}
-                <span
-                  role="tooltip"
-                  dir="rtl"
-                  className={`pointer-events-none invisible absolute z-40 w-44 rounded-lg border border-gold/40 bg-[#100d08]/97 p-3 text-right opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${tipPosition(a)}`}
-                >
-                  <span className="block text-sm font-black text-zinc-300">
-                    {meta.label}
-                  </span>
-                  <span className="mt-0.5 block text-[10px] text-zinc-500">
-                    סלוט ריק
-                  </span>
-                  <span className="mt-2 block text-xs text-zinc-300">
-                    <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" /> {statMeta.label}
-                  </span>
-                  <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
-                    {waiting > 0
-                      ? `${waiting} בתיק — לחץ לבחירה`
-                      : "אין חפץ כזה בתיק — לכוד אחד בתקיפה"}
-                  </span>
-                </span>
-              </button>
+              <EmptySocket
+                label={meta.label}
+                icon={meta.icon}
+                statIcon={statMeta.icon}
+                statLabel={statMeta.label}
+                waiting={waiting}
+                onPick={() => setPickSlot(slot)}
+              />
             )}
           </div>
         );
@@ -258,6 +216,68 @@ export function HeroPaperdoll({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * An unfilled socket on the portrait: the dashed medallion plus a floating
+ * tooltip explaining what belongs there and whether the bag holds a candidate.
+ */
+function EmptySocket({
+  label,
+  icon,
+  statIcon,
+  statLabel,
+  waiting,
+  onPick,
+}: {
+  label: string;
+  icon: string;
+  statIcon: IconName;
+  statLabel: string;
+  /** How many matching items are waiting in the bag. */
+  waiting: number;
+  onPick: () => void;
+}) {
+  const { triggerProps, node } = useTip(
+    <>
+      <span className="block text-sm font-black text-zinc-300">{label}</span>
+      <span className="mt-0.5 block text-[10px] text-zinc-500">סלוט ריק</span>
+      <span className="mt-2 block text-xs text-zinc-300">
+        <Icon name={statIcon} size={12} className="inline align-[-2px]" /> {statLabel}
+      </span>
+      <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
+        {waiting > 0
+          ? `${waiting} בתיק — לחץ לבחירה`
+          : "אין חפץ כזה בתיק — לכוד אחד בתקיפה"}
+      </span>
+    </>,
+    { className: "w-44 p-3", bare: true },
+  );
+
+  return (
+    <button
+      type="button"
+      onClick={onPick}
+      className="group relative block w-full"
+      aria-label={`סלוט ${label} ריק — בחר חפץ`}
+      {...triggerProps}
+    >
+      <div className="relative flex aspect-square w-full items-center justify-center rounded-xl border-2 border-dashed border-gold/25 bg-black/55 backdrop-blur-[2px] transition group-hover:border-gold/70 group-hover:bg-black/75">
+        <span aria-hidden className="text-3xl opacity-30 grayscale">
+          {icon}
+        </span>
+        {waiting > 0 && (
+          <span
+            className="nums absolute -left-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-gold text-[10px] font-black text-black shadow-[0_0_10px_rgba(212,168,67,0.7)]"
+            dir="ltr"
+          >
+            {waiting}
+          </span>
+        )}
+      </div>
+      {node}
+    </button>
   );
 }
 

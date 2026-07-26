@@ -8,6 +8,7 @@ import { DuelBar, Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatCompact } from "@/lib/game/format";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 
 type NavItem = {
   href: string;
@@ -21,6 +22,8 @@ export type SidebarProps = {
   heroClass: string;
   /** Portrait art of the chosen hero class (see heroClassImage). */
   heroImage?: string;
+  /** rgb triple for the class — the portrait's own light. */
+  heroAccent?: string;
   heroLevel: number;
   /** Prestige count — how many times the hero was reset at level 100. */
   heroResets?: number;
@@ -37,12 +40,21 @@ export type SidebarProps = {
   isAdmin?: boolean;
 };
 
-/** Desktop-only static sidebar column (hidden below the lg breakpoint). */
+/**
+ * Desktop-only sidebar column (hidden below the lg breakpoint). It sticks just
+ * under the command bar while the page scrolls — see .sidebar-sticky in
+ * globals.css, which owns position/top/align-self/max-height (a `position`
+ * utility loses to .ornate-shell's unlayered position:relative). The inner
+ * wrapper scrolls on its own when the nav outgrows the viewport, so the aside
+ * stays clipped and its ornate frame stays painted around the edge.
+ */
 export function Sidebar(props: SidebarProps) {
   const pathname = usePathname();
   return (
-    <aside className="ornate-shell hidden w-full shrink-0 flex-col gap-4 rounded-lg p-3 lg:flex lg:w-72">
-      <SidebarContent {...props} pathname={pathname} />
+    <aside className="ornate-shell sidebar-sticky hidden w-full shrink-0 overflow-hidden rounded-lg lg:flex lg:w-72 lg:flex-col">
+      <div className="flex min-h-0 flex-col gap-4 overflow-y-auto p-3">
+        <SidebarContent {...props} pathname={pathname} />
+      </div>
     </aside>
   );
 }
@@ -125,6 +137,7 @@ function SidebarContent({
   empireName,
   heroClass,
   heroImage,
+  heroAccent,
   heroLevel,
   heroResets = 0,
   heroPoints = 0,
@@ -201,19 +214,25 @@ function SidebarContent({
       {/* hero card */}
       <div className="panel-gold rounded-lg p-3">
         <div className="flex items-center justify-between gap-3">
-          <span className="relative">
-            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
+          <div className="relative">
+            {/* a div, not a span: the portrait frame below is flow content */}
+            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
               {heroImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
+                /* Chrome, and on screen on every page — so this one only
+                   breathes, on a long cycle, with no embers or halo. */
+                <LivingPortrait
                   src={heroImage}
                   alt={heroClass}
-                  className="h-full w-full object-cover object-top"
+                  className="absolute inset-0"
+                  accent={heroAccent}
+                  tilt={2}
+                  drift={34}
+                  halo={false}
                 />
               ) : (
                 <Icon name="hero" size={30} className="text-crimson-bright" />
               )}
-            </span>
+            </div>
             <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap">
               <Tip tip="רמת הגיבור — עולה מ-XP שנצבר בקרבות">
                 <span className="rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">
@@ -228,7 +247,7 @@ function SidebarContent({
                 </Tip>
               )}
             </span>
-          </span>
+          </div>
           <div className="min-w-0 flex-1 text-right">
             <div className="flex items-center justify-end gap-1.5">
               <Tip tip="מקצוע הגיבור">

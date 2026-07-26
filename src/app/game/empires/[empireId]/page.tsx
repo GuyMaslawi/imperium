@@ -15,6 +15,7 @@ import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
 import { ItemTile } from "@/components/game/ItemTile";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import {
   HERO_CLASS_META,
@@ -172,11 +173,13 @@ export default async function EmpireProfilePage({
         <div className="flex flex-wrap items-center justify-between gap-5">
           <div className="flex items-center gap-4">
             <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black text-4xl">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <LivingPortrait
                 src={heroClassImage(heroClassKey)}
                 alt={HERO_CLASS_META[heroClassKey].label}
-                className="h-full w-full object-cover object-top"
+                className="absolute inset-0"
+                accent={HERO_CLASS_META[heroClassKey].accent}
+                tilt={3}
+                drift={22}
               />
               <span
                 className="nums absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-gold/50 bg-black px-2 text-[10px] font-bold text-gold-bright"

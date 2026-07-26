@@ -76,7 +76,8 @@ export function ResourceBar({
       className="sticky top-0 z-40 border-b bg-[#0b0a0e]/95 backdrop-blur supports-[backdrop-filter]:bg-[#0b0a0e]/80"
       style={{ borderColor: "rgba(196,160,50,0.22)" }}
     >
-      <div className="mx-auto flex max-w-[1900px] items-center gap-2 px-2 py-2 sm:gap-3 sm:px-3 md:px-5">
+      {/* Fixed height so the sticky sidebar can offset itself by --header-h. */}
+      <div className="mx-auto flex h-[var(--header-h)] max-w-[1900px] items-center gap-2 px-2 sm:gap-3 sm:px-3 md:px-5">
         {mobileMenu}
         {/* balances */}
         <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto">

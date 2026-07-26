@@ -65,6 +65,7 @@ export default async function HeroPage() {
             <HeroPaperdoll
               portrait={heroClassImage(hero.heroClass)}
               portraitAlt={classMeta.label}
+              portraitAccent={classMeta.accent}
               equipped={equippedItems}
               bag={bagItems}
               heroLevel={hero.level}

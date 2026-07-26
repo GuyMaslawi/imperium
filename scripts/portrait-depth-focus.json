@@ -1,0 +1,16 @@
+{
+  "/boss/azrael-depth.png": 0.251,
+  "/boss/dragor-depth.png": 0.243,
+  "/boss/kharon-depth.png": 0.22,
+  "/boss/morgeth-depth.png": 0.365,
+  "/boss/nox-depth.png": 0.318,
+  "/boss/rythen-depth.png": 0.42,
+  "/boss/serpina-depth.png": 0.376,
+  "/boss/tharos-depth.png": 0.38,
+  "/boss/varkos-depth.png": 0.2,
+  "/boss/volgaris-depth.png": 0.451,
+  "/hero/classes/guardian-depth.png": 0.2,
+  "/hero/classes/merchant-depth.png": 0.451,
+  "/hero/classes/shadow-depth.png": 0.455,
+  "/hero/classes/warlord-depth.png": 0.553
+}

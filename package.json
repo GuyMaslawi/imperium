@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "assets": "node scripts/portrait-assets.mjs",
+    "prebuild": "node scripts/portrait-assets.mjs",
     "build": "prisma migrate deploy && next build --turbopack",
     "start": "next start --turbopack",
     "postinstall": "prisma generate",
@@ -12,6 +14,7 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:wipe": "tsx scripts/wipe-data.ts",
+    "db:admin": "tsx scripts/grant-admin.ts",
     "mail:test": "tsx scripts/test-mail.ts"
   },
   "prisma": {

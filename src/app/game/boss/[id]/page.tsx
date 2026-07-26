@@ -6,6 +6,7 @@ import { formatDate, formatNumber } from "@/lib/game/format";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 import { ItemTile } from "@/components/game/ItemTile";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { RESOURCE_META } from "@/lib/game/constants";
@@ -95,11 +96,15 @@ export default async function BossFightPage({
           {/* boss side */}
           <div className="flex flex-1 flex-col items-center gap-2 text-center">
             <div className="relative h-20 w-20 overflow-hidden rounded-xl border-2 border-[rgb(var(--boss-accent))]/60 bg-gradient-to-b from-[rgb(var(--boss-accent)/0.3)] to-black shadow-[0_0_30px_-8px_rgb(var(--boss-accent)/0.6)]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              {/* Thumbnail-sized, so the lean has to stay well inside the
+                  artwork's overscan or it would bare the frame's edge. */}
+              <LivingPortrait
                 src={bossImage(boss.key)}
                 alt={boss.name}
-                className="h-full w-full object-cover object-top"
+                className="absolute inset-0"
+                accent={boss.accent}
+                tilt={3}
+                drift={20}
               />
             </div>
             <p className="font-black text-[rgb(var(--boss-accent))]">{boss.name}</p>
@@ -217,7 +222,6 @@ export default async function BossFightPage({
                   level={droppedItem.level}
                   rarity={uiRarityForLevel(droppedItem.level)}
                   details={itemDetails(droppedItem, me.hero?.level ?? 1)}
-                  tooltipBelow
                 />
               </div>
               <div>

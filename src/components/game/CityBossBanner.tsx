@@ -6,6 +6,7 @@ import { formatGameTime } from "@/lib/game/time";
 import { BOSS_REWARD_RESOURCES, bossImage } from "@/lib/game/bosses";
 import { RESOURCE_META } from "@/lib/game/constants";
 import { BossAttackButton } from "@/components/game/BossAttackButton";
+import { LivingPortrait } from "@/components/game/LivingPortrait";
 import type { CityBossState } from "@/server/bossState";
 
 /**
@@ -76,20 +77,25 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           >
             <Icon name="attack" size={90} className="text-black/40" />
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <LivingPortrait
             src={bossImage(boss.key)}
             alt={`${boss.name} — ${boss.title}`}
-            className="absolute inset-0 h-full w-full object-cover object-top"
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/35"
-          />
-          <div
-            aria-hidden
-            className="absolute inset-y-0 left-0 w-14 bg-gradient-to-l from-transparent to-[#0a0709] md:w-20"
-          />
+            className="absolute inset-0"
+            accent={boss.accent}
+            embers={8}
+            tilt={9}
+            drift={24}
+            rich
+          >
+            <div
+              aria-hidden
+              className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/35"
+            />
+            <div
+              aria-hidden
+              className="absolute inset-y-0 left-0 w-14 bg-gradient-to-l from-transparent to-[#0a0709] md:w-20"
+            />
+          </LivingPortrait>
 
           {/* kill tally — the tier badge moved next to the name in the dossier */}
           {myKills > 0 && (

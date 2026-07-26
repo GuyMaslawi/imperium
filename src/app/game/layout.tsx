@@ -72,6 +72,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     empireName: empire.name,
     heroClass: HERO_CLASS_META[hero?.heroClass ?? "WARLORD"].label,
     heroImage: heroClassImage(hero?.heroClass ?? "WARLORD"),
+    heroAccent: HERO_CLASS_META[hero?.heroClass ?? "WARLORD"].accent,
     heroLevel,
     heroResets: hero?.resets ?? 0,
     heroPoints: hero?.unspentPoints ?? 0,

@@ -14,6 +14,12 @@ import type { NextConfig } from "next";
  * The accounts.google.com / gstatic entries are what Google Identity Services
  * needs: the GIS client script, the iframe it renders the button into, the
  * token endpoint it calls, and the avatars it shows.
+ *
+ * The paypal.com / paypalobjects.com entries are what PayPal Checkout needs:
+ * the SDK script itself, the buttons/approval iframes it renders, the endpoints
+ * those iframes call (including its `c.paypal.com` fraud-signal collector), the
+ * logos served from paypalobjects, and `form-action` for the classic form POST
+ * the approval window still uses on some funding sources.
  */
 // React evaluates code via `eval` in development to rebuild server stacks for
 // the error overlay. Production builds never do, so the escape hatch is scoped
@@ -22,15 +28,15 @@ const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${devEval} https://accounts.google.com https://apis.google.com`,
+  `script-src 'self' 'unsafe-inline'${devEval} https://accounts.google.com https://apis.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com",
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://*.paypal.com https://www.paypalobjects.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://accounts.google.com",
-  "frame-src https://accounts.google.com",
+  "connect-src 'self' https://accounts.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com",
+  "frame-src https://accounts.google.com https://www.paypal.com https://*.paypal.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://www.paypal.com https://*.paypal.com",
   "object-src 'none'",
   "upgrade-insecure-requests",
 ].join("; ");
@@ -57,8 +63,12 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
+            // `payment` is granted to PayPal's frames (and our own origin) so
+            // the wallet funding sources inside the checkout iframe work; the
+            // rest stay switched off everywhere.
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=(), payment=()",
+            value:
+              'camera=(), microphone=(), geolocation=(), payment=(self "https://www.paypal.com")',
           },
         ],
       },

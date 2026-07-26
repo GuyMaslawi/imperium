@@ -8,8 +8,17 @@
  * these definitions with the server page.
  */
 
+/**
+ * Currency every package is priced and charged in. PayPal is told this code on
+ * every order, and the browser SDK is loaded with it — the two must agree or
+ * PayPal rejects the order.
+ */
+export const STORE_CURRENCY = "ILS";
+
 export interface DiamondPackage {
   id: string;
+  /** Hebrew display name shown on the store card. */
+  name: string;
   /** Base diamonds granted. */
   diamonds: number;
   /** Extra diamonds thrown in on top (0 for the entry tier). */
@@ -23,16 +32,31 @@ export interface DiamondPackage {
 }
 
 export const DIAMOND_PACKAGES: readonly DiamondPackage[] = [
-  { id: "spark", emoji: "✨", diamonds: 400, bonus: 0, priceIls: 9.9 },
-  { id: "pouch", emoji: "💠", diamonds: 1200, bonus: 100, priceIls: 24.9 },
-  { id: "chest", emoji: "🧰", diamonds: 3000, bonus: 500, priceIls: 49.9, tag: "popular" },
-  { id: "vault", emoji: "🏆", diamonds: 7500, bonus: 1500, priceIls: 99.9, tag: "best" },
-  { id: "hoard", emoji: "👑", diamonds: 24000, bonus: 6000, priceIls: 199.9 },
+  { id: "spark", name: "ניצוץ", emoji: "✨", diamonds: 400, bonus: 0, priceIls: 13.9 },
+  { id: "pouch", name: "פיקדון", emoji: "💠", diamonds: 1200, bonus: 100, priceIls: 34.9 },
+  { id: "chest", name: "ארגז אוצר", emoji: "🧰", diamonds: 3000, bonus: 500, priceIls: 69.9, tag: "popular" },
+  { id: "vault", name: "כספת הקיסר", emoji: "🏆", diamonds: 7500, bonus: 1500, priceIls: 139.9, tag: "best" },
+  { id: "hoard", name: "אוצר הכתר", emoji: "👑", diamonds: 24000, bonus: 6000, priceIls: 279.9 },
 ];
 
 /** Total diamonds a package grants (base + bonus). */
 export function packageTotal(pkg: DiamondPackage): number {
   return pkg.diamonds + pkg.bonus;
+}
+
+/** Diamonds granted per shekel — the raw value of a package. */
+export function packageRate(pkg: DiamondPackage): number {
+  return packageTotal(pkg) / pkg.priceIls;
+}
+
+/**
+ * How much more value a package gives per shekel than the entry tier, in
+ * percent (0 for the entry tier itself). Drives the "+X% ערך" badge.
+ */
+export function packageValuePct(pkg: DiamondPackage): number {
+  const base = packageRate(DIAMOND_PACKAGES[0]);
+  if (base <= 0) return 0;
+  return Math.max(0, Math.round((packageRate(pkg) / base - 1) * 100));
 }
 
 /** Apply the admin discount % to a package price, rounded to agorot. */
@@ -64,3 +88,20 @@ export interface StoreActionState {
 }
 
 export const STORE_IDLE: StoreActionState = { status: "idle" };
+
+/* ---------------------------- approval checkout ---------------------------- */
+
+/**
+ * Results of the two-step approval flow (PayPal). Same reasoning as
+ * `StoreActionState` for why they live here: the `"use server"` action module
+ * may only export async functions, so its types are declared in this
+ * client-safe module and imported by both sides.
+ */
+export type CreateOrderState =
+  | { ok: true; orderId: string }
+  | { ok: false; message: string };
+
+export type CaptureOrderState =
+  | { ok: true; diamonds: number; message: string }
+  | { ok: false; message: string };
+

@@ -246,12 +246,41 @@ model Empire {
   diamondPurchases   DiamondPurchase[]
   seasonPass         SeasonPassProgress?
   bossFights         BossFight[]
+  achievements       EmpireAchievement[]
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
   // season. Without these, both are full-table scans that grow with the player
   // base. The composite also serves the (now-removed) stale-daily settle query.
   @@index([cities, lastDailyUpdateAt])
   @@index([seasonId])
+}
+
+/// A single collected achievement. The row IS the receipt: nothing is written
+/// until the player presses "collect".
+///
+/// Deliberately there is no progress column. Every achievement's condition is
+/// *derived on read* from data the game already stores (battle reports, spy
+/// reports, buildings, army, hero items…), so no gameplay action has to be
+/// instrumented to keep a counter in sync — and a condition can be retuned in
+/// src/lib/game/achievements.ts without a backfill. See
+/// src/server/actions/achievements.ts.
+///
+/// The composite unique is the whole concurrency story: claiming inserts the
+/// row first and lets the constraint reject a duplicate, so two simultaneous
+/// clicks can never both pay out.
+model EmpireAchievement {
+  id        String   @id @default(cuid())
+  empireId  String
+  /// Catalog key from ACHIEVEMENTS. Kept as a plain string rather than an enum
+  /// so adding an achievement is a code change, not a migration. Keys that fall
+  /// out of the catalog are ignored on read.
+  key       String
+  claimedAt DateTime @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  // Also serves the "which has this empire claimed" read — no separate index needed.
+  @@unique([empireId, key])
 }
 
 /// Per-empire season-pass state. Exactly one row per empire, reset in place on
@@ -301,6 +330,10 @@ enum PurchaseStatus {
   PAID
   /// Charge failed or was declined — no diamonds credited.
   FAILED
+  /// A settled charge was refunded or reversed by the provider (PayPal refund
+  /// or chargeback). The diamonds are NOT clawed back automatically — a balance
+  /// can already have been spent — so an admin decides what to adjust.
+  REFUNDED
 }
 
 /// One real-money purchase attempt of a diamond package — a full financial
@@ -347,13 +380,20 @@ model DiamondPurchase {
   /// credited would otherwise settle a second row and double-credit diamonds.
   /// The future webhook handler must look the purchase up BY THIS FIELD.
   providerRef  String?        @unique
-  /// True when no real money moved (mock provider / admin test purchase).
+  /// Provider-side id of the money movement itself — for PayPal the *capture*
+  /// id, which is what a refund is issued against and what refund/chargeback
+  /// webhooks identify the payment by (`providerRef` holds the order id).
+  /// Unique for the same anti-replay reason as `providerRef`.
+  captureRef   String?        @unique
+  /// True when no real money moved (mock provider / PayPal sandbox).
   isTest       Boolean        @default(false)
   status       PurchaseStatus @default(PENDING)
   /// Why the charge failed (only set on FAILED).
   failureReason String?
   /// When the charge settled as PAID.
   paidAt       DateTime?
+  /// When a settled charge was refunded or reversed.
+  refundedAt   DateTime?
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
