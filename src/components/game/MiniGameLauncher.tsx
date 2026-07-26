@@ -7,7 +7,7 @@ import { MINIGAME_TYPE_META, type MiniGameState } from "@/lib/game/minigame";
 import { Icon } from "@/components/ui/Icon";
 
 const POLL_MS = 12_000;
-const DISMISS_KEY = "warzone-minigame-dismissed";
+const DISMISS_KEY = "imperium-minigame-dismissed";
 
 function isDismissed(id: string): boolean {
   try {

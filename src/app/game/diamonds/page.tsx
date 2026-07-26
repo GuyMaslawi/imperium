@@ -12,7 +12,7 @@ import {
   TURN_PACKAGES,
 } from "@/lib/game/diamondShop";
 
-export const metadata = { title: "יהלומים | WARZONE" };
+export const metadata = { title: "יהלומים | IMPERIUM" };
 
 export default async function DiamondsPage() {
   const empire = await requireEmpire();

@@ -20,7 +20,7 @@ import { WheelCard } from "@/components/game/WheelCard";
 import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
 
-export const metadata = { title: "בסיס | WARZONE" };
+export const metadata = { title: "בסיס | IMPERIUM" };
 
 export default async function BasePage() {
   const empire = await requireEmpire();

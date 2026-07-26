@@ -21,7 +21,7 @@ import {
   xpToNextLevel,
 } from "@/lib/game/hero";
 
-export const metadata = { title: "גיבור | WARZONE" };
+export const metadata = { title: "גיבור | IMPERIUM" };
 
 export default async function HeroPage() {
   const empire = await requireEmpire();

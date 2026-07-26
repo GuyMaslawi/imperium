@@ -6,7 +6,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber, formatDate } from "@/lib/game/format";
 
-export const metadata = { title: "תוצאת ריגול | WARZONE" };
+export const metadata = { title: "תוצאת ריגול | IMPERIUM" };
 
 export default async function SpyResultPage({
   params,

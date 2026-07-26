@@ -7,7 +7,7 @@ import { formatNumber } from "@/lib/game/format";
 import { arePurchasesLive } from "@/server/payments";
 import { DiamondStore } from "@/components/game/DiamondStore";
 
-export const metadata = { title: "רכישת יהלומים | WARZONE" };
+export const metadata = { title: "רכישת יהלומים | IMPERIUM" };
 
 export default async function BuyDiamondsPage() {
   const empire = await requireEmpire();

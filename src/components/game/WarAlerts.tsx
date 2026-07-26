@@ -10,7 +10,7 @@ import { Icon } from "@/components/ui/Icon";
 const POLL_MS = 20_000;
 const TOAST_MS = 12_000;
 const MAX_VISIBLE = 4;
-const SEEN_KEY = "warzone-alerts-seen";
+const SEEN_KEY = "imperium-alerts-seen";
 const SEEN_CAP = 200;
 
 type KindStyle = {

@@ -3,7 +3,7 @@ import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
-export const metadata = { title: "הישגים | WARZONE" };
+export const metadata = { title: "הישגים | IMPERIUM" };
 
 type Achievement = {
   name: string;

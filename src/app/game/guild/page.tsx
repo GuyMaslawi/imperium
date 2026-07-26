@@ -27,7 +27,7 @@ import { GuildAidCard } from "@/components/game/GuildAidCard";
 import { GuildMemberActions } from "@/components/game/GuildMemberActions";
 import { GuildLeaveButton } from "@/components/game/GuildLeaveButton";
 
-export const metadata = { title: "הברית שלי | WARZONE" };
+export const metadata = { title: "הברית שלי | IMPERIUM" };
 
 /** How many guilds the recruitment browser lists. */
 const GUILD_BROWSE_LIMIT = 100;

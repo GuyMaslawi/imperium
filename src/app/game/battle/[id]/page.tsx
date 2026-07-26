@@ -10,7 +10,7 @@ import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { Icon } from "@/components/ui/Icon";
 
-export const metadata = { title: "תוצאת קרב | WARZONE" };
+export const metadata = { title: "תוצאת קרב | IMPERIUM" };
 
 const RES = [
   { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle" />, label: "זהב" },
