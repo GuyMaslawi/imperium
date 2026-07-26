@@ -244,6 +244,7 @@ model Empire {
   diamondEffects     DiamondEffect[]
   diamondPurchases   DiamondPurchase[]
   seasonPass         SeasonPassProgress?
+  bossFights         BossFight[]
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
   // season. Without these, both are full-table scans that grow with the player
@@ -791,4 +792,51 @@ model BattleReport {
   @@index([attackerEmpireId, createdAt])
   @@index([defenderEmpireId, createdAt])
   @@index([createdAt])
+}
+
+/// One run at the city boss — the PvE tyrant guarding each city tier.
+/// See src/lib/game/bosses.ts for the catalog and every balance formula, and
+/// src/server/actions/boss.ts for resolution.
+model BossFight {
+  id       String @id @default(cuid())
+  empireId String
+
+  /// City tier fought (1..MAX_CITIES) and the boss that rules it. Both are
+  /// denormalized snapshots: the empire may found another city afterwards, and
+  /// the report must keep showing the fight that actually happened.
+  cityTier Int
+  bossKey  String
+
+  victory       Boolean
+  attackerPower Float
+  bossPower     Float
+  soldiersLost  Int
+  turnsSpent    Int
+
+  /// Spoils. All zero on a defeat — the boss keeps its hoard.
+  rewardGold   Float @default(0)
+  rewardWood   Float @default(0)
+  rewardIron   Float @default(0)
+  rewardStone  Float @default(0)
+  rewardSlaves Int   @default(0)
+
+  /// Battle bonuses that were in effect, mirrored from BattleReport so the
+  /// report page can show the same power breakdown a player battle shows.
+  heroBonusPct  Float?
+  guildBonusPct Float?
+  heroXp        Int    @default(0)
+
+  /// Gear the felled boss dropped (denormalized snapshot, as on BattleReport).
+  droppedItemSlot   HeroItemSlot?
+  droppedItemLevel  Int?
+  droppedItemRarity HeroRarity?
+
+  createdAt DateTime @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  // The per-cycle victory allowance counts this empire's recent wins on every
+  // run; the rankings banner lists the conquerors of one city tier newest-first.
+  @@index([empireId, createdAt])
+  @@index([cityTier, victory, createdAt])
 }
