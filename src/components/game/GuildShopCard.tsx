@@ -54,7 +54,7 @@ export function GuildShopCard({
     <div className="panel-inset flex flex-col gap-3 rounded-lg p-3">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-gold-bright">
-          <span aria-hidden>{meta.icon}</span>
+          <Icon name={meta.icon} size={15} className="text-gold-bright" />
           {meta.label}
         </p>
         <span className="nums rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-black text-gold-bright" dir="ltr">

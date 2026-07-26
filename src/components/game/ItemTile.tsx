@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
 
 export type Rarity = "legendary" | "epic" | "rare" | "common";
 
@@ -74,7 +75,7 @@ export interface ItemTileDetails {
   name: string;
   rarityLabel: string;
   /** What the item grants, e.g. +12% התקפה or +40 תורות. */
-  statIcon: string;
+  statIcon: IconName;
   statLabel: string;
   /** The bonus amount — a percentage, unless `bonusIsFlat` is set. */
   bonusValue: number;
@@ -84,7 +85,7 @@ export interface ItemTileDetails {
    * For resource items: one line per resource granted (icon + word + amount).
    * When present it replaces the single stat line.
    */
-  resourceLines?: { icon: string; label: string; value: number }[];
+  resourceLines?: { resource: string; label: string; value: number }[];
   /** Requirement: the hero must be at least this level to equip. */
   requiredLevel: number;
   /** Whether the current hero meets the requirement. */
@@ -267,8 +268,13 @@ export function ItemTile({
             <div className="space-y-0.5 text-xs text-zinc-300">
               {details.resourceLines.map((line) => (
                 <p key={line.label} className="flex items-center justify-between gap-2">
-                  <span>
-                    {line.icon} {line.label}
+                  <span className="inline-flex items-center gap-1">
+                    <Icon
+                      name={RESOURCE_ICON[line.resource]}
+                      size={13}
+                      className={RESOURCE_ICON_COLOR[line.resource]}
+                    />
+                    {line.label}
                   </span>
                   <span className="nums font-black text-emerald-400" dir="ltr">
                     +{formatBonus(line.value)}
@@ -278,7 +284,7 @@ export function ItemTile({
             </div>
           ) : (
             <p className="text-xs text-zinc-300">
-              {details.statIcon}{" "}
+              <Icon name={details.statIcon} size={13} className="inline align-[-2px]" />{" "}
               <span className="nums font-black text-emerald-400" dir="ltr">
                 +{formatBonus(details.bonusValue)}
                 {details.bonusIsFlat ? "" : "%"}

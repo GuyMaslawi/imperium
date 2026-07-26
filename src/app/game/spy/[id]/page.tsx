@@ -31,10 +31,10 @@ export default async function SpyResultPage({
     { icon: <Icon name="mine" size={14} className="inline-block align-middle" />, label: "עבדי מכרות", value: report.revealedMineSlaves },
   ];
   const res = [
-    { icon: <Icon name="gold" size={14} className="inline-block align-middle" />, label: "זהב", value: report.revealedGold },
-    { icon: <Icon name="wood" size={14} className="inline-block align-middle" />, label: "עץ", value: report.revealedWood },
-    { icon: <Icon name="iron" size={14} className="inline-block align-middle" />, label: "ברזל", value: report.revealedIron },
-    { icon: <Icon name="stone" size={14} className="inline-block align-middle" />, label: "אבן", value: report.revealedStone },
+    { icon: <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" />, label: "זהב", value: report.revealedGold },
+    { icon: <Icon name="wood" size={14} className="inline-block align-middle text-amber-600" />, label: "עץ", value: report.revealedWood },
+    { icon: <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" />, label: "ברזל", value: report.revealedIron },
+    { icon: <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" />, label: "אבן", value: report.revealedStone },
   ];
 
   return (

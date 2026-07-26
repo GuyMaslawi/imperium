@@ -8,6 +8,7 @@ import { CityBossBanner } from "@/components/game/CityBossBanner";
 import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { Tip } from "@/components/ui/Tip";
 
 export const metadata = { title: "דירוג | אימפריום" };
 
@@ -81,146 +82,148 @@ export default async function RankingsPage() {
       {/* -------- city boss -------- */}
       <CityBossBanner state={bossState} cities={myCity} />
 
-      {/* -------- status strip -------- */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-2 rounded-full border border-border-subtle bg-panel-inset px-3 py-1.5 text-xs text-zinc-300">
-          <Icon name="base" size={14} className="text-crimson-bright" />
-          העיר שלך (
-          <span className="nums font-bold text-gold-bright" dir="ltr">
-            {myCity}
-          </span>{" "}
-          ערים):{" "}
-          <span className="nums font-bold text-emerald-400" dir="ltr">
-            {ranked.length}
-          </span>{" "}
-          אימפריות
-        </span>
-        <span className="text-xs text-zinc-400">
-          בדירוג שלך:{" "}
-          <span className="nums font-bold text-gold-bright" dir="ltr">
-            {myRank}
-          </span>
-        </span>
-      </div>
-
-      {/* Interaction is city-scoped; the cross-game boards live on their own page. */}
-      <div className="flex flex-wrap gap-2">
-        <Link href="/game/leaderboards" className="btn btn-gold px-4 py-2 text-sm">
-          <Icon name="rankings" size={16} className="inline-block align-middle" /> טבלאות מובילים
-        </Link>
-      </div>
-
-      <p className="panel-inset rounded-lg p-3 text-center text-xs text-zinc-400">
-        הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.
-      </p>
-
       {/* -------- leaderboard -------- */}
-      <div className="panel-gold overflow-x-auto rounded-xl p-0">
-        <h2 className="flex items-center gap-2 px-4 pb-3 pt-4 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="rankings" size={20} className="text-crimson-bright" />
-          דירוג לפי ואלקריה
-        </h2>
-        <table className="w-full min-w-[640px] text-sm">
-          <thead>
-            <tr className="border-y border-border-subtle text-right text-xs text-gold-dim">
-              <th className="px-4 py-2.5 font-semibold">#</th>
-              <th className="px-4 py-2.5 font-semibold">שם הצבא</th>
-              <th className="px-4 py-2.5 font-semibold">ברית</th>
-              <th className="px-4 py-2.5 font-semibold">זהב</th>
-              <th className="px-4 py-2.5 font-semibold">חיילים</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((empire, index) => {
-              const isMe = empire.id === myEmpire.id;
-              const medal =
-                index === 0
-                  ? "🥇"
-                  : index === 1
-                    ? "🥈"
-                    : index === 2
-                      ? "🥉"
-                      : null;
-              return (
-                <tr
-                  key={empire.id}
-                  className={`border-b border-border-subtle last:border-b-0 ${
-                    isMe ? "bg-gold/5" : "hover:bg-panel-raised/50"
-                  }`}
-                >
-                  <td className="px-4 py-3">
-                    <span className="nums font-black text-gold" dir="ltr">
-                      {medal ?? index + 1}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-gradient-to-b from-gold-deep/40 to-black text-lg">
-                        <Icon name="crown" size={20} className="text-bone" />
+      {/* The status strip, the cross-game link and the scope note all used to be
+          separate full-width blocks between the boss and the table; folded into
+          the table's own header they cost one row instead of four. The
+          horizontal scroll sits on the table wrapper rather than the panel —
+          on the panel it would also clip that header's tooltip. */}
+      <div className="panel-gold rounded-xl p-0">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 pb-3 pt-4">
+          <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="rankings" size={20} className="text-crimson-bright" />
+            דירוג לפי ואלקריה
+            <Tip tip="הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.">
+              <span className="cursor-help rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] font-normal text-zinc-300">
+                <Icon name="base" size={12} className="inline-block align-middle text-crimson-bright" />{" "}
+                עיר{" "}
+                <span className="nums font-bold text-gold-bright" dir="ltr">
+                  {myCity}
+                </span>{" "}
+                ·{" "}
+                <span className="nums font-bold text-emerald-400" dir="ltr">
+                  {ranked.length}
+                </span>{" "}
+                אימפריות
+              </span>
+            </Tip>
+          </h2>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-zinc-400">
+              הדירוג שלך:{" "}
+              <span className="nums font-bold text-gold-bright" dir="ltr">
+                {myRank}
+              </span>
+            </span>
+            {/* Interaction is city-scoped; the cross-game boards live on their own page. */}
+            <Link href="/game/leaderboards" className="btn btn-ghost px-3 py-1.5 text-xs">
+              <Icon name="rankings" size={14} className="inline-block align-middle" /> טבלאות מובילים
+            </Link>
+          </div>
+        </div>
+        <div className="overflow-x-auto rounded-b-xl">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead>
+              <tr className="border-y border-border-subtle text-right text-xs text-gold-dim">
+                <th className="px-4 py-2.5 font-semibold">#</th>
+                <th className="px-4 py-2.5 font-semibold">שם הצבא</th>
+                <th className="px-4 py-2.5 font-semibold">ברית</th>
+                <th className="px-4 py-2.5 font-semibold">זהב</th>
+                <th className="px-4 py-2.5 font-semibold">חיילים</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.map((empire, index) => {
+                const isMe = empire.id === myEmpire.id;
+                const medal =
+                  index === 0
+                    ? "🥇"
+                    : index === 1
+                      ? "🥈"
+                      : index === 2
+                        ? "🥉"
+                        : null;
+                return (
+                  <tr
+                    key={empire.id}
+                    className={`border-b border-border-subtle last:border-b-0 ${
+                      isMe ? "bg-gold/5" : "hover:bg-panel-raised/50"
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="nums font-black text-gold" dir="ltr">
+                        {medal ?? index + 1}
                       </span>
-                      <div className="min-w-0">
-                        <Link
-                          href={`/game/empires/${empire.id}`}
-                          className="font-bold text-zinc-100 underline-offset-4 hover:text-gold-bright hover:underline"
-                        >
-                          {empire.name}
-                        </Link>{" "}
-                        <span className="text-xs text-gold-dim">
-                          (רמה{" "}
-                          <span className="nums" dir="ltr">
-                            {empire.level}
-                          </span>
-                          ) <Icon name="spark" size={14} className="inline-block align-middle" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-gradient-to-b from-gold-deep/40 to-black text-lg">
+                          <Icon name="crown" size={20} className="text-bone" />
                         </span>
-                        {isMe && (
-                          <span className="mr-1.5 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
-                            הצבא שלך
-                          </span>
-                        )}
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span className="text-[11px] text-zinc-500">גיבור</span>
-                          <span
-                            className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[10px] font-bold text-gold-bright"
-                            dir="ltr"
-                            title={`רמת הגיבור: ${empire.hero?.level ?? 1}`}
+                        <div className="min-w-0">
+                          <Link
+                            href={`/game/empires/${empire.id}`}
+                            className="font-bold text-zinc-100 underline-offset-4 hover:text-gold-bright hover:underline"
                           >
-                            <Icon name="attack" size={12} className="inline-block align-middle" /> {empire.hero?.level ?? 1}
+                            {empire.name}
+                          </Link>{" "}
+                          <span className="text-xs text-gold-dim">
+                            (רמה{" "}
+                            <span className="nums" dir="ltr">
+                              {empire.level}
+                            </span>
+                            ) <Icon name="spark" size={14} className="inline-block align-middle" />
                           </span>
-                          {(empire.hero?.resets ?? 0) > 0 && (
-                            <span
-                              className="nums rounded-full border border-purple-400/50 bg-purple-950/60 px-1.5 text-[10px] font-black text-purple-300"
-                              dir="ltr"
-                              title={`הגיבור אופס ${empire.hero!.resets} פעמים ברמה 100`}
-                            >
-                              ↻×{empire.hero!.resets}
+                          {isMe && (
+                            <span className="mr-1.5 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
+                              הצבא שלך
                             </span>
                           )}
-                          <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
-                            100 <Icon name="heart" size={12} className="inline-block align-middle" />
-                          </span>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            <span className="text-[11px] text-zinc-500">גיבור</span>
+                            <span
+                              className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[10px] font-bold text-gold-bright"
+                              dir="ltr"
+                              title={`רמת הגיבור: ${empire.hero?.level ?? 1}`}
+                            >
+                              <Icon name="attack" size={12} className="inline-block align-middle" /> {empire.hero?.level ?? 1}
+                            </span>
+                            {(empire.hero?.resets ?? 0) > 0 && (
+                              <span
+                                className="nums rounded-full border border-purple-400/50 bg-purple-950/60 px-1.5 text-[10px] font-black text-purple-300"
+                                dir="ltr"
+                                title={`הגיבור אופס ${empire.hero!.resets} פעמים ברמה 100`}
+                              >
+                                ↻×{empire.hero!.resets}
+                              </span>
+                            )}
+                            <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
+                              100 <Icon name="heart" size={12} className="inline-block align-middle" />
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600">—</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className="nums inline-flex items-center gap-1 font-bold text-gold-bright"
-                      dir="ltr"
-                    >
-                      {formatNumber(Math.floor(empire.gold))} <Icon name="gold" size={14} className="inline-block align-middle" />
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="nums text-zinc-300" dir="ltr">
-                      {formatNumber(empire.army?.soldiers ?? 0)}
-                    </span>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    </td>
+                    <td className="px-4 py-3 text-zinc-600">—</td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="nums inline-flex items-center gap-1 font-bold text-gold-bright"
+                        dir="ltr"
+                      >
+                        {formatNumber(Math.floor(empire.gold))} <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" />
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="nums text-zinc-300" dir="ltr">
+                        {formatNumber(empire.army?.soldiers ?? 0)}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* -------- hall of fame -------- */}

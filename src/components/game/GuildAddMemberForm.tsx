@@ -48,7 +48,7 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
           disabled={full}
           pendingText="מצרף..."
         >
-          <Icon name="citizens" size={14} className="inline-block align-text-bottom" /> צרף לברית
+          <Icon name="citizens" size={14} className="inline-block align-text-bottom text-bone" /> צרף לברית
         </SubmitButton>
       </div>
 

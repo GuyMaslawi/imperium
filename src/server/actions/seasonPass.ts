@@ -16,6 +16,7 @@ import {
   seasonPassRewardAmount,
   tierForXp,
   type SeasonPassReward,
+  type SeasonPassRewardKind,
 } from "@/lib/game/seasonPass";
 
 const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
@@ -113,8 +114,8 @@ async function loadCycle(
 export interface SeasonPassTierView {
   tier: number;
   reached: boolean;
-  free: { icon: string; label: string; claimed: boolean };
-  premium: { icon: string; label: string; claimed: boolean };
+  free: { kind: SeasonPassRewardKind; label: string; claimed: boolean };
+  premium: { kind: SeasonPassRewardKind; label: string; claimed: boolean };
 }
 
 export interface SeasonPassState {
@@ -152,12 +153,12 @@ function buildState(
     tier: t.tier,
     reached: t.tier <= level,
     free: {
-      icon: t.free.icon,
+      kind: t.free.kind,
       label: rewardLabel(t.free, day),
       claimed: claimedFree.has(t.tier),
     },
     premium: {
-      icon: t.premium.icon,
+      kind: t.premium.kind,
       label: rewardLabel(t.premium, day),
       claimed: claimedPremium.has(t.tier),
     },

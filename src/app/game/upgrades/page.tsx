@@ -91,7 +91,7 @@ export default async function UpgradesPage() {
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <dt className="text-zinc-400">
-                    <Icon name="citizens" size={14} className="inline align-[-2px]" /> אזרחים
+                    <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> אזרחים
                   </dt>
                   <dd className="font-bold text-zinc-100 nums" dir="ltr">
                     {formatNumber(citizens)} / {formatNumber(capacity)}

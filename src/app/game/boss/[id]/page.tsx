@@ -172,7 +172,7 @@ export default async function BossFightPage({
       {fight.victory && (
         <div className="panel-gold rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-            <Icon name="gold" size={16} /> אוצר {boss.name}
+            <Icon name="gold" size={16} className="text-gold-bright" /> אוצר {boss.name}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {BOSS_REWARD_RESOURCES.map((res) => (

@@ -2,29 +2,34 @@ import type { MiniGameEvent, MiniGameType } from "@prisma/client";
 
 /** Prize bundle fields on a MiniGameEvent, in display order. */
 export const PRIZE_FIELDS = [
-  { key: "prizeGold", icon: "🪙", label: "זהב", int: false },
-  { key: "prizeWood", icon: "🪵", label: "עץ", int: false },
-  { key: "prizeIron", icon: "⚙️", label: "ברזל", int: false },
-  { key: "prizeStone", icon: "🪨", label: "אבן", int: false },
-  { key: "prizeDiamonds", icon: "💎", label: "יהלומים", int: false },
-  { key: "prizeCitizens", icon: "👥", label: "אזרחים", int: true },
-  { key: "prizeTurns", icon: "⏳", label: "תורות", int: true },
-  { key: "prizeWheelSpins", icon: "🎡", label: "סיבובים", int: true },
+  { key: "prizeGold", label: "זהב", int: false },
+  { key: "prizeWood", label: "עץ", int: false },
+  { key: "prizeIron", label: "ברזל", int: false },
+  { key: "prizeStone", label: "אבן", int: false },
+  { key: "prizeDiamonds", label: "יהלומים", int: false },
+  { key: "prizeCitizens", label: "אזרחים", int: true },
+  { key: "prizeTurns", label: "תורות", int: true },
+  { key: "prizeWheelSpins", label: "סיבובים", int: true },
 ] as const satisfies ReadonlyArray<{
   key: keyof MiniGameEvent;
-  icon: string;
   label: string;
   int: boolean;
 }>;
 
-/** Compact one-line prize summary, e.g. "🪙 1,000 · 💎 5". */
+/**
+ * Compact one-line prize summary, e.g. "1,000 זהב · 5 יהלומים".
+ *
+ * Named in words rather than icons on purpose: this string lands in inbox
+ * bodies and toasts, where an emoji would be a second, off-set drawing of a
+ * resource the rest of the UI renders from the shared icon set.
+ */
 export function prizeText(event: MiniGameEvent): string {
   const parts: string[] = [];
   for (const f of PRIZE_FIELDS) {
     const amount = Number(event[f.key] ?? 0);
-    if (amount > 0) parts.push(`${f.icon} ${Math.round(amount).toLocaleString("he-IL")}`);
+    if (amount > 0) parts.push(`${Math.round(amount).toLocaleString("he-IL")} ${f.label}`);
   }
-  return parts.length ? parts.join(" · ") : "כבוד בלבד 🏅";
+  return parts.length ? parts.join(" · ") : "כבוד בלבד";
 }
 
 export const MINIGAME_TYPE_META: Record<MiniGameType, { label: string; icon: string }> = {

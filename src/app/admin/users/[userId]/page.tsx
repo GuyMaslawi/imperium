@@ -5,7 +5,12 @@ import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
-import { LabeledInput, LabeledSelect, EditorSection } from "@/components/admin/fields";
+import {
+  LabeledInput,
+  LabeledSelect,
+  EditorSection,
+  ResourceFieldLabel,
+} from "@/components/admin/fields";
 import {
   BUILDING_META,
   BUILDING_TYPES,
@@ -167,13 +172,13 @@ export default async function AdminUserDetail({
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 <LabeledInput label="שם אימפריה" name="name" defaultValue={empire.name} required />
                 <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={empire.level} />
-                <LabeledInput label="🪙 זהב" name="gold" type="number" min={0} defaultValue={Math.round(empire.gold)} />
-                <LabeledInput label="🪵 עץ" name="wood" type="number" min={0} defaultValue={Math.round(empire.wood)} />
-                <LabeledInput label="⚙️ ברזל" name="iron" type="number" min={0} defaultValue={Math.round(empire.iron)} />
-                <LabeledInput label="🪨 אבן" name="stone" type="number" min={0} defaultValue={Math.round(empire.stone)} />
-                <LabeledInput label="💎 יהלומים" name="diamonds" type="number" min={0} defaultValue={Math.round(empire.diamonds)} />
-                <LabeledInput label="👥 אזרחים" name="citizens" type="number" min={0} defaultValue={empire.citizens} />
-                <LabeledInput label="⏳ תורות" name="turns" type="number" min={0} defaultValue={empire.turns} />
+                <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} defaultValue={Math.round(empire.gold)} />
+                <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} defaultValue={Math.round(empire.wood)} />
+                <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} defaultValue={Math.round(empire.iron)} />
+                <LabeledInput label={<ResourceFieldLabel resource="stone" text="אבן" />} name="stone" type="number" min={0} defaultValue={Math.round(empire.stone)} />
+                <LabeledInput label={<ResourceFieldLabel resource="diamonds" text="יהלומים" />} name="diamonds" type="number" min={0} defaultValue={Math.round(empire.diamonds)} />
+                <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} defaultValue={empire.citizens} />
+                <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} defaultValue={empire.turns} />
                 <LabeledInput label="🎡 סיבובי גלגל" name="wheelSpins" type="number" min={0} defaultValue={empire.wheelSpins} />
               </div>
             </ActionForm>
@@ -188,7 +193,7 @@ export default async function AdminUserDetail({
                 <div className="grid grid-cols-3 gap-3">
                   <LabeledInput label="🪖 חיילים" name="soldiers" type="number" min={0} defaultValue={empire.army?.soldiers ?? 0} />
                   <LabeledInput label="🕵️ מרגלים" name="spies" type="number" min={0} defaultValue={empire.army?.spies ?? 0} />
-                  <LabeledInput label="⛏️ עבדים" name="mineSlaves" type="number" min={0} defaultValue={empire.army?.mineSlaves ?? 0} />
+                  <LabeledInput label={<><Icon name="mine" size={13} className="inline align-[-2px]" /> עבדים</>} name="mineSlaves" type="number" min={0} defaultValue={empire.army?.mineSlaves ?? 0} />
                 </div>
               </ActionForm>
             </EditorSection>
@@ -198,7 +203,7 @@ export default async function AdminUserDetail({
                 <input type="hidden" name="empireId" value={empire.id} />
                 <input type="hidden" name="userId" value={user.id} />
                 <LabeledInput
-                  label="💰 יתרת זהב בבנק"
+                  label={<ResourceFieldLabel resource="gold" text="יתרת זהב בבנק" />}
                   name="goldBalance"
                   type="number"
                   min={0}
@@ -226,8 +231,8 @@ export default async function AdminUserDetail({
                     <input type="hidden" name="empireId" value={empire.id} />
                     <input type="hidden" name="userId" value={user.id} />
                     <input type="hidden" name="type" value={type} />
-                    <p className="text-xs font-bold text-gold-bright">
-                      {meta.icon} {meta.label}
+                    <p className="flex items-center gap-1.5 text-xs font-bold text-gold-bright">
+                      <Icon name={meta.icon} size={14} /> {meta.label}
                     </p>
                     <div className={`grid gap-2 ${meta.supportsSlaves ? "grid-cols-2" : "grid-cols-1"}`}>
                       <LabeledInput label="רמה" name="level" type="number" min={0} defaultValue={b?.level ?? 0} />
@@ -260,8 +265,8 @@ export default async function AdminUserDetail({
                       <input type="hidden" name="empireId" value={empire.id} />
                       <input type="hidden" name="userId" value={user.id} />
                       <input type="hidden" name="resourceType" value={type} />
-                      <p className="text-xs font-bold text-gold-bright">
-                        {meta.icon} {meta.label}
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-gold-bright">
+                        <Icon name={meta.icon} size={14} /> {meta.label}
                       </p>
                       <div className="grid grid-cols-2 gap-2">
                         <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={s?.level ?? 1} />
@@ -290,8 +295,8 @@ export default async function AdminUserDetail({
                       <input type="hidden" name="empireId" value={empire.id} />
                       <input type="hidden" name="userId" value={user.id} />
                       <input type="hidden" name="type" value={type} />
-                      <p className="text-xs font-bold text-gold-bright">
-                        {meta.icon} {meta.label}
+                      <p className="flex items-center gap-1.5 text-xs font-bold text-gold-bright">
+                        <Icon name={meta.icon} size={14} /> {meta.label}
                       </p>
                       <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={u?.level ?? 1} />
                     </ActionForm>
@@ -485,13 +490,13 @@ export default async function AdminUserDetail({
                 <input type="hidden" name="scope" value="empire" />
                 <input type="hidden" name="scopeId" value={empire.id} />
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <LabeledInput label="🪙 זהב" name="gold" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="🪵 עץ" name="wood" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="⚙️ ברזל" name="iron" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="🪨 אבן" name="stone" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="💎 יהלומים" name="diamonds" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="👥 אזרחים" name="citizens" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="⏳ תורות" name="turns" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="stone" text="אבן" />} name="stone" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="diamonds" text="יהלומים" />} name="diamonds" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} placeholder="0" />
                   <LabeledInput label="🎡 סיבובים" name="wheelSpins" type="number" min={0} placeholder="0" />
                 </div>
                 <LabeledInput label="כותרת הודעה מצורפת (אופציונלי)" name="title" placeholder="🎁 מתנה מההנהלה" />

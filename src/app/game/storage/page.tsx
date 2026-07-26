@@ -83,7 +83,6 @@ export default async function StoragePage() {
               key={type}
               resourceType={type}
               label={meta.label}
-              icon={meta.icon}
               level={level}
               available={available[meta.resourceKey]}
               stored={storage?.storedAmount ?? 0}

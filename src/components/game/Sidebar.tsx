@@ -16,11 +16,6 @@ type NavItem = {
   badge?: number;
 };
 
-type NavSection = {
-  title: string;
-  items: NavItem[];
-};
-
 export type SidebarProps = {
   empireName: string;
   heroClass: string;
@@ -38,10 +33,6 @@ export type SidebarProps = {
   heroXp: number;
   heroXpMax: number;
   recruits: number;
-  /** Unread inbox messages — badge on the הודעות button. */
-  unreadMessages?: number;
-  /** Reports created since the last reports-page visit — badge on היסטוריה. */
-  newReports?: number;
   /** Show the admin control-center link (admins only). */
   isAdmin?: boolean;
 };
@@ -75,8 +66,6 @@ export function MobileMenu(props: SidebarProps) {
     };
   }, [open]);
 
-  const badgeCount = (props.unreadMessages ?? 0) + (props.newReports ?? 0);
-
   return (
     <div className="lg:hidden">
       <button
@@ -89,11 +78,6 @@ export function MobileMenu(props: SidebarProps) {
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
-        {badgeCount > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
-            {badgeCount}
-          </span>
-        )}
       </button>
 
       {/* backdrop + drawer */}
@@ -150,35 +134,24 @@ function SidebarContent({
   heroXp,
   heroXpMax,
   recruits,
-  unreadMessages = 0,
-  newReports = 0,
   isAdmin = false,
   pathname,
 }: SidebarProps & { pathname: string }) {
-  const sections: NavSection[] = [
-    {
-      title: "פעולות",
-      items: [
-        { href: "/game/base", label: "בסיס", icon: "base" },
-        { href: "/game/hero", label: "גיבור", icon: "hero" },
-        { href: "/game/rankings", label: "דירוג", icon: "rankings" },
-        { href: "/game/weapons", label: "מפעל", icon: "factory" },
-        { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
-        { href: "/game/production", label: "מכונות", icon: "mine" },
-        { href: "/game/guild", label: "ברית", icon: "guild" },
-      ],
-    },
-    {
-      title: "משאבים",
-      items: [
-        { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
-        { href: "/game/bank", label: "בנק", icon: "bank" },
-        { href: "/game/storage", label: "מחסנים", icon: "storage" },
-        { href: "/game/achievements", label: "הישגים", icon: "achievements" },
-        { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
-        { href: "/game/reports", label: "דוחות", icon: "reports" },
-      ],
-    },
+  // One flat list — no section headings. History lives in the top command bar
+  // (see InboxNav), so it deliberately has no entry here.
+  const navItems: NavItem[] = [
+    { href: "/game/base", label: "בסיס", icon: "base" },
+    { href: "/game/hero", label: "גיבור", icon: "hero" },
+    { href: "/game/rankings", label: "דירוג", icon: "rankings" },
+    { href: "/game/weapons", label: "מפעל", icon: "factory" },
+    { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
+    { href: "/game/production", label: "מכונות", icon: "mine" },
+    { href: "/game/guild", label: "ברית", icon: "guild" },
+    { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
+    { href: "/game/bank", label: "בנק", icon: "bank" },
+    { href: "/game/storage", label: "מחסנים", icon: "storage" },
+    { href: "/game/achievements", label: "הישגים", icon: "achievements" },
+    { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
   ];
 
   const xpPct = heroXpMax > 0 ? Math.round((heroXp / heroXpMax) * 100) : 0;
@@ -214,39 +187,7 @@ function SidebarContent({
         </div>
       </div>
 
-      {/* messages / history */}
-      <div className="grid grid-cols-2 gap-2">
-        <Tip tip="היסטוריית קרבות וריגול" side="bottom" className="w-full">
-          <Link
-            href="/game/reports"
-            className={`btn btn-ghost relative w-full px-2 py-1.5 text-xs ${
-              pathname.startsWith("/game/reports") ? "border-gold text-white" : ""
-            }`}
-          >
-            <Icon name="reports" size={15} /> היסטוריה
-            {newReports > 0 && (
-              <span className="absolute -left-1.5 -top-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
-                {newReports}
-              </span>
-            )}
-          </Link>
-        </Tip>
-        <Tip tip="התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת" side="bottom" className="w-full">
-          <Link
-            href="/game/messages"
-            className={`btn btn-ghost relative w-full px-2 py-1.5 text-xs ${
-              pathname.startsWith("/game/messages") ? "border-gold text-white" : ""
-            }`}
-          >
-            <Icon name="messages" size={15} /> הודעות
-            {unreadMessages > 0 && (
-              <span className="absolute -left-1.5 -top-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
-                {unreadMessages}
-              </span>
-            )}
-          </Link>
-        </Tip>
-      </div>
+      {/* History + messages now live in the top command bar — see InboxNav. */}
 
       {isAdmin && (
         <Link
@@ -344,47 +285,38 @@ function SidebarContent({
       </div>
 
       {/* nav sections */}
-      <nav className="flex flex-col gap-4">
-        {sections.map((section) => {
-          return (
-            <div key={section.title}>
-              <div className="mb-1.5 px-1 text-right text-[11px] font-bold uppercase tracking-widest text-gold-dim">
-                {section.title}
-              </div>
-              <ul className="flex flex-col gap-0.5">
-                  {section.items.map((item) => {
-                    const active = pathname.startsWith(item.href);
-                    return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          className={`group flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                            active
-                              ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"
-                              : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
-                          }`}
-                        >
-                          <span className="flex items-center gap-2.5">
-                            {item.label}
-                            {item.badge != null && item.badge > 0 && (
-                              <span className="rounded bg-black/40 px-1.5 text-[10px] font-bold text-zinc-400 nums">
-                                {formatCompact(item.badge)}
-                              </span>
-                            )}
-                          </span>
-                          <Icon
-                            name={item.icon}
-                            size={20}
-                            className={active ? "text-crimson-bright" : "text-bone-dim opacity-90 group-hover:text-bone"}
-                          />
-                        </Link>
-                      </li>
-                    );
-                  })}
-              </ul>
-            </div>
-          );
-        })}
+      <nav>
+        <ul className="flex flex-col gap-0.5">
+          {navItems.map((item) => {
+            const active = pathname.startsWith(item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`group flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                    active
+                      ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"
+                      : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    {item.label}
+                    {item.badge != null && item.badge > 0 && (
+                      <span className="rounded bg-black/40 px-1.5 text-[10px] font-bold text-zinc-400 nums">
+                        {formatCompact(item.badge)}
+                      </span>
+                    )}
+                  </span>
+                  <Icon
+                    name={item.icon}
+                    size={20}
+                    className={active ? "text-crimson-bright" : "text-bone-dim opacity-90 group-hover:text-bone"}
+                  />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       </nav>
     </>
   );

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { type ResourceKey } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/Logo";
 
 /**
@@ -60,12 +60,15 @@ export function ResourceBar({
   resources,
   miniGame,
   mobileMenu,
+  inbox,
 }: {
   resources: Record<ResourceKey, number>;
   /** Optional slot rendered on the right of the command bar (mini-game die). */
   miniGame?: ReactNode;
   /** Mobile-only nav trigger, rendered at the start of the bar (hidden at lg+). */
   mobileMenu?: ReactNode;
+  /** History + messages pills, parked in the bar's free space (see InboxNav). */
+  inbox?: ReactNode;
 }) {
   return (
     <header
@@ -80,7 +83,10 @@ export function ResourceBar({
           {PILLS.map((p) => (
             <Tip key={p.key} tip={p.tip} side="bottom">
               <div className={`res-pill ${p.borderClass}`}>
-                <Icon name={p.icon} size={20} className={`shrink-0 ${p.numClass}`} />
+                {/* Icon wears the canonical resource tint; the number keeps the
+                    pill's own accent, which is a bar-layout choice, not an
+                    identity for the resource. */}
+                <Icon name={p.icon} size={20} className={`shrink-0 ${RESOURCE_ICON_COLOR[p.key]}`} />
                 <div className="flex flex-col items-start leading-tight">
                   <span className="text-[10px] font-medium text-zinc-400">{p.label}</span>
                   <span className={`nums text-sm font-extrabold ${p.numClass}`} dir="ltr">
@@ -91,6 +97,9 @@ export function ResourceBar({
             </Tip>
           ))}
         </div>
+
+        {/* history + messages (the bar's free stretch, before the die) */}
+        {inbox}
 
         {/* mini-game die (right side of the command bar) */}
         {miniGame}

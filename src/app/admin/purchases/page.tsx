@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import type { PurchaseStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ function StatCard({
 }: {
   label: string;
   value: string | number;
-  icon: string;
+  icon: ReactNode;
   hint?: string;
 }) {
   return (
@@ -77,7 +78,7 @@ export default async function AdminPurchasesPage() {
       <SectionHeading
         title="רכישות והכנסות"
         subtitle="REVENUE"
-        ornament={<Icon name="diamond" size={22} className="text-sky-300" />}
+        ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -87,7 +88,11 @@ export default async function AdminPurchasesPage() {
           icon="💰"
           hint={`${realRevenue._count.toLocaleString("he-IL")} רכישות`}
         />
-        <StatCard label="יהלומים שנמכרו" value={Math.round(realDiamonds)} icon="💎" />
+        <StatCard
+          label="יהלומים שנמכרו"
+          value={Math.round(realDiamonds)}
+          icon={<Icon name="diamond" size={26} className="text-cyan-300" />}
+        />
         <StatCard
           label="רכישות בדיקה"
           value={formatIls(testIls)}

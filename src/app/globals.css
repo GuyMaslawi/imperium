@@ -402,6 +402,42 @@ body {
   animation: points-pulse 1.6s ease-in-out infinite;
 }
 
+/* --- Top-bar inbox pills — pulse while history/messages have something new --- */
+@keyframes inbox-glow-red {
+  0%,
+  100% {
+    border-color: rgba(239, 68, 68, 0.45);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    border-color: rgba(248, 113, 113, 0.95);
+    box-shadow: 0 0 14px 1px rgba(239, 68, 68, 0.55);
+  }
+}
+.inbox-glow-red {
+  animation: inbox-glow-red 1.8s ease-in-out infinite;
+}
+@keyframes inbox-glow-green {
+  0%,
+  100% {
+    border-color: rgba(16, 185, 129, 0.45);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    border-color: rgba(52, 211, 153, 0.95);
+    box-shadow: 0 0 14px 1px rgba(16, 185, 129, 0.55);
+  }
+}
+.inbox-glow-green {
+  animation: inbox-glow-green 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-glow-red,
+  .inbox-glow-green {
+    animation: none;
+  }
+}
+
 /* --- Wheel of Fortune spin effects --- */
 /* pulsing gold halo on the rim while the wheel spins */
 @keyframes wheel-glow {

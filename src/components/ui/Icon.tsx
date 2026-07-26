@@ -83,13 +83,26 @@ export function Icon({
   );
 }
 
-/** Map a resource key to its icon name (used by ResourceBar / storages). */
+/**
+ * Map a resource key to its icon name — the single source of truth for which
+ * glyph a resource wears. Every surface (command bar, mines, warehouses, wheel,
+ * season pass, boss loot, hero items, battle reports) resolves through here, so
+ * a resource never shows two different icons in two different screens.
+ *
+ * Accepts both the singular `diamond` and the `diamonds` balance key, since
+ * call sites legitimately hold either.
+ */
 export const RESOURCE_ICON: Record<string, IconName> = {
   gold: "gold", wood: "wood", iron: "iron", stone: "stone",
-  diamonds: "diamond", citizens: "citizens", turns: "turns",
+  diamond: "diamond", diamonds: "diamond", citizens: "citizens", turns: "turns",
 };
 
-/** Authentic per-resource icon tint, so each resource reads at a glance. */
+/**
+ * Authentic per-resource icon tint, so each resource reads at a glance — and
+ * the companion source of truth to `RESOURCE_ICON`. Pair the two whenever a
+ * resource is shown as a value; the only icons that opt out are section-heading
+ * ornaments, which follow the crimson heading language instead.
+ */
 export const RESOURCE_ICON_COLOR: Record<string, string> = {
   gold: "text-gold-bright",
   wood: "text-amber-600",
@@ -97,4 +110,11 @@ export const RESOURCE_ICON_COLOR: Record<string, string> = {
   stone: "text-stone-400",
   diamond: "text-cyan-300",
   diamonds: "text-cyan-300",
+  citizens: "text-bone",
+  turns: "text-emerald-400",
 };
+
+/** Icon name + tint for a resource key, ready to spread onto `<Icon>`. */
+export function resourceIcon(key: string): { name: IconName; className: string } {
+  return { name: RESOURCE_ICON[key], className: RESOURCE_ICON_COLOR[key] };
+}

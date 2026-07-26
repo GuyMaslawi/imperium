@@ -14,13 +14,12 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
 export interface StorageCardProps {
   resourceType: "GOLD" | "WOOD" | "IRON" | "STONE";
   label: string;
-  icon: string;
   level: number;
   /** Available balance outside the warehouse. */
   available: number;
@@ -37,13 +36,14 @@ const formatAmount = (value: number) => formatNumber(value);
 export function StorageCard({
   resourceType,
   label,
-  icon,
   level,
   available,
   stored,
   capacity,
   upgradeCost,
 }: StorageCardProps) {
+  /** The resource this warehouse holds — drives its canonical icon and tint. */
+  const storedResource = resourceType.toLowerCase();
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeStorage,
     {}
@@ -120,7 +120,11 @@ export function StorageCard({
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span aria-hidden className="text-3xl">{icon}</span>
+          <Icon
+            name={RESOURCE_ICON[storedResource]}
+            size={30}
+            className={RESOURCE_ICON_COLOR[storedResource]}
+          />
           <div>
             <h3 className="font-bold text-gold-bright">{label}</h3>
             <p className="text-xs font-semibold text-gold">
@@ -243,10 +247,16 @@ export function StorageCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
-            <span className="nums" dir="ltr"><Icon name="gold" size={14} className="inline align-[-2px]" /> {formatAmount(upgradeCost.gold)}</span>
-            <span className="nums" dir="ltr"><Icon name="wood" size={14} className="inline align-[-2px]" /> {formatAmount(upgradeCost.wood)}</span>
-            <span className="nums" dir="ltr"><Icon name="iron" size={14} className="inline align-[-2px]" /> {formatAmount(upgradeCost.iron)}</span>
-            <span className="nums" dir="ltr"><Icon name="stone" size={14} className="inline align-[-2px]" /> {formatAmount(upgradeCost.stone)}</span>
+            {(["gold", "wood", "iron", "stone"] as const).map((key) => (
+              <span key={key} className="nums" dir="ltr">
+                <Icon
+                  name={RESOURCE_ICON[key]}
+                  size={14}
+                  className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[key]}`}
+                />{" "}
+                {formatAmount(upgradeCost[key])}
+              </span>
+            ))}
           </div>
         </div>
         <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">

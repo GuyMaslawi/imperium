@@ -168,7 +168,9 @@ export const TUNABLE_META: Record<
   },
   diamondStore: {
     label: "חנות יהלומים — רכישה",
-    icon: "💎",
+    // 🛒 (the storefront), not 💎: a gem here would be a second, emoji drawing
+    // of the diamond the whole game renders from the shared icon set.
+    icon: "🛒",
     fields: {
       purchaseDiscountPct: { label: "אחוז הנחה על מחירי חבילות יהלומים (0-100)" },
     },

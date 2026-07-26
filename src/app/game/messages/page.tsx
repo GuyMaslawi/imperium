@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { markMessagesRead } from "@/server/actions/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
+import { MessageCompose, type PlayerOption } from "@/components/game/MessageCompose";
 import type { MessageKind } from "@prisma/client";
 import type { ReactNode } from "react";
 
@@ -15,16 +16,31 @@ const KIND_META: Record<MessageKind, { icon: ReactNode; label: string; tone: str
   SYSTEM: { icon: "📣", label: "מערכת", tone: "border-gold/40 text-gold" },
   BATTLE: { icon: <Icon name="attack" size={22} />, label: "קרב", tone: "border-red-500/40 text-red-400" },
   SPY: { icon: <Icon name="spy" size={22} />, label: "ריגול", tone: "border-purple-500/40 text-purple-300" },
+  PLAYER: { icon: <Icon name="messages" size={22} />, label: "משחקן", tone: "border-emerald-500/40 text-emerald-300" },
 };
 
 export default async function MessagesPage() {
   const empire = await requireEmpire();
 
-  const messages = await prisma.message.findMany({
-    where: { empireId: empire.id },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  const [messages, roster] = await Promise.all([
+    prisma.message.findMany({
+      where: { empireId: empire.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: { sender: { select: { name: true } } },
+    }),
+    // The closed list the compose form picks from: every live empire but mine.
+    // Only id + name leave the server — this is an address book, not a scouting
+    // report.
+    prisma.empire.findMany({
+      where: { id: { not: empire.id }, user: { bannedAt: null } },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+      take: 1000,
+    }),
+  ]);
+
+  const players: PlayerOption[] = roster;
 
   // "New" = unread, or read moments ago (so the highlight survives the
   // mark-read revalidation that clears the sidebar badge).
@@ -37,12 +53,19 @@ export default async function MessagesPage() {
       <MarkSeen action={markMessagesRead} />
       <SectionHeading title="הודעות" subtitle="MESSAGES" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
 
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-zinc-500">
+          תיבת הדואר שלך — הודעות משחקנים והתראות מהמערכת.
+        </p>
+        <MessageCompose players={players} />
+      </div>
+
       {messages.length === 0 ? (
         <div className="panel-gold rounded-xl p-10 text-center">
           <p className="text-4xl">🕊️</p>
           <p className="mt-3 font-bold text-zinc-300">אין הודעות עדיין</p>
           <p className="mt-1 text-sm text-zinc-500">
-            התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת יופיעו כאן.
+            הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת יופיעו כאן.
           </p>
         </div>
       ) : (
@@ -50,6 +73,10 @@ export default async function MessagesPage() {
           {messages.map((m) => {
             const meta = KIND_META[m.kind];
             const fresh = isNew(m);
+            // A PLAYER message whose author was deleted keeps its text but
+            // loses the name (the FK is SetNull, not Cascade).
+            const from =
+              m.kind === "PLAYER" ? m.sender?.name ?? "שחקן שנמחק" : null;
             return (
               <li
                 key={m.id}
@@ -73,7 +100,14 @@ export default async function MessagesPage() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-sm leading-relaxed text-zinc-400">{m.body}</p>
+                    {from && (
+                      <p className="mt-0.5 text-xs text-emerald-300/90">
+                        מאת <span className="font-bold">{from}</span>
+                      </p>
+                    )}
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">
+                      {m.body}
+                    </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <span className={`font-semibold ${meta.tone.split(" ")[1]}`}>
                         {meta.label}

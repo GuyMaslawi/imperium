@@ -4,7 +4,8 @@ import { useActionState, useState } from "react";
 import type { MiniGameType } from "@prisma/client";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { LabeledInput } from "@/components/admin/fields";
+import { LabeledInput, ResourceFieldLabel } from "@/components/admin/fields";
+import { Icon } from "@/components/ui/Icon";
 import type { AdminActionState } from "@/server/actions/admin";
 
 type Action = (
@@ -18,14 +19,14 @@ const TYPES: { value: MiniGameType; label: string; icon: string; hint: string }[
 ];
 
 const PRIZE_FIELDS = [
-  { name: "prizeGold", label: "🪙 זהב" },
-  { name: "prizeWood", label: "🪵 עץ" },
-  { name: "prizeIron", label: "⚙️ ברזל" },
-  { name: "prizeStone", label: "🪨 אבן" },
-  { name: "prizeDiamonds", label: "💎 יהלומים" },
-  { name: "prizeCitizens", label: "👥 אזרחים" },
-  { name: "prizeTurns", label: "⏳ תורות" },
-  { name: "prizeWheelSpins", label: "🎡 סיבובים" },
+  { name: "prizeGold", resource: "gold", label: "זהב" },
+  { name: "prizeWood", resource: "wood", label: "עץ" },
+  { name: "prizeIron", resource: "iron", label: "ברזל" },
+  { name: "prizeStone", resource: "stone", label: "אבן" },
+  { name: "prizeDiamonds", resource: "diamonds", label: "יהלומים" },
+  { name: "prizeCitizens", resource: "citizens", label: "אזרחים" },
+  { name: "prizeTurns", resource: "turns", label: "תורות" },
+  { name: "prizeWheelSpins", resource: null, label: "סיבובים" },
 ] as const;
 
 /**
@@ -96,7 +97,22 @@ export function MiniGameCreator({ action }: { action: Action }) {
         <p className="mb-2 text-xs font-semibold text-gold-dim">פרס לזוכים</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {PRIZE_FIELDS.map((p) => (
-            <LabeledInput key={p.name} label={p.label} name={p.name} type="number" min={0} placeholder="0" />
+            <LabeledInput
+              key={p.name}
+              label={
+                p.resource ? (
+                  <ResourceFieldLabel resource={p.resource} text={p.label} />
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="wheel" size={13} className="text-gold-bright" /> {p.label}
+                  </span>
+                )
+              }
+              name={p.name}
+              type="number"
+              min={0}
+              placeholder="0"
+            />
           ))}
         </div>
       </div>

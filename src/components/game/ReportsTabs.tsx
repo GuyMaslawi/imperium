@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { formatNumber } from "@/lib/game/format";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 
 export type BattleRow = {
   id: string;
@@ -34,6 +34,8 @@ export type SpyRow = {
   /** Created after the player's last visit to the reports page. */
   isNew: boolean;
   rival: string;
+  /** True for missions I sent, false for enemy spies caught in my territory. */
+  isAttacker: boolean;
   success: boolean;
   turnsSpent: number;
   finalChance: number | null;
@@ -49,12 +51,13 @@ export type SpyRow = {
   revealedMineSlaves: number;
 };
 
-type TabKey = "myAttacks" | "againstMe" | "mySpies";
+type TabKey = "againstMe" | "myAttacks" | "spiesOnMe" | "mySpies";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "myAttacks", label: "תקיפות שלי" },
-  { key: "againstMe", label: "תקיפות נגדי" },
-  { key: "mySpies", label: "ריגול שלי" },
+const TABS: { key: TabKey; label: string; icon: IconName }[] = [
+  { key: "againstMe", label: "תקיפות עליי", icon: "shield" },
+  { key: "myAttacks", label: "תקיפות שלי", icon: "attack" },
+  { key: "spiesOnMe", label: "ריגול עליי", icon: "spy" },
+  { key: "mySpies", label: "ריגול שלי", icon: "spy" },
 ];
 
 function EmptyState({ text }: { text: string }) {
@@ -86,18 +89,23 @@ export function ReportsTabs({
   battles: BattleRow[];
   spies: SpyRow[];
 }) {
-  const [tab, setTab] = useState<TabKey>("myAttacks");
+  const [tab, setTab] = useState<TabKey>("againstMe");
 
   const myAttacks = battles.filter((b) => b.isAttacker);
   const againstMe = battles.filter((b) => !b.isAttacker);
+  const mySpies = spies.filter((s) => s.isAttacker);
+  const spiesOnMe = spies.filter((s) => !s.isAttacker);
 
+  const isSpyTab = tab === "mySpies" || tab === "spiesOnMe";
   const battleRows =
     tab === "myAttacks" ? myAttacks : tab === "againstMe" ? againstMe : [];
+  const spyRows = tab === "mySpies" ? mySpies : spiesOnMe;
 
   const newCount: Record<TabKey, number> = {
     myAttacks: myAttacks.filter((b) => b.isNew).length,
     againstMe: againstMe.filter((b) => b.isNew).length,
-    mySpies: spies.filter((s) => s.isNew).length,
+    mySpies: mySpies.filter((s) => s.isNew).length,
+    spiesOnMe: spiesOnMe.filter((s) => s.isNew).length,
   };
 
   return (
@@ -113,6 +121,7 @@ export function ReportsTabs({
               tab === t.key ? "btn-dark" : "btn-ghost"
             }`}
           >
+            <Icon name={t.icon} size={16} />
             {t.label}
             {newCount[t.key] > 0 && (
               <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-black text-white nums">
@@ -124,7 +133,7 @@ export function ReportsTabs({
       </div>
 
       {/* battle table */}
-      {tab !== "mySpies" && (
+      {!isSpyTab && (
         <div className="panel-gold overflow-x-auto rounded-xl p-0">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
@@ -190,9 +199,9 @@ export function ReportsTabs({
                             r.plunderIsMine ? "text-gold" : "text-zinc-500"
                           }`}
                         >
-                          שלל: <Icon name="gold" size={14} className="inline-block align-middle" /> {num(r.stolenGold)} · <Icon name="wood" size={14} className="inline-block align-middle" />{" "}
-                          {num(r.stolenWood)} · <Icon name="iron" size={14} className="inline-block align-middle" />{" "}
-                          {num(r.stolenIron)} · <Icon name="stone" size={14} className="inline-block align-middle" />{" "}
+                          שלל: <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {num(r.stolenGold)} · <Icon name="wood" size={14} className="inline-block align-middle text-amber-600" />{" "}
+                          {num(r.stolenWood)} · <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" />{" "}
+                          {num(r.stolenIron)} · <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" />{" "}
                           {num(r.stolenStone)}
                         </p>
                       )}
@@ -206,8 +215,15 @@ export function ReportsTabs({
       )}
 
       {/* spy table */}
-      {tab === "mySpies" && (
-        <div className="panel-gold overflow-x-auto rounded-xl p-0">
+      {isSpyTab && (
+        <div className="space-y-3">
+          {tab === "spiesOnMe" && (
+            <p className="rounded-lg border border-purple-500/30 bg-purple-950/25 px-3 py-2 text-xs text-purple-200/90">
+              כאן מופיעים רק מרגלים שכוחות הביטחון שלך <b>תפסו</b> — ריגול מוצלח
+              נגדך נשאר חשאי ואינו נרשם.
+            </p>
+          )}
+          <div className="panel-gold overflow-x-auto rounded-xl p-0">
           <table className="w-full min-w-[680px] text-sm">
             <thead>
               <tr className="border-b border-border-subtle text-right text-xs text-gold-dim">
@@ -218,14 +234,20 @@ export function ReportsTabs({
               </tr>
             </thead>
             <tbody>
-              {spies.length === 0 ? (
+              {spyRows.length === 0 ? (
                 <tr>
                   <td colSpan={4}>
-                    <EmptyState text="אין דוחות ריגול עדיין." />
+                    <EmptyState
+                      text={
+                        tab === "mySpies"
+                          ? "לא שלחת מרגלים עדיין."
+                          : "לא נתפסו מרגלים בשטחך."
+                      }
+                    />
                   </td>
                 </tr>
               ) : (
-                spies.map((r) => (
+                spyRows.map((r) => (
                   <tr
                     key={r.id}
                     className="border-b border-border-subtle align-top last:border-b-0"
@@ -242,23 +264,31 @@ export function ReportsTabs({
                     <td className="px-4 py-3">
                       <span
                         className={`font-bold ${
-                          r.success ? "text-emerald-400" : "text-red-400"
+                          // Success is the attacker's outcome — for a spy caught
+                          // in my territory the same failure is *my* win.
+                          r.success === r.isAttacker
+                            ? "text-emerald-400"
+                            : "text-red-400"
                         }`}
                       >
-                        {r.success ? "המשימה הצליחה" : "המרגל נתפס"}
+                        {r.isAttacker
+                          ? r.success
+                            ? "המשימה הצליחה"
+                            : "המרגל נתפס"
+                          : "תפסת את המרגל!"}
                       </span>
                       <p className="mt-1 text-xs text-zinc-500">
-                        עלות: {num(r.turnsSpent)} תורות
+                        {r.isAttacker && <>עלות: {num(r.turnsSpent)} תורות</>}
                         {r.attackerIntel !== null && r.defenderIntel !== null ? (
                           <>
-                            {" "}
-                            · כח מודיעין:{" "}
+                            {r.isAttacker ? " · " : ""}כח מודיעין:{" "}
                             <span className="nums" dir="ltr">
-                              {num(Math.round(r.attackerIntel))} מול{" "}
-                              {num(Math.round(r.defenderIntel))}
+                              {num(Math.round(r.isAttacker ? r.attackerIntel : r.defenderIntel))} (שלך) מול{" "}
+                              {num(Math.round(r.isAttacker ? r.defenderIntel : r.attackerIntel))}
                             </span>
                           </>
                         ) : (
+                          r.isAttacker &&
                           r.finalChance !== null && (
                             <>
                               {" "}
@@ -272,12 +302,16 @@ export function ReportsTabs({
                       </p>
                     </td>
                     <td className="px-4 py-3">
-                      {r.success ? (
+                      {!r.isAttacker ? (
+                        <span className="text-xs text-zinc-500">
+                          המרגל חוסל לפני שאסף מידע — לא דלף דבר.
+                        </span>
+                      ) : r.success ? (
                         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-300 sm:grid-cols-3">
-                          <span><Icon name="gold" size={14} className="inline-block align-middle" /> {num(r.revealedGold)}</span>
-                          <span><Icon name="wood" size={14} className="inline-block align-middle" /> {num(r.revealedWood)}</span>
-                          <span><Icon name="iron" size={14} className="inline-block align-middle" /> {num(r.revealedIron)}</span>
-                          <span><Icon name="stone" size={14} className="inline-block align-middle" /> {num(r.revealedStone)}</span>
+                          <span><Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {num(r.revealedGold)}</span>
+                          <span><Icon name="wood" size={14} className="inline-block align-middle text-amber-600" /> {num(r.revealedWood)}</span>
+                          <span><Icon name="iron" size={14} className="inline-block align-middle text-slate-300" /> {num(r.revealedIron)}</span>
+                          <span><Icon name="stone" size={14} className="inline-block align-middle text-stone-400" /> {num(r.revealedStone)}</span>
                           <span><Icon name="army" size={14} className="inline-block align-middle" /> {num(r.revealedSoldiers)}</span>
                           <span><Icon name="spy" size={14} className="inline-block align-middle" /> {num(r.revealedSpies)}</span>
                           <span><Icon name="mine" size={14} className="inline-block align-middle" /> {num(r.revealedMineSlaves)}</span>
@@ -293,6 +327,7 @@ export function ReportsTabs({
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

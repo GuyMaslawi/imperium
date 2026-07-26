@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Dialog } from "@/components/ui/Dialog";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { ItemTile, formatBonus } from "@/components/game/ItemTile";
 import { uiRarity, type HeroItemView } from "@/components/game/heroItemView";
@@ -160,8 +160,13 @@ export function ItemDialog({
           <div className="space-y-1">
             {resourceLines.map((line) => (
               <div key={line.label} className="flex items-center justify-between">
-                <span className="text-zinc-400">
-                  {line.icon} {line.label}
+                <span className="inline-flex items-center gap-1.5 text-zinc-400">
+                  <Icon
+                    name={RESOURCE_ICON[line.resource]}
+                    size={14}
+                    className={RESOURCE_ICON_COLOR[line.resource]}
+                  />
+                  {line.label}
                 </span>
                 <span className="nums font-black text-emerald-400" dir="ltr">
                   +{formatBonus(line.value)}
@@ -171,8 +176,9 @@ export function ItemDialog({
           </div>
         ) : (
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400">
-              {statMeta.icon} {statMeta.label}
+            <span className="inline-flex items-center gap-1.5 text-zinc-400">
+              <Icon name={statMeta.icon} size={14} />
+              {statMeta.label}
             </span>
             <span className="nums font-black text-emerald-400" dir="ltr">
               +{formatBonus(bonus.value)}{unit}
@@ -215,7 +221,7 @@ export function ItemDialog({
               className={`nums font-bold ${canAfford ? "text-gold-bright" : "text-red-400"}`}
               dir="ltr"
             >
-              <Icon name="gold" size={14} className="inline align-[-2px]" /> {upgradeCost != null ? formatNumber(upgradeCost) : ""}
+              <Icon name="gold" size={14} className="inline align-[-2px] text-gold-bright" /> {upgradeCost != null ? formatNumber(upgradeCost) : ""}
             </span>
           </div>
           {!meetsUpgradeLevel && (

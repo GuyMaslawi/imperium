@@ -1,4 +1,5 @@
 import type { Hero, HeroClass, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
+import type { IconName } from "@/components/ui/Icon";
 import { RESOURCE_META, type StorableResource } from "./constants";
 import { secureRandom } from "./random";
 
@@ -133,7 +134,8 @@ export type HeroStat = HeroPercentStat | HeroFlatStat;
 
 export interface HeroStatMeta {
   label: string;
-  icon: string;
+  /** Shared icon-set name — resource stats wear the same glyph as everywhere. */
+  icon: IconName;
   tone: string;
   /** Present only on stats that accept allocated hero points. */
   pointsField?: "attackPoints" | "defensePoints" | "resourcePoints";
@@ -143,21 +145,21 @@ export interface HeroStatMeta {
 export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   attack: {
     label: "התקפה",
-    icon: "⚔️",
+    icon: "attack",
     tone: "text-red-400",
     pointsField: "attackPoints",
     description: "כל אחוז מגדיל את כוח הצבא שלך בתקיפה.",
   },
   defense: {
     label: "הגנה",
-    icon: "🛡️",
+    icon: "shield",
     tone: "text-sky-300",
     pointsField: "defensePoints",
     description: "כל אחוז מגדיל את כוח הצבא שלך בהגנה מפני תקיפות.",
   },
   resources: {
     label: "משאבים",
-    icon: "⛏️",
+    icon: "mine",
     tone: "text-emerald-400",
     pointsField: "resourcePoints",
     // Points give a %; items give flat resources (see HeroPowerSummary).
@@ -165,25 +167,25 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   },
   spy: {
     label: "ריגול",
-    icon: "🕵️",
+    icon: "spy",
     tone: "text-fuchsia-300",
     description: "כל אחוז מחפצים מגדיל את סיכוי הצלחת משימת הריגול שלך.",
   },
   turns: {
     label: "תורות",
-    icon: "⏳",
+    icon: "turns",
     tone: "text-amber-300",
     description: "חפצים מוסיפים תורות בכמות קבועה בכל עדכון רגיל (לא באחוזים).",
   },
   diamonds: {
     label: "יהלומים",
-    icon: "💎",
+    icon: "diamond",
     tone: "text-cyan-300",
     description: "חפצים מוסיפים יהלומים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
   citizens: {
     label: "אזרחים",
-    icon: "👥",
+    icon: "citizens",
     tone: "text-lime-300",
     description: "חפצים מוסיפים אזרחים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
@@ -434,15 +436,16 @@ export function itemBonusValue(
 
 /** One resource line an item grants: its icon, its name, and the flat amount. */
 export interface ItemResourceLine {
-  icon: string;
+  /** Resource key — the view resolves icon + tint from the shared maps. */
+  resource: StorableResource;
   label: string;
   value: number;
 }
 
 /**
  * The per-resource breakdown a resource-item grants — one line per covered
- * resource, each with its icon, its word, and its flat amount (e.g.
- * "⚙️ ברזל 20"). Empty for non-resource items (which show a single stat line).
+ * resource, each with its key, its word, and its flat amount (e.g. iron/"ברזל"
+ * /20). Empty for non-resource items (which show a single stat line).
  */
 export function itemResourceBreakdown(
   slot: HeroItemSlot,
@@ -451,7 +454,7 @@ export function itemResourceBreakdown(
   if (SLOT_META[slot].stat !== "resources") return [];
   const value = itemBonusFlat(slot, level);
   return resourceItemResources(level).map((r) => ({
-    icon: RESOURCE_META[r].icon,
+    resource: r,
     label: RESOURCE_META[r].label,
     value,
   }));
@@ -556,14 +559,14 @@ export function classXpMultiplier(heroClass: HeroClass | null | undefined): numb
 /** The non-zero bonus lines of a class, for badges/tooltips. */
 export function heroClassBonusLines(
   heroClass: HeroClass
-): { label: string; icon: string; pct: number }[] {
+): { label: string; icon: IconName; pct: number }[] {
   const b = HERO_CLASS_META[heroClass].bonuses;
-  const lines: { label: string; icon: string; pct: number }[] = [];
-  if (b.attack) lines.push({ label: "התקפה", icon: "⚔️", pct: b.attack });
-  if (b.defense) lines.push({ label: "הגנה", icon: "🛡️", pct: b.defense });
-  if (b.resources) lines.push({ label: "תפוקת משאבים", icon: "⛏️", pct: b.resources });
-  if (b.spy) lines.push({ label: "ריגול", icon: "🕵️", pct: b.spy });
-  if (b.xp) lines.push({ label: "ניסיון גיבור", icon: "✨", pct: b.xp });
+  const lines: { label: string; icon: IconName; pct: number }[] = [];
+  if (b.attack) lines.push({ label: "התקפה", icon: "attack", pct: b.attack });
+  if (b.defense) lines.push({ label: "הגנה", icon: "shield", pct: b.defense });
+  if (b.resources) lines.push({ label: "תפוקת משאבים", icon: "mine", pct: b.resources });
+  if (b.spy) lines.push({ label: "ריגול", icon: "spy", pct: b.spy });
+  if (b.xp) lines.push({ label: "ניסיון גיבור", icon: "spark", pct: b.xp });
   return lines;
 }
 

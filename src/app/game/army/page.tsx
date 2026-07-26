@@ -24,7 +24,7 @@ export default async function ArmyPage() {
           <span className="rounded-lg border border-gold/40 bg-panel-inset px-3 py-1 text-sm">
             <span className="text-gold-dim">אזרחים פנויים </span>
             <span className="nums font-black text-gold-bright" dir="ltr">
-              <Icon name="citizens" size={14} className="inline align-[-2px]" /> {formatNumber(empire.citizens)}
+              <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> {formatNumber(empire.citizens)}
             </span>
           </span>
         </div>

@@ -25,11 +25,20 @@ export default async function ReportsPage() {
       take: 30,
       include: { attackerEmpire: true, defenderEmpire: true },
     }),
+    // Missions I sent, plus enemy spies my defenses caught. A *successful*
+    // enemy mission is deliberately not listed: stealth is the whole point of
+    // spying, and the game only ever tells the defender about a caught spy
+    // (see the SPY message in spyOnEmpire).
     prisma.spyReport.findMany({
-      where: { attackerEmpireId: empire.id },
+      where: {
+        OR: [
+          { attackerEmpireId: empire.id },
+          { defenderEmpireId: empire.id, success: false },
+        ],
+      },
       orderBy: { createdAt: "desc" },
-      take: 30,
-      include: { defenderEmpire: true },
+      take: 60,
+      include: { attackerEmpire: true, defenderEmpire: true },
     }),
   ]);
 
@@ -75,25 +84,33 @@ export default async function ReportsPage() {
     };
   });
 
-  const spyRows: SpyRow[] = spies.map((report) => ({
-    id: report.id,
-    createdAt: formatDate(report.createdAt),
-    isNew: report.createdAt > seenAt,
-    rival: report.defenderEmpire.name,
-    success: report.success,
-    turnsSpent: report.turnsSpent,
-    finalChance: report.finalChance,
-    weaponsBonus: report.weaponsBonus,
-    attackerIntel: report.attackerIntel,
-    defenderIntel: report.defenderIntel,
-    revealedGold: report.revealedGold ?? 0,
-    revealedWood: report.revealedWood ?? 0,
-    revealedIron: report.revealedIron ?? 0,
-    revealedStone: report.revealedStone ?? 0,
-    revealedSoldiers: report.revealedSoldiers ?? 0,
-    revealedSpies: report.revealedSpies ?? 0,
-    revealedMineSlaves: report.revealedMineSlaves ?? 0,
-  }));
+  const spyRows: SpyRow[] = spies.map((report) => {
+    const isAttacker = report.attackerEmpireId === empire.id;
+    return {
+      id: report.id,
+      createdAt: formatDate(report.createdAt),
+      isNew: report.createdAt > seenAt,
+      rival: isAttacker
+        ? report.defenderEmpire.name
+        : report.attackerEmpire.name,
+      isAttacker,
+      success: report.success,
+      turnsSpent: report.turnsSpent,
+      finalChance: report.finalChance,
+      weaponsBonus: report.weaponsBonus,
+      attackerIntel: report.attackerIntel,
+      defenderIntel: report.defenderIntel,
+      // Nothing was revealed to me by an enemy spy I caught — zero the intel
+      // columns rather than leak the snapshot the report happens to carry.
+      revealedGold: isAttacker ? report.revealedGold ?? 0 : 0,
+      revealedWood: isAttacker ? report.revealedWood ?? 0 : 0,
+      revealedIron: isAttacker ? report.revealedIron ?? 0 : 0,
+      revealedStone: isAttacker ? report.revealedStone ?? 0 : 0,
+      revealedSoldiers: isAttacker ? report.revealedSoldiers ?? 0 : 0,
+      revealedSpies: isAttacker ? report.revealedSpies ?? 0 : 0,
+      revealedMineSlaves: isAttacker ? report.revealedMineSlaves ?? 0 : 0,
+    };
+  });
 
   return (
     <div className="space-y-6">

@@ -109,7 +109,7 @@ export function DiamondStore({
                   {pkg.emoji}
                 </span>
                 <div className="mt-2 flex items-center gap-2">
-                  <Icon name="diamond" size={26} className="text-sky-300" />
+                  <Icon name="diamond" size={26} className="text-cyan-300" />
                   <span
                     className="nums text-3xl font-black text-sky-200"
                     dir="ltr"
@@ -260,7 +260,7 @@ function CheckoutModal({
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">יהלומים</span>
                 <span className="nums inline-flex items-center gap-1 font-black text-sky-200" dir="ltr">
-                  <Icon name="diamond" size={16} className="text-sky-300" />
+                  <Icon name="diamond" size={16} className="text-cyan-300" />
                   {formatNumber(total)}
                 </span>
               </div>

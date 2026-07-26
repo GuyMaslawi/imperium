@@ -45,7 +45,7 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
         disabled={!canAfford}
         pendingText="מקים ברית..."
       >
-        ⚒️ שלם {GUILD_CREATION_COST_DIAMONDS} <Icon name="diamond" size={14} className="inline-block align-text-bottom" /> והקם ברית
+        ⚒️ שלם {GUILD_CREATION_COST_DIAMONDS} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" /> והקם ברית
       </SubmitButton>
 
       {!canAfford && (

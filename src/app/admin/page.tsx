@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
@@ -7,7 +8,7 @@ import { formatIls } from "@/lib/game/diamondStore";
 
 export const dynamic = "force-dynamic";
 
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {
+function StatCard({ label, value, icon }: { label: string; value: string | number; icon: ReactNode }) {
   return (
     <div className="panel rounded-xl p-4 text-center">
       <div className="text-2xl" aria-hidden>
@@ -83,7 +84,7 @@ export default async function AdminDashboard() {
         <StatCard
           label='סה"כ יהלומים'
           value={Math.round(resources._sum.diamonds ?? 0)}
-          icon="💎"
+          icon={<Icon name="diamond" size={26} className="text-cyan-300" />}
         />
         <Link href="/admin/purchases" className="contents">
           <StatCard

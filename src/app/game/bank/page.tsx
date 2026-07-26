@@ -22,7 +22,9 @@ const TRANSACTION_META: Record<
 > = {
   DEPOSIT: { label: "הפקדה", icon: "⬇️", sign: "+", color: "text-emerald-400" },
   WITHDRAW: { label: "משיכה", icon: "⬆️", sign: "-", color: "text-red-400" },
-  INTEREST: { label: "ריבית", icon: "💰", sign: "+", color: "text-gold" },
+  // 📈 rather than a money bag: these three mark the *direction* of a movement,
+  // and a coin here would be a second drawing of the gold icon.
+  INTEREST: { label: "ריבית", icon: "📈", sign: "+", color: "text-gold" },
 };
 
 export default async function BankPage() {
@@ -145,7 +147,11 @@ export default async function BankPage() {
           <ul className="space-y-3 text-sm">
             <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
               <span className="font-semibold text-zinc-100">
-                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.icon}{" "}
+                <Icon
+                  name={EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.icon}
+                  size={14}
+                  className="inline align-[-2px] text-gold-bright"
+                />{" "}
                 {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.label} — רמה{" "}
                 <span className="nums" dir="ltr">
                   {depositLevel}
@@ -157,7 +163,11 @@ export default async function BankPage() {
             </li>
             <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
               <span className="font-semibold text-zinc-100">
-                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.icon}{" "}
+                <Icon
+                  name={EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.icon}
+                  size={14}
+                  className="inline align-[-2px] text-gold-bright"
+                />{" "}
                 {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.label} — רמה{" "}
                 <span className="nums" dir="ltr">
                   {interestLevel}

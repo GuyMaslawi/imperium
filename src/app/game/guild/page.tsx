@@ -119,7 +119,7 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
             יצירת ברית
           </h2>
           <span className="nums flex items-center gap-1 rounded-full border border-gold/50 bg-panel-inset px-3 py-1 text-sm font-bold text-sky-300">
-            <Icon name="diamond" size={14} /> {GUILD_CREATION_COST_DIAMONDS}
+            <Icon name="diamond" size={14} className="text-cyan-300" /> {GUILD_CREATION_COST_DIAMONDS}
           </span>
         </div>
 

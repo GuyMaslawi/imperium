@@ -2,6 +2,7 @@
 
 import { ItemTile, formatBonus } from "@/components/game/ItemTile";
 import { catalogKey, itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
+import { Icon } from "@/components/ui/Icon";
 import {
   HERO_STAT_META,
   ITEM_DROP_CHANCE,
@@ -83,7 +84,8 @@ export function ItemCatalog({
                 {slotMeta.icon} {slotMeta.label}
               </h2>
               <span className="text-[11px] text-zinc-500">
-                {statMeta.icon} {statMeta.label} — עד{" "}
+                <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" />{" "}
+                {statMeta.label} — עד{" "}
                 <span className="nums text-emerald-400" dir="ltr">
                   +{formatBonus(maxBonus.value)}
                   {maxBonus.flat ? "" : "%"}

@@ -54,9 +54,12 @@ export default async function HeroPage() {
         ornament={<Icon name="attack" size={22} className="text-crimson" />}
       />
 
-      {/* -------- character showcase: the hero wearing his own gear -------- */}
+      {/* -------- character showcase: the hero wearing his own gear --------
+          The portrait is capped narrow and the class prose trimmed to a line so
+          the point allocation — the only thing on this page a player acts on
+          every visit — sits beside it instead of a scroll below it. */}
       <div className="panel relative rounded-2xl border border-border-gold-strong">
-        <div className="grid md:grid-cols-[minmax(0,400px)_1fr]">
+        <div className="grid md:grid-cols-[minmax(0,290px)_1fr]">
           {/* paperdoll (right in RTL) — the 9 pieces sit on the figure itself */}
           <div className="relative">
             <HeroPaperdoll
@@ -98,60 +101,80 @@ export default async function HeroPage() {
             </div>
           </div>
 
-          {/* identity + class bonuses + xp (left in RTL) */}
-          <div className="flex flex-col justify-center gap-4 p-5 md:p-6">
-            <div>
-              {/* the class name lives here now — the portrait is pure visual */}
-              <p className="text-2xl font-black text-gold-bright">{classMeta.label}</p>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.35em] text-bone-dim">
+          {/* identity + class bonuses + xp + point allocation (left in RTL) */}
+          <div className="flex flex-col gap-3.5 p-4 md:p-5">
+            {/* identity — one compact line; the long class blurb is a tooltip */}
+            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+              <p className="text-xl font-black text-gold-bright">{classMeta.label}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
                 {classMeta.title}
               </p>
-              <p className="text-sm text-zinc-400">{classMeta.tagline}</p>
-              <p className="mt-1 text-base text-zinc-300">{classMeta.description}</p>
+              <Tip tip={classMeta.description}>
+                <span className="cursor-help text-xs text-zinc-500 underline decoration-dotted underline-offset-2">
+                  על המחלקה
+                </span>
+              </Tip>
             </div>
+            <p className="-mt-2 text-xs text-zinc-400">{classMeta.tagline}</p>
 
             {/* permanent class bonuses */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {classLines.map((line) => (
                 <Tip key={line.label} tip="יתרון המחלקה — בונוס קבוע שנבחר בעת ההרשמה">
-                  <span className="flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-950/40 px-2.5 py-1 text-sm font-bold text-emerald-300">
+                  <span className="flex items-center gap-1.5 rounded-lg border border-emerald-400/30 bg-emerald-950/40 px-2 py-0.5 text-xs font-bold text-emerald-300">
                     <span aria-hidden>{line.icon}</span>
                     {line.label}
                     <span className="nums" dir="ltr">+{line.pct}%</span>
                   </span>
                 </Tip>
               ))}
-              <Tip tip="נקודות גיבור שטרם הוקצו — מתקבלת נקודה בכל עליית רמה. הקצה אותן בכרטיסי ההתקפה/הגנה/משאבים למטה (כל נקודה = +1% לצמיתות).">
-                <span className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-panel-inset px-2.5 py-1 text-sm font-bold text-gold">
-                  נקודות פנויות
-                  <span className="nums" dir="ltr">{hero.unspentPoints}</span>
-                </span>
-              </Tip>
             </div>
 
             {/* xp */}
             <div>
-              <div className="mb-1.5 flex items-center justify-between text-xs text-zinc-400">
+              <div className="mb-1 flex items-center justify-between text-[11px] text-zinc-400">
                 <span className="nums" dir="ltr">
                   {atCap ? "MAX" : `${formatNumber(hero.xp)}/${formatNumber(xpMax)}`}
                 </span>
-                <span className="nums text-gold" dir="ltr">
-                  {xpPct}%
-                </span>
+                <Tip tip="ניסיון מצטבר מקרבות — ניצחון בתקיפה מעניק הכי הרבה, וגם הגנה מוצלחת מזכה. כל עליית רמה מעניקה נקודת גיבור.">
+                  <span className="nums cursor-help text-gold" dir="ltr">
+                    {xpPct}%
+                  </span>
+                </Tip>
               </div>
               <Meter tone="xp" value={atCap ? 1 : hero.xp} max={atCap ? 1 : xpMax} />
-              <p className="mt-1.5 text-[11px] text-zinc-500">
-                ניסיון מצטבר מקרבות — ניצחון בתקיפה מעניק הכי הרבה, וגם הגנה
-                מוצלחת מזכה. כל עליית רמה מעניקה נקודת גיבור.
-              </p>
             </div>
 
-            {atCap && <HeroResetButton />}
+            {/* -------- point allocation: the page's one recurring action -------- */}
+            <div className="panel-inset rounded-xl p-3">
+              <div className="mb-2.5 flex items-center justify-between gap-2">
+                <Tip tip="שלוש התכונות שנקודות הגיבור מחזקות. חפצי הגיבור אינם משנים אחוזים אלה — התרומה שלהם מרוכזת ב'סך הכל מהגיבור' שלמטה.">
+                  <h2 className="cursor-help text-sm font-bold tracking-wide text-gold-bright">
+                    נקודות גיבור
+                  </h2>
+                </Tip>
+                <Tip tip="נקודות גיבור שטרם הוקצו — מתקבלת נקודה בכל עליית רמה. כל נקודה = ‎+1% לצמיתות.">
+                  <span
+                    className={`flex items-center gap-1.5 rounded-lg border px-2 py-0.5 text-xs font-bold ${
+                      hero.unspentPoints > 0
+                        ? "border-gold/50 bg-gold/10 text-gold-bright"
+                        : "border-border-subtle bg-panel-inset text-zinc-400"
+                    }`}
+                  >
+                    פנויות
+                    <span className="nums" dir="ltr">{hero.unspentPoints}</span>
+                  </span>
+                </Tip>
+              </div>
+              {/* stat cards + point allocation (points only — items excluded) */}
+              <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
+            </div>
 
-            <div className="flex justify-start">
+            <div className="flex flex-wrap items-center gap-2">
+              {atCap && <HeroResetButton />}
               <Tip tip="חנות פריטים וחיזוקים לגיבור — בקרוב" side="bottom">
-                <button className="btn btn-ghost px-4 py-2 text-sm">
-                  <Icon name="shop" size={16} className="inline align-[-2px]" /> חנות גיבור
+                <button className="btn btn-ghost px-3 py-1.5 text-xs">
+                  <Icon name="shop" size={14} className="inline align-[-2px]" /> חנות גיבור
                 </button>
               </Tip>
             </div>
@@ -159,26 +182,13 @@ export default async function HeroPage() {
         </div>
       </div>
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {/* -------- inventory (right in RTL) -------- */}
-        <HeroBag
-          items={bagItems}
-          heroLevel={hero.level}
-          gold={empire.gold}
-          wheelSpinBonus={wheelSpinBonus}
-        />
-
-        {/* -------- point allocation (left in RTL) -------- */}
-        <div className="panel rounded-xl p-4">
-          <Tip tip="שלוש התכונות שנקודות הגיבור מחזקות. חפצי הגיבור אינם משנים אחוזים אלה — התרומה שלהם מרוכזת ב'סך הכל מהגיבור' שלמטה.">
-            <h2 className="mb-3 cursor-help text-base font-bold tracking-wide text-gold-bright">
-              נקודות גיבור
-            </h2>
-          </Tip>
-          {/* stat cards + point allocation (points only — items excluded) */}
-          <HeroStatsCards points={bonuses.points} unspentPoints={hero.unspentPoints} />
-        </div>
-      </div>
+      {/* -------- inventory -------- */}
+      <HeroBag
+        items={bagItems}
+        heroLevel={hero.level}
+        gold={empire.gold}
+        wheelSpinBonus={wheelSpinBonus}
+      />
 
       {/* combined yield from points + items together — full-width footer so the
           two columns above stay balanced and nothing trails off into blank space */}

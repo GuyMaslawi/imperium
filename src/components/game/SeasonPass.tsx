@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import {
   buySeasonPassPremium,
   claimSeasonPassRewards,
@@ -11,14 +11,18 @@ import {
 
 function FreeTile({ tier }: { tier: SeasonPassTierView }) {
   const { reached } = tier;
-  const { icon, label, claimed } = tier.free;
+  const { kind, label, claimed } = tier.free;
   return (
     <div
       className={`flex h-full flex-col items-center justify-center gap-1 rounded-lg border p-2 text-center ${
         reached ? "border-sky-500/40 bg-gradient-to-b from-sky-900/30 to-sky-950/50" : "border-white/10 bg-black/30"
       }`}
     >
-      <span className={`text-2xl ${reached ? "" : "opacity-40"}`}>{icon}</span>
+      <Icon
+        name={RESOURCE_ICON[kind]}
+        size={26}
+        className={`${RESOURCE_ICON_COLOR[kind]} ${reached ? "" : "opacity-40"}`}
+      />
       <span className={`px-1 text-[10px] font-bold leading-tight ${reached ? "text-sky-200" : "text-zinc-600"}`}>
         {label}
       </span>
@@ -45,7 +49,7 @@ function PremiumTile({
   delay: number;
 }) {
   const { reached } = tier;
-  const { icon, label, claimed } = tier.premium;
+  const { kind, label, claimed } = tier.premium;
   const showContentUnlocked = owned || unlocking; // reveal artwork as it pops open
   return (
     <div
@@ -56,7 +60,11 @@ function PremiumTile({
           : "border-gold/30 bg-gradient-to-b from-amber-900/20 to-amber-950/40"
       } ${unlocking ? "sp-unlocking" : ""}`}
     >
-      <span className={`text-2xl ${showContentUnlocked ? "" : "opacity-40 grayscale"}`}>{icon}</span>
+      <Icon
+        name={RESOURCE_ICON[kind]}
+        size={26}
+        className={`${RESOURCE_ICON_COLOR[kind]} ${showContentUnlocked ? "" : "opacity-40 grayscale"}`}
+      />
       <span
         className={`px-1 text-[10px] font-bold leading-tight ${
           showContentUnlocked ? "text-gold-bright" : "text-gold-dim/60"
@@ -288,14 +296,14 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                     }`}
                   >
                     {unlocking || pending ? "🔓 פותח..." : (
-                      <span className="inline-flex items-center gap-1">🔓 שדרג עכשיו · {state.price} <Icon name="diamond" size={14} /></span>
+                      <span className="inline-flex items-center gap-1">🔓 שדרג עכשיו · {state.price} <Icon name="diamond" size={14} className="text-cyan-300" /></span>
                     )}
                   </button>
                   <p className={`mt-1.5 text-[10px] ${canAfford ? "text-amber-200/60" : "text-red-400 font-bold"}`}>
                     {canAfford ? (
-                      <span className="inline-flex items-center gap-1">יש לך {state.diamonds} <Icon name="diamond" size={12} /> · נשאר פתוח עד סוף העונה</span>
+                      <span className="inline-flex items-center gap-1">יש לך {state.diamonds} <Icon name="diamond" size={12} className="text-cyan-300" /> · נשאר פתוח עד סוף העונה</span>
                     ) : (
-                      <span className="inline-flex items-center gap-1">אין מספיק יהלומים ({state.diamonds}/{state.price} <Icon name="diamond" size={12} />)</span>
+                      <span className="inline-flex items-center gap-1">אין מספיק יהלומים ({state.diamonds}/{state.price} <Icon name="diamond" size={12} className="text-cyan-300" />)</span>
                     )}
                   </p>
                 </div>

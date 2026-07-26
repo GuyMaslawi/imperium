@@ -6,6 +6,7 @@ import { ItemTile, formatBonus } from "@/components/game/ItemTile";
 import { ItemDialog } from "@/components/game/ItemDialog";
 import { Dialog } from "@/components/ui/Dialog";
 import { Tip } from "@/components/ui/Tip";
+import { Icon } from "@/components/ui/Icon";
 import { equipHeroItem } from "@/server/actions/hero";
 import type { ActionState } from "@/server/actions/game";
 import {
@@ -211,7 +212,7 @@ export function HeroPaperdoll({
                     סלוט ריק
                   </span>
                   <span className="mt-2 block text-xs text-zinc-300">
-                    {statMeta.icon} {statMeta.label}
+                    <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" /> {statMeta.label}
                   </span>
                   <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
                     {waiting > 0
@@ -317,7 +318,7 @@ function SlotPicker({
             <span aria-hidden>{meta.icon}</span> {meta.label}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            {statMeta.icon} {statMeta.label} — בחר חפץ מהתיק כדי ללבוש אותו
+            <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" /> {statMeta.label} — בחר חפץ מהתיק כדי ללבוש אותו
           </p>
         </div>
         <button

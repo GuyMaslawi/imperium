@@ -4,13 +4,13 @@ import { useActionState } from "react";
 import { trainUnits, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
 export interface TrainCardProps {
   unit: "soldiers" | "spies" | "mineSlaves";
   label: string;
-  icon: string;
+  icon: IconName;
   description: string;
   owned: number;
   power: number;
@@ -32,7 +32,7 @@ export function TrainCard({
     <div className="panel-inset rounded-xl p-4 flex flex-col gap-4">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <span aria-hidden className="text-3xl">{icon}</span>
+          <Icon name={icon} size={30} className="text-gold-bright" />
           <div>
             <h3 className="font-bold text-gold-bright">{label}</h3>
             <p className="text-xs text-gold-dim">

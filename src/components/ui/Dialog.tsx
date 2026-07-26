@@ -13,12 +13,15 @@ export function Dialog({
   onClose,
   children,
   labelledBy,
+  size = "sm",
 }: {
   open: boolean;
   onClose: () => void;
   children: ReactNode;
   /** id of the heading that names the dialog, for aria-labelledby. */
   labelledBy?: string;
+  /** "lg" for content that needs room (e.g. a player picker + message form). */
+  size?: "sm" | "lg";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -47,7 +50,9 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={labelledBy}
         dir="rtl"
-        className="panel-gold relative z-10 max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.85)]"
+        className={`panel-gold relative z-10 max-h-[90vh] w-full overflow-y-auto rounded-2xl p-5 shadow-[0_20px_60px_rgba(0,0,0,0.85)] ${
+          size === "lg" ? "max-w-xl" : "max-w-sm"
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

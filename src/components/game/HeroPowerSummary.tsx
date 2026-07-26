@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import { HERO_STAT_META, type HeroBonuses, type HeroStat } from "@/lib/game/hero";
 import { RESOURCE_META, type StorableResource } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
 /**
  * "סך הכל מהגיבור" — the combined yield the player actually gets from the hero,
@@ -38,7 +40,7 @@ function StatRow({
       >
         <div className="min-w-0 text-right">
           <p className="text-sm font-bold text-zinc-200">
-            <span aria-hidden>{meta.icon}</span> {meta.label}
+            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {meta.label}
           </p>
           <p className="text-[11px] leading-tight text-zinc-500">{note}</p>
         </div>
@@ -77,7 +79,7 @@ function ResourcesRow({
   /** Flat resource units the equipped relic conjures each regular tick. */
   itemFlat: number;
   /** Which resources the relic feeds (or a waiting hint when none equipped). */
-  itemNote: string;
+  itemNote: ReactNode;
 }) {
   const meta = HERO_STAT_META.resources;
   const totalPctValue = pointsPct + classPct;
@@ -99,7 +101,7 @@ function ResourcesRow({
       >
         <div className="min-w-0 text-right">
           <p className="text-sm font-bold text-zinc-200">
-            <span aria-hidden>{meta.icon}</span> {meta.label}
+            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {meta.label}
           </p>
           <div className="mt-0.5 space-y-0.5 text-[11px] leading-tight text-zinc-500">
             {pointsPct > 0 && (
@@ -159,9 +161,24 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
     (r) => itemsFlatByResource[r] > 0
   );
   const resourcesNote =
-    coveredResources.length > 0
-      ? `${coveredResources.map((r) => `${RESOURCE_META[r].icon} ${RESOURCE_META[r].label}`).join(" · ")} — בכל עדכון רגיל`
-      : "מחפץ פרי שטן — המשאבים לפי דרגת החפץ";
+    coveredResources.length > 0 ? (
+      <>
+        {coveredResources.map((r, i) => (
+          <span key={r} className="inline-flex items-center gap-1">
+            {i > 0 && <span className="mx-0.5">·</span>}
+            <Icon
+              name={RESOURCE_ICON[r]}
+              size={11}
+              className={RESOURCE_ICON_COLOR[r]}
+            />
+            {RESOURCE_META[r].label}
+          </span>
+        ))}{" "}
+        — בכל עדכון רגיל
+      </>
+    ) : (
+      "מחפץ פרי שטן — המשאבים לפי דרגת החפץ"
+    );
 
   // התקפה/הגנה = נקודות + חפצים; ריגול מגיע מחפצים בלבד.
   const percentRows: { stat: HeroStat; value: number; note: string }[] = [

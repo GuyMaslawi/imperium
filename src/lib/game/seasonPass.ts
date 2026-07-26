@@ -135,8 +135,11 @@ export type SeasonPassRewardKind =
   | "citizens";
 
 export interface SeasonPassReward {
+  /**
+   * Also picks the icon: the ladder renders through `RESOURCE_ICON[kind]`, so a
+   * reward can never drift to a glyph the rest of the game doesn't use.
+   */
   kind: SeasonPassRewardKind;
-  icon: string;
   /** Day-1 quantity. */
   base: number;
   /** Round the grown amount to a clean, readable step. */
@@ -161,43 +164,43 @@ export interface SeasonPassTier {
 export const SEASON_PASS_TIERS: SeasonPassTier[] = [
   {
     tier: 1,
-    free: { kind: "gold", icon: "🪙", base: 4000, step: 100 },
-    premium: { kind: "gold", icon: "🪙", base: 12000, step: 100 },
+    free: { kind: "gold", base: 4000, step: 100 },
+    premium: { kind: "gold", base: 12000, step: 100 },
   },
   {
     tier: 2,
-    free: { kind: "wood", icon: "🌲", base: 3000, step: 100 },
-    premium: { kind: "wood", icon: "🌲", base: 9000, step: 100 },
+    free: { kind: "wood", base: 3000, step: 100 },
+    premium: { kind: "wood", base: 9000, step: 100 },
   },
   {
     tier: 3,
-    free: { kind: "iron", icon: "⚙️", base: 2500, step: 100 },
-    premium: { kind: "iron", icon: "⚙️", base: 7500, step: 100 },
+    free: { kind: "iron", base: 2500, step: 100 },
+    premium: { kind: "iron", base: 7500, step: 100 },
   },
   {
     tier: 4,
-    free: { kind: "stone", icon: "🪨", base: 2500, step: 100 },
-    premium: { kind: "stone", icon: "🪨", base: 7500, step: 100 },
+    free: { kind: "stone", base: 2500, step: 100 },
+    premium: { kind: "stone", base: 7500, step: 100 },
   },
   {
     tier: 5,
-    free: { kind: "turns", icon: "🔄", base: 40, step: 5 },
-    premium: { kind: "turns", icon: "🔄", base: 120, step: 5 },
+    free: { kind: "turns", base: 40, step: 5 },
+    premium: { kind: "turns", base: 120, step: 5 },
   },
   {
     tier: 6,
-    free: { kind: "citizens", icon: "👥", base: 25, step: 5 },
-    premium: { kind: "citizens", icon: "👥", base: 75, step: 5 },
+    free: { kind: "citizens", base: 25, step: 5 },
+    premium: { kind: "citizens", base: 75, step: 5 },
   },
   {
     tier: 7,
-    free: { kind: "gold", icon: "🪙", base: 5000, step: 100 },
-    premium: { kind: "gold", icon: "🪙", base: 15000, step: 100 },
+    free: { kind: "gold", base: 5000, step: 100 },
+    premium: { kind: "gold", base: 15000, step: 100 },
   },
   {
     tier: 8,
-    free: { kind: "wood", icon: "🌲", base: 4000, step: 100 },
-    premium: { kind: "wood", icon: "🌲", base: 12000, step: 100 },
+    free: { kind: "wood", base: 4000, step: 100 },
+    premium: { kind: "wood", base: 12000, step: 100 },
   },
 ];
 

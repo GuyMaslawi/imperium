@@ -1,4 +1,5 @@
 import type { GameSeason } from "@prisma/client";
+import type { IconName } from "@/components/ui/Icon";
 import { dailyUpdatesBetween } from "./time";
 import { secureRandom } from "./random";
 
@@ -25,7 +26,8 @@ export type WheelPrizeKind = "amount" | "unit";
 export interface WheelPrizeDef {
   key: string;
   label: string;
-  icon: string;
+  /** Shared icon-set name — resource wedges resolve through `RESOURCE_ICON`. */
+  icon: IconName;
   color: string;
   kind: WheelPrizeKind;
   /** Day-1 amount for `kind: "amount"` prizes; ignored for unit prizes. */
@@ -47,16 +49,16 @@ export interface WheelPrizeDef {
 
 /** 10 wedges (36° each), going clockwise from the top pointer. */
 export const WHEEL_PRIZES: WheelPrizeDef[] = [
-  { key: "diamonds", label: "יהלומים", icon: "💎", color: "#6d1f1f", kind: "amount", base: 3, step: 1, fixed: true },
-  { key: "turns", label: "תורות", icon: "🔄", color: "#141414", kind: "amount", base: 30, step: 5 },
-  { key: "gold", label: "זהב", icon: "🪙", color: "#6d1f1f", kind: "amount", base: 800, step: 50 },
-  { key: "iron", label: "ברזל", icon: "⚙️", color: "#141414", kind: "amount", base: 400, step: 50 },
-  { key: "stone", label: "אבן", icon: "🪨", color: "#6d1f1f", kind: "amount", base: 400, step: 50 },
-  { key: "wood", label: "עץ", icon: "🪵", color: "#141414", kind: "amount", base: 500, step: 50 },
-  { key: "allWeapons", label: "כל הנשק", icon: "🗡️", color: "#6d1f1f", kind: "unit", base: 1, step: 1, note: "אחד מכל סוג נשק שפתחת" },
-  { key: "citizens", label: "אזרחים", icon: "👥", color: "#c9761b", kind: "amount", base: 20, step: 5 },
-  { key: "item", label: "חפץ", icon: "✨", color: "#6d28d9", kind: "unit", base: 1, step: 1, note: "דורש מקום פנוי בתיק הגיבור" },
-  { key: "loot", label: "שלל", icon: "🎁", color: "#141414", kind: "amount", base: 1000, step: 100, note: "חבילת משאבים מעורבת בשווי זהב" },
+  { key: "diamonds", label: "יהלומים", icon: "diamond", color: "#6d1f1f", kind: "amount", base: 3, step: 1, fixed: true },
+  { key: "turns", label: "תורות", icon: "turns", color: "#141414", kind: "amount", base: 30, step: 5 },
+  { key: "gold", label: "זהב", icon: "gold", color: "#6d1f1f", kind: "amount", base: 800, step: 50 },
+  { key: "iron", label: "ברזל", icon: "iron", color: "#141414", kind: "amount", base: 400, step: 50 },
+  { key: "stone", label: "אבן", icon: "stone", color: "#6d1f1f", kind: "amount", base: 400, step: 50 },
+  { key: "wood", label: "עץ", icon: "wood", color: "#141414", kind: "amount", base: 500, step: 50 },
+  { key: "allWeapons", label: "כל הנשק", icon: "attack", color: "#6d1f1f", kind: "unit", base: 1, step: 1, note: "אחד מכל סוג נשק שפתחת" },
+  { key: "citizens", label: "אזרחים", icon: "citizens", color: "#c9761b", kind: "amount", base: 20, step: 5 },
+  { key: "item", label: "חפץ", icon: "spark", color: "#6d28d9", kind: "unit", base: 1, step: 1, note: "דורש מקום פנוי בתיק הגיבור" },
+  { key: "loot", label: "שלל", icon: "gift", color: "#141414", kind: "amount", base: 1000, step: 100, note: "חבילת משאבים מעורבת בשווי זהב" },
 ];
 
 /** A concrete quantity actually granted by a spin, in the prize's own unit. */

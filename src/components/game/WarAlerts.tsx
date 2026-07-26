@@ -40,6 +40,12 @@ const KIND_STYLE: Record<LiveAlert["kind"], KindStyle> = {
     accent: "240 205 120",
     tagClass: "bg-amber-500 text-black",
   },
+  PLAYER: {
+    icon: <Icon name="messages" size={22} />,
+    tag: "משחקן",
+    accent: "16 185 129",
+    tagClass: "bg-emerald-500 text-black",
+  },
 };
 
 function loadSeen(): Set<string> {

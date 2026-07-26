@@ -20,7 +20,7 @@ export default async function BuyDiamondsPage() {
       <SectionHeading
         title="רכישת יהלומים"
         subtitle="GET DIAMONDS"
-        ornament={<Icon name="diamond" size={22} className="text-sky-300" />}
+        ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
       {/* hero / balance banner */}
@@ -32,7 +32,7 @@ export default async function BuyDiamondsPage() {
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <h2 className="flex items-center gap-2 text-xl font-black text-sky-100">
-              <Icon name="diamond" size={22} className="text-sky-300" />
+              <Icon name="diamond" size={22} className="text-cyan-300" />
               יהלומים — המטבע היוקרתי של האימפריום
             </h2>
             <p className="mt-1 max-w-lg text-sm text-zinc-400">
@@ -45,7 +45,7 @@ export default async function BuyDiamondsPage() {
             <span className="nums text-2xl font-black text-sky-300" dir="ltr">
               {formatNumber(diamonds)}
             </span>
-            <Icon name="diamond" size={18} className="text-sky-300" />
+            <Icon name="diamond" size={18} className="text-cyan-300" />
           </div>
         </div>
       </div>

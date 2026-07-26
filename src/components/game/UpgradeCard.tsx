@@ -5,7 +5,7 @@ import { upgradeEmpireUpgrade, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
 import type { AvailableResources } from "@/components/game/WeaponCard";
@@ -20,7 +20,7 @@ const COST_RESOURCES = [
 export interface UpgradeCardProps {
   upgradeType: ActiveEmpireUpgradeType;
   label: string;
-  icon: string;
+  icon: IconName;
   description: string;
   level: number;
   currentEffect: string;
@@ -50,11 +50,8 @@ export function UpgradeCard({
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        <span
-          aria-hidden
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-panel-inset text-2xl"
-        >
-          {icon}
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-panel-inset">
+          <Icon name={icon} size={26} className="text-gold-bright" />
         </span>
         <div>
           <h3 className="font-bold text-gold-bright">{label}</h3>

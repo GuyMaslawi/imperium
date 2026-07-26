@@ -34,15 +34,18 @@ export function HeroStatsCards({
     <div className="flex w-full flex-col gap-3">
       {unspentPoints > 0 && (
         <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בכרטיס מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
-          <div className="points-pulse w-full rounded-lg border bg-gold/10 p-3 text-center">
+          {/* One line, not a stacked hero block: this panel now sits at the top
+              of the hero screen, where every row it costs pushes the cards down. */}
+          <div className="points-pulse flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-lg border bg-gold/10 px-3 py-1.5 text-center">
             <p className="text-xs font-bold text-gold-bright">
-              <Icon name="spark" size={14} className="inline align-[-2px]" /> יש לך נקודות פנויות!
-            </p>
-            <p className="nums text-2xl font-black text-gold-bright" dir="ltr">
-              {unspentPoints}
+              <Icon name="spark" size={14} className="inline align-[-2px]" /> יש לך{" "}
+              <span className="nums text-base font-black" dir="ltr">
+                {unspentPoints}
+              </span>{" "}
+              נקודות פנויות
             </p>
             <p className="text-[10px] text-gold-dim">
-              לחץ +1 / +5 בכרטיס כדי להקצות (כל נקודה = ‎+1%)
+              — לחץ +1 / +5 בכרטיס (כל נקודה = ‎+1%)
             </p>
           </div>
         </Tip>
@@ -67,7 +70,7 @@ export function HeroStatsCards({
                 }
               >
                 <p className="cursor-help text-xs text-zinc-400">
-                  {meta.icon} {meta.label}
+                  <Icon name={meta.icon} size={13} className="inline align-[-2px]" /> {meta.label}
                 </p>
               </Tip>
               <p className={`nums mt-0.5 text-lg font-bold ${meta.tone}`} dir="ltr">

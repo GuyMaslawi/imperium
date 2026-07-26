@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
 const INPUT_CLASS =
   "w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 outline-none transition-colors focus:border-gold/60";
@@ -16,7 +17,7 @@ export function LabeledInput({
   dir,
   hint,
 }: {
-  label: string;
+  label: ReactNode;
   name: string;
   defaultValue?: string | number;
   type?: "text" | "number" | "email" | "password" | "datetime-local";
@@ -80,7 +81,7 @@ export function EditorSection({
   className = "",
 }: {
   title: string;
-  icon?: string;
+  icon?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -98,3 +99,20 @@ export function EditorSection({
 export const HIDDEN = (name: string, value: string) => (
   <input type="hidden" name={name} value={value} />
 );
+
+/**
+ * Field label for a resource amount — the same glyph and tint the game screens
+ * use, so an admin editing gold sees the icon a player sees.
+ */
+export function ResourceFieldLabel({ resource, text }: { resource: string; text: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <Icon
+        name={RESOURCE_ICON[resource]}
+        size={13}
+        className={RESOURCE_ICON_COLOR[resource]}
+      />
+      {text}
+    </span>
+  );
+}

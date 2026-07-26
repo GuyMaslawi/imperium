@@ -3,15 +3,21 @@ import type {
   EmpireUpgradeType,
   ResourceStorageType,
 } from "@prisma/client";
+import type { IconName } from "@/components/ui/Icon";
 
+/**
+ * The words for each balance. Deliberately icon-free: a resource's glyph and
+ * tint live in `RESOURCE_ICON` / `RESOURCE_ICON_COLOR` (components/ui/Icon), so
+ * there is exactly one place that decides what a resource looks like.
+ */
 export const RESOURCE_META = {
-  gold: { label: "זהב", icon: "🪙" },
-  wood: { label: "עץ", icon: "🪵" },
-  iron: { label: "ברזל", icon: "⚙️" },
-  stone: { label: "אבן", icon: "🪨" },
-  diamonds: { label: "יהלומים", icon: "💎" },
-  citizens: { label: "אזרחים", icon: "👥" },
-  turns: { label: "תורות", icon: "⏳" },
+  gold: { label: "זהב" },
+  wood: { label: "עץ" },
+  iron: { label: "ברזל" },
+  stone: { label: "אבן" },
+  diamonds: { label: "יהלומים" },
+  citizens: { label: "אזרחים" },
+  turns: { label: "תורות" },
 } as const;
 
 export type ResourceKey = keyof typeof RESOURCE_META;
@@ -37,7 +43,7 @@ export const DAILY_UPDATE_TIMES: ReadonlyArray<{ hour: number; minute: number }>
 
 export interface BuildingMeta {
   label: string;
-  icon: string;
+  icon: IconName;
   description: string;
   producedResource: StorableResource | null;
   supportsSlaves: boolean;
@@ -46,42 +52,42 @@ export interface BuildingMeta {
 export const BUILDING_META: Record<BuildingType, BuildingMeta> = {
   GOLD_MINE: {
     label: "מכרה זהב",
-    icon: "🪙",
+    icon: "gold",
     description: "כורה זהב מהאדמה. ככל שרמת המכרה גבוהה יותר ויש יותר עבדי מכרות — התפוקה עולה.",
     producedResource: "gold",
     supportsSlaves: true,
   },
   WOOD_CAMP: {
     label: "מכרה עץ",
-    icon: "🪵",
+    icon: "wood",
     description: "עבדי המכרות כורתים כאן עץ לבנייה ולצבא.",
     producedResource: "wood",
     supportsSlaves: true,
   },
   IRON_MINE: {
     label: "מכרה ברזל",
-    icon: "⚙️",
+    icon: "iron",
     description: "ברזל הוא הבסיס לכל כלי הנשק של האימפריה.",
     producedResource: "iron",
     supportsSlaves: true,
   },
   STONE_QUARRY: {
     label: "מחצבת אבן",
-    icon: "🪨",
+    icon: "stone",
     description: "אבן איכותית לחומות, מבנים וביצורים.",
     producedResource: "stone",
     supportsSlaves: true,
   },
   BARRACKS: {
     label: "מחנה אימונים",
-    icon: "⚔️",
+    icon: "army",
     description: "כאן מאומנים חיילי האימפריה.",
     producedResource: null,
     supportsSlaves: false,
   },
   SPY_CENTER: {
     label: "מרכז מודיעין",
-    icon: "🕵️",
+    icon: "spy",
     description: "מרכז הריגול של האימפריה. נדרש להכשרת מרגלים.",
     producedResource: null,
     supportsSlaves: false,
@@ -164,7 +170,7 @@ export function mineUpgradeCost(level: number, resource: StorableResource) {
 export interface UnitMeta {
   label: string;
   labelPlural: string;
-  icon: string;
+  icon: IconName;
   description: string;
   /** Training is free of resources — each unit converts one citizen. */
   citizenCost: number;
@@ -175,7 +181,7 @@ export const UNIT_META = {
   soldiers: {
     label: "חייל",
     labelPlural: "חיילים",
-    icon: "🪖",
+    icon: "army",
     description: "כוח הלחימה המרכזי של האימפריה.",
     citizenCost: 1,
     power: 10,
@@ -183,7 +189,7 @@ export const UNIT_META = {
   spies: {
     label: "מרגל",
     labelPlural: "מרגלים",
-    icon: "🕵️",
+    icon: "spy",
     description: "חושפים מידע על אימפריות יריבות.",
     citizenCost: 1,
     power: 0,
@@ -191,7 +197,7 @@ export const UNIT_META = {
   mineSlaves: {
     label: "עבד מכרות",
     labelPlural: "עבדי מכרות",
-    icon: "⛏️",
+    icon: "mine",
     description: "מוצבים במכרות ומגדילים את תפוקת המשאבים.",
     citizenCost: 1,
     power: 0,
@@ -214,15 +220,15 @@ export const SPY_POWER = 10;
 
 export interface StorageMeta {
   label: string;
-  icon: string;
+  icon: IconName;
   resourceKey: StorableResource;
 }
 
 export const STORAGE_META: Record<ResourceStorageType, StorageMeta> = {
-  GOLD: { label: "מחסן זהב", icon: "🪙", resourceKey: "gold" },
-  WOOD: { label: "מחסן עץ", icon: "🪵", resourceKey: "wood" },
-  IRON: { label: "מחסן ברזל", icon: "⚙️", resourceKey: "iron" },
-  STONE: { label: "מחסן אבן", icon: "🪨", resourceKey: "stone" },
+  GOLD: { label: "מחסן זהב", icon: "gold", resourceKey: "gold" },
+  WOOD: { label: "מחסן עץ", icon: "wood", resourceKey: "wood" },
+  IRON: { label: "מחסן ברזל", icon: "iron", resourceKey: "iron" },
+  STONE: { label: "מחסן אבן", icon: "stone", resourceKey: "stone" },
 };
 
 export const STORAGE_TYPES = Object.keys(STORAGE_META) as ResourceStorageType[];
@@ -247,7 +253,7 @@ export function storageUpgradeCost(level: number) {
 
 export interface EmpireUpgradeMeta {
   label: string;
-  icon: string;
+  icon: IconName;
   description: string;
   /** Human-readable effect for a given level. */
   effectLabel: (level: number) => string;
@@ -414,13 +420,13 @@ export const EMPIRE_UPGRADE_META: Record<
 > = {
   CITIZEN_GROWTH: {
     label: "קבלת אזרחים",
-    icon: "👥",
+    icon: "citizens",
     description: "מגדיל את כמות האזרחים שמתקבלת בכל עדכון יומי.",
     effectLabel: (level) => `${citizensPerDailyUpdate(level)} אזרחים בכל עדכון יומי`,
   },
   INTELLIGENCE: {
     label: "מודיעין",
-    icon: "🕵️",
+    icon: "spy",
     description:
       "מגדיל את כח המודיעין שלך. ריגול מצליח כשכח המודיעין שלך גדול מזה של היעד — בלי הגרלה.",
     effectLabel: (level) =>
@@ -429,7 +435,7 @@ export const EMPIRE_UPGRADE_META: Record<
   },
   BANK_DEPOSIT_COUNT: {
     label: "כמות הפקדות בבנק",
-    icon: "🏦",
+    icon: "bank",
     description: "מגדיל את מספר ההפקדות שניתן לבצע בבנק בין עדכון יומי לעדכון יומי.",
     effectLabel: (level) =>
       `${allowedDepositsPerDailyPeriod(level).toLocaleString("he-IL")} הפקדות בין עדכון יומי לעדכון יומי`,
@@ -437,21 +443,21 @@ export const EMPIRE_UPGRADE_META: Record<
   },
   BANK_DAILY_INTEREST: {
     label: "ריבית בנק",
-    icon: "💰",
+    icon: "gold",
     description: "מגדיל את הריבית שמתקבלת בבנק בכל עדכון יומי.",
     effectLabel: (level) => `${Math.round(bankInterestRate(level) * 100)}% ריבית בכל עדכון יומי`,
     maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
   },
   TURNS_PER_REGULAR_UPDATE: {
     label: "קבלת תורות",
-    icon: "⏳",
+    icon: "turns",
     description: "מגדיל את כמות התורות שמתקבלת בכל עדכון רגיל.",
     effectLabel: (level) => `+${turnsPerRegularUpdate(level)} תורות לעדכון רגיל`,
     maxLevel: TURNS_UPGRADE_MAX_LEVEL,
   },
   WHEEL_LUCK: {
     label: "מזל הגלגל",
-    icon: "🎡",
+    icon: "wheel",
     description:
       "מגדיל את הסיכוי לזכות בסיבוב גלגל מזל מזריקת חפץ ומתקיפה מנצחת.",
     effectLabel: (level) => `+${Math.round(wheelLuckBonus(level) * 100)}% סיכוי לסיבוב גלגל מזל`,

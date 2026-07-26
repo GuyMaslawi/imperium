@@ -1,4 +1,5 @@
 import type { GuildRole, GuildSpellType } from "@prisma/client";
+import type { IconName } from "@/components/ui/Icon";
 
 /* ------------------------------ creation & capacity ------------------------------ */
 
@@ -77,7 +78,7 @@ export function spellCastCostDiamonds(level: number): number {
 
 export interface GuildSpellMeta {
   label: string;
-  icon: string;
+  icon: IconName;
   description: string;
   /** Human-readable effect for a given bonus percent. */
   effectLabel: (pct: number) => string;
@@ -86,25 +87,25 @@ export interface GuildSpellMeta {
 export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
   ATTACK: {
     label: "קסם התקפה",
-    icon: "⚔️",
+    icon: "attack",
     description: "מגביר את כוח ההתקפה שלך בקרבות.",
     effectLabel: (pct) => `+${pct}% לכוח ההתקפה למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
   },
   DEFENSE: {
     label: "קסם הגנה",
-    icon: "🛡️",
+    icon: "shield",
     description: "מגביר את כוח ההגנה שלך כשמתקיפים אותך.",
     effectLabel: (pct) => `+${pct}% לכוח ההגנה למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
   },
   SPY: {
     label: "קסם ריגול",
-    icon: "🕵️",
+    icon: "spy",
     description: "משפר את סיכויי ההצלחה של משימות הריגול שלך.",
     effectLabel: (pct) => `+${pct}% לסיכויי הריגול למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
   },
   RESOURCES: {
     label: "קסם משאבים",
-    icon: "🌾",
+    icon: "mine",
     description: "מאיץ את תפוקת המכרות של האימפריה שלך.",
     effectLabel: (pct) => `+${pct}% לתפוקת המכרות למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
   },

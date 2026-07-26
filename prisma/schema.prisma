@@ -238,7 +238,8 @@ model Empire {
   spyReportsReceived SpyReport[]    @relation("SpyDefender")
   battlesAttacked    BattleReport[] @relation("BattleAttacker")
   battlesDefended    BattleReport[] @relation("BattleDefender")
-  messages           Message[]
+  messages           Message[]      @relation("MessageInbox")
+  messagesSent       Message[]      @relation("MessageSender")
   guildMembership    GuildMember?
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
@@ -481,13 +482,20 @@ enum MessageKind {
   SYSTEM
   BATTLE
   SPY
+  /// Player-to-player mail, written from the messages screen.
+  PLAYER
 }
 
-/// Inbox message for an empire — system announcements and combat alerts
-/// ("you were attacked", "a spy was caught in your territory").
+/// Inbox message for an empire — system announcements, combat alerts
+/// ("you were attacked", "a spy was caught in your territory") and mail sent
+/// by other players.
 model Message {
-  id        String      @id @default(cuid())
-  empireId  String
+  id       String      @id @default(cuid())
+  empireId String
+  /// Author of a PLAYER message. Null for anything the game itself wrote.
+  /// SetNull (not Cascade) so a deleted sender does not erase the recipient's
+  /// inbox — the message survives as "שחקן שנמחק".
+  senderEmpireId String?
   kind      MessageKind @default(SYSTEM)
   title     String
   body      String
@@ -496,10 +504,12 @@ model Message {
   readAt    DateTime?
   createdAt DateTime    @default(now())
 
-  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  empire Empire  @relation("MessageInbox", fields: [empireId], references: [id], onDelete: Cascade)
+  sender Empire? @relation("MessageSender", fields: [senderEmpireId], references: [id], onDelete: SetNull)
 
   @@index([empireId, readAt])
   @@index([empireId, createdAt])
+  @@index([senderEmpireId, createdAt])
 }
 
 enum HeroRarity {

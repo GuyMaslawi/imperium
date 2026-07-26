@@ -23,7 +23,7 @@ import {
 } from "@/lib/game/diamondShop";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
 /**
@@ -78,7 +78,11 @@ function ResourceBoostCard({
     <div className="panel-inset flex flex-col gap-2 rounded-lg p-3">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-zinc-100">
-          <span aria-hidden className="text-lg">{meta.icon}</span>
+          <Icon
+            name={RESOURCE_ICON[resource]}
+            size={18}
+            className={RESOURCE_ICON_COLOR[resource]}
+          />
           תוספת {meta.label}
         </p>
         <span
@@ -106,7 +110,7 @@ function ResourceBoostCard({
             disabled={diamonds < BOOST_STEP_COST}
             pendingText="רוכש..."
           >
-            +{BOOST_STEP_PCT}% · {BOOST_STEP_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            +{BOOST_STEP_PCT}% · {BOOST_STEP_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
       </form>
@@ -145,7 +149,7 @@ function DiscountCard({
             disabled={diamonds < SHOP_DISCOUNT_COST}
             pendingText="רוכש..."
           >
-            הפעל הנחה · {SHOP_DISCOUNT_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            הפעל הנחה · {SHOP_DISCOUNT_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
       </form>
@@ -208,7 +212,7 @@ function TurnPackageRow({
               disabled={diamonds < cost}
               pendingText="..."
             >
-              {cost} <Icon name="diamond" size={13} className="inline-block align-text-bottom" />
+              {cost} <Icon name="diamond" size={13} className="inline-block align-text-bottom text-cyan-300" />
             </SubmitButton>
           )}
         </form>
@@ -285,7 +289,7 @@ function HeroResetCard({
             disabled={diamonds < HERO_POINTS_RESET_COST || allocatedPoints === 0}
             pendingText="מאפס..."
           >
-            אפס · {HERO_POINTS_RESET_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom" />
+            אפס · {HERO_POINTS_RESET_COST} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
       </form>
@@ -321,7 +325,7 @@ function BankInterestCard({
       <p className="text-xs text-zinc-400">
         ריבית נוכחית:{" "}
         <span className="nums inline-flex items-center gap-1 font-black text-emerald-400" dir="ltr">
-          <Icon name="gold" size={14} className="text-gold" /> {formatNumber(preview)}
+          <Icon name="gold" size={14} className="text-gold-bright" /> {formatNumber(preview)}
         </span>
       </p>
       <form className="mt-auto grid gap-1.5">
@@ -336,7 +340,8 @@ function BankInterestCard({
             disabled={diamonds < BANK_INTEREST_SPELL_COST || preview <= 0}
             pendingText="מטיל..."
           >
-            הטל · {BANK_INTEREST_SPELL_COST} 💎
+            הטל · {BANK_INTEREST_SPELL_COST}{" "}
+            <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
       </form>

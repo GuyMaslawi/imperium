@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { WHEEL_PRIZES, wheelPrizeByKey, type WheelPrizeDef } from "@/lib/game/wheel";
 import { spinWheel } from "@/server/actions/wheel";
 import { formatNumber } from "@/lib/game/format";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
 /**
  * One line in a batch reveal: a prize totalled across the whole batch.
@@ -23,7 +23,9 @@ function conic(): string {
 
 type ConfettiPiece = { id: number; dx: string; dy: string; rot: string; delay: string; icon: string };
 
-const CONFETTI_ICONS = ["✨", "⭐", "🪙", "💎", "🎉"];
+// Pure celebration marks — deliberately no coin/diamond emoji, so confetti
+// never renders a second, off-set version of a resource icon.
+const CONFETTI_ICONS = ["✨", "⭐", "🎉", "🌟", "💫"];
 
 function makeConfetti(): ConfettiPiece[] {
   return Array.from({ length: 18 }, (_, i) => {
@@ -245,7 +247,13 @@ export function WheelOfFortune({
                     transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-108px) rotate(${-angle}deg)`,
                   }}
                 >
-                  <span className="text-2xl drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">{p.icon}</span>
+                  <Icon
+                    name={p.icon}
+                    size={24}
+                    className={`drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${
+                      RESOURCE_ICON_COLOR[p.key] ?? "text-white"
+                    }`}
+                  />
                   <span className="whitespace-nowrap text-[10px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
                     {p.label}
                   </span>
@@ -299,7 +307,11 @@ export function WheelOfFortune({
                     key={h.prize.key}
                     className="inline-flex items-center gap-1 rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2.5 py-1 text-xs font-bold text-emerald-100"
                   >
-                    <span className="text-sm">{h.prize.icon}</span>
+                    <Icon
+                      name={h.prize.icon}
+                      size={14}
+                      className={RESOURCE_ICON_COLOR[h.prize.key] ?? "text-emerald-100"}
+                    />
                     {h.prize.label}
                     {h.count >= 2 && (
                       <span className="nums rounded bg-gold/25 px-1 text-[10px] font-black text-gold-bright" dir="ltr">

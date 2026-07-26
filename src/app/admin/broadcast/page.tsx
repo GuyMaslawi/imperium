@@ -2,7 +2,12 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
-import { LabeledInput, LabeledSelect, EditorSection } from "@/components/admin/fields";
+import {
+  LabeledInput,
+  LabeledSelect,
+  EditorSection,
+  ResourceFieldLabel,
+} from "@/components/admin/fields";
 import { TargetPicker } from "@/components/admin/TargetPicker";
 import { broadcastMessage, sendGift } from "@/server/actions/admin";
 
@@ -59,13 +64,13 @@ export default async function AdminBroadcastPage() {
           <ActionForm action={sendGift} submitLabel="שלח מתנה" submitVariant="secondary">
             <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <LabeledInput label="🪙 זהב" name="gold" type="number" min={0} placeholder="0" />
-              <LabeledInput label="🪵 עץ" name="wood" type="number" min={0} placeholder="0" />
-              <LabeledInput label="⚙️ ברזל" name="iron" type="number" min={0} placeholder="0" />
-              <LabeledInput label="🪨 אבן" name="stone" type="number" min={0} placeholder="0" />
-              <LabeledInput label="💎 יהלומים" name="diamonds" type="number" min={0} placeholder="0" />
-              <LabeledInput label="👥 אזרחים" name="citizens" type="number" min={0} placeholder="0" />
-              <LabeledInput label="⏳ תורות" name="turns" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="stone" text="אבן" />} name="stone" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="diamonds" text="יהלומים" />} name="diamonds" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} placeholder="0" />
+              <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} placeholder="0" />
               <LabeledInput label="🎡 סיבובים" name="wheelSpins" type="number" min={0} placeholder="0" />
             </div>
             <LabeledInput label="כותרת הודעה מצורפת (אופציונלי)" name="title" placeholder="🎁 מתנה מההנהלה" />

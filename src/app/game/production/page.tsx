@@ -94,7 +94,6 @@ export default async function ProductionPage() {
               key={mine.type}
               resource={resource}
               label={meta.label}
-              icon={meta.icon}
               description={meta.description}
               level={mine.level}
               maxLevel={MINE_MAX_LEVEL}

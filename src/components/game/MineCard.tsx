@@ -9,7 +9,7 @@ import {
 } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
 
@@ -18,7 +18,6 @@ const nis = (n: number) => formatNumber(n);
 export interface MineCardProps {
   resource: "gold" | "wood" | "iron" | "stone";
   label: string;
-  icon: string;
   description: string;
   level: number;
   maxLevel: number;
@@ -35,7 +34,6 @@ export interface MineCardProps {
 export function MineCard({
   resource,
   label,
-  icon,
   description,
   level,
   maxLevel,
@@ -65,7 +63,11 @@ export function MineCard({
     <div className="panel rounded-xl p-4 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span aria-hidden className="text-3xl">{icon}</span>
+          <Icon
+            name={RESOURCE_ICON[resource]}
+            size={30}
+            className={RESOURCE_ICON_COLOR[resource]}
+          />
           <div>
             <h3 className="font-bold text-gold-bright">{label}</h3>
             <p className="text-xs font-semibold text-gold-dim">
@@ -181,7 +183,11 @@ export function MineCard({
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
             <span className="nums" dir="ltr">
-              <Icon name={resource} size={14} className="inline align-[-2px]" />{" "}
+              <Icon
+                name={RESOURCE_ICON[resource]}
+                size={14}
+                className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[resource]}`}
+              />{" "}
               {nis(upgradeCost[resource])} {resourceLabel}
             </span>
           </div>

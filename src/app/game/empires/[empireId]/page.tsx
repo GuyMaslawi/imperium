@@ -102,7 +102,7 @@ export default async function EmpireProfilePage({
     { label: "רמה", value: formatNumber(empire.level), tone: "text-gold-bright" },
     { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
     // Gold and soldier count are shown openly on every profile.
-    { label: "זהב", value: <><Icon name="gold" size={14} className="inline-block align-middle" /> {formatNumber(Math.floor(empire.gold))}</>, tone: "text-gold-bright" },
+    { label: "זהב", value: <><Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(Math.floor(empire.gold))}</>, tone: "text-gold-bright" },
     { label: "חיילים", value: <><Icon name="army" size={14} className="inline-block align-middle" /> {formatNumber(empire.army?.soldiers ?? 0)}</>, tone: "text-zinc-100" },
     // Power and citizen count are intelligence — visible only for your own
     // empire or after a successful spy mission.
@@ -353,16 +353,16 @@ export default async function EmpireProfilePage({
                 </h4>
                 <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                   <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="gold" size={14} className="inline-block align-middle" /> {formatNumber(spyReport.revealedGold ?? 0)}
+                    <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(spyReport.revealedGold ?? 0)}
                   </span>
                   <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="wood" size={14} className="inline-block align-middle" /> {formatNumber(spyReport.revealedWood ?? 0)}
+                    <Icon name="wood" size={14} className="inline-block align-middle text-amber-600" /> {formatNumber(spyReport.revealedWood ?? 0)}
                   </span>
                   <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="iron" size={14} className="inline-block align-middle" /> {formatNumber(spyReport.revealedIron ?? 0)}
+                    <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" /> {formatNumber(spyReport.revealedIron ?? 0)}
                   </span>
                   <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="stone" size={14} className="inline-block align-middle" /> {formatNumber(spyReport.revealedStone ?? 0)}
+                    <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" /> {formatNumber(spyReport.revealedStone ?? 0)}
                   </span>
                   <span className="nums text-zinc-300" dir="ltr">
                     <Icon name="attack" size={14} className="inline-block align-middle" /> {formatNumber(weaponsPower(empire.weapons, "ATTACK"))}

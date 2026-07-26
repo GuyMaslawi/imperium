@@ -191,7 +191,7 @@ export default async function LeaderboardsPage({
           title="הבנק הגדול ביותר"
           icon="bank"
           iconClass="text-gold-bright"
-          unit={<Icon name="gold" size={13} className="inline-block align-middle" />}
+          unit={<Icon name="gold" size={13} className="inline-block align-middle text-gold-bright" />}
           rows={topBy("bank")}
           myEmpireId={myEmpire.id}
           hideValue
@@ -271,7 +271,7 @@ export default async function LeaderboardsPage({
                     )}
                   </span>
                   <span className="nums inline-flex shrink-0 items-center gap-1 font-bold text-gold-bright" dir="ltr">
-                    {formatNumber(row.value)} <Icon name="gold" size={13} className="inline-block align-middle" />
+                    {formatNumber(row.value)} <Icon name="gold" size={13} className="inline-block align-middle text-gold-bright" />
                   </span>
                 </li>
               );

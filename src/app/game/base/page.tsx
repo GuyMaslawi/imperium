@@ -114,13 +114,13 @@ export default async function BasePage() {
 
   const resourceTiles = [
     { icon: <Icon name="turns" size={14} className="text-emerald-400" />, label: "תורות", value: empire.turns, tone: "text-emerald-400" },
-    { icon: <Icon name="iron" size={14} className="text-zinc-200" />, label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
-    { icon: <Icon name="wood" size={14} className="text-amber-200/90" />, label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
+    { icon: <Icon name="iron" size={14} className="text-slate-300" />, label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
+    { icon: <Icon name="wood" size={14} className="text-amber-600" />, label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
     { icon: <Icon name="gold" size={14} className="text-gold-bright" />, label: "זהב", value: empire.gold, tone: "text-gold-bright" },
     { icon: <Icon name="bank" size={14} className="text-gold" />, label: "בבנק", value: bankGold, tone: "text-gold" },
-    { icon: <Icon name="diamond" size={14} className="text-sky-300" />, label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
-    { icon: <Icon name="stone" size={14} className="text-zinc-200" />, label: "אבן", value: empire.stone, tone: "text-zinc-200" },
-    { icon: <Icon name="citizens" size={14} className="text-zinc-200" />, label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
+    { icon: <Icon name="diamond" size={14} className="text-cyan-300" />, label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
+    { icon: <Icon name="stone" size={14} className="text-stone-400" />, label: "אבן", value: empire.stone, tone: "text-zinc-200" },
+    { icon: <Icon name="citizens" size={14} className="text-bone" />, label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
   ];
 
   // Server component renders once per request, so reading the clock here is safe.
@@ -150,7 +150,7 @@ export default async function BasePage() {
           </p>
           {season && (
             <p className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <Icon name="turns" size={14} />
+              <Icon name="turns" size={14} className="text-emerald-400" />
               סיום עונה:
               <span className="font-bold text-gold nums" dir="ltr">
                 {formatDate(season.endsAt)}

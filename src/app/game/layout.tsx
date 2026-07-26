@@ -14,6 +14,7 @@ import { ResourceBar } from "@/components/game/ResourceBar";
 import { UpdateTimers } from "@/components/game/UpdateTimers";
 import { SeasonPassButton } from "@/components/game/SeasonPass";
 import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sidebar";
+import { InboxNav } from "@/components/game/InboxNav";
 import { WarAlerts } from "@/components/game/WarAlerts";
 import { MiniGameLauncher } from "@/components/game/MiniGameLauncher";
 import { getMiniGameState } from "@/server/actions/minigame";
@@ -44,7 +45,10 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const admin = await isAdmin();
   const miniGame = await getMiniGameState();
 
-  // Sidebar badges: unread inbox messages + reports since the last visit.
+  // Command-bar badges: unread inbox messages + reports since the last visit.
+  // The spy count mirrors what the history screen actually shows: every mission
+  // I sent, plus only the enemy spies my defenses caught (a successful enemy
+  // spy stays invisible to its target — see ReportsTabs).
   const [unreadMessages, newBattleReports, newSpyReports] = await Promise.all([
     prisma.message.count({ where: { empireId: empire.id, readAt: null } }),
     prisma.battleReport.count({
@@ -54,7 +58,13 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       },
     }),
     prisma.spyReport.count({
-      where: { attackerEmpireId: empire.id, createdAt: { gt: empire.reportsSeenAt } },
+      where: {
+        OR: [
+          { attackerEmpireId: empire.id },
+          { defenderEmpireId: empire.id, success: false },
+        ],
+        createdAt: { gt: empire.reportsSeenAt },
+      },
     }),
   ]);
 
@@ -71,8 +81,6 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     heroXp,
     heroXpMax,
     recruits: empire.citizens,
-    unreadMessages,
-    newReports: newBattleReports + newSpyReports,
     isAdmin: admin,
   };
 
@@ -92,6 +100,12 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
         }}
         miniGame={<MiniGameLauncher initial={miniGame} />}
         mobileMenu={<MobileMenu {...sidebarProps} />}
+        inbox={
+          <InboxNav
+            newReports={newBattleReports + newSpyReports}
+            unreadMessages={unreadMessages}
+          />
+        }
       />
 
       <div

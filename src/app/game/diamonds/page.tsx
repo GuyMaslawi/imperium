@@ -71,13 +71,13 @@ export default async function DiamondsPage() {
       <SectionHeading
         title="יהלומים"
         subtitle="DIAMONDS"
-        ornament={<Icon name="diamond" size={22} className="text-sky-300" />}
+        ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
       {/* -------- balance -------- */}
       <div className="panel-gold flex flex-col gap-3 rounded-xl p-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="diamond" size={18} className="text-sky-300" />
+          <Icon name="diamond" size={18} className="text-cyan-300" />
           חנות יהלומים
         </h2>
         <div className="flex flex-wrap items-center gap-3">
@@ -93,7 +93,7 @@ export default async function DiamondsPage() {
               {formatNumber(diamonds)}
             </span>
             <span className="flex items-center rounded-full border border-sky-400/40 bg-panel-inset px-2 py-0.5 text-sm">
-              <Icon name="diamond" size={16} className="text-sky-300" />
+              <Icon name="diamond" size={16} className="text-cyan-300" />
             </span>
           </div>
         </div>

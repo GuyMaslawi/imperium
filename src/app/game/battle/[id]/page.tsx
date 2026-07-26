@@ -13,10 +13,10 @@ import { Icon } from "@/components/ui/Icon";
 export const metadata = { title: "תוצאת קרב | IMPERIUM" };
 
 const RES = [
-  { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle" />, label: "זהב" },
-  { key: "stolenWood", icon: <Icon name="wood" size={14} className="inline-block align-middle" />, label: "עץ" },
-  { key: "stolenIron", icon: <Icon name="iron" size={14} className="inline-block align-middle" />, label: "ברזל" },
-  { key: "stolenStone", icon: <Icon name="stone" size={14} className="inline-block align-middle" />, label: "אבן" },
+  { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" />, label: "זהב" },
+  { key: "stolenWood", icon: <Icon name="wood" size={14} className="inline-block align-middle text-amber-600" />, label: "עץ" },
+  { key: "stolenIron", icon: <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" />, label: "ברזל" },
+  { key: "stolenStone", icon: <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" />, label: "אבן" },
 ] as const;
 
 export default async function BattleResultPage({
@@ -298,7 +298,7 @@ export default async function BattleResultPage({
         <div className="panel-gold rounded-xl p-4">
           <h3 className="mb-3 text-sm font-bold text-gold-bright">
             {iAmAttacker ? (
-              <><Icon name="gold" size={16} className="inline-block align-middle" /> שלל הביזה</>
+              <><Icon name="gold" size={16} className="inline-block align-middle text-gold-bright" /> שלל הביזה</>
             ) : (
               "💸 נבזז ממך"
             )}

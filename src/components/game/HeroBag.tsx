@@ -370,13 +370,13 @@ export function HeroBag({
                 }`}
                 dir="ltr"
               >
-                <Icon name="gold" size={14} className="inline align-[-2px]" /> {formatNumber(totalUpgradeCost)}
+                <Icon name="gold" size={14} className="inline align-[-2px] text-gold-bright" /> {formatNumber(totalUpgradeCost)}
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between">
               <span className="text-zinc-500">הזהב שלך</span>
               <span className="nums text-xs font-bold text-zinc-300" dir="ltr">
-                <Icon name="gold" size={14} className="inline align-[-2px]" /> {formatNumber(gold)}
+                <Icon name="gold" size={14} className="inline align-[-2px] text-gold-bright" /> {formatNumber(gold)}
               </span>
             </div>
           </div>
