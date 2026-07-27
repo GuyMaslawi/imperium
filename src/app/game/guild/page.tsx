@@ -155,7 +155,6 @@ export default async function GuildPage() {
       <div className="space-y-6">
         <SectionHeading
           title="הברית שלי"
-          subtitle="MY GUILD"
           ornament={<Icon name="base" size={22} className="text-crimson" />}
         />
         <NoGuildView diamonds={diamonds} />
@@ -187,7 +186,6 @@ export default async function GuildPage() {
     <div className="space-y-6">
       <SectionHeading
         title={guild.name}
-        subtitle="MY GUILD"
         ornament={<Icon name="base" size={22} className="text-crimson" />}
       />
 

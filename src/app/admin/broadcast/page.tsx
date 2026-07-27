@@ -24,7 +24,7 @@ export default async function AdminBroadcastPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="שידור ומתנות" subtitle="BROADCAST & GIFTS" ornament="📣" />
+      <SectionHeading title="שידור ומתנות" ornament="📣" />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <EditorSection title="שידור הודעה" icon="📣">

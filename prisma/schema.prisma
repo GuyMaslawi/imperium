@@ -111,7 +111,7 @@ enum MiniGameType {
 }
 
 /// An admin-authored mini-game event (guess-the-number / find-the-ball). When
-/// `isActive`, it shows as a live bar at the top of every player's screen and
+/// `isActive`, it shows as a big panel at the top of every player's screen and
 /// grants the prize bundle to winners. `config` holds the secret answer +
 /// public params ({min,max,answer} or {cups,answer}) — never send answer to
 /// the client.
@@ -126,6 +126,10 @@ model MiniGameEvent {
   winnersCount Int          @default(0)
   isActive     Boolean      @default(false)
 
+  /// How long a release lasts, in minutes (0 = until the admin stops it). Kept
+  /// on the event so re-activating it reuses the last chosen duration.
+  durationMinutes Int @default(0)
+
   prizeGold       Float @default(0)
   prizeWood       Float @default(0)
   prizeIron       Float @default(0)
@@ -137,6 +141,9 @@ model MiniGameEvent {
 
   createdAt   DateTime  @default(now())
   activatedAt DateTime?
+  /// When a timed release auto-expires (null = no deadline). Read as the real
+  /// gate alongside `isActive`; the flag is flipped lazily on first read after.
+  endsAt      DateTime?
   endedAt     DateTime?
   updatedAt   DateTime  @updatedAt
 
@@ -591,6 +598,13 @@ model Hero {
   defensePoints  Int      @default(0)
   resourcePoints Int      @default(0)
   resets         Int      @default(0)
+  /// Hero health, 0–100. Every attack that breaches this empire's defence
+  /// wounds the hero (see HERO_DAMAGE_PER_LOST_DEFENSE); at 0 he is dead.
+  health         Int      @default(100)
+  /// When the hero fell (health hit 0), else null. He rises by himself an hour
+  /// later — applied lazily by applyPendingUpdates — or instantly for diamonds.
+  /// While dead he grants **no** bonuses at all (see heroBonuses).
+  diedAt         DateTime?
   /// The season in which the diamond points-reset was last used (once/season).
   pointsResetSeasonId String?
   createdAt      DateTime @default(now())

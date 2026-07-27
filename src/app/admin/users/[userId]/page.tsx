@@ -23,6 +23,7 @@ import { WEAPONS, WEAPON_CATEGORIES, WEAPON_CATEGORY_META, weaponByKey } from "@
 import {
   HERO_CLASS_META,
   HERO_CLASS_ORDER,
+  HERO_MAX_HEALTH,
   SLOT_META,
   SLOT_ORDER,
 } from "@/lib/game/hero";
@@ -393,12 +394,14 @@ export default async function AdminUserDetail({
                   }))}
                 />
                 <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={empire.hero?.level ?? 1} />
-                <LabeledInput label="XP" name="xp" type="number" min={0} defaultValue={empire.hero?.xp ?? 0} />
+                <LabeledInput label="ניסיון" name="xp" type="number" min={0} defaultValue={empire.hero?.xp ?? 0} />
                 <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} defaultValue={empire.hero?.unspentPoints ?? 0} />
                 <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} defaultValue={empire.hero?.attackPoints ?? 0} />
                 <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} defaultValue={empire.hero?.defensePoints ?? 0} />
                 <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} defaultValue={empire.hero?.resourcePoints ?? 0} />
                 <LabeledInput label="איפוסים" name="resets" type="number" min={0} defaultValue={empire.hero?.resets ?? 0} />
+                {/* 0 = הגיבור מת (וכל הבונוסים שלו מושבתים); כל ערך גבוה יותר מחייה אותו */}
+                <LabeledInput label="חיים (0=מת)" name="health" type="number" min={0} defaultValue={empire.hero?.health ?? HERO_MAX_HEALTH} />
               </div>
             </ActionForm>
 

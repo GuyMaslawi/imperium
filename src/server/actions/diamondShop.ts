@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { bankInterestRate } from "@/lib/game/constants";
+import { HERO_MAX_HEALTH, isHeroDead } from "@/lib/game/hero";
 import {
   BANK_INTEREST_COOLDOWN_MS,
   BANK_INTEREST_SPELL_COST,
@@ -15,6 +16,7 @@ import {
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
   HERO_POINTS_RESET_COST,
+  HERO_REVIVE_COST,
   RESOURCE_BOOST_KIND,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_DURATION_MS,
@@ -272,6 +274,53 @@ export async function resetHeroPointsWithDiamonds(
       });
 
       return { success: `${allocated} נקודות גיבור שוחררו מחדש להקצאה!` };
+    });
+
+    revalidateGame();
+    return result;
+  } catch {
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/* ------------------------------ hero revival ------------------------------ */
+
+/**
+ * Raise a fallen hero to full health immediately, for diamonds. The free path
+ * is simply waiting: applyPendingUpdates revives him an hour after he fell, so
+ * this only buys back the hour — and with it every bonus he carries.
+ */
+export async function reviveHeroWithDiamonds(
+  _prev: ActionState,
+  _formData: FormData
+): Promise<ActionState> {
+  try {
+    const empireId = await requireOwnEmpireId();
+    const result = await prisma.$transaction(async (tx) => {
+      // The empire lock also serializes against an incoming attack (which locks
+      // both empire rows before wounding the hero), so a raid can never land on
+      // top of the revival and knock the freshly-raised hero straight back down.
+      await lockEmpire(tx, empireId);
+      // Applies the free hourly revival first, if it is already due — the
+      // player is never charged for an hour that has quietly passed.
+      const empire = await applyPendingUpdates(empireId, tx);
+      const hero = empire.hero;
+      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!isHeroDead(hero)) return { error: "הגיבור בחיים — אין צורך בהחייאה" };
+
+      if (!(await spendDiamonds(tx, empireId, HERO_REVIVE_COST))) {
+        return { error: `דרושים ${HERO_REVIVE_COST} יהלומים להחייאת הגיבור` };
+      }
+
+      // Guarded on "still dead": if anything raised him between the check and
+      // here, throw so the whole transaction — diamonds included — rolls back.
+      const raised = await tx.hero.updateMany({
+        where: { id: hero.id, health: { lte: 0 } },
+        data: { health: HERO_MAX_HEALTH, diedAt: null },
+      });
+      if (raised.count === 0) throw new Error("hero revive conflict");
+
+      return { success: "הגיבור קם לתחייה עם 100% חיים — כל הבונוסים שלו חזרו!" };
     });
 
     revalidateGame();

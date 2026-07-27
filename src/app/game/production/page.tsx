@@ -53,7 +53,6 @@ export default async function ProductionPage() {
     <div className="space-y-6">
       <SectionHeading
         title="מכונות"
-        subtitle="WAR MACHINES"
         ornament={<Icon name="mine" size={22} className="text-crimson" />}
       />
 

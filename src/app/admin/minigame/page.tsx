@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminMiniGamePage() {
   await requireAdmin();
+  const now = new Date();
   const games = await prisma.miniGameEvent.findMany({
     orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
     include: { _count: { select: { entries: true } } },
@@ -23,11 +24,12 @@ export default async function AdminMiniGamePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מיני-משחק" subtitle="MINI-GAME" ornament="🎯" />
+      <SectionHeading title="מיני-משחק" ornament="🎯" />
 
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
         בחר סוג, קבע פרס — ולחץ <span className="font-bold text-gold-bright">🚀 צור והפעל מיד</span> כדי לשחרר לכולם בלחיצה אחת.
         כותרת ריקה מקבלת אוטומטית את שם המשחק. התשובה מוגרלת מחדש בכל הפעלה.
+        קביעת <span className="font-bold text-gold-bright">משך בדקות</span> תסגור את המשחק לבד בתום הזמן.
       </p>
 
       <EditorSection title="משחק חדש" icon="➕">
@@ -35,19 +37,39 @@ export default async function AdminMiniGamePage() {
       </EditorSection>
 
       <div className="space-y-3">
-        {games.map((g) => (
+        {games.map((g) => {
+          // A timed release is over once its deadline passes; the isActive flag
+          // is only flipped lazily on the next player read, so the deadline —
+          // not the flag — is what this screen reports.
+          const minutesLeft =
+            g.isActive && g.endsAt
+              ? Math.ceil((g.endsAt.getTime() - now.getTime()) / 60_000)
+              : null;
+          const live = g.isActive && (minutesLeft === null || minutesLeft > 0);
+
+          return (
           <div
             key={g.id}
-            className={`panel rounded-xl p-4 ${g.isActive ? "ring-1 ring-emerald-500/50" : ""}`}
+            className={`panel rounded-xl p-4 ${live ? "ring-1 ring-emerald-500/50" : ""}`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="flex items-center gap-2 font-bold text-gold-bright">
                   <span aria-hidden>{MINIGAME_TYPE_META[g.type].icon}</span>
                   {g.title}
-                  {g.isActive && (
+                  {live && (
                     <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
                       פעיל עכשיו
+                    </span>
+                  )}
+                  {live && minutesLeft !== null && (
+                    <span className="rounded bg-gold/20 px-2 py-0.5 text-[10px] font-bold text-gold-bright">
+                      ⏳ נותרו {minutesLeft} דק׳
+                    </span>
+                  )}
+                  {g.isActive && !live && (
+                    <span className="rounded bg-zinc-700/40 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
+                      הזמן תם
                     </span>
                   )}
                 </p>
@@ -61,18 +83,31 @@ export default async function AdminMiniGamePage() {
                   <span className="nums" dir="ltr">
                     {g.winnersCount}
                   </span>{" "}
-                  · {g._count.entries} משתתפים
+                  · {g._count.entries} משתתפים ·{" "}
+                  {g.durationMinutes > 0 ? `משך ${g.durationMinutes} דק׳` : "ללא הגבלת זמן"}
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {g.isActive ? (
+              <div className="flex flex-wrap items-end gap-2">
+                {live ? (
                   <ActionForm action={deactivateMiniGame} submitLabel="⏹ הפסק" submitVariant="danger" submitClassName="text-xs">
                     <input type="hidden" name="id" value={g.id} />
                   </ActionForm>
                 ) : (
                   <ActionForm action={activateMiniGame} submitLabel="🚀 שחרר לכולם" submitClassName="text-xs">
                     <input type="hidden" name="id" value={g.id} />
+                    <label className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      <span>למשך</span>
+                      <input
+                        name="durationMinutes"
+                        type="number"
+                        min={0}
+                        defaultValue={g.durationMinutes}
+                        dir="ltr"
+                        className="w-16 rounded border border-border-subtle bg-panel-inset px-2 py-1 text-center text-xs text-zinc-100 outline-none focus:border-gold/60"
+                      />
+                      <span>דק׳ (0=∞)</span>
+                    </label>
                   </ActionForm>
                 )}
                 <ActionForm
@@ -87,7 +122,8 @@ export default async function AdminMiniGamePage() {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         {games.length === 0 && (
           <p className="panel-inset rounded-xl p-6 text-center text-zinc-500">אין מיני-משחקים עדיין</p>
         )}

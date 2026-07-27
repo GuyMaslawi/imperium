@@ -85,7 +85,7 @@ export function MineCard({
               : "border border-border-subtle bg-panel-inset text-gold-dim"
           }`}
         >
-          {isMaxLevel ? "MAX " : ""}
+          {isMaxLevel ? "שיא " : ""}
           רמה{" "}
           <span className="nums" dir="ltr">
             {maxLevel}

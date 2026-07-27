@@ -5,9 +5,10 @@ import { isAdmin } from "@/lib/admin";
 import { nextDailyUpdate, nextRegularUpdate, formatGameTime } from "@/lib/game/time";
 import {
   HERO_CLASS_META,
+  HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
-  heroBonuses,
   heroClassImage,
+  isHeroDead,
   xpToNextLevel,
 } from "@/lib/game/hero";
 import { ResourceBar } from "@/components/game/ResourceBar";
@@ -16,9 +17,10 @@ import { SeasonPassButton } from "@/components/game/SeasonPass";
 import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sidebar";
 import { InboxNav } from "@/components/game/InboxNav";
 import { WarAlerts } from "@/components/game/WarAlerts";
-import { MiniGameLauncher } from "@/components/game/MiniGameLauncher";
+import { MiniGamePanel } from "@/components/game/MiniGamePanel";
 import { getMiniGameState } from "@/server/actions/minigame";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
+import { getCollectableAchievements } from "@/server/achievementState";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
@@ -40,33 +42,38 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const heroAtCap = heroLevel >= HERO_MAX_LEVEL;
   const heroXpMax = heroAtCap ? 1 : xpToNextLevel(heroLevel);
   const heroXp = heroAtCap ? 1 : hero?.xp ?? 0;
-  const bonuses = heroBonuses(hero);
 
   const admin = await isAdmin();
   const miniGame = await getMiniGameState();
 
   // Command-bar badges: unread inbox messages + reports since the last visit.
-  // The spy count mirrors what the history screen actually shows: every mission
-  // I sent, plus only the enemy spies my defenses caught (a successful enemy
-  // spy stays invisible to its target — see ReportsTabs).
-  const [unreadMessages, newBattleReports, newSpyReports] = await Promise.all([
-    prisma.message.count({ where: { empireId: empire.id, readAt: null } }),
-    prisma.battleReport.count({
-      where: {
-        OR: [{ attackerEmpireId: empire.id }, { defenderEmpireId: empire.id }],
-        createdAt: { gt: empire.reportsSeenAt },
-      },
-    }),
-    prisma.spyReport.count({
-      where: {
-        OR: [
-          { attackerEmpireId: empire.id },
-          { defenderEmpireId: empire.id, success: false },
-        ],
-        createdAt: { gt: empire.reportsSeenAt },
-      },
-    }),
-  ]);
+  // Only things *done to me* alert: an attack I was the defender of, or an
+  // enemy spy my defenses caught (a successful enemy spy stays invisible to its
+  // target — see ReportsTabs). My own attacks and missions are things I just
+  // did on purpose, so they land in the history silently.
+  //
+  // The achievements count rides along here so an unclaimed reward is visible
+  // from every screen, not only after the player happens to open the ladder.
+  // It is memoised per request (see getAchievementsState), so the achievements
+  // page itself does not pay for it twice.
+  const [unreadMessages, newBattleReports, newSpyReports, collectableAchievements] =
+    await Promise.all([
+      prisma.message.count({ where: { empireId: empire.id, readAt: null } }),
+      prisma.battleReport.count({
+        where: {
+          defenderEmpireId: empire.id,
+          createdAt: { gt: empire.reportsSeenAt },
+        },
+      }),
+      prisma.spyReport.count({
+        where: {
+          defenderEmpireId: empire.id,
+          success: false,
+          createdAt: { gt: empire.reportsSeenAt },
+        },
+      }),
+      getCollectableAchievements(empire.id),
+    ]);
 
   const sidebarProps: SidebarProps = {
     empireName: empire.name,
@@ -76,12 +83,14 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     heroLevel,
     heroResets: hero?.resets ?? 0,
     heroPoints: hero?.unspentPoints ?? 0,
-    heroAttackPct: bonuses.totalPct.attack,
-    heroDefensePct: bonuses.totalPct.defense,
-    heroHealthPct: 100,
+    // Real hero health: every breached defence wounds him, and at zero he is
+    // dead — no points, no gear, no class bonus — until he rises.
+    heroHealthPct: hero?.health ?? HERO_MAX_HEALTH,
+    heroDead: isHeroDead(hero),
     heroXp,
     heroXpMax,
     recruits: empire.citizens,
+    collectableAchievements,
     isAdmin: admin,
   };
 
@@ -99,12 +108,12 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           citizens: empire.citizens,
           turns: empire.turns,
         }}
-        miniGame={<MiniGameLauncher initial={miniGame} />}
         mobileMenu={<MobileMenu {...sidebarProps} />}
         inbox={
           <InboxNav
             newReports={newBattleReports + newSpyReports}
             unreadMessages={unreadMessages}
+            collectableAchievements={collectableAchievements}
           />
         }
       />
@@ -126,7 +135,13 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
                 nextDailyLabel={formatGameTime(nextDaily)}
               />
             </div>
-            <div className="flex-1 pt-5">{children}</div>
+            {/* A released mini-game is an event, not a toolbar affordance: it
+                sits right under the season pass, full width, above the screen
+                the player came for. */}
+            <div className="flex-1 pt-5">
+              <MiniGamePanel initial={miniGame} />
+              {children}
+            </div>
           </OrnateFrame>
         </main>
       </div>

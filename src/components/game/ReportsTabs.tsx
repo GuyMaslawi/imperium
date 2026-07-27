@@ -187,12 +187,17 @@ export function ReportsTabs({
                             ? "הדפת את ההתקפה בהצלחה!"
                             : "היריב פרץ את הגנתך."}
                       </p>
-                      <p className="mt-1 text-xs text-zinc-500">
-                        האבדות שלך: {num(r.myLossSoldiers)} חיילים
-                        {r.isAttacker && (
-                          <> · עלות: {num(r.turnsSpent)} תורות</>
-                        )}
-                      </p>
+                      {(r.myLossSoldiers > 0 || r.isAttacker) && (
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {/* Player battles cost no soldiers — only older
+                              reports still carry casualties. */}
+                          {r.myLossSoldiers > 0 && (
+                            <>האבדות שלך: {num(r.myLossSoldiers)} חיילים</>
+                          )}
+                          {r.myLossSoldiers > 0 && r.isAttacker && " · "}
+                          {r.isAttacker && <>עלות: {num(r.turnsSpent)} תורות</>}
+                        </p>
+                      )}
                       {r.totalStolen > 0 && (
                         <p
                           className={`mt-1 text-xs ${

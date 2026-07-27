@@ -41,11 +41,12 @@ import { armyPower, getEmpireIntelPower } from "@/lib/game/power";
 import {
   CITIZENS_PER_LEVEL,
   HERO_BAG_CAPACITY,
+  HERO_DAMAGE_PER_LOST_DEFENSE,
   applyHeroXp,
   classXpMultiplier,
   attackWinXp,
   bonusMultiplier,
-  defenseLossXp,
+  damagedHealth,
   defenseWinXp,
   heroBonuses,
   rollItemDrop,
@@ -860,42 +861,23 @@ export async function attackEmpire(
       const attackerWins = attackerPower > defenderPower;
       const winnerEmpireId = attackerWins ? attacker.id : defender.id;
 
-      // Proportional losses: a winning attacker loses a share scaled by how
-      // close the fight was; a losing attacker loses a larger fixed share.
-      // A defender who repels the attack loses nothing — soldiers and
-      // resources stay untouched.
-      const total = attackerPower + defenderPower;
-      const closeness = total > 0 ? Math.min(attackerPower, defenderPower) / total : 0;
-      const winnerLossRate = 0.1 * closeness * 2; // 0..0.1
-      const loserLossRate = 0.3;
-
-      const attackerLossRate = attackerWins ? winnerLossRate : loserLossRate;
-      const defenderLossRate = attackerWins ? loserLossRate : 0;
-
-      const attackerSoldiersLost = Math.min(
-        attackerArmy.soldiers,
-        Math.round(attackerArmy.soldiers * attackerLossRate)
-      );
-      const defenderSoldiersLost = defenderArmy
-        ? Math.min(
-            defenderArmy.soldiers,
-            Math.round(defenderArmy.soldiers * defenderLossRate)
-          )
-        : 0;
+      // Player-vs-player battles cost no lives: neither side loses soldiers,
+      // win or lose. Armies only die marching on a city boss (bossFight.ts),
+      // so the whole risk of a raid is the turns — and, for the defender, the
+      // plunder and the enslavement below.
+      const attackerSoldiersLost = 0;
+      const defenderSoldiersLost = 0;
 
       // Enslavement: a winning attack against a defender fielding 20+
       // soldiers captures a share of them. The haul scales with the
       // defender's army size and joins the attacker's free mine-slave pool
       // (not citizens).
-      const defenderSoldiersRemaining = defenderArmy
-        ? defenderArmy.soldiers - defenderSoldiersLost
-        : 0;
       const enslavedSoldiers =
         attackerWins &&
         defenderArmy &&
         defenderArmy.soldiers >= ENSLAVE_MIN_SOLDIERS
           ? Math.min(
-              defenderSoldiersRemaining,
+              defenderArmy.soldiers,
               Math.max(1, Math.floor(defenderArmy.soldiers * ENSLAVE_RATE))
             )
           : 0;
@@ -911,22 +893,16 @@ export async function attackEmpire(
           }
         : { gold: 0, wood: 0, iron: 0, stone: 0 };
 
-      await tx.army.update({
-        where: { empireId },
-        data: {
-          soldiers: { decrement: attackerSoldiersLost },
+      // Only the enslaved change hands — no casualties to write on either side.
+      if (enslavedSoldiers > 0) {
+        await tx.army.update({
+          where: { empireId },
           // Captured defenders arrive as unassigned mine slaves.
-          ...(enslavedSoldiers > 0
-            ? { mineSlaves: { increment: enslavedSoldiers } }
-            : {}),
-        },
-      });
-      if (defenderArmy) {
+          data: { mineSlaves: { increment: enslavedSoldiers } },
+        });
         await tx.army.update({
           where: { empireId: targetEmpireId },
-          data: {
-            soldiers: { decrement: defenderSoldiersLost + enslavedSoldiers },
-          },
+          data: { soldiers: { decrement: enslavedSoldiers } },
         });
       }
 
@@ -979,8 +955,41 @@ export async function attackEmpire(
         });
       }
 
+      /* ---- the defending hero takes the blow ---- */
+      // Only a breach wounds him: repel the raid and your hero is untouched.
+      // At zero health he falls, and a fallen hero stops granting *every*
+      // bonus he carries — points, gear and class alike (see heroBonuses) —
+      // until he rises an hour later or his owner pays to raise him at once.
+      let defenderHeroDamage = 0;
+      let defenderHeroHealth = defenderHero?.health ?? 0;
+      let defenderHeroFell = false;
+      if (attackerWins && defenderHero && defenderHero.health > 0) {
+        const nextHealth = damagedHealth(
+          defenderHero.health,
+          HERO_DAMAGE_PER_LOST_DEFENSE
+        );
+        // Guarded on the health we read. Both empire rows are locked above, so
+        // no second battle can be in here — but a diamond revival that slipped
+        // in must not be clobbered back down to a wounded (or dead) hero.
+        const wounded = await tx.hero.updateMany({
+          where: { id: defenderHero.id, health: defenderHero.health },
+          data: {
+            health: nextHealth,
+            // The hour starts at the blow that felled him; a hero already down
+            // keeps his original timer (he takes no further damage at 0).
+            ...(nextHealth === 0 ? { diedAt: now } : {}),
+          },
+        });
+        if (wounded.count > 0) {
+          defenderHeroDamage = defenderHero.health - nextHealth;
+          defenderHeroHealth = nextHealth;
+          defenderHeroFell = nextHealth === 0;
+        }
+      }
+
       /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
-      // A failed attack earns the attacker nothing.
+      // Only the winner learns anything: a repelled attacker and a breached
+      // defender both earn zero XP.
       const attackerHeroXp = attackerWins
         ? attackWinXp(
             defenderHero?.level ?? 1,
@@ -990,7 +999,7 @@ export async function attackEmpire(
           )
         : 0;
       const defenderHeroXp = attackerWins
-        ? defenseLossXp()
+        ? 0
         : defenseWinXp(
             attackerHero?.level ?? 1,
             attackerHero?.resets ?? 0,
@@ -1002,7 +1011,7 @@ export async function attackEmpire(
         // The class XP bonus (הצל) scales every battle-XP gain.
         const next = applyHeroXp(
           attackerHero,
-          Math.round(attackerHeroXp * classXpMultiplier(attackerHero.heroClass))
+          Math.round(attackerHeroXp * classXpMultiplier(attackerHero))
         );
         await tx.hero.update({
           where: { id: attackerHero.id },
@@ -1013,19 +1022,18 @@ export async function attackEmpire(
           },
         });
         // Each hero level gained hands the empire fresh citizens — through
-        // grantCitizens so the city ceiling holds. Note both empires can level
-        // from one battle (a losing defender still earns defence XP), so a raw
-        // increment here minted citizens rather than moving them: farming a
-        // controlled alt was a net population faucet on both sides.
+        // grantCitizens so the city ceiling holds, since a raw increment here
+        // minted citizens rather than moving them: farming a controlled alt was
+        // a net population faucet.
         const levelsGained = next.level - attackerHero.level;
         if (levelsGained > 0) {
           await grantCitizens(tx, empireId, levelsGained * CITIZENS_PER_LEVEL);
         }
       }
-      if (defenderHero) {
+      if (defenderHero && defenderHeroXp > 0) {
         const next = applyHeroXp(
           defenderHero,
-          Math.round(defenderHeroXp * classXpMultiplier(defenderHero.heroClass))
+          Math.round(defenderHeroXp * classXpMultiplier(defenderHero))
         );
         await tx.hero.update({
           where: { id: defenderHero.id },
@@ -1044,7 +1052,12 @@ export async function attackEmpire(
       /* ---- item capture: winning attacks can loot a hero item ---- */
       let droppedItem: ReturnType<typeof rollItemDrop> = null;
       if (attackerWins && attackerHero) {
-        const bagCount = attackerHero.items.filter((i) => !i.equipped).length;
+        // Count the bag live, not off `attackerHero.items`: that snapshot was
+        // read before this tx took the empire locks, so a drop that landed in
+        // between would be invisible and the bag could overflow its capacity.
+        const bagCount = await tx.heroItem.count({
+          where: { heroId: attackerHero.id, equipped: false },
+        });
         if (bagCount < HERO_BAG_CAPACITY) {
           // Loot rolls near the attacker's hero level — usable soon, not
           // trivially high/low because of who the target happened to be.
@@ -1116,11 +1129,17 @@ export async function attackEmpire(
             ? `⚔️ הותקפת על ידי ${attacker.name} — ההגנה נפרצה`
             : `🛡️ הדפת התקפה של ${attacker.name}!`,
           body: attackerWins
-            ? `איבדת ${defenderSoldiersLost} חיילים${
+            ? `${
                 enslavedSoldiers > 0
-                  ? `, ${enslavedSoldiers} חיילים נלקחו לעבדות`
+                  ? `${enslavedSoldiers} חיילים נלקחו לעבדות ו`
                   : ""
-              } ונבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן.`
+              }נבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן. צבאך לא ספג אבדות.${
+                defenderHeroFell
+                  ? ` 💀 הגיבור שלך נפל בקרב! כל הנקודות והבונוסים שלו מושבתים עד שיקום לתחייה.`
+                  : defenderHeroDamage > 0
+                    ? ` הגיבור שלך ספג ${defenderHeroDamage} נזק — נותרו לו ${defenderHeroHealth}% חיים.`
+                    : ""
+              }`
             : `צבאך עמד איתן מול ההתקפה — לא איבדת חיילים או משאבים.`,
           href: `/game/battle/${report.id}`,
         },

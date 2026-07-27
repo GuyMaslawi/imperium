@@ -11,8 +11,16 @@ import {
   publicConfig,
   PRIZE_FIELDS,
   type MiniGameState,
+  type MiniGameBoardRow,
   type MiniGameGuessResult,
 } from "@/lib/game/minigame";
+
+/** How many rival rows the live board carries (the viewer is always included). */
+const BOARD_LIMIT = 50;
+
+type Board = { rows: MiniGameBoardRow[]; players: number };
+
+const EMPTY_BOARD: Board = { rows: [], players: 0 };
 
 async function ownEmpireId(): Promise<string | null> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -21,7 +29,8 @@ async function ownEmpireId(): Promise<string | null> {
 
 function toState(
   event: MiniGameEvent,
-  entry: { attempts: number; solved: boolean; won: boolean } | null
+  entry: { attempts: number; solved: boolean; won: boolean } | null,
+  board: Board = EMPTY_BOARD
 ): MiniGameState {
   const attempts = entry?.attempts ?? 0;
   const solved = entry?.solved ?? false;
@@ -42,27 +51,109 @@ function toState(
     prizesLeft: event.maxWinners === 0 || event.winnersCount < event.maxWinners,
     winnersCount: event.winnersCount,
     maxWinners: event.maxWinners,
+    endsAt: event.endsAt?.getTime() ?? null,
+    serverNow: Date.now(),
+    board: board.rows,
+    players: board.players,
+  };
+}
+
+/** A timed release is over once its deadline passes, flag or no flag. */
+function isExpired(event: { endsAt: Date | null }, now = Date.now()): boolean {
+  return event.endsAt != null && event.endsAt.getTime() <= now;
+}
+
+/**
+ * The event a player may currently interact with, or null. `isActive` alone is
+ * not the gate: a timed release expires on the wall clock, and nothing runs on
+ * a schedule here — so the first read after the deadline is what flips the
+ * flag (guarded, so concurrent readers don't double-write).
+ */
+async function loadLiveEvent(): Promise<MiniGameEvent | null> {
+  const event = await prisma.miniGameEvent.findFirst({
+    where: { isActive: true },
+    orderBy: { activatedAt: "desc" },
+  });
+  if (!event) return null;
+  if (isExpired(event)) {
+    await prisma.miniGameEvent.updateMany({
+      where: { id: event.id, isActive: true },
+      data: { isActive: false, endedAt: new Date() },
+    });
+    return null;
+  }
+  return event;
+}
+
+/**
+ * Public progress of everyone playing the event. This is what a knocked-out
+ * player keeps watching until the event ends, so it deliberately exposes only
+ * attempt counts and win state — never a guess, never the answer.
+ */
+async function loadBoard(eventId: string, selfEmpireId: string): Promise<Board> {
+  const [entries, players] = await Promise.all([
+    prisma.miniGameEntry.findMany({
+      where: { eventId },
+      orderBy: [
+        { won: "desc" },
+        { wonAt: "asc" },
+        { solved: "desc" },
+        { attempts: "desc" },
+        { updatedAt: "asc" },
+      ],
+      take: BOARD_LIMIT,
+      select: { empireId: true, attempts: true, solved: true, won: true },
+    }),
+    prisma.miniGameEntry.count({ where: { eventId } }),
+  ]);
+
+  // The viewer's own row always rides along, even past the cap — the board is
+  // there so a knocked-out player can follow the race they're still in.
+  if (entries.length && !entries.some((e) => e.empireId === selfEmpireId)) {
+    const own = await prisma.miniGameEntry.findUnique({
+      where: { eventId_empireId: { eventId, empireId: selfEmpireId } },
+      select: { empireId: true, attempts: true, solved: true, won: true },
+    });
+    if (own) entries.push(own);
+  }
+
+  const empires = await prisma.empire.findMany({
+    where: { id: { in: entries.map((e) => e.empireId) } },
+    select: { id: true, name: true },
+  });
+  const names = new Map(empires.map((e) => [e.id, e.name]));
+
+  return {
+    players,
+    rows: entries.map((e) => ({
+      empireId: e.empireId,
+      name: names.get(e.empireId) ?? "אימפריה אלמונית",
+      attempts: e.attempts,
+      solved: e.solved,
+      won: e.won,
+      isSelf: e.empireId === selfEmpireId,
+    })),
   };
 }
 
 /**
  * Live state of the active mini-game for the current player. Best-effort —
- * polled by the banner and also read once server-side by the game layout.
+ * polled by the panel and also read once server-side by the game layout.
  */
 export async function getMiniGameState(): Promise<MiniGameState | null> {
   try {
     const empireId = await ownEmpireId();
     if (!empireId) return null;
-    const event = await prisma.miniGameEvent.findFirst({
-      where: { isActive: true },
-      orderBy: { activatedAt: "desc" },
-    });
+    const event = await loadLiveEvent();
     if (!event) return null;
-    const entry = await prisma.miniGameEntry.findUnique({
-      where: { eventId_empireId: { eventId: event.id, empireId } },
-      select: { attempts: true, solved: true, won: true },
-    });
-    return toState(event, entry);
+    const [entry, board] = await Promise.all([
+      prisma.miniGameEntry.findUnique({
+        where: { eventId_empireId: { eventId: event.id, empireId } },
+        select: { attempts: true, solved: true, won: true },
+      }),
+      loadBoard(event.id, empireId),
+    ]);
+    return toState(event, entry, board);
   } catch {
     return null;
   }
@@ -114,7 +205,9 @@ export async function submitMiniGameGuess(
 
     const result = await prisma.$transaction(async (tx) => {
       const event = await tx.miniGameEvent.findFirst({ where: { isActive: true } });
-      if (!event) {
+      // A timed release stops accepting guesses the moment its deadline passes,
+      // even if no read has flipped `isActive` yet (see loadLiveEvent).
+      if (!event || isExpired(event)) {
         return { state: null, feedback: "המשחק הסתיים", tone: "info" as const };
       }
       const cfg = (event.config ?? {}) as Record<string, unknown>;
@@ -271,6 +364,12 @@ export async function submitMiniGameGuess(
     });
 
     if (result.tone === "win") revalidatePath("/game", "layout");
+    // Refresh the rival board on the way out so a player who just spent their
+    // last attempt lands straight on the live standings instead of a stale copy.
+    if (result.state) {
+      const board = await loadBoard(result.state.id, empireId);
+      return { ...result, state: { ...result.state, board: board.rows, players: board.players } };
+    }
     return result;
   } catch {
     return { state: null, feedback: "אירעה שגיאה, נסה שוב", tone: "error" };

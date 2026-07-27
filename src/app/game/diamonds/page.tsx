@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { bankInterestRate } from "@/lib/game/constants";
+import { isHeroDead } from "@/lib/game/hero";
 import { DiamondShop } from "@/components/game/DiamondShop";
 import { DiamondsHeader } from "@/components/game/DiamondsHeader";
 import {
@@ -69,7 +70,6 @@ export default async function DiamondsPage() {
     <div className="space-y-6">
       <SectionHeading
         title="יהלומים"
-        subtitle="DIAMONDS"
         ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
@@ -88,6 +88,7 @@ export default async function DiamondsPage() {
         pointsResetUsed={pointsResetUsed}
         interestPreview={interestPreview}
         bankReadyAt={bankReadyAt}
+        heroDead={isHeroDead(hero)}
       />
     </div>
   );

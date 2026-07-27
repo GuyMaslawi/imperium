@@ -77,7 +77,7 @@ export default async function RankingsPage() {
     <div className="space-y-6">
       {/* Other players train, attack and rise in rank — keep the table live. */}
       <AutoRefresh intervalMs={30_000} />
-      <SectionHeading title="דירוג" subtitle="LEADERBOARD" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
+      <SectionHeading title="דירוג" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
 
       {/* -------- city boss -------- */}
       <CityBossBanner state={bossState} cities={myCity} />

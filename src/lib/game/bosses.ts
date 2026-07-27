@@ -309,8 +309,8 @@ export function bossHeroXp(cities: number): number {
   return BOSS_HERO_XP_BASE + (tier - 1) * BOSS_HERO_XP_PER_TIER;
 }
 
-/** A failed run still teaches the hero something. */
-export const BOSS_HERO_XP_DEFEAT = 60;
+/** A failed run teaches the hero nothing — only a felled boss pays XP. */
+export const BOSS_HERO_XP_DEFEAT = 0;
 
 /**
  * Rarity floor of the guaranteed drop a felled boss leaves behind. The roll

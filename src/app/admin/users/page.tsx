@@ -44,7 +44,6 @@ export default async function AdminUsersPage({
     <div className="space-y-6">
       <SectionHeading
         title="שחקנים"
-        subtitle="PLAYERS"
         ornament={<Icon name="citizens" size={22} className="text-crimson" />}
       />
 

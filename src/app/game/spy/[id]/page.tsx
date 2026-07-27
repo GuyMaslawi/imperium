@@ -39,7 +39,7 @@ export default async function SpyResultPage({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="תוצאת ריגול" subtitle="SPY REPORT" ornament={<Icon name="spy" size={22} className="text-crimson" />} />
+      <SectionHeading title="תוצאת ריגול" ornament={<Icon name="spy" size={22} className="text-crimson" />} />
 
       {/* verdict banner */}
       <div

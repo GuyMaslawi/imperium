@@ -15,7 +15,6 @@ export default async function SettingsPage() {
     <div className="space-y-6">
       <SectionHeading
         title="הגדרות"
-        subtitle="SETTINGS"
         ornament={<Icon name="settings" size={22} className="text-crimson" />}
       />
 

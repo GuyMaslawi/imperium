@@ -125,6 +125,12 @@ export interface SeasonPassState {
   premium: boolean;
   price: number;
   diamonds: number;
+  /**
+   * Whether a season is currently active. False means the premium track cannot
+   * be sold at all (see buySeasonPassPremium), so the UI must say so up front
+   * instead of letting the player click a button that can only fail.
+   */
+  seasonActive: boolean;
   /** 1-based day of the season the payouts are priced at. */
   day: number;
   /** When the ladder resets and the next, larger one opens. */
@@ -143,7 +149,8 @@ function buildState(
   progress: SeasonPassProgress,
   diamonds: number,
   day: number,
-  now: Date
+  now: Date,
+  seasonActive: boolean
 ): SeasonPassState {
   const level = tierForXp(progress.xp);
   const claimedFree = new Set(progress.claimedFree);
@@ -176,6 +183,7 @@ function buildState(
     premium: progress.premium,
     price: SEASON_PASS_PREMIUM_PRICE,
     diamonds,
+    seasonActive,
     day,
     cycleEndsAt: nextDailyUpdate(now).getTime(),
     collectable,
@@ -203,7 +211,7 @@ export async function getSeasonPassState(): Promise<SeasonPassState | null> {
 
   const progress = await loadCycle(prisma, empireId, season?.id ?? null, now);
   const day = seasonPassDay(season, now.getTime());
-  return buildState(progress, empire.diamonds, day, now);
+  return buildState(progress, empire.diamonds, day, now, season !== null);
 }
 
 /* ------------------------------ premium purchase ------------------------------ */
@@ -281,7 +289,7 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
       return {
         ok: true as const,
         message: "מסלול הפרימיום נפתח לכל העונה! 👑",
-        state: buildState(fresh, empire.diamonds, day, now),
+        state: buildState(fresh, empire.diamonds, day, now, true),
       };
     });
 
@@ -394,7 +402,7 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
       return {
         ok: true as const,
         message: `נאספו: ${granted.join(" · ")}`,
-        state: buildState(fresh, empire.diamonds, day, now),
+        state: buildState(fresh, empire.diamonds, day, now, season !== null),
       };
     });
 

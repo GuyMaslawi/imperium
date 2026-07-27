@@ -51,7 +51,7 @@ export default async function MessagesPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markMessagesRead} />
-      <SectionHeading title="הודעות" subtitle="MESSAGES" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
+      <SectionHeading title="הודעות" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-500">

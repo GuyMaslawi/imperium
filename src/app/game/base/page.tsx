@@ -135,7 +135,7 @@ export default async function BasePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מרכז הפיקוד" subtitle="COMMAND CENTER" ornament={<Icon name="base" size={22} className="text-crimson" />} />
+      <SectionHeading title="מרכז הפיקוד" ornament={<Icon name="base" size={22} className="text-crimson" />} />
 
       {/* announcement */}
       <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">

@@ -20,7 +20,7 @@ export default async function HeroItemsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="כל הפריטים" subtitle="ITEM CATALOG" ornament="🗡" />
+      <SectionHeading title="כל הפריטים" ornament="🗡" />
 
       <div className="flex justify-center">
         <Link href="/game/hero" className="btn btn-ghost px-4 py-2 text-sm">

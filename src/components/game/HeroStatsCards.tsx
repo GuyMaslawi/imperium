@@ -13,9 +13,14 @@ import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
 /**
- * The three point-allocatable stats (attack/defense/resources). Each card shows
- * ONLY the permanent % earned from allocated points — equipped items no longer
- * change these numbers; their combined yield lives in the power summary below.
+ * The three point-allocatable stats (attack/defense/resources). Each one is a
+ * single compact row — label, %, and the allocation buttons on one line — so
+ * the three stack in half the panel's width beside the meters instead of
+ * eating a full-width band of tall cards.
+ *
+ * A row shows ONLY the permanent % earned from allocated points; equipped items
+ * no longer change these numbers, their combined yield lives in the power
+ * summary below.
  */
 export function HeroStatsCards({
   points,
@@ -31,87 +36,91 @@ export function HeroStatsCards({
   );
 
   return (
-    <div className="flex w-full flex-col gap-3">
+    <div className="flex w-full flex-col gap-2">
       {unspentPoints > 0 && (
-        <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בכרטיס מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
-          {/* One line, not a stacked hero block: this panel now sits at the top
-              of the hero screen, where every row it costs pushes the cards down. */}
-          <div className="points-pulse flex w-full flex-wrap items-center justify-center gap-x-2 gap-y-0.5 rounded-lg border bg-gold/10 px-3 py-1.5 text-center">
-            <p className="text-xs font-bold text-gold-bright">
-              <Icon name="spark" size={14} className="inline align-[-2px]" /> יש לך{" "}
-              <span className="nums text-base font-black" dir="ltr">
+        <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בשורת התכונה מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
+          {/* One line, not a stacked hero block: every row this costs pushes
+              the stat rows down. */}
+          <div className="points-pulse flex w-full flex-wrap items-center justify-center gap-x-2 rounded-lg border bg-gold/10 px-2 py-1 text-center">
+            <p className="text-[11px] font-bold text-gold-bright">
+              <Icon name="spark" size={13} className="inline align-[-2px]" />{" "}
+              <span className="nums text-sm font-black" dir="ltr">
                 {unspentPoints}
               </span>{" "}
-              נקודות פנויות
-            </p>
-            <p className="text-[10px] text-gold-dim">
-              — לחץ +1 / +5 בכרטיס (כל נקודה = ‎+1%)
+              נקודות פנויות — כל נקודה ‎+1%
             </p>
           </div>
         </Tip>
       )}
 
-      {/* one card per point stat — three across when there's room for them */}
-      <div className="grid gap-3 sm:grid-cols-3">
-        {HERO_POINT_STATS.map((stat) => {
-          const meta = HERO_STAT_META[stat];
-          const pointsPct = points[stat];
-          return (
-            <div key={stat} className="panel-inset relative rounded-lg p-3">
-              <Tip
-                tip={
-                  <>
-                    {meta.description}
-                    <br />
-                    אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}%).
-                    חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל מהגיבור&quot;
-                    למטה.
-                  </>
-                }
-              >
-                <p className="cursor-help text-xs text-zinc-400">
-                  <Icon name={meta.icon} size={13} className="inline align-[-2px]" /> {meta.label}
-                </p>
-              </Tip>
-              <p className={`nums mt-0.5 text-lg font-bold ${meta.tone}`} dir="ltr">
-                +{formatBonus(pointsPct)}%
+      {/* one compact row per point stat, stacked */}
+      {HERO_POINT_STATS.map((stat) => {
+        const meta = HERO_STAT_META[stat];
+        const pointsPct = points[stat];
+        return (
+          <div
+            key={stat}
+            className="panel-inset flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2.5 py-1.5"
+          >
+            <Tip
+              tip={
+                <>
+                  {meta.description}
+                  <br />
+                  אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}%).
+                  חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל מהגיבור&quot;
+                  למטה.
+                </>
+              }
+            >
+              <p className="cursor-help whitespace-nowrap text-[11px] text-zinc-400">
+                <Icon name={meta.icon} size={13} className="inline align-[-2px]" />{" "}
+                {meta.label}
               </p>
-              {unspentPoints > 0 && (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  <div className="flex gap-1.5">
-                    <form action={formAction} className="flex-1">
-                      <input type="hidden" name="stat" value={stat} />
-                      <input type="hidden" name="amount" value={1} />
-                      <button type="submit" className="btn btn-gold w-full px-2 py-1 text-xs">
-                        +1
-                      </button>
-                    </form>
-                    {unspentPoints >= 5 && (
-                      <form action={formAction} className="flex-1">
-                        <input type="hidden" name="stat" value={stat} />
-                        <input type="hidden" name="amount" value={5} />
-                        <button type="submit" className="btn btn-ghost w-full px-2 py-1 text-xs">
-                          +5
-                        </button>
-                      </form>
-                    )}
-                  </div>
+            </Tip>
+            <p
+              className={`nums me-auto text-sm font-black ${meta.tone}`}
+              dir="ltr"
+            >
+              +{formatBonus(pointsPct)}%
+            </p>
+            {unspentPoints > 0 && (
+              <div className="flex items-center gap-1">
+                <form action={formAction}>
+                  <input type="hidden" name="stat" value={stat} />
+                  <input type="hidden" name="amount" value={1} />
+                  <button type="submit" className="btn btn-gold px-2 py-0.5 text-[11px]">
+                    +1
+                  </button>
+                </form>
+                {unspentPoints >= 5 && (
                   <form action={formAction}>
                     <input type="hidden" name="stat" value={stat} />
-                    <input type="hidden" name="amount" value={unspentPoints} />
+                    <input type="hidden" name="amount" value={5} />
                     <button
                       type="submit"
-                      className="btn btn-ghost w-full px-2 py-1 text-[11px]"
+                      className="btn btn-ghost px-2 py-0.5 text-[11px]"
                     >
-                      שים את כל הנקודות ({unspentPoints})
+                      +5
                     </button>
                   </form>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+                )}
+                <form action={formAction}>
+                  <input type="hidden" name="stat" value={stat} />
+                  <input type="hidden" name="amount" value={unspentPoints} />
+                  <button
+                    type="submit"
+                    title={`שים את כל ${unspentPoints} הנקודות ב${meta.label}`}
+                    className="btn btn-ghost px-2 py-0.5 text-[11px]"
+                  >
+                    הכל
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {(state.error || state.success) && (
         <p

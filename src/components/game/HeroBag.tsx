@@ -21,20 +21,12 @@ import {
 } from "@/lib/game/hero";
 import { itemDetails, uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 
-/** Identical items (same slot+level) merged into one tile, keeping every id. */
-type BagStack = {
-  key: string;
-  slot: HeroItemView["slot"];
-  level: number;
-  rarity: HeroRarity;
-  ids: string[];
-};
-
 /**
- * The hero's bag: unequipped items in a 24-slot grid with rarity filters.
- * Clicking an item opens its detail dialog (wear / upgrade / discard). A
- * selection mode lets the player mark many items and discard or upgrade them
- * all at once.
+ * The hero's bag: unequipped items in a 5×3 grid of slots with rarity filters.
+ * One item per slot — duplicates are not merged, because each copy really does
+ * occupy a slot and the free-slot count has to be honest. Clicking an item
+ * opens its detail dialog (wear / upgrade / discard). A selection mode lets the
+ * player mark many items and discard or upgrade them all at once.
  */
 export function HeroBag({
   items,
@@ -58,52 +50,31 @@ export function HeroBag({
 
   const rarityRank = (r: HeroRarity) => RARITY_ORDER.indexOf(r);
 
-  // Merge identical items (same slot+level look and perform identically) into a
-  // single stack, keeping every underlying id so bulk actions still apply to
-  // the whole stack.
-  const stackMap = new Map<string, BagStack>();
-  for (const it of items) {
-    const key = `${it.slot}-${it.level}`;
-    const cur = stackMap.get(key);
-    if (cur) cur.ids.push(it.id);
-    else
-      stackMap.set(key, {
-        key,
-        slot: it.slot,
-        level: it.level,
-        rarity: it.rarity,
-        ids: [it.id],
-      });
-  }
-  const stacks = [...stackMap.values()].sort(
+  const sorted = [...items].sort(
     (a, b) => rarityRank(b.rarity) - rarityRank(a.rarity) || b.level - a.level
   );
-  const visible = filter ? stacks.filter((s) => s.rarity === filter) : stacks;
-  // Pad only to complete the last row so the grid stays tidy; real capacity is
-  // shown in the header, and the grid scrolls past ~4 rows.
-  const COLS = 6;
-  const emptySlots =
-    visible.length === 0 ? COLS : (COLS - (visible.length % COLS)) % COLS;
+  const visible = filter ? sorted.filter((i) => i.rarity === filter) : sorted;
+  // Every slot the bag has is drawn, so a full bag reads as full at a glance.
+  const emptySlots = Math.max(0, HERO_BAG_CAPACITY - items.length);
+  const bagFull = items.length >= HERO_BAG_CAPACITY;
 
-  // Expand the selected stacks back to the individual item ids the actions need.
-  const selectedIds = stacks
-    .filter((s) => selected.has(s.key))
-    .flatMap((s) => s.ids);
+  // Drop ids of items that are already gone (discarded / equipped elsewhere).
+  const selectedIds = items.filter((i) => selected.has(i.id)).map((i) => i.id);
   const selectedIdSet = new Set(selectedIds);
 
   const allVisibleSelected =
-    visible.length > 0 && visible.every((s) => selected.has(s.key));
+    visible.length > 0 && visible.every((i) => selected.has(i.id));
 
-  const toggleSelect = (key: string) =>
+  const toggleSelect = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
 
   const selectAll = () =>
-    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((s) => s.key)));
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((i) => i.id)));
 
   const exitSelect = () => {
     setSelecting(false);
@@ -140,8 +111,10 @@ export function HeroBag({
   };
 
   return (
-    <div className="panel-gold rounded-xl p-4">
-      <div className="flex items-center justify-between">
+    /* No panel of its own: the bag is the left column *inside* the hero panel,
+       so the page owns its frame. */
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Tip tip="חפצים שנלכדו בקרבות וממתינים בתיק. לחיצה על חפץ פותחת את פרטיו — שם אפשר ללבוש, לשדרג או לזרוק.">
           <h2 className="cursor-help text-base font-bold tracking-wide text-gold-bright">
             התיק
@@ -152,158 +125,31 @@ export function HeroBag({
             (selecting ? (
               <button
                 onClick={exitSelect}
-                className="btn btn-ghost px-3 py-1.5 text-xs"
+                className="btn btn-ghost px-2.5 py-1 text-xs"
               >
                 בטל
               </button>
             ) : (
               <button
                 onClick={() => setSelecting(true)}
-                className="btn btn-ghost px-3 py-1.5 text-xs"
+                className="btn btn-ghost px-2.5 py-1 text-xs"
               >
                 בחירה
               </button>
             ))}
           <Tip tip="הקטלוג המלא: כל החפצים הקיימים במשחק, מרמה 1 עד 100 בכל הדרגות" side="bottom">
-            <Link href="/game/hero/items" className="btn btn-ghost px-3 py-1.5 text-xs">
+            <Link href="/game/hero/items" className="btn btn-ghost px-2.5 py-1 text-xs">
               לכל הפריטים
             </Link>
           </Tip>
         </div>
       </div>
 
-      <div className="mt-3 flex items-center justify-between text-xs text-zinc-400">
-        {selecting ? (
-          <button
-            onClick={selectAll}
-            disabled={visible.length === 0}
-            className="btn btn-ghost px-3 py-1 text-xs"
-          >
-            {allVisibleSelected ? "נקה בחירה" : "סמן הכל"}
-          </button>
-        ) : (
-          <Tip tip={`מקום בתיק: עד ${HERO_BAG_CAPACITY} חפצים. כשהתיק מלא — לא נלכדים חפצים חדשים בקרב!`}>
-            <span className="cursor-help">סלוטים</span>
-          </Tip>
-        )}
-        <span className="nums" dir="ltr">
-          {selecting ? `${selectedCount} נבחרו` : `${items.length}/${HERO_BAG_CAPACITY}`}
-        </span>
-      </div>
-
-      <div className="mt-2 max-h-[21rem] overflow-y-auto pr-0.5">
-        <div className="grid grid-cols-4 gap-3 sm:grid-cols-6">
-          {visible.map((stack) => {
-            const isSelected = selected.has(stack.key);
-            const view: HeroItemView = {
-              id: stack.ids[0],
-              slot: stack.slot,
-              level: stack.level,
-              rarity: stack.rarity,
-            };
-            return (
-              <button
-                key={stack.key}
-                type="button"
-                onClick={() =>
-                  selecting ? toggleSelect(stack.key) : setOpenItem(view)
-                }
-                className={`relative block w-full rounded-xl transition ${
-                  selecting && isSelected
-                    ? "ring-2 ring-gold ring-offset-2 ring-offset-black"
-                    : ""
-                }`}
-                aria-label={`${SLOT_META[stack.slot].label} רמה ${stack.level}${
-                  stack.ids.length > 1 ? ` ×${stack.ids.length}` : ""
-                }`}
-              >
-                <ItemTile
-                  slug={SLOT_META[stack.slot].slug}
-                  icon={SLOT_META[stack.slot].icon}
-                  level={stack.level}
-                  rarity={uiRarity(stack.rarity)}
-                  details={
-                    selecting
-                      ? undefined
-                      : itemDetails(view, heroLevel, { hint: "לחץ לפרטים" })
-                  }
-                />
-                {stack.ids.length > 1 && (
-                  <span
-                    aria-hidden
-                    className="nums absolute left-1 top-1 z-10 rounded bg-black/80 px-1.5 py-0.5 text-[10px] font-black text-gold-bright"
-                    dir="ltr"
-                  >
-                    ×{stack.ids.length}
-                  </span>
-                )}
-                {selecting && (
-                  <span
-                    aria-hidden
-                    className={`absolute right-1.5 top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-black ${
-                      isSelected
-                        ? "border-gold bg-gold text-black"
-                        : "border-white/50 bg-black/70 text-transparent"
-                    }`}
-                  >
-                    ✓
-                  </span>
-                )}
-              </button>
-            );
-          })}
-          {Array.from({ length: emptySlots }).map((_, i) => (
-            <div
-              key={`empty-${i}`}
-              className="panel-inset flex aspect-square items-center justify-center rounded-xl text-zinc-700"
-            >
-              <span aria-hidden className="text-xl">
-                ◇
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {(msg.error || msg.success) && (
-        <p
-          className={`mt-3 text-xs font-semibold ${
-            msg.error ? "text-red-400" : "text-emerald-400"
-          }`}
-        >
-          {msg.error ?? msg.success}
-        </p>
-      )}
-
-      {/* bulk action bar */}
-      {selecting && (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            onClick={() => runBulk(discardHeroItems)}
-            disabled={pending || selectedCount === 0}
-            className="btn py-2 text-sm font-black text-white disabled:opacity-45"
-            style={{ background: "linear-gradient(180deg,#b91c1c,#7f1d1d)" }}
-          >
-            זרוק הכל ({selectedCount})
-          </button>
-          <button
-            onClick={() => setConfirmUpgrade(true)}
-            disabled={pending || selectedUpgradeable === 0}
-            title={selectedUpgradeable === 0 ? "אין פריטים לשדרוג מבין הנבחרים" : undefined}
-            className="btn btn-dark py-2 text-sm"
-          >
-            שדרג הכל ({selectedUpgradeable})
-          </button>
-        </div>
-      )}
-
-      <div className="rule-gold my-4" />
-
       {/* rarity filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap justify-center gap-1.5">
         <button
           onClick={() => setFilter(null)}
-          className={`btn px-3 py-1.5 text-xs ${
+          className={`btn px-2.5 py-1 text-[11px] ${
             filter === null ? "btn-gold" : "btn-ghost text-zinc-300"
           }`}
         >
@@ -315,7 +161,7 @@ export function HeroBag({
             <button
               key={r}
               onClick={() => setFilter(filter === r ? null : r)}
-              className={`btn px-3 py-1.5 text-xs ${
+              className={`btn px-2.5 py-1 text-[11px] ${
                 filter === r ? "btn-gold" : `btn-ghost ${RARITY_META[r].tone}`
               }`}
             >
@@ -325,10 +171,138 @@ export function HeroBag({
         })}
       </div>
 
-      <p className="mt-3 text-[11px] leading-relaxed text-zinc-500">
-        חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים — ככל שהחפץ נדיר יותר, כך
-        קשה יותר ללכוד אותו.
-      </p>
+      {/* the grid never stretches — a fixed, readable slot size, centred so the
+          panel stays symmetric instead of hugging one edge */}
+      <div className="mt-4">
+        <div className="mx-auto w-full max-w-[25rem]">
+          <div className="flex items-center justify-between text-xs text-zinc-400">
+            {selecting ? (
+              <button
+                onClick={selectAll}
+                disabled={visible.length === 0}
+                className="btn btn-ghost px-3 py-1 text-xs"
+              >
+                {allVisibleSelected ? "נקה בחירה" : "סמן הכל"}
+              </button>
+            ) : (
+              <Tip tip={`מקום בתיק: ${HERO_BAG_CAPACITY} סלוטים (5 על 3). כשהתיק מלא — לא נלכדים חפצים חדשים בקרב ואי אפשר להסיר ציוד מהגיבור!`}>
+                <span className="cursor-help">סלוטים</span>
+              </Tip>
+            )}
+            <span
+              className={`nums ${bagFull ? "font-black text-red-400" : ""}`}
+              dir="ltr"
+            >
+              {selecting
+                ? `${selectedCount} נבחרו`
+                : `${items.length}/${HERO_BAG_CAPACITY}`}
+            </span>
+          </div>
+
+          {bagFull && !selecting && (
+            <p className="mt-2 text-[11px] font-semibold text-amber-300">
+              התיק מלא — חפצים חדשים לא ייכנסו. זרוק או שדרג כדי לפנות מקום.
+            </p>
+          )}
+
+          <div className="mt-2 grid grid-cols-5 gap-2">
+            {visible.map((item) => {
+              const isSelected = selected.has(item.id);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() =>
+                    selecting ? toggleSelect(item.id) : setOpenItem(item)
+                  }
+                  className={`relative block w-full rounded-xl transition ${
+                    selecting && isSelected
+                      ? "ring-2 ring-gold ring-offset-2 ring-offset-black"
+                      : ""
+                  }`}
+                  aria-label={`${SLOT_META[item.slot].label} רמה ${item.level}`}
+                >
+                  <ItemTile
+                    slug={SLOT_META[item.slot].slug}
+                    icon={SLOT_META[item.slot].icon}
+                    level={item.level}
+                    rarity={uiRarity(item.rarity)}
+                    size="sm"
+                    details={
+                      selecting
+                        ? undefined
+                        : itemDetails(item, heroLevel, { hint: "לחץ לפרטים" })
+                    }
+                  />
+                  {selecting && (
+                    <span
+                      aria-hidden
+                      className={`absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full border text-[10px] font-black ${
+                        isSelected
+                          ? "border-gold bg-gold text-black"
+                          : "border-white/50 bg-black/70 text-transparent"
+                      }`}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+            {Array.from({ length: emptySlots }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="panel-inset flex aspect-square items-center justify-center rounded-xl text-zinc-700"
+              >
+                <span aria-hidden className="text-base">
+                  ◇
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {(msg.error || msg.success) && (
+            <p
+              className={`mt-3 text-xs font-semibold ${
+                msg.error ? "text-red-400" : "text-emerald-400"
+              }`}
+            >
+              {msg.error ?? msg.success}
+            </p>
+          )}
+
+          {/* bulk action bar */}
+          {selecting && (
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => runBulk(discardHeroItems)}
+                disabled={pending || selectedCount === 0}
+                className="btn py-2 text-sm font-black text-white disabled:opacity-45"
+                style={{ background: "linear-gradient(180deg,#b91c1c,#7f1d1d)" }}
+              >
+                זרוק הכל ({selectedCount})
+              </button>
+              <button
+                onClick={() => setConfirmUpgrade(true)}
+                disabled={pending || selectedUpgradeable === 0}
+                title={
+                  selectedUpgradeable === 0
+                    ? "אין פריטים לשדרוג מבין הנבחרים"
+                    : undefined
+                }
+                className="btn btn-dark py-2 text-sm"
+              >
+                שדרג הכל ({selectedUpgradeable})
+              </button>
+            </div>
+          )}
+        </div>
+
+        <p className="mx-auto mt-4 max-w-md text-center text-[11px] leading-relaxed text-zinc-500">
+          חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים — ככל שהחפץ נדיר יותר, כך
+          קשה יותר ללכוד אותו.
+        </p>
+      </div>
 
       {openItem && (
         <ItemDialog

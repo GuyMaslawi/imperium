@@ -42,8 +42,12 @@ export default async function ReportsPage() {
     }),
   ]);
 
-  // Reports that arrived since the player's last visit get a "new" marker.
+  // Reports that arrived since the player's last visit get a "new" marker —
+  // but only for things done *to* me. My own attacks and spy missions are
+  // never "news" to me, so they never carry a marker or feed a tab badge.
   const seenAt = empire.reportsSeenAt;
+  const isIncomingNew = (createdAt: Date, isAttacker: boolean) =>
+    !isAttacker && createdAt > seenAt;
 
   const battleRows: BattleRow[] = battles.map((report) => {
     const isAttacker = report.attackerEmpireId === empire.id;
@@ -63,7 +67,7 @@ export default async function ReportsPage() {
     return {
       id: report.id,
       createdAt: formatDate(report.createdAt),
-      isNew: report.createdAt > seenAt,
+      isNew: isIncomingNew(report.createdAt, isAttacker),
       rival,
       isAttacker,
       won,
@@ -89,7 +93,7 @@ export default async function ReportsPage() {
     return {
       id: report.id,
       createdAt: formatDate(report.createdAt),
-      isNew: report.createdAt > seenAt,
+      isNew: isIncomingNew(report.createdAt, isAttacker),
       rival: isAttacker
         ? report.defenderEmpire.name
         : report.attackerEmpire.name,
@@ -115,7 +119,7 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markReportsSeen} />
-      <SectionHeading title="היסטוריה" subtitle="BATTLE HISTORY" ornament={<Icon name="reports" size={22} className="text-crimson" />} />
+      <SectionHeading title="היסטוריה" ornament={<Icon name="reports" size={22} className="text-crimson" />} />
 
       <ReportsTabs battles={battleRows} spies={spyRows} />
     </div>

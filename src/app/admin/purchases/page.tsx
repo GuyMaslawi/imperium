@@ -81,7 +81,6 @@ export default async function AdminPurchasesPage() {
     <div className="space-y-6">
       <SectionHeading
         title="רכישות והכנסות"
-        subtitle="REVENUE"
         ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 

@@ -32,9 +32,9 @@ function StatRow({
   const meta = HERO_STAT_META[stat];
   const active = value > 0;
   return (
-    <Tip tip={<>{meta.description}<br />{note}</>}>
+    <Tip className="w-full" tip={<>{meta.description}<br />{note}</>}>
       <div
-        className={`flex cursor-help items-center justify-between gap-3 rounded-lg p-2.5 ${
+        className={`flex w-full cursor-help items-center justify-between gap-3 rounded-lg p-2.5 ${
           active ? "panel" : "panel-inset opacity-60"
         }`}
       >
@@ -86,6 +86,7 @@ function ResourcesRow({
   const active = totalPctValue > 0 || itemFlat > 0;
   return (
     <Tip
+      className="w-full"
       tip={
         <>
           {meta.description}
@@ -95,7 +96,7 @@ function ResourcesRow({
       }
     >
       <div
-        className={`flex cursor-help items-center justify-between gap-3 rounded-lg p-2.5 ${
+        className={`flex w-full cursor-help items-center justify-between gap-3 rounded-lg p-2.5 ${
           active ? "panel" : "panel-inset opacity-60"
         }`}
       >
@@ -211,15 +212,13 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
   ];
 
   return (
-    <div className="panel-inset rounded-xl p-4">
-      <div className="mb-1 flex items-baseline justify-between gap-2">
-        <h3 className="text-sm font-bold tracking-wide text-gold-bright">
+    <div className="panel-gold rounded-2xl p-4 md:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-base font-bold tracking-wide text-gold-bright">
           סך הכל מהגיבור
         </h3>
-        <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
-          Total Hero Yield
-        </span>
       </div>
+      <div className="rule-gold my-3" />
       <p className="mb-4 text-[11px] leading-relaxed text-zinc-500">
         מה שאתה מקבל בפועל מהנקודות והחפצים יחד. שורות מודגשות פעילות; שורות
         עמומות ממתינות לחפץ מתאים.
@@ -230,17 +229,17 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
           space; they stack on narrow screens. */}
       <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
         {/* battle percentages: attack / defense / spy */}
-        <div>
+        <section>
           <SectionLabel>בונוסי קרב · באחוזים</SectionLabel>
           <div className="flex flex-col gap-1.5">
             {percentRows.map(({ stat, value, note }) => (
               <StatRow key={stat} stat={stat} value={value} suffix="%" note={note} />
             ))}
           </div>
-        </div>
+        </section>
 
         {/* flat per-tick yield from items: turns / diamonds / citizens */}
-        <div>
+        <section className="lg:border-e lg:border-s lg:border-border-subtle lg:px-6">
           <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
           <div className="flex flex-col gap-1.5">
             {flatRows.map(({ stat, value, note }) => (
@@ -253,10 +252,10 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
               />
             ))}
           </div>
-        </div>
+        </section>
 
         {/* resources: hybrid — % from points (mines) + flat from the relic */}
-        <div>
+        <section>
           <SectionLabel>תפוקת משאבים · נקודות + חפץ</SectionLabel>
           <ResourcesRow
             pointsPct={points.resources}
@@ -264,7 +263,7 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
             itemFlat={itemsFlat.resources}
             itemNote={resourcesNote}
           />
-        </div>
+        </section>
       </div>
     </div>
   );

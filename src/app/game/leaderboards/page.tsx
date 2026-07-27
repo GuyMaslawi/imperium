@@ -167,7 +167,6 @@ export default async function LeaderboardsPage({
       <AutoRefresh intervalMs={30_000} />
       <SectionHeading
         title="טבלאות מובילים"
-        subtitle="HALL OF FAME"
         ornament={<Icon name="rankings" size={22} className="text-crimson" />}
       />
 

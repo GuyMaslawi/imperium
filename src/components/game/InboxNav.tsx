@@ -6,10 +6,16 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
 export type InboxNavProps = {
-  /** Reports created since the last visit to the history page (red badge). */
+  /**
+   * Incoming reports since the last visit to the history page (red badge):
+   * attacks on me and enemy spies I caught. My own attacks and missions never
+   * count — they are not news to the player who ordered them.
+   */
   newReports?: number;
   /** Unread inbox messages (green badge). */
   unreadMessages?: number;
+  /** Achievement rewards unlocked and not yet collected (gold badge). */
+  collectableAchievements?: number;
 };
 
 type Entry = {
@@ -18,8 +24,14 @@ type Entry = {
   icon: IconName;
   tip: string;
   count: number;
-  /** Badge + glow color: red for history, green for messages. */
-  tone: "red" | "green";
+  /** Badge + glow color: red for history, green for messages, gold for rewards. */
+  tone: "red" | "green" | "gold";
+  /**
+   * Hide the pill entirely at count 0. History and messages are permanent
+   * destinations; the rewards pill is a nudge, so it earns its space in an
+   * already-crowded bar only while something is actually waiting.
+   */
+  onlyWhenWaiting?: boolean;
 };
 
 const TONE = {
@@ -35,23 +47,33 @@ const TONE = {
     idle: "text-emerald-300/90",
     glow: "inbox-glow-green",
   },
+  gold: {
+    badge: "bg-gold text-black",
+    active: "border-gold/70 text-white",
+    idle: "text-gold-bright",
+    glow: "inbox-glow-gold",
+  },
 } as const;
 
 /**
- * History + messages, parked in the free space of the top command bar so both
- * are reachable from every screen. Each carries its own colored counter badge
- * (red = new battle/spy reports, green = unread mail) and pulses while it has
- * something waiting, so an update can't be missed.
+ * History, messages and unclaimed rewards, parked in the free space of the top
+ * command bar so all three are reachable from every screen. Each carries its
+ * own colored counter badge and pulses while it has something waiting, so an
+ * update can't be missed.
  */
-export function InboxNav({ newReports = 0, unreadMessages = 0 }: InboxNavProps) {
+export function InboxNav({
+  newReports = 0,
+  unreadMessages = 0,
+  collectableAchievements = 0,
+}: InboxNavProps) {
   const pathname = usePathname();
 
-  const entries: Entry[] = [
+  const allEntries: Entry[] = [
     {
       href: "/game/reports",
       label: "היסטוריה",
       icon: "reports",
-      tip: "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי",
+      tip: "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי. ההתראה נדלקת רק כשתוקפים או מרגלים עליי",
       count: newReports,
       tone: "red",
     },
@@ -63,7 +85,17 @@ export function InboxNav({ newReports = 0, unreadMessages = 0 }: InboxNavProps) 
       count: unreadMessages,
       tone: "green",
     },
+    {
+      href: "/game/achievements",
+      label: "פרסים",
+      icon: "gift",
+      tip: "יש לך הישגים שהושלמו וממתינים לאיסוף — היכנס ואסוף את התגמולים",
+      count: collectableAchievements,
+      tone: "gold",
+      onlyWhenWaiting: true,
+    },
   ];
+  const entries = allEntries.filter((e) => !e.onlyWhenWaiting || e.count > 0);
 
   return (
     <div dir="rtl" className="flex shrink-0 items-center gap-1.5 sm:gap-2">

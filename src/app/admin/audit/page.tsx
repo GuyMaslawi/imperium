@@ -18,7 +18,6 @@ export default async function AdminAuditPage() {
     <div className="space-y-6">
       <SectionHeading
         title="יומן פעולות"
-        subtitle="AUDIT LOG"
         ornament={<Icon name="reports" size={22} className="text-crimson" />}
       />
       <p className="text-xs text-zinc-500">מציג {entries.length} רשומות אחרונות.</p>

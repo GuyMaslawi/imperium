@@ -14,9 +14,6 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <div className="mx-auto flex w-full max-w-[1900px] flex-col gap-4 px-3 py-4 lg:flex-row lg:px-5">
         <aside className="ornate-shell flex w-full shrink-0 flex-col gap-4 rounded-lg p-3 lg:w-64">
           <div className="text-right">
-            <p className="text-[11px] uppercase tracking-widest text-gold-dim">
-              IMPERIUM ADMIN
-            </p>
             <p className="flex items-center justify-end gap-1.5 font-black text-gold-bright">
               מרכז שליטה <span aria-hidden>🛡️</span>
             </p>

@@ -10,6 +10,7 @@ import {
   buyTurns,
   castBankInterestSpell,
   resetHeroPointsWithDiamonds,
+  reviveHeroWithDiamonds,
 } from "@/server/actions/diamondShop";
 import {
   BOOST_MAX_PCT,
@@ -17,6 +18,7 @@ import {
   BOOST_STEP_PCT,
   BANK_INTEREST_SPELL_COST,
   HERO_POINTS_RESET_COST,
+  HERO_REVIVE_COST,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_PCT,
   TURN_PACKAGES,
@@ -321,6 +323,49 @@ function HeroResetCard({
   );
 }
 
+/* ------------------------------ hero revival ------------------------------ */
+
+function HeroReviveCard({ dead, diamonds }: { dead: boolean; diamonds: number }) {
+  const [state, action] = useActionState<ActionState, FormData>(
+    reviveHeroWithDiamonds,
+    {}
+  );
+  return (
+    <ShopCard
+      icon={<span className="text-lg">💀</span>}
+      title="החייאת גיבור"
+      badge={
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-black ${
+            dead
+              ? "border-red-500/50 bg-red-500/10 text-red-300"
+              : "border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
+          }`}
+        >
+          {dead ? "מת" : "חי"}
+        </span>
+      }
+      desc={`מקים גיבור שנפל בקרב מיד ל־100% חיים, במקום להמתין שעה. כל עוד הוא מת — הנקודות, החפצים ובונוס המחלקה שלו מושבתים.`}
+    >
+      <form>
+        {dead ? (
+          <SubmitButton
+            className="btn btn-gold w-full px-3 py-2 text-sm"
+            formAction={action}
+            disabled={diamonds < HERO_REVIVE_COST}
+            pendingText="מחייה..."
+          >
+            החייה · <Price cost={HERO_REVIVE_COST} />
+          </SubmitButton>
+        ) : (
+          <ActiveBadge label="✨ הגיבור שלך חי ובועט" />
+        )}
+      </form>
+      <FormMessage error={state.error} success={state.success} />
+    </ShopCard>
+  );
+}
+
 /* ------------------------------ bank interest spell ------------------------------ */
 
 function BankInterestCard({
@@ -383,6 +428,8 @@ export interface DiamondShopProps {
   pointsResetUsed: boolean;
   interestPreview: number;
   bankReadyAt: string | null;
+  /** The hero has fallen — the revival card is live. */
+  heroDead: boolean;
 }
 
 export function DiamondShop({
@@ -394,6 +441,7 @@ export function DiamondShop({
   pointsResetUsed,
   interestPreview,
   bankReadyAt,
+  heroDead,
 }: DiamondShopProps) {
   return (
     <div className="space-y-7">
@@ -448,6 +496,7 @@ export function DiamondShop({
             used={pointsResetUsed}
             diamonds={diamonds}
           />
+          <HeroReviveCard dead={heroDead} diamonds={diamonds} />
         </div>
       </section>
     </div>

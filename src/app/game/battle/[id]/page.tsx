@@ -49,6 +49,11 @@ export default async function BattleResultPage({
 
   const mySoldiersLost = iAmAttacker ? report.attackerSoldiersLost : report.defenderSoldiersLost;
   const foeSoldiersLost = iAmAttacker ? report.defenderSoldiersLost : report.attackerSoldiersLost;
+  // Player battles no longer kill soldiers, but reports written before that
+  // change still carry casualties — show the panels only when there were any.
+  const hadCasualties = mySoldiersLost > 0 || foeSoldiersLost > 0;
+  const aftermathPanels =
+    (hadCasualties ? 2 : 0) + (report.enslavedSoldiers > 0 ? 1 : 0) + 1;
 
   // Plunder: attacker gains it on a win, defender loses it.
   const plunderTotal = report.stolenGold + report.stolenWood + report.stolenIron + report.stolenStone;
@@ -142,14 +147,14 @@ export default async function BattleResultPage({
           {/* verdict */}
           <div className="flex flex-col items-center">
             <p
-              className={`text-4xl font-black tracking-widest ${
+              className={`text-4xl font-black ${
                 iWon ? "text-emerald-400" : "text-red-500"
               }`}
               style={{ textShadow: "0 2px 18px rgba(0,0,0,0.8)" }}
             >
-              {iWon ? "WIN" : "LOSE"}
+              {iWon ? "ניצחון" : "תבוסה"}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">VS</p>
+            <p className="mt-1 text-xs text-zinc-500">מול</p>
           </div>
 
           {/* foe side */}
@@ -177,15 +182,29 @@ export default async function BattleResultPage({
       </div>
 
       {/* -------- aftermath -------- */}
-      <div className={`grid gap-4 ${report.enslavedSoldiers > 0 ? "grid-cols-2 sm:grid-cols-4" : "sm:grid-cols-3"}`}>
-        <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">אבדות שלך</p>
-          <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">−{formatNumber(mySoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
-        </div>
-        <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">אבדות היריב</p>
-          <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">−{formatNumber(foeSoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
-        </div>
+      <div
+        className={`grid gap-4 ${
+          aftermathPanels >= 4
+            ? "grid-cols-2 sm:grid-cols-4"
+            : aftermathPanels === 3
+              ? "sm:grid-cols-3"
+              : aftermathPanels === 2
+                ? "grid-cols-2"
+                : ""
+        }`}
+      >
+        {hadCasualties && (
+          <>
+            <div className="panel-inset rounded-xl p-4 text-center">
+              <p className="text-xs text-zinc-400">אבדות שלך</p>
+              <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">−{formatNumber(mySoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
+            </div>
+            <div className="panel-inset rounded-xl p-4 text-center">
+              <p className="text-xs text-zinc-400">אבדות היריב</p>
+              <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">−{formatNumber(foeSoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
+            </div>
+          </>
+        )}
         {report.enslavedSoldiers > 0 && (
           <div className="panel-inset rounded-xl p-4 text-center">
             <Tip tip="ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים).">
@@ -204,6 +223,11 @@ export default async function BattleResultPage({
           <p className="nums mt-1 text-xl font-black text-gold" dir="ltr">{formatNumber(report.turnsSpent)}</p>
         </div>
       </div>
+      {!hadCasualties && (
+        <p className="text-center text-xs text-zinc-500">
+          קרבות מול שחקנים אינם גורמים לאבדות בחיילים — רק קרב מול בוס עיר קוטל חיילים.
+        </p>
+      )}
 
       {/* -------- hero rewards -------- */}
       {(myHeroXp > 0 || capturedItem || wonWheelSpin) && (
@@ -214,7 +238,7 @@ export default async function BattleResultPage({
               <div className="panel-inset cursor-help rounded-lg p-3 text-center">
                 <p className="text-[11px] text-zinc-400">ניסיון שהתקבל</p>
                 <p className="nums mt-0.5 text-xl font-black text-purple-300" dir="ltr">
-                  +{formatNumber(myHeroXp)} XP
+                  +{formatNumber(myHeroXp)}
                 </p>
               </div>
             </Tip>

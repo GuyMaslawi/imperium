@@ -26,7 +26,6 @@ export default async function BuyDiamondsPage() {
     <div className="space-y-6">
       <SectionHeading
         title="רכישת יהלומים"
-        subtitle="GET DIAMONDS"
         ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 

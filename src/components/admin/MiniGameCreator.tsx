@@ -69,7 +69,7 @@ export function MiniGameCreator({ action }: { action: Action }) {
       </div>
 
       {/* Title (optional) + shared settings */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <LabeledInput
           label="כותרת (רשות)"
           name="title"
@@ -78,6 +78,14 @@ export function MiniGameCreator({ action }: { action: Action }) {
         />
         <LabeledInput label="ניסיונות לשחקן" name="maxAttempts" type="number" min={1} defaultValue={5} />
         <LabeledInput label="מקס׳ זוכים (0=∞)" name="maxWinners" type="number" min={0} defaultValue={0} />
+        <LabeledInput
+          label="⏳ משך המשחק (דקות)"
+          name="durationMinutes"
+          type="number"
+          min={0}
+          defaultValue={0}
+          hint="0 = עד שתפסיק ידנית"
+        />
       </div>
 
       {/* Type-specific config */}

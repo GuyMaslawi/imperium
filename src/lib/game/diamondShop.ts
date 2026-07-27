@@ -87,6 +87,15 @@ export const TURN_PACKAGE_KINDS: DiamondEffectKind[] = TURN_PACKAGES.map(
 /** Diamonds to refund all allocated hero points to "unspent" (once/season). */
 export const HERO_POINTS_RESET_COST = 100;
 
+/* ------------------------------ hero revival ------------------------------ */
+
+/**
+ * Diamonds to raise a fallen hero back to full health on the spot, instead of
+ * waiting out the hour (HERO_REVIVE_HOURS). Deliberately the most expensive
+ * thing in the shop: the alternative is free, it just costs patience.
+ */
+export const HERO_REVIVE_COST = 500;
+
 /* ------------------------------ bank interest spell ------------------------------ */
 
 export const BANK_INTEREST_SPELL_COST = 60;

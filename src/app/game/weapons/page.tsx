@@ -90,7 +90,7 @@ export default async function WeaponsPage({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="חנות נשקים" subtitle="SHOP" ornament="🛍️" />
+      <SectionHeading title="חנות נשקים" ornament="🛍️" />
 
       <WeaponsTabs
         tabs={tabs}

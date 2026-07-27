@@ -117,7 +117,7 @@ export default async function EmpireProfilePage({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="פרופיל" subtitle="EMPIRE PROFILE" ornament={<Icon name="crown" size={22} className="text-crimson" />} />
+      <SectionHeading title="פרופיל" ornament={<Icon name="crown" size={22} className="text-crimson" />} />
 
       {/* An empire outside your city is off-limits: no spying, no attacking. */}
       {!isMe && !sameCity && (
@@ -311,13 +311,10 @@ export default async function EmpireProfilePage({
         {/* -------- intelligence / spy report -------- */}
         {canEngage && (
           <div className="panel-gold rounded-xl p-4">
-            <h3 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
               <Icon name="spy" size={20} className="text-crimson-bright" />
               תוצאת ריגול
             </h3>
-            <p className="mb-4 text-[10px] uppercase tracking-[0.35em] text-gold-dim">
-              SPY REPORT
-            </p>
             {spyReport ? (
               <>
                 <p className="mb-3 text-xs text-zinc-500">
@@ -437,7 +434,7 @@ export default async function EmpireProfilePage({
                 level={item.level}
                 name={meta.label}
                 rarity={uiRarityForLevel(item.level)}
-                details={itemDetails(item, heroLevel, { equipped: true })}
+                details={itemDetails(item, heroLevel)}
               />
             );
           })}

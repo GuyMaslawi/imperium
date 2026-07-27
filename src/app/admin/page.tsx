@@ -69,7 +69,6 @@ export default async function AdminDashboard() {
     <div className="space-y-6">
       <SectionHeading
         title="לוח בקרה"
-        subtitle="CONTROL CENTER"
         ornament={<Icon name="shield" size={22} className="text-crimson" />}
       />
 

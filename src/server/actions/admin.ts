@@ -22,6 +22,7 @@ import { requireAdmin, logAdmin } from "@/lib/admin";
 import { weaponByKey } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
+import { HERO_MAX_HEALTH } from "@/lib/game/hero";
 import {
   DEFAULT_TUNABLES,
   getTunables,
@@ -673,8 +674,16 @@ export async function updateHero(
     const heroClass = z
       .enum(["WARLORD", "GUARDIAN", "MERCHANT", "SHADOW"])
       .parse(formData.get("heroClass"));
+    // Health doubles as the life/death switch: setting it to 0 kills the hero
+    // here and now (starting his revival hour), anything above raises him.
+    const health = Math.max(
+      0,
+      Math.min(HERO_MAX_HEALTH, Math.round(num(formData, "health")))
+    );
     const data = {
       heroClass,
+      health,
+      diedAt: health <= 0 ? new Date() : null,
       level: Math.max(1, Math.round(num(formData, "level"))),
       xp: Math.max(0, Math.round(num(formData, "xp"))),
       unspentPoints: Math.max(0, Math.round(num(formData, "unspentPoints"))),
@@ -1309,13 +1318,23 @@ function readPrizeBundle(formData: FormData) {
   };
 }
 
-/** Release an event to all players: fresh answer, cleared entries, live. */
+/** Upper bound on a timed release: one week, in minutes. */
+const MAX_DURATION_MINUTES = 7 * 24 * 60;
+
+/**
+ * Release an event to all players: fresh answer, cleared entries, live.
+ * `durationMinutes` > 0 sets a deadline the event expires at on its own (no
+ * scheduler involved — the deadline is enforced on read; see minigame.ts).
+ */
 async function activateEvent(
   admin: Awaited<ReturnType<typeof requireAdmin>>,
-  event: { id: string; type: MiniGameType; config: unknown; title: string }
+  event: { id: string; type: MiniGameType; config: unknown; title: string },
+  durationMinutes: number
 ): Promise<void> {
   const cfg = (event.config ?? {}) as Record<string, number>;
   const params = { min: cfg.min ?? 1, max: cfg.max ?? 100, cups: cfg.cups ?? 3 };
+  const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(durationMinutes)));
+  const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
 
   await prisma.$transaction([
     prisma.miniGameEvent.updateMany({ data: { isActive: false } }),
@@ -1326,6 +1345,8 @@ async function activateEvent(
         isActive: true,
         winnersCount: 0,
         activatedAt: new Date(),
+        durationMinutes: minutes,
+        endsAt,
         endedAt: null,
         config: freshConfig(event.type, params),
       },
@@ -1335,7 +1356,10 @@ async function activateEvent(
     action: "minigame.activate",
     targetType: "minigame",
     targetId: event.id,
-    summary: `שוחרר מיני-משחק "${event.title}" לכל השחקנים`,
+    summary:
+      minutes > 0
+        ? `שוחרר מיני-משחק "${event.title}" לכל השחקנים למשך ${minutes} דקות`
+        : `שוחרר מיני-משחק "${event.title}" לכל השחקנים`,
   });
   revalidatePath("/admin/minigame");
   revalidatePath("/game", "layout");
@@ -1361,6 +1385,10 @@ export async function createMiniGame(
     }
     const maxAttempts = Math.max(1, Math.round(optNum(formData, "maxAttempts", 5)));
     const maxWinners = Math.max(0, Math.round(optNum(formData, "maxWinners", 0)));
+    const durationMinutes = Math.min(
+      MAX_DURATION_MINUTES,
+      Math.max(0, Math.round(optNum(formData, "durationMinutes", 0)))
+    );
 
     const event = await prisma.miniGameEvent.create({
       data: {
@@ -1369,6 +1397,7 @@ export async function createMiniGame(
         config: freshConfig(type, { min, max, cups }),
         maxAttempts,
         maxWinners,
+        durationMinutes,
         ...readPrizeBundle(formData),
       },
     });
@@ -1381,8 +1410,12 @@ export async function createMiniGame(
 
     // One-click launch: create and immediately release to everyone.
     if (str(formData, "activate") === "1") {
-      await activateEvent(admin, event);
-      return { success: `"${title}" נוצר ושוחרר לכל השחקנים! 🎉` };
+      await activateEvent(admin, event, durationMinutes);
+      return {
+        success: durationMinutes
+          ? `"${title}" נוצר ושוחרר לכל השחקנים למשך ${durationMinutes} דקות! 🎉`
+          : `"${title}" נוצר ושוחרר לכל השחקנים! 🎉`,
+      };
     }
 
     revalidatePath("/admin/minigame");
@@ -1403,8 +1436,15 @@ export async function activateMiniGame(
     const event = await prisma.miniGameEvent.findUnique({ where: { id } });
     if (!event) return { error: "המיני-משחק לא נמצא" };
 
-    await activateEvent(admin, event);
-    return { success: "המיני-משחק שוחרר לכל השחקנים! 🎉" };
+    // An omitted field keeps the duration the event was last released with.
+    const durationMinutes = optNum(formData, "durationMinutes", event.durationMinutes);
+    await activateEvent(admin, event, durationMinutes);
+    return {
+      success:
+        durationMinutes > 0
+          ? `המיני-משחק שוחרר לכל השחקנים למשך ${Math.round(durationMinutes)} דקות! 🎉`
+          : "המיני-משחק שוחרר לכל השחקנים! 🎉",
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -1420,7 +1460,9 @@ export async function deactivateMiniGame(
     const id = str(formData, "id");
     await prisma.miniGameEvent.update({
       where: { id },
-      data: { isActive: false, endedAt: new Date() },
+      // Clearing the deadline too: stopping by hand is the end, so nothing
+      // should still read as "expires in N minutes".
+      data: { isActive: false, endsAt: null, endedAt: new Date() },
     });
     await logAdmin(admin, {
       action: "minigame.deactivate",

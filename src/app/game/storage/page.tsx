@@ -44,7 +44,7 @@ export default async function StoragePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מחסנים" subtitle="STORAGE" ornament="🏛️" />
+      <SectionHeading title="מחסנים" ornament="🏛️" />
 
       {/* -------- warehouse network summary -------- */}
       <div className="panel-gold rounded-xl p-4">

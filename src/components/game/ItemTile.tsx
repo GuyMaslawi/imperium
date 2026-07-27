@@ -125,13 +125,14 @@ export function ItemTile({
   level?: number;
   name?: string;
   rarity: Rarity;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
   details?: ItemTileDetails;
 }) {
   const [imgOk, setImgOk] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const r = RARITY[rarity];
-  const iconSize = size === "lg" ? "text-6xl" : "text-4xl";
+  const iconSize =
+    size === "lg" ? "text-6xl" : size === "sm" ? "text-3xl" : "text-4xl";
   const locked = details?.meetsRequirement === false;
   // Locked items stay dim & inert; everything else shimmers. Desync each tile's
   // sweep from a stable seed so a grid twinkles unevenly rather than in a wave.

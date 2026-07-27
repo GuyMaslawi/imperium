@@ -176,7 +176,7 @@ export async function runBossFight(empireId: string): Promise<BossFightOutcome> 
     if (hero) {
       const next = applyHeroXp(
         hero,
-        Math.round(heroXp * classXpMultiplier(hero.heroClass))
+        Math.round(heroXp * classXpMultiplier(hero))
       );
       await tx.hero.update({
         where: { id: hero.id },
@@ -200,21 +200,30 @@ export async function runBossFight(empireId: string): Promise<BossFightOutcome> 
       // tier is derived from the level (`tierForLevel`), and the stored
       // `rarity` column is only a denormalised copy. A COMMON level tagged RARE
       // would still display and perform as COMMON — a lying row, not a floor.
-      if (victory && hero.items.filter((i) => !i.equipped).length < HERO_BAG_CAPACITY) {
-        const rolled = rollGuaranteedItem(next.level);
-        const belowFloor =
-          RARITY_ORDER.indexOf(rolled.rarity) <
-          RARITY_ORDER.indexOf(BOSS_ITEM_RARITY_FLOOR);
-        droppedItem = belowFloor
-          ? {
-              slot: rolled.slot,
-              level: itemLevelForRarity(next.level, BOSS_ITEM_RARITY_FLOOR),
-              rarity: BOSS_ITEM_RARITY_FLOOR,
-            }
-          : rolled;
-        await tx.heroItem.create({
-          data: { heroId: hero.id, ...droppedItem },
+      //
+      // The bag is counted live rather than off the `hero.items` snapshot,
+      // which predates this tx's empire lock — a drop that landed in between
+      // would otherwise be missed and push the bag past its capacity.
+      if (victory) {
+        const bagCount = await tx.heroItem.count({
+          where: { heroId: hero.id, equipped: false },
         });
+        if (bagCount < HERO_BAG_CAPACITY) {
+          const rolled = rollGuaranteedItem(next.level);
+          const belowFloor =
+            RARITY_ORDER.indexOf(rolled.rarity) <
+            RARITY_ORDER.indexOf(BOSS_ITEM_RARITY_FLOOR);
+          droppedItem = belowFloor
+            ? {
+                slot: rolled.slot,
+                level: itemLevelForRarity(next.level, BOSS_ITEM_RARITY_FLOOR),
+                rarity: BOSS_ITEM_RARITY_FLOOR,
+              }
+            : rolled;
+          await tx.heroItem.create({
+            data: { heroId: hero.id, ...droppedItem },
+          });
+        }
       }
     }
 

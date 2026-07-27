@@ -17,7 +17,7 @@ export default async function AdminBalancePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="איזון גלובלי" subtitle="GAME BALANCE" ornament="⚖️" />
+      <SectionHeading title="איזון גלובלי" ornament="⚖️" />
 
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
         ערכים אלה נקראים ישירות מהלוגיקה של המשחק (חבילת פתיחה, עדכון יומי, קרב וריגול, תפוקה גלובלית).

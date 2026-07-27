@@ -58,13 +58,10 @@ const PILLS: PillConfig[] = [
 
 export function ResourceBar({
   resources,
-  miniGame,
   mobileMenu,
   inbox,
 }: {
   resources: Record<ResourceKey, number>;
-  /** Optional slot rendered on the right of the command bar (mini-game die). */
-  miniGame?: ReactNode;
   /** Mobile-only nav trigger, rendered at the start of the bar (hidden at lg+). */
   mobileMenu?: ReactNode;
   /** History + messages pills, parked in the bar's free space (see InboxNav). */
@@ -99,17 +96,8 @@ export function ResourceBar({
           ))}
         </div>
 
-        {/* history + messages (the bar's free stretch, before the die) */}
+        {/* history + messages (the bar's free stretch) */}
         {inbox}
-
-        {/* mini-game die (right side of the command bar) */}
-        {miniGame}
-
-        {/* language toggle */}
-        <div className="hidden shrink-0 items-center overflow-hidden rounded-md border border-border-subtle text-xs font-bold sm:flex">
-          <span className="bg-transparent px-2.5 py-1 text-zinc-400">EN</span>
-          <span className="bg-gold/15 px-2.5 py-1 text-gold-bright">עב</span>
-        </div>
 
         {/* brand emblem */}
         <div className="flex shrink-0 items-center gap-2">

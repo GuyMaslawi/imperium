@@ -17,8 +17,12 @@ export const CITIZENS_PER_LEVEL = 25;
 export const HERO_RESET_CITIZENS = 2500;
 export const HERO_RESET_POINTS = 25;
 
-/** Unequipped items the bag can hold. */
-export const HERO_BAG_CAPACITY = 24;
+/**
+ * Unequipped items the bag can hold — a 5×3 grid of slots. When it is full no
+ * new item enters it: drops (attack, boss, wheel) are skipped and unequipping
+ * is refused, so the count can never exceed this.
+ */
+export const HERO_BAG_CAPACITY = 15;
 
 /** XP needed to advance from `level` to `level + 1`. */
 export function xpToNextLevel(level: number): number {
@@ -52,7 +56,9 @@ export function matchupXpFactor(ownPower: number, foePower: number): number {
 }
 
 /**
- * Battle XP: attacking is the main source; defending well also pays. The reward
+ * Battle XP: attacking is the main source; defending well also pays. Only
+ * winning pays — a repelled attack and a breached defence both earn nothing, so
+ * these two functions cover every XP-bearing outcome of a battle. The reward
  * scales with three things — the opponent hero's level (a higher target is
  * inherently worth more), how many times they have prestiged (+25% per reset),
  * and the power matchup (see `matchupXpFactor`). Because the matchup factor
@@ -71,9 +77,6 @@ export function attackWinXp(
     base * matchupXpFactor(attackerPower, defenderPower) * resetXpMultiplier(defenderResets)
   );
 }
-export function attackLossXp(): number {
-  return 15;
-}
 export function defenseWinXp(
   attackerHeroLevel: number,
   attackerResets: number,
@@ -84,9 +87,6 @@ export function defenseWinXp(
   return Math.round(
     base * matchupXpFactor(defenderPower, attackerPower) * resetXpMultiplier(attackerResets)
   );
-}
-export function defenseLossXp(): number {
-  return 10;
 }
 
 /**
@@ -109,6 +109,53 @@ export function applyHeroXp(
   }
   if (level >= HERO_MAX_LEVEL) xp = 0;
   return { level, xp, pointsGained };
+}
+
+/* ------------------------------ health, death & revival ------------------------------ */
+
+/** A hero at full strength. Health is a plain 0–100 percentage. */
+export const HERO_MAX_HEALTH = 100;
+
+/**
+ * Health lost every time an enemy attack breaches the empire's defence. Ten
+ * lost defences fell the hero — and only a *won* attack wounds him, so a
+ * repelled raid costs the defender nothing.
+ */
+export const HERO_DAMAGE_PER_LOST_DEFENSE = 10;
+
+/** How long a fallen hero lies dead before rising by himself. */
+export const HERO_REVIVE_HOURS = 1;
+export const HERO_REVIVE_MS = HERO_REVIVE_HOURS * 3_600_000;
+
+/** The two columns that decide whether the hero is alive — all these need. */
+export type HeroVitals = Pick<Hero, "health" | "diedAt">;
+
+/** A hero at zero health is dead: he grants nothing until he is raised. */
+export function isHeroDead(hero: HeroVitals | null | undefined): boolean {
+  return hero != null && hero.health <= 0;
+}
+
+/** Health remaining after taking a blow, floored at 0 (dead) and capped at full. */
+export function damagedHealth(
+  health: number,
+  damage: number = HERO_DAMAGE_PER_LOST_DEFENSE
+): number {
+  return Math.max(0, Math.min(HERO_MAX_HEALTH, health) - Math.max(0, damage));
+}
+
+/** When a fallen hero rises on his own, or null while he still lives. */
+export function heroReviveAt(hero: HeroVitals | null | undefined): Date | null {
+  if (!hero || !isHeroDead(hero) || !hero.diedAt) return null;
+  return new Date(hero.diedAt.getTime() + HERO_REVIVE_MS);
+}
+
+/** Whether the hour is up and the hero should be raised (lazy — see updates.ts). */
+export function heroShouldRevive(
+  hero: HeroVitals | null | undefined,
+  now: Date
+): boolean {
+  const at = heroReviveAt(hero);
+  return at !== null && at <= now;
 }
 
 /* ------------------------------ stats ------------------------------ */
@@ -492,8 +539,6 @@ export interface HeroClassBonuses {
 
 export interface HeroClassMeta {
   label: string;
-  /** English caps subtitle, matching the SectionHeading convention. */
-  title: string;
   /** Portrait art at /hero/classes/<slug>.jpg. */
   slug: string;
   /** rgb triple tinting the portrait's embers and halo — the class's own
@@ -510,7 +555,6 @@ export const HERO_CLASS_ORDER: HeroClass[] = ["WARLORD", "GUARDIAN", "MERCHANT",
 export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
   WARLORD: {
     label: "המצביא",
-    title: "WARLORD",
     slug: "warlord",
     accent: "214 84 62",
     tagline: "כוח הוא הטיעון היחיד",
@@ -519,7 +563,6 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
   },
   GUARDIAN: {
     label: "המגן",
-    title: "GUARDIAN",
     slug: "guardian",
     accent: "96 156 224",
     tagline: "החומה שלא נפלה מעולם",
@@ -528,7 +571,6 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
   },
   MERCHANT: {
     label: "הסוחר",
-    title: "MERCHANT",
     slug: "merchant",
     accent: "228 195 90",
     tagline: "כל מלחמה מתחילה באוצר",
@@ -537,7 +579,6 @@ export const HERO_CLASS_META: Record<HeroClass, HeroClassMeta> = {
   },
   SHADOW: {
     label: "הצל",
-    title: "SHADOW",
     slug: "shadow",
     accent: "150 96 232",
     tagline: "מה שלא רואים — מנצח",
@@ -558,9 +599,16 @@ export function heroClassBonuses(heroClass: HeroClass | null | undefined): HeroC
     : { attack: 0, defense: 0, resources: 0, spy: 0, xp: 0 };
 }
 
-/** Battle-XP multiplier from the class (e.g. הצל earns +10% XP). */
-export function classXpMultiplier(heroClass: HeroClass | null | undefined): number {
-  return bonusMultiplier(heroClassBonuses(heroClass).xp);
+/**
+ * Battle-XP multiplier from the class (e.g. הצל earns +10% XP). A fallen hero
+ * still learns from the battle his army fought, but his class bonus — like
+ * every other bonus he brings — is switched off until he is raised.
+ */
+export function classXpMultiplier(
+  hero: (Pick<Hero, "heroClass"> & HeroVitals) | null | undefined
+): number {
+  if (!hero || isHeroDead(hero)) return 1;
+  return bonusMultiplier(heroClassBonuses(hero.heroClass).xp);
 }
 
 /** The non-zero bonus lines of a class, for badges/tooltips. */
@@ -609,13 +657,39 @@ export interface HeroBonuses {
   totalPct: Record<HeroPercentStat, number>;
 }
 
+/** Every bonus at zero — what a fallen hero contributes, and a missing one. */
+export function zeroHeroBonuses(): HeroBonuses {
+  return {
+    points: { attack: 0, defense: 0, resources: 0 },
+    itemsPct: { attack: 0, defense: 0, spy: 0 },
+    itemsFlat: { resources: 0, turns: 0, diamonds: 0, citizens: 0 },
+    itemsFlatByResource: { gold: 0, wood: 0, iron: 0, stone: 0 },
+    classPct: { attack: 0, defense: 0, resources: 0, spy: 0 },
+    totalPct: { attack: 0, defense: 0, spy: 0 },
+  };
+}
+
 /**
- * Aggregate the hero's bonuses. Percentage stats (attack/defense/spy) combine
- * allocated points with item %; flat stats (resources/turns/diamonds/citizens)
- * come from equipped items only, as whole unit counts. Every value is an
- * integer, so no rounding is needed here.
+ * The bonuses the hero is **actually** contributing right now. A dead hero
+ * (health 0) carries none of them — not his allocated points, not his gear,
+ * not his class bonus — until he rises, an hour after he fell or the moment
+ * his owner pays the diamonds. Every gameplay site (battle, spy, production,
+ * boss, the power cards) reads this, so death is felt everywhere at once.
+ *
+ * The character sheet wants the numbers the hero *would* grant — it uses
+ * `rawHeroBonuses` and says plainly that death has switched them off.
  */
 export function heroBonuses(hero: HeroWithItems | null): HeroBonuses {
+  return isHeroDead(hero) ? zeroHeroBonuses() : rawHeroBonuses(hero);
+}
+
+/**
+ * Aggregate the hero's bonuses, ignoring whether he is alive. Percentage stats
+ * (attack/defense/spy) combine allocated points with item %; flat stats
+ * (resources/turns/diamonds/citizens) come from equipped items only, as whole
+ * unit counts. Every value is an integer, so no rounding is needed here.
+ */
+export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
   const points: Record<HeroPointStat, number> = {
     attack: hero?.attackPoints ?? 0,
     defense: hero?.defensePoints ?? 0,
@@ -675,19 +749,18 @@ export function bonusMultiplier(pct: number): number {
  * Chance that winning an attack captures an item **of each rarity**.
  *
  * Rarity drives frequency directly, rather than falling out of a uniform level
- * roll. Under the old model the level was uniform across a ±12 window and the
- * tier was read off it, which made אגדי roughly 1-in-10 of all drops — far too
- * common for the top of the ladder. Now an אגדי is a flat 1% of winning
- * attacks and each step down is several times more likely.
+ * roll. Gear is meant to be earned: fewer than one in five winning attacks
+ * yields anything at all, and the top of the ladder stays rare — an אגדי is a
+ * flat 0.5% of winning attacks, an אליט 1.5%.
  *
  * These are per-winning-attack probabilities and are mutually exclusive; the
  * remainder (1 − ITEM_DROP_CHANCE) is no drop at all.
  */
 export const ITEM_DROP_CHANCE_BY_RARITY: Record<HeroRarity, number> = {
-  COMMON: 0.27, // פשוט — 27%
-  RARE: 0.13, // מתקדם — 13%
-  EPIC: 0.04, // אליט — 4%
-  LEGENDARY: 0.01, // אגדי — 1%
+  COMMON: 0.12, // פשוט — 12%
+  RARE: 0.05, // מתקדם — 5%
+  EPIC: 0.015, // אליט — 1.5%
+  LEGENDARY: 0.005, // אגדי — 0.5%
 };
 
 /** Chance a won attack yields any item at all — the sum of the table above. */

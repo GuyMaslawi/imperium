@@ -31,7 +31,7 @@ export default async function AdminSeasonsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="עונות" subtitle="SEASONS" ornament="📅" />
+      <SectionHeading title="עונות" ornament="📅" />
 
       <EditorSection title="עונה חדשה" icon="➕">
         <ActionForm action={createSeason} submitLabel="צור עונה">

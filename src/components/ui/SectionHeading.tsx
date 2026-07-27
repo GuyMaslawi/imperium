@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 /**
- * Centered gold section title with an uppercase English subtitle and flanking
- * decorative rules — the header treatment used at the top of every screen
- * (e.g. "⚔ גיבור ⚔ / WAR HERO").
+ * Centered gold section title with flanking decorative rules — the header
+ * treatment used at the top of every screen (e.g. "⚔ גיבור ⚔"). `subtitle` is
+ * for a second data line (an email, an id); screen labels stay Hebrew-only.
  */
 export function SectionHeading({
   title,

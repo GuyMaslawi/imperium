@@ -15,10 +15,10 @@ import {
   itemBonusValue,
 } from "@/lib/game/hero";
 
-/** "27%" / "1%" — one decimal only when the odds are below a whole percent. */
+/** "12%" / "1.5%" — a decimal only when the odds are not a whole percent. */
 function formatDropChance(chance: number): string {
   const pct = chance * 100;
-  return `${pct < 1 ? pct.toFixed(1) : Math.round(pct)}%`;
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
 }
 
 /**

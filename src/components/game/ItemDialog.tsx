@@ -137,11 +137,6 @@ export function ItemDialog({
             {" · "}רמת פריט:{" "}
             <span className="nums text-zinc-200">{level}</span>
           </p>
-          {equipped && (
-            <span className="mt-2 inline-block rounded bg-emerald-600/90 px-2 py-0.5 text-[10px] font-black text-white">
-              לבוש כעת
-            </span>
-          )}
         </div>
         <button
           onClick={onClose}

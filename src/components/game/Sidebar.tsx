@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/actions/auth";
-import { DuelBar, Meter } from "@/components/ui/Meter";
+import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatCompact } from "@/lib/game/format";
@@ -15,6 +15,13 @@ type NavItem = {
   label: string;
   icon: IconName;
   badge?: number;
+  /**
+   * How the badge reads. "muted" is a neutral count (recruits waiting);
+   * "attention" is something the player can act on right now, so it takes the
+   * gold treatment and pulses the row — matching the rewards pill in the
+   * command bar (see InboxNav).
+   */
+  badgeTone?: "muted" | "attention";
 };
 
 export type SidebarProps = {
@@ -29,13 +36,15 @@ export type SidebarProps = {
   heroResets?: number;
   /** Unspent hero points waiting to be allocated. */
   heroPoints?: number;
-  /** Total hero attack/defense % (points + equipped items). */
-  heroAttackPct?: number;
-  heroDefensePct?: number;
+  /** Hero health, 0–100. */
   heroHealthPct: number;
+  /** Health has hit zero: the hero is out until he rises (see isHeroDead). */
+  heroDead?: boolean;
   heroXp: number;
   heroXpMax: number;
   recruits: number;
+  /** Achievement rewards unlocked and waiting to be collected. */
+  collectableAchievements?: number;
   /** Show the admin control-center link (admins only). */
   isAdmin?: boolean;
 };
@@ -141,12 +150,12 @@ function SidebarContent({
   heroLevel,
   heroResets = 0,
   heroPoints = 0,
-  heroAttackPct = 0,
-  heroDefensePct = 0,
   heroHealthPct,
+  heroDead = false,
   heroXp,
   heroXpMax,
   recruits,
+  collectableAchievements = 0,
   isAdmin = false,
   pathname,
 }: SidebarProps & { pathname: string }) {
@@ -163,7 +172,13 @@ function SidebarContent({
     { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
     { href: "/game/bank", label: "בנק", icon: "bank" },
     { href: "/game/storage", label: "מחסנים", icon: "storage" },
-    { href: "/game/achievements", label: "הישגים", icon: "achievements" },
+    {
+      href: "/game/achievements",
+      label: "הישגים",
+      icon: "achievements",
+      badge: collectableAchievements,
+      badgeTone: "attention",
+    },
     { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
   ];
 
@@ -234,7 +249,7 @@ function SidebarContent({
               )}
             </div>
             <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap">
-              <Tip tip="רמת הגיבור — עולה מ-XP שנצבר בקרבות">
+              <Tip tip="רמת הגיבור — עולה מניסיון שנצבר בקרבות">
                 <span className="rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">
                   {heroLevel}
                 </span>
@@ -255,19 +270,26 @@ function SidebarContent({
               </Tip>
             </div>
             <p className="font-bold text-gold-bright">גיבור</p>
-            <Tip
-              tip={`יחס הבונוסים של הגיבור: התקפה ${heroAttackPct}% (אדום) מול הגנה ${heroDefensePct}% (כחול)`}
-              className="mt-1.5 w-full"
-            >
-              <DuelBar
-                leftPct={
-                  heroAttackPct + heroDefensePct > 0
-                    ? (heroAttackPct / (heroAttackPct + heroDefensePct)) * 100
-                    : 50
-                }
-                className="w-full"
-              />
-            </Tip>
+            {/* Health, not a stat ratio: this is the bar that actually moves —
+                every breached defence takes a bite out of it, and at zero the
+                hero is out of the fight until he is raised. */}
+            {heroDead ? (
+              <Tip
+                tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
+                className="mt-1.5 w-full"
+              >
+                <Link
+                  href="/game/hero"
+                  className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-0.5 text-[10px] font-black text-red-300"
+                >
+                  💀 הגיבור מת
+                </Link>
+              </Tip>
+            ) : (
+              <Tip tip={`בריאות הגיבור: ${heroHealthPct}%`} className="mt-1.5 w-full">
+                <Meter value={heroHealthPct} tone="health" className="w-full" />
+              </Tip>
+            )}
           </div>
         </div>
         <div className="mt-3 flex items-center justify-between text-xs">
@@ -285,8 +307,18 @@ function SidebarContent({
                 {heroLevel}
               </span>
             </Tip>
-            <Tip tip="בריאות הגיבור">
-              <span className="flex items-center gap-0.5 text-red-400">
+            <Tip
+              tip={
+                heroDead
+                  ? "הגיבור מת — חוזר לחיים שעה אחרי שנפל, או מיידית תמורת יהלומים"
+                  : "בריאות הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ממנה"
+              }
+            >
+              <span
+                className={`flex items-center gap-0.5 ${
+                  heroDead ? "font-black text-red-500" : "text-red-400"
+                }`}
+              >
                 {heroHealthPct} <Icon name="heart" size={13} />
               </span>
             </Tip>
@@ -298,8 +330,11 @@ function SidebarContent({
         >
           <Meter value={heroXp} max={heroXpMax} tone="xp" className="w-full" />
         </Tip>
-        <p className="mt-1 text-left text-[10px] text-zinc-500 nums" dir="ltr">
-          {formatCompact(heroXp)}/{formatCompact(heroXpMax)} XP
+        <p className="mt-1 text-left text-[10px] text-zinc-500">
+          <span className="nums" dir="ltr">
+            {formatCompact(heroXp)}/{formatCompact(heroXpMax)}
+          </span>{" "}
+          ניסיון
         </p>
       </div>
 
@@ -308,6 +343,10 @@ function SidebarContent({
         <ul className="flex flex-col gap-0.5">
           {navItems.map((item) => {
             const active = pathname.startsWith(item.href);
+            const hasBadge = item.badge != null && item.badge > 0;
+            // Only an actionable badge pulses the row, and never while the
+            // player is already standing on that page.
+            const calling = hasBadge && item.badgeTone === "attention" && !active;
             return (
               <li key={item.href}>
                 <Link
@@ -315,21 +354,35 @@ function SidebarContent({
                   className={`group flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
                     active
                       ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"
-                      : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
+                      : calling
+                        ? "nav-glow-gold text-gold-bright hover:text-gold-bright"
+                        : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
                     {item.label}
-                    {item.badge != null && item.badge > 0 && (
-                      <span className="rounded bg-black/40 px-1.5 text-[10px] font-bold text-zinc-400 nums">
-                        {formatCompact(item.badge)}
+                    {hasBadge && (
+                      <span
+                        className={`rounded px-1.5 text-[10px] font-bold nums ${
+                          item.badgeTone === "attention"
+                            ? "bg-gold font-black text-black"
+                            : "bg-black/40 text-zinc-400"
+                        }`}
+                      >
+                        {formatCompact(item.badge!)}
                       </span>
                     )}
                   </span>
                   <Icon
                     name={item.icon}
                     size={20}
-                    className={active ? "text-crimson-bright" : "text-bone-dim opacity-90 group-hover:text-bone"}
+                    className={
+                      active
+                        ? "text-crimson-bright"
+                        : calling
+                          ? "text-gold-bright"
+                          : "text-bone-dim opacity-90 group-hover:text-bone"
+                    }
                   />
                 </Link>
               </li>

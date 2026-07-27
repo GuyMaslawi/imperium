@@ -10,6 +10,8 @@ import {
 import { formatGameTime, nextDailyUpdate } from "@/lib/game/time";
 import { formatDate, formatNumber } from "@/lib/game/format";
 import { BankActions } from "@/components/game/BankActions";
+import { BankFxProvider } from "@/components/game/BankFx";
+import { BankVault } from "@/components/game/BankVault";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
@@ -61,81 +63,110 @@ export default async function BankPage() {
     <div className="space-y-6">
       <SectionHeading
         title="בנק"
-        subtitle="BANK"
         ornament={<Icon name="bank" size={22} className="text-crimson" />}
       />
 
-      {/* -------- central bank card -------- */}
-      <div className="panel-gold rounded-xl p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Icon name="bank" size={32} className="text-crimson-bright" />
-            <div>
-              <h2 className="text-xl font-black text-gold-bright">הבנק המרכזי</h2>
-              <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-                <span aria-hidden>●</span>
-                פעיל · דרגה{" "}
-                <span className="nums" dir="ltr">
-                  {interestLevel}
+      {/* The vault drawing and the transfer form share an effect bus, so a
+          settled deposit rains coins into the vault beside it. */}
+      <BankFxProvider>
+        <div className="space-y-6">
+          {/* -------- central bank card -------- */}
+          <BankVault
+            bankGold={bankGold}
+            availableGold={availableGold}
+            storedGold={storedGold}
+            nextInterest={nextInterest}
+            ratePercent={ratePercent}
+            interestLevel={interestLevel}
+          />
+
+          {/* -------- deposit / withdraw + daily stats -------- */}
+          <div className="grid items-start gap-4 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <BankActions
+                availableGold={availableGold}
+                bankGold={bankGold}
+                storedGold={storedGold}
+                remainingDeposits={remainingDeposits}
+              />
+            </div>
+
+            <Card variant="gold" className="space-y-3">
+              <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
+                <Icon name="upgrades" size={18} className="text-crimson" />
+                תשואה יומית
+              </h3>
+              <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
+                +{formatNumber(nextInterest)}
+                <span className="mr-1 text-sm font-semibold text-emerald-400/70">
+                  זהב/יום
                 </span>
               </p>
-            </div>
-          </div>
-          <div className="text-left">
-            <p className="text-xs uppercase tracking-widest text-gold-dim">
-              יתרה בבנק
-            </p>
-            <p className="nums mt-0.5 text-3xl font-black text-gold-bright" dir="ltr">
-              {formatNumber(bankGold)}
-            </p>
+
+              {/* compounding curve — draws itself in, purely decorative */}
+              <svg
+                className="h-14 w-full"
+                viewBox="0 0 120 40"
+                preserveAspectRatio="none"
+                aria-hidden
+              >
+                <defs>
+                  <linearGradient id="yield-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#35d39a" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#35d39a" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  className="gold-spark-area"
+                  d="M0 38 C 26 36, 46 32, 62 24 S 96 8, 120 3 L120 40 L0 40 Z"
+                  fill="url(#yield-area)"
+                />
+                <path
+                  className="gold-spark-line"
+                  d="M0 38 C 26 36, 46 32, 62 24 S 96 8, 120 3"
+                  fill="none"
+                  stroke="#35d39a"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+
+              <div className="rule-gold" />
+              <p className="text-sm text-zinc-300">
+                ריבית נוכחית:{" "}
+                <span className="nums font-bold text-gold" dir="ltr">
+                  {ratePercent}
+                </span>
+              </p>
+              <p className="text-sm text-zinc-300">
+                הפקדות זמינות להיום:{" "}
+                <span className="nums font-bold text-gold-bright" dir="ltr">
+                  {remainingDeposits.toLocaleString("he-IL")} /{" "}
+                  {allowedDeposits.toLocaleString("he-IL")}
+                </span>
+              </p>
+              {/* one pip per deposit in the daily allowance */}
+              <div className="flex flex-wrap gap-1.5" aria-hidden>
+                {Array.from({ length: allowedDeposits }).map((_, index) => (
+                  <span
+                    key={index}
+                    className={`deposit-pip ${
+                      index < remainingDeposits ? "deposit-pip-on" : ""
+                    }`}
+                    style={{ "--i": index } as React.CSSProperties}
+                  />
+                ))}
+              </div>
+              <p className="text-sm text-zinc-300">
+                העדכון היומי הבא:{" "}
+                <span className="nums font-bold text-gold-bright" dir="ltr">
+                  {nextDailyLabel}
+                </span>
+              </p>
+            </Card>
           </div>
         </div>
-      </div>
-
-      {/* -------- deposit / withdraw + daily stats -------- */}
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <BankActions
-            availableGold={availableGold}
-            bankGold={bankGold}
-            storedGold={storedGold}
-            remainingDeposits={remainingDeposits}
-          />
-        </div>
-
-        <Card variant="gold" className="space-y-3">
-          <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
-            <Icon name="upgrades" size={18} className="text-crimson" />
-            תשואה יומית
-          </h3>
-          <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
-            +{formatNumber(nextInterest)}
-            <span className="mr-1 text-sm font-semibold text-emerald-400/70">
-              זהב/יום
-            </span>
-          </p>
-          <div className="rule-gold" />
-          <p className="text-sm text-zinc-300">
-            ריבית נוכחית:{" "}
-            <span className="nums font-bold text-gold" dir="ltr">
-              {ratePercent}
-            </span>
-          </p>
-          <p className="text-sm text-zinc-300">
-            הפקדות זמינות להיום:{" "}
-            <span className="nums font-bold text-gold-bright" dir="ltr">
-              {remainingDeposits.toLocaleString("he-IL")} /{" "}
-              {allowedDeposits.toLocaleString("he-IL")}
-            </span>
-          </p>
-          <p className="text-sm text-zinc-300">
-            העדכון היומי הבא:{" "}
-            <span className="nums font-bold text-gold-bright" dir="ltr">
-              {nextDailyLabel}
-            </span>
-          </p>
-        </Card>
-      </div>
+      </BankFxProvider>
 
       {/* -------- bank upgrades summary + transaction history -------- */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
@@ -195,12 +226,13 @@ export default async function BankPage() {
             <p className="text-sm text-zinc-500">אין עדיין תנועות בבנק.</p>
           ) : (
             <ul className="divide-y divide-border-subtle text-sm">
-              {transactions.map((transaction) => {
+              {transactions.map((transaction, index) => {
                 const meta = TRANSACTION_META[transaction.type];
                 return (
                   <li
                     key={transaction.id}
-                    className="flex items-center justify-between gap-3 py-2"
+                    className="bank-row flex items-center justify-between gap-3 py-2"
+                    style={{ "--i": index } as React.CSSProperties}
                   >
                     <span className="flex items-center gap-2 text-zinc-300">
                       <span aria-hidden>{meta.icon}</span>

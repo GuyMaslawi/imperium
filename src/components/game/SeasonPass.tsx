@@ -131,33 +131,40 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
   // (revalidatePath), so adopt it rather than drifting on stale local state.
   useEffect(() => setState(initial), [initial]);
 
-  const { premium: owned, tiers, collectable } = state;
+  const { premium: owned, tiers, collectable, seasonActive } = state;
   const pct = state.xpMax > 0 ? Math.min(100, Math.round((state.xp / state.xpMax) * 100)) : 0;
   const canAfford = state.diamonds >= state.price;
+  const canBuy = seasonActive && canAfford;
+
+  function reject(message?: string) {
+    setShake(true);
+    setTimeout(() => setShake(false), 450);
+    if (message) setNotice(message);
+  }
 
   function handleUpgrade() {
     if (owned || unlocking || pending) return;
-    if (!canAfford) {
-      setShake(true);
-      setTimeout(() => setShake(false), 450);
-      return;
-    }
-    // Play the cascade while the purchase is in flight; the gold track only
-    // stays open if the server actually took the diamonds.
-    setUnlocking(true);
-    setFlash(true);
-    setTimeout(() => setFlash(false), 700);
+    // The pass is sold per season, so the server refuses the sale outright when
+    // none is active. Say so here rather than firing a request that can only
+    // come back as an error.
+    if (!seasonActive) return reject("אין עונה פעילה כרגע — הרכישה תיפתח כשתתחיל עונה חדשה");
+    if (!canAfford) return reject();
 
     startTransition(async () => {
       const res = await buySeasonPassPremium();
-      const total = (tiers.length - 1) * 90 + 700;
-      setTimeout(() => setUnlocking(false), total);
-      if (res.ok && res.state) {
-        setState(res.state);
-        setNotice(res.message ?? null);
-      } else {
-        setNotice(res.error ?? "הרכישה נכשלה");
+      if (!res.ok || !res.state) {
+        reject(res.error ?? "הרכישה נכשלה");
+        return;
       }
+      setState(res.state);
+      setNotice(res.message ?? null);
+      // Celebrate only now: playing the cascade while the request was still in
+      // flight made a *refused* sale look like a successful one, and the gold
+      // track then snapped shut a second later with no obvious reason.
+      setUnlocking(true);
+      setFlash(true);
+      setTimeout(() => setFlash(false), 700);
+      setTimeout(() => setUnlocking(false), (tiers.length - 1) * 90 + 700);
     });
   }
 
@@ -180,7 +187,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         onClick={() => setOpen(true)}
         className={`btn gap-2 px-4 py-1.5 text-sm ${owned ? "btn-gold" : "btn-dark"}`}
       >
-        Season Pass
+        מסלול העונה
         {collectable > 0 && (
           <span aria-hidden className="rounded-full bg-emerald-500 px-1.5 text-[9px] font-black text-white">
             {collectable}
@@ -188,12 +195,15 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         )}
         {owned ? (
           <span aria-hidden className="rounded bg-emerald-500 px-1 text-[9px] font-black text-white">
-            PREMIUM
+            פרימיום
           </span>
         ) : (
-          <span aria-hidden className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
-            שדרג <Icon name="spark" size={11} />
-          </span>
+          // No upsell badge while the pass is unsellable — see seasonActive.
+          seasonActive && (
+            <span aria-hidden className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
+              שדרג <Icon name="spark" size={11} />
+            </span>
+          )
         )}
       </button>
 
@@ -223,7 +233,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 ✕
               </button>
               <h2 className="flex items-center gap-2 text-2xl font-black text-zinc-100">
-                Season Pass
+                מסלול העונה
                 <span aria-hidden className="rounded bg-red-500 px-1.5 text-[10px] font-black text-white">
                   יום {state.day}
                 </span>
@@ -231,11 +241,11 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
               <span className="w-8" />
             </div>
 
-            {/* Level + XP progress */}
+            {/* Level + experience progress */}
             <div className="mt-5">
               <div className="flex items-center justify-between text-sm font-bold text-zinc-200">
                 <span>דרגה נוכחית: {state.level}/{tiers.length}</span>
-                <span className="inline-flex items-center gap-1 text-zinc-400">כל פעולה במשחק = XP <Icon name="spark" size={12} /></span>
+                <span className="inline-flex items-center gap-1 text-zinc-400">כל פעולה במשחק מזכה בניסיון <Icon name="spark" size={12} /></span>
               </div>
               <div className="relative mt-2 h-5 overflow-hidden rounded-full border border-gold/40 bg-black/50">
                 <span
@@ -243,7 +253,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                   style={{ width: `${pct}%` }}
                 />
                 <span className="absolute inset-0 flex items-center justify-center gap-1 text-[11px] font-black text-black/80 nums">
-                  XP {state.xp}/{state.xpMax} <Icon name="spark" size={12} />
+                  {state.xp}/{state.xpMax} ניסיון <Icon name="spark" size={12} />
                 </span>
               </div>
               <p className="mt-1.5 text-center text-[10px] text-zinc-500">
@@ -260,7 +270,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
             {/* Premium status / sales CTA */}
             {owned ? (
               <div className="mt-5 rounded-lg border border-emerald-500/50 bg-emerald-950/40 p-4 text-center">
-                <p className="font-black text-emerald-400">✅ Premium Pass פעיל לכל העונה — הצד הזהוב נפתח!</p>
+                <p className="font-black text-emerald-400">✅ מסלול הפרימיום פעיל לכל העונה — הצד הזהוב נפתח!</p>
                 <button
                   onClick={handleClaim}
                   disabled={collectable === 0 || pending}
@@ -283,24 +293,30 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                     shake ? "sp-shake" : ""
                   }`}
                 >
-                  <p className="flex items-center justify-center gap-1.5 text-lg font-black text-gold-bright"><Icon name="crown" size={18} /> שדרג ל־PREMIUM</p>
+                  <p className="flex items-center justify-center gap-1.5 text-lg font-black text-gold-bright"><Icon name="crown" size={18} /> שדרג לפרימיום</p>
                   <p className="mt-1 text-sm text-amber-100/90">
                     פתח את <span className="font-black text-gold-bright">כל {tiers.length} התגמולים</span> — פי 3 שלל
                     ופריט גיבור אגדי, <span className="font-black text-gold-bright">תשלום אחד לכל העונה</span> 🔥
                   </p>
                   <button
                     onClick={handleUpgrade}
-                    disabled={unlocking || pending}
-                    className={`btn btn-gold mt-3 w-full py-2.5 text-base font-black disabled:opacity-70 ${
-                      unlocking ? "" : "animate-pulse"
+                    disabled={unlocking || pending || !seasonActive}
+                    className={`btn btn-gold mt-3 w-full py-2.5 text-base font-black disabled:cursor-not-allowed disabled:opacity-60 ${
+                      unlocking || !canBuy ? "" : "animate-pulse"
                     }`}
                   >
-                    {unlocking || pending ? "🔓 פותח..." : (
+                    {!seasonActive ? (
+                      "⏳ אין עונה פעילה"
+                    ) : unlocking || pending ? (
+                      "🔓 פותח..."
+                    ) : (
                       <span className="inline-flex items-center gap-1">🔓 שדרג עכשיו · {state.price} <Icon name="diamond" size={14} className="text-cyan-300" /></span>
                     )}
                   </button>
-                  <p className={`mt-1.5 text-[10px] ${canAfford ? "text-amber-200/60" : "text-red-400 font-bold"}`}>
-                    {canAfford ? (
+                  <p className={`mt-1.5 text-[10px] ${canBuy ? "text-amber-200/60" : "text-red-400 font-bold"}`}>
+                    {!seasonActive ? (
+                      <span>מסלול הפרימיום נמכר לעונה שלמה — הוא ייפתח לרכישה כשתתחיל העונה הבאה</span>
+                    ) : canAfford ? (
                       <span className="inline-flex items-center gap-1">יש לך {state.diamonds} <Icon name="diamond" size={12} className="text-cyan-300" /> · נשאר פתוח עד סוף העונה</span>
                     ) : (
                       <span className="inline-flex items-center gap-1">אין מספיק יהלומים ({state.diamonds}/{state.price} <Icon name="diamond" size={12} className="text-cyan-300" />)</span>

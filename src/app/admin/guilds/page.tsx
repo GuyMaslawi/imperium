@@ -33,7 +33,6 @@ export default async function AdminGuildsPage() {
     <div className="space-y-6">
       <SectionHeading
         title="בריתות"
-        subtitle="GUILDS"
         ornament={<Icon name="guild" size={22} className="text-crimson" />}
       />
 

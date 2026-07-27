@@ -83,14 +83,14 @@ export default async function BossFightPage({
 
           <div className="flex flex-col items-center">
             <p
-              className={`text-4xl font-black tracking-widest ${
+              className={`text-4xl font-black ${
                 fight.victory ? "text-emerald-400" : "text-red-500"
               }`}
               style={{ textShadow: "0 2px 18px rgba(0,0,0,0.8)" }}
             >
-              {fight.victory ? "WIN" : "LOSE"}
+              {fight.victory ? "ניצחון" : "תבוסה"}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">VS</p>
+            <p className="mt-1 text-xs text-zinc-500">מול</p>
           </div>
 
           {/* boss side */}
@@ -199,20 +199,23 @@ export default async function BossFightPage({
         </div>
       )}
 
-      {/* -------- hero -------- */}
+      {/* -------- hero: only a felled boss pays the hero anything -------- */}
+      {(fight.heroXp > 0 || droppedItem) && (
       <div className="panel rounded-xl p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך
         </h3>
         <div className="flex flex-wrap items-center gap-4">
-          <Tip tip="ניסיון לגיבור מהקרב מול הבוס. ניצחון מזכה בהרבה יותר מתקיפת שחקן, כי הקרב עולה פי עשרות תורות; גם תבוסה מזכה בקצת.">
+          {fight.heroXp > 0 && (
+          <Tip tip="ניסיון לגיבור מהקרב מול הבוס. רק ניצחון מזכה בניסיון — ותשלום הניצחון גבוה בהרבה מתקיפת שחקן, כי הקרב עולה פי עשרות תורות.">
             <div className="panel-inset cursor-help rounded-lg p-3 text-center">
               <p className="text-[11px] text-zinc-400">ניסיון שהתקבל</p>
               <p className="nums mt-0.5 text-xl font-black text-purple-300" dir="ltr">
-                +{formatNumber(fight.heroXp)} XP
+                +{formatNumber(fight.heroXp)}
               </p>
             </div>
           </Tip>
+          )}
           {droppedItem && (
             <div className="flex items-center gap-3">
               <div className="w-20">
@@ -244,6 +247,7 @@ export default async function BossFightPage({
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

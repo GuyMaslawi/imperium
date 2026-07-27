@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState, useState, type MouseEvent } from "react";
+import { useActionState, useEffect, useState, type MouseEvent } from "react";
 import {
   depositAllGoldToBank,
   depositGoldToBank,
   withdrawAllGoldFromBank,
   withdrawGoldFromBank,
 } from "@/server/actions/bank";
+import { useBankFire } from "./BankFx";
 import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
@@ -54,6 +55,23 @@ export function BankActions({
   const [amount, setAmount] = useState("");
   const [clientError, setClientError] = useState<string>();
   const [lastAction, setLastAction] = useState<BankActionKind>();
+
+  // Every settled transfer hands the vault drawing a coin burst. The action
+  // states are fresh objects per submit, so an identical repeat still fires;
+  // `fire` is stable, so a pulse elsewhere on the page can't re-trigger these.
+  const fire = useBankFire();
+  useEffect(() => {
+    if (depositState.success) fire("deposit");
+  }, [depositState, fire]);
+  useEffect(() => {
+    if (depositAllState.success) fire("deposit");
+  }, [depositAllState, fire]);
+  useEffect(() => {
+    if (withdrawState.success) fire("withdraw");
+  }, [withdrawState, fire]);
+  useEffect(() => {
+    if (withdrawAllState.success) fire("withdraw");
+  }, [withdrawAllState, fire]);
 
   const depositsExhausted = remainingDeposits < 1;
 

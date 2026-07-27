@@ -50,6 +50,21 @@ export function publicConfig(event: MiniGameEvent): MiniGamePublicConfig {
   return { min: n(cfg.min), max: n(cfg.max), cups: n(cfg.cups) };
 }
 
+/**
+ * One rival's public progress in the running event. A player who is out of
+ * attempts keeps watching this board until the event itself ends, so it
+ * carries no secrets — only how far everyone else got.
+ */
+export interface MiniGameBoardRow {
+  empireId: string;
+  name: string;
+  attempts: number;
+  solved: boolean;
+  won: boolean;
+  /** True for the viewer's own row, so it can be highlighted. */
+  isSelf: boolean;
+}
+
 /** Live per-player state of the active mini-game (null = none active). */
 export interface MiniGameState {
   id: string;
@@ -69,6 +84,15 @@ export interface MiniGameState {
   prizesLeft: boolean;
   winnersCount: number;
   maxWinners: number;
+  /** Epoch ms this timed release expires at (null = until the admin stops it). */
+  endsAt: number | null;
+  /** Server clock when this snapshot was built — the countdown ticks from it,
+   *  so a skewed client clock can't disagree with the server-side deadline. */
+  serverNow: number;
+  /** Everyone who has played this event, best progress first. */
+  board: MiniGameBoardRow[];
+  /** Total participants (the board itself is capped for size). */
+  players: number;
 }
 
 /** Result of a single guess submission. */

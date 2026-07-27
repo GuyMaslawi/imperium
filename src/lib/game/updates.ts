@@ -12,7 +12,7 @@ import {
 import { getTunables } from "./config";
 import { dailyUpdatesBetween, elapsedRegularTicks, lastTickBoundary } from "./time";
 import { turnsGainFromUpgrades } from "./turns";
-import { bonusMultiplier, heroBonuses } from "./hero";
+import { HERO_MAX_HEALTH, bonusMultiplier, heroBonuses, heroShouldRevive } from "./hero";
 import { getActiveGuildBuffPct } from "./guildBuffs";
 import { getActiveResourceBoosts } from "./diamondEffects";
 
@@ -57,11 +57,29 @@ export async function applyPendingUpdates(
   }
 
   const now = new Date();
+
+  // A fallen hero rises by himself an hour after the blow that felled him.
+  // This is part of the lazy clock on purpose: it runs on every page load and
+  // every action, so the hour passes for offline players too. Guarded on the
+  // `diedAt` we read — if a concurrent settlement (or a diamond revival) got
+  // there first the updateMany matches nothing, and either way the hero is
+  // alive again, so the in-memory snapshot below is corrected unconditionally.
+  const deadHero = empire.hero;
+  if (deadHero && heroShouldRevive(deadHero, now)) {
+    await tx.hero.updateMany({
+      where: { id: deadHero.id, diedAt: deadHero.diedAt },
+      data: { health: HERO_MAX_HEALTH, diedAt: null },
+    });
+    deadHero.health = HERO_MAX_HEALTH;
+    deadHero.diedAt = null;
+  }
+
   const tunables = await getTunables();
 
   // Hero bonuses: the resources *points* still multiply mine production, while
   // equipped items now add flat amounts — extra resources per tick, and extra
-  // turns/citizens/diamonds per update (whole units, not percentages).
+  // turns/citizens/diamonds per update (whole units, not percentages). A hero
+  // who is still dead at this point contributes none of it (heroBonuses).
   const heroBonus = heroBonuses(empire.hero);
 
   /* ---- regular ticks: mine-slave production + turns ---- */

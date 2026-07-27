@@ -145,15 +145,14 @@ export function HeroPaperdoll({
                 className="relative block w-full"
                 aria-label={`${meta.label} רמה ${item.level} — פרטים`}
               >
+                {/* no "לבוש" flag — an item sitting in a body socket is
+                    self-evidently worn */}
                 <ItemTile
                   slug={meta.slug}
                   icon={meta.icon}
                   level={item.level}
                   rarity={uiRarity(item.rarity)}
-                  details={itemDetails(item, heroLevel, {
-                    equipped: true,
-                    hint: "לחץ לפרטים",
-                  })}
+                  details={itemDetails(item, heroLevel, { hint: "לחץ לפרטים" })}
                 />
                 {/* a stronger piece of the same kind is sitting in the bag */}
                 {bag.some(

@@ -13,7 +13,7 @@ export default async function ArmyPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="ניהול" subtitle="CITY MANAGEMENT" ornament="🛠️" />
+      <SectionHeading title="ניהול" ornament="🛠️" />
 
       <div className="panel-gold rounded-xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
