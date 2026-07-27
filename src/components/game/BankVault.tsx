@@ -72,10 +72,15 @@ const prefersReducedMotion = () =>
  */
 function useCountUp(value: number, duration = 900): number {
   const [display, setDisplay] = useState(0);
-  const from = useRef(0);
+  // The number the last painted frame actually showed. The roll always starts
+  // from here, so a cancelled run (StrictMode's double mount, or a balance that
+  // changes mid-count) resumes from the digits on screen instead of jumping —
+  // and, critically, never leaves the counter stranded on a value it only
+  // *intended* to reach.
+  const shown = useRef(0);
 
   useEffect(() => {
-    const start = from.current;
+    const start = shown.current;
     if (start === value) return;
     // A zero-length roll lands on the final value in the very first frame,
     // which is how the reduced-motion case skips the count.
@@ -85,15 +90,13 @@ function useCountUp(value: number, duration = 900): number {
     const step = (now: number) => {
       const t = span === 0 ? 1 : Math.min(1, (now - t0) / span);
       const eased = 1 - (1 - t) ** 3;
-      setDisplay(Math.round(start + (value - start) * eased));
+      const next = Math.round(start + (value - start) * eased);
+      shown.current = next;
+      setDisplay(next);
       if (t < 1) raf = requestAnimationFrame(step);
-      else from.current = value;
     };
     raf = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(raf);
-      from.current = value;
-    };
+    return () => cancelAnimationFrame(raf);
   }, [value, duration]);
 
   return display;
