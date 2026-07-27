@@ -1,9 +1,15 @@
+import type { PotionKind } from "@prisma/client";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { HeroBag } from "@/components/game/HeroBag";
+import { HeroPotions } from "@/components/game/HeroPotions";
+import {
+  getActivePotionExpiries,
+  getPotionCounts,
+} from "@/lib/game/potionEffects";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
 import { HeroStatsCards } from "@/components/game/HeroStatsCards";
 import { HeroPowerSummary } from "@/components/game/HeroPowerSummary";
@@ -58,6 +64,19 @@ export default async function HeroPage() {
     empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
   );
 
+  // The belt: what is in hand, and what is already running. Expiries cross to
+  // the client as epoch ms — Dates don't survive the boundary as Dates.
+  const [potionCounts, potionExpiries] = await Promise.all([
+    getPotionCounts(empire.id),
+    getActivePotionExpiries(empire.id, undefined, serverNow),
+  ]);
+  const potionActiveUntil = Object.fromEntries(
+    Object.entries(potionExpiries).map(([kind, at]) => [kind, at.getTime()])
+  ) as Partial<Record<PotionKind, number>>;
+  // The forge brew halves every upgrade price the item dialogs quote, so the
+  // preview has to know about it or it would advertise the wrong number.
+  const forgeDiscount = potionExpiries.FORGE_DISCOUNT !== undefined;
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -93,6 +112,7 @@ export default async function HeroPage() {
               heroLevel={hero.level}
               gold={empire.gold}
               wheelSpinBonus={wheelSpinBonus}
+              forgeDiscount={forgeDiscount}
             />
 
             {/* level + resets badge */}
@@ -242,6 +262,15 @@ export default async function HeroPage() {
               heroLevel={hero.level}
               gold={empire.gold}
               wheelSpinBonus={wheelSpinBonus}
+              forgeDiscount={forgeDiscount}
+            />
+
+            {/* the belt sits directly under the bag: same column, same width —
+                loot from the same battles, one glance apart */}
+            <HeroPotions
+              counts={potionCounts}
+              activeUntil={potionActiveUntil}
+              serverNow={serverNow.getTime()}
             />
           </div>
         </div>

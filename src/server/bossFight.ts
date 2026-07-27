@@ -22,6 +22,8 @@ import {
   CITIZENS_PER_LEVEL,
 } from "@/lib/game/hero";
 import { grantCitizens } from "@/lib/game/grants";
+import { getActivePotionKinds } from "@/lib/game/potionEffects";
+import { POTION_DOUBLE } from "@/lib/game/potions";
 import {
   BOSS_HERO_XP_DEFEAT,
   BOSS_ITEM_RARITY_FLOOR,
@@ -170,7 +172,16 @@ export async function runBossFight(empireId: string): Promise<BossFightOutcome> 
     }
 
     /* ---- hero: XP, level-ups and the boss's gear ---- */
-    const heroXp = victory ? bossHeroXp(empire.cities) : BOSS_HERO_XP_DEFEAT;
+    // Marching on a tyrant is an attack too, so שיקוי הניסיון doubles what the
+    // hero learns from it — win or lose, exactly like the base XP.
+    const xpMultiplier = (await getActivePotionKinds(empireId, tx, now)).has(
+      "DOUBLE_XP"
+    )
+      ? POTION_DOUBLE
+      : 1;
+    const heroXp = Math.round(
+      (victory ? bossHeroXp(empire.cities) : BOSS_HERO_XP_DEFEAT) * xpMultiplier
+    );
     let droppedItem: { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null = null;
 
     if (hero) {

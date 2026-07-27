@@ -24,6 +24,8 @@ import {
   rollDiscardWheelSpin,
   tierForLevel,
 } from "@/lib/game/hero";
+import { forgeDiscountedCost } from "@/lib/game/potions";
+import { isPotionActive } from "@/lib/game/potionEffects";
 import type { ActionState } from "./game";
 
 /**
@@ -441,7 +443,9 @@ export async function upgradeHeroItem(
         };
       }
 
-      const cost = itemUpgradeCost(item.level) ?? 0;
+      // שיקוי הנפח halves every upgrade while its half-hour runs.
+      const forgeDiscount = await isPotionActive(empireId, "FORGE_DISCOUNT", tx);
+      const cost = forgeDiscountedCost(itemUpgradeCost(item.level) ?? 0, forgeDiscount);
       if (empire.gold < cost) {
         return {
           error: `דרוש ${cost.toLocaleString("he-IL")} זהב לשדרוג (יש לך ${Math.floor(
@@ -504,12 +508,14 @@ export async function upgradeHeroItems(
       // Only upgradeable items (not at max level, and whose next level the hero
       // is high enough to reach), cheapest first so a limited gold budget buys
       // as many upgrades as possible.
+      // שיקוי הנפח halves every upgrade in the batch while its half-hour runs.
+      const forgeDiscount = await isPotionActive(empireId, "FORGE_DISCOUNT", tx);
       const upgradeable = hero.items
         .filter((i) => ids.has(i.id) && canUpgradeItem(hero.level, i.level))
         .map((i) => ({
           item: i,
           targetLevel: nextTierLevel(i.level)!,
-          cost: itemUpgradeCost(i.level) ?? 0,
+          cost: forgeDiscountedCost(itemUpgradeCost(i.level) ?? 0, forgeDiscount),
         }))
         .sort((a, b) => a.cost - b.cost);
 

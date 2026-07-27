@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import type { BuildingType, Prisma, ResourceStorageType } from "@prisma/client";
+import type {
+  BuildingType,
+  PotionKind,
+  Prisma,
+  ResourceStorageType,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { awardSeasonPassXp } from "@/server/seasonPassXp";
@@ -37,6 +42,8 @@ import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
+import { getActivePotionKinds, grantPotion } from "@/lib/game/potionEffects";
+import { POTION_DOUBLE, rollPotionDrop } from "@/lib/game/potions";
 import { armyPower, getEmpireIntelPower } from "@/lib/game/power";
 import {
   CITIZENS_PER_LEVEL,
@@ -803,6 +810,14 @@ export async function attackEmpire(
       const blocked = await targetBlockedReason(tx, defender, now);
       if (blocked) return { error: blocked };
 
+      // Potions in force on either side. Each is an hour in which one rule of
+      // the battle is bent: the attacker's XP or plunder doubled, or the
+      // defender's hero walking away from a breach without a scratch. Read once
+      // here, after both empire rows are locked, so the whole battle resolves
+      // against one consistent view of who is buffed.
+      const attackerPotions = await getActivePotionKinds(empireId, tx, now);
+      const defenderPotions = await getActivePotionKinds(targetEmpireId, tx, now);
+
       const attackerArmy = attacker.army;
       const defenderArmy = defender.army;
 
@@ -884,12 +899,17 @@ export async function attackEmpire(
 
       // Plunder touches only the defender's available balances — resources
       // deposited in warehouses (storedAmount) are protected from attacks.
+      // שיקוי השפע doubles the attacker's share; the live clamp below still
+      // caps the haul at what the defender actually holds.
+      const plunderRate =
+        PLUNDER_RATE *
+        (attackerPotions.has("DOUBLE_RESOURCES") ? POTION_DOUBLE : 1);
       const stolen = attackerWins
         ? {
-            gold: Math.floor(defender.gold * PLUNDER_RATE),
-            wood: Math.floor(defender.wood * PLUNDER_RATE),
-            iron: Math.floor(defender.iron * PLUNDER_RATE),
-            stone: Math.floor(defender.stone * PLUNDER_RATE),
+            gold: Math.floor(defender.gold * plunderRate),
+            wood: Math.floor(defender.wood * plunderRate),
+            iron: Math.floor(defender.iron * plunderRate),
+            stone: Math.floor(defender.stone * plunderRate),
           }
         : { gold: 0, wood: 0, iron: 0, stone: 0 };
 
@@ -960,10 +980,23 @@ export async function attackEmpire(
       // At zero health he falls, and a fallen hero stops granting *every*
       // bonus he carries — points, gear and class alike (see heroBonuses) —
       // until he rises an hour later or his owner pays to raise him at once.
+      // …unless שיקוי החסינות is running, in which case the blow lands on the
+      // empire but never on the hero: he keeps every point of health, and with
+      // it every bonus he carries.
       let defenderHeroDamage = 0;
       let defenderHeroHealth = defenderHero?.health ?? 0;
       let defenderHeroFell = false;
-      if (attackerWins && defenderHero && defenderHero.health > 0) {
+      const defenderHeroShielded =
+        attackerWins &&
+        defenderHero != null &&
+        defenderHero.health > 0 &&
+        defenderPotions.has("HERO_INVULNERABLE");
+      if (
+        attackerWins &&
+        defenderHero &&
+        defenderHero.health > 0 &&
+        !defenderHeroShielded
+      ) {
         const nextHealth = damagedHealth(
           defenderHero.health,
           HERO_DAMAGE_PER_LOST_DEFENSE
@@ -990,21 +1023,34 @@ export async function attackEmpire(
       /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
       // Only the winner learns anything: a repelled attacker and a breached
       // defender both earn zero XP.
+      // שיקוי הניסיון doubles the winner's haul of XP. Folded in here rather
+      // than at the hero write, so the battle report shows the XP that was
+      // really earned instead of the un-doubled base.
+      const attackerXpMultiplier = attackerPotions.has("DOUBLE_XP")
+        ? POTION_DOUBLE
+        : 1;
+      const defenderXpMultiplier = defenderPotions.has("DOUBLE_XP")
+        ? POTION_DOUBLE
+        : 1;
       const attackerHeroXp = attackerWins
-        ? attackWinXp(
-            defenderHero?.level ?? 1,
-            defenderHero?.resets ?? 0,
-            attackerPower,
-            defenderPower
+        ? Math.round(
+            attackWinXp(
+              defenderHero?.level ?? 1,
+              defenderHero?.resets ?? 0,
+              attackerPower,
+              defenderPower
+            ) * attackerXpMultiplier
           )
         : 0;
       const defenderHeroXp = attackerWins
         ? 0
-        : defenseWinXp(
-            attackerHero?.level ?? 1,
-            attackerHero?.resets ?? 0,
-            defenderPower,
-            attackerPower
+        : Math.round(
+            defenseWinXp(
+              attackerHero?.level ?? 1,
+              attackerHero?.resets ?? 0,
+              defenderPower,
+              attackerPower
+            ) * defenderXpMultiplier
           );
 
       if (attackerHero && attackerHeroXp > 0) {
@@ -1070,6 +1116,17 @@ export async function attackEmpire(
         }
       }
 
+      /* ---- potion capture: winning attacks can also yield a brew ---- */
+      // Potions stack by count rather than by slot, so there is no bag to check
+      // — only the (very high) per-kind cap, which grantPotion reports on.
+      let droppedPotion: PotionKind | null = null;
+      if (attackerWins) {
+        const rolled = rollPotionDrop();
+        if (rolled && (await grantPotion(tx, empireId, rolled))) {
+          droppedPotion = rolled;
+        }
+      }
+
       /* ---- wheel-of-fortune spin: a winning attack has a wheel-luck chance ---- */
       let wonWheelSpin = false;
       if (attackerWins) {
@@ -1117,6 +1174,7 @@ export async function attackEmpire(
                 droppedItemRarity: droppedItem.rarity,
               }
             : {}),
+          ...(droppedPotion ? { droppedPotionKind: droppedPotion } : {}),
         },
       });
 
@@ -1134,11 +1192,13 @@ export async function attackEmpire(
                   ? `${enslavedSoldiers} חיילים נלקחו לעבדות ו`
                   : ""
               }נבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן. צבאך לא ספג אבדות.${
-                defenderHeroFell
-                  ? ` 💀 הגיבור שלך נפל בקרב! כל הנקודות והבונוסים שלו מושבתים עד שיקום לתחייה.`
-                  : defenderHeroDamage > 0
-                    ? ` הגיבור שלך ספג ${defenderHeroDamage} נזק — נותרו לו ${defenderHeroHealth}% חיים.`
-                    : ""
+                defenderHeroShielded
+                  ? ` 🧪 שיקוי החסינות הגן על הגיבור שלך — הוא יצא מהקרב ללא פגע.`
+                  : defenderHeroFell
+                    ? ` 💀 הגיבור שלך נפל בקרב! כל הנקודות והבונוסים שלו מושבתים עד שיקום לתחייה.`
+                    : defenderHeroDamage > 0
+                      ? ` הגיבור שלך ספג ${defenderHeroDamage} נזק — נותרו לו ${defenderHeroHealth}% חיים.`
+                      : ""
               }`
             : `צבאך עמד איתן מול ההתקפה — לא איבדת חיילים או משאבים.`,
           href: `/game/battle/${report.id}`,

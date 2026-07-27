@@ -721,6 +721,51 @@ body {
 }
 
 /* =========================================================================
+   Potions — the glassware under the bag. Three touches make a flat SVG read
+   as a living brew: bubbles rising through the liquid, a breathing glow
+   behind the glass, and a pulsing ring around a cube whose window is open.
+   All three are pure opacity/transform, and all three stop dead for a player
+   who asked for reduced motion (the bottle itself stays perfectly legible).
+   ========================================================================= */
+
+.potion-bubble {
+  opacity: 0;
+}
+.potion-glow {
+  transform-origin: 32px 43px;
+}
+
+@keyframes potion-bubble {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 0.7; }
+  85% { opacity: 0.35; }
+  100% { transform: translateY(-17px); opacity: 0; }
+}
+@keyframes potion-glow {
+  0%, 100% { opacity: 0.12; transform: scale(0.94); }
+  50% { opacity: 0.26; transform: scale(1.06); }
+}
+@keyframes potion-ring {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .potion-bubble {
+    animation-name: potion-bubble;
+    animation-timing-function: ease-in;
+    animation-iteration-count: infinite;
+    opacity: 0.6;
+  }
+  .potion-glow {
+    animation: potion-glow 3.6s ease-in-out infinite;
+  }
+  .potion-ring {
+    animation: potion-ring 2.2s ease-in-out infinite;
+  }
+}
+
+/* =========================================================================
    Living portraits — the hero paperdoll and the city-boss art. Four layers
    over an ordinary still: a slow breathe-and-drift zoom, a pointer-driven
    lean for parallax, embers rising in the subject's accent colour, and a

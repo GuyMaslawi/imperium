@@ -17,6 +17,8 @@ import { SeasonPassButton } from "@/components/game/SeasonPass";
 import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sidebar";
 import { InboxNav } from "@/components/game/InboxNav";
 import { WarAlerts } from "@/components/game/WarAlerts";
+import { ActivePotions } from "@/components/game/ActivePotions";
+import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { MiniGamePanel } from "@/components/game/MiniGamePanel";
 import { getMiniGameState } from "@/server/actions/minigame";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
@@ -45,6 +47,14 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
 
   const admin = await isAdmin();
   const miniGame = await getMiniGameState();
+
+  // Running potions ride in the command bar: a buff that is quietly doubling
+  // plunder and XP has to be visible from the screens people actually play on,
+  // not only from the belt it was drunk on.
+  const potionExpiries = await getActivePotionExpiries(empire.id, undefined, now);
+  const potionActiveUntil = Object.fromEntries(
+    Object.entries(potionExpiries).map(([kind, at]) => [kind, at.getTime()])
+  );
 
   // Command-bar badges: unread inbox messages + reports since the last visit.
   // Only things *done to me* alert: an attack I was the defender of, or an
@@ -128,6 +138,10 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           <OrnateFrame className="flex min-h-full flex-col overflow-hidden p-3 sm:p-4 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border-subtle pb-3">
               {seasonPass && <SeasonPassButton initial={seasonPass} />}
+              <ActivePotions
+                activeUntil={potionActiveUntil}
+                serverNow={now.getTime()}
+              />
               <UpdateTimers
                 serverNow={now.getTime()}
                 nextRegularAt={nextRegular.getTime()}

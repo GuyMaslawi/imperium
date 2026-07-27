@@ -331,12 +331,33 @@ export function upgradeStep(level: number): number {
 }
 
 /**
- * Gold per target level. Anchored so the early upgrades (the first tier band,
- * target levels 1→10) cost between 100k and 1M gold, then keep climbing
- * linearly with the target level: 100k at level 1, 1M at level 10, 10M at the
- * cap (level 100). A higher-level upgrade costs proportionally more.
+ * Upgrade prices are **geometric in the target level**, not linear — the two
+ * ends of the ladder are the anchors and every rung between them is filled in
+ * by the same ratio:
+ *
+ *   - the first series' last step (אליט → אגדי, target level 10) costs 3M
+ *   - the last series' last step (target level 100) costs 700B
+ *
+ * That is a factor of ~233,000 spread over 90 levels — ≈ +14.7% per level, or
+ * **×3.95 per series**. So each decade of gear is worth about four times the
+ * decade below it, forever, instead of the old linear curve where a level-100
+ * upgrade cost only ten times a level-10 one and late-game gold had nothing to
+ * buy. Prices are rounded to three significant figures so they read as prices.
  */
-export const UPGRADE_GOLD_PER_LEVEL = 100_000;
+export const UPGRADE_COST_AT_LEVEL_10 = 3_000_000;
+export const UPGRADE_COST_AT_LEVEL_100 = 700_000_000_000;
+
+/** Per-level growth factor derived from the two anchors above (≈1.1472). */
+export const UPGRADE_COST_GROWTH = Math.pow(
+  UPGRADE_COST_AT_LEVEL_100 / UPGRADE_COST_AT_LEVEL_10,
+  1 / 90
+);
+
+/** Round to three significant figures — 3M, 11.9M, 47M, 700B, never 46,847,113. */
+function roundCost(value: number): number {
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 2);
+  return Math.round(value / magnitude) * magnitude;
+}
 
 /**
  * Gold needed to upgrade one item to the next tier level, or null when it is
@@ -345,7 +366,9 @@ export const UPGRADE_GOLD_PER_LEVEL = 100_000;
 export function itemUpgradeCost(level: number): number | null {
   const target = nextTierLevel(level);
   if (target === null) return null;
-  return Math.round(target * UPGRADE_GOLD_PER_LEVEL);
+  return roundCost(
+    UPGRADE_COST_AT_LEVEL_10 * UPGRADE_COST_GROWTH ** (target - 10)
+  );
 }
 
 /* ------------------------------ item slots ------------------------------ */

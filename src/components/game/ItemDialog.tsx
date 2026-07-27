@@ -13,6 +13,7 @@ import {
   upgradeHeroItem,
 } from "@/server/actions/hero";
 import type { ActionState } from "@/server/actions/game";
+import { FORGE_DISCOUNT_PCT, forgeDiscountedCost } from "@/lib/game/potions";
 import {
   HERO_STAT_META,
   RARITY_META,
@@ -38,6 +39,7 @@ export function ItemDialog({
   gold,
   equipped,
   wheelSpinBonus = 0,
+  forgeDiscount = false,
   onClose,
 }: {
   item: HeroItemView;
@@ -47,6 +49,8 @@ export function ItemDialog({
   equipped: boolean;
   /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
   wheelSpinBonus?: number;
+  /** Whether שיקוי הנפח is running — halves the upgrade price quoted here. */
+  forgeDiscount?: boolean;
   onClose: () => void;
 }) {
   const [pending, startTransition] = useTransition();
@@ -65,7 +69,13 @@ export function ItemDialog({
   const unit = bonus.flat ? "" : "%";
 
   const upgradeToLevel = nextTierLevel(level);
-  const upgradeCost = itemUpgradeCost(level);
+  const fullUpgradeCost = itemUpgradeCost(level);
+  // The forge brew halves the price for as long as it runs; the struck-through
+  // full price stays visible so the discount is the thing the player sees.
+  const upgradeCost =
+    fullUpgradeCost === null
+      ? null
+      : forgeDiscountedCost(fullUpgradeCost, forgeDiscount);
   const nextTier = upgradeToLevel != null ? tierForLevel(upgradeToLevel) : null;
   const nextBonus =
     upgradeToLevel != null ? itemBonusValue(item.slot, upgradeToLevel).value : null;
@@ -216,9 +226,19 @@ export function ItemDialog({
               className={`nums font-bold ${canAfford ? "text-gold-bright" : "text-red-400"}`}
               dir="ltr"
             >
+              {forgeDiscount && fullUpgradeCost != null && (
+                <span className="me-1.5 text-zinc-500 line-through">
+                  {formatNumber(fullUpgradeCost)}
+                </span>
+              )}
               <Icon name="gold" size={14} className="inline align-[-2px] text-gold-bright" /> {upgradeCost != null ? formatNumber(upgradeCost) : ""}
             </span>
           </div>
+          {forgeDiscount && (
+            <p className="mt-1.5 text-[11px] font-semibold text-violet-300">
+              🧪 שיקוי הנפח פעיל — {FORGE_DISCOUNT_PCT}% הנחה על השדרוג
+            </p>
+          )}
           {!meetsUpgradeLevel && (
             <p className="mt-2 text-[11px] font-semibold text-red-400">
               דרוש גיבור רמה {upgradeToLevel} כדי לשדרג (אתה ברמה {heroLevel})

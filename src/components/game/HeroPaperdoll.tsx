@@ -83,6 +83,7 @@ export function HeroPaperdoll({
   heroLevel,
   gold,
   wheelSpinBonus = 0,
+  forgeDiscount = false,
 }: {
   /** Class artwork src (832×1216, so the frame keeps a 13/19 ratio). */
   portrait: string;
@@ -96,6 +97,8 @@ export function HeroPaperdoll({
   gold: number;
   /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
   wheelSpinBonus?: number;
+  /** Whether שיקוי הנפח is running — halves every upgrade price quoted. */
+  forgeDiscount?: boolean;
 }) {
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
   const [pickSlot, setPickSlot] = useState<HeroItemSlot | null>(null);
@@ -202,6 +205,7 @@ export function HeroPaperdoll({
           gold={gold}
           equipped
           wheelSpinBonus={wheelSpinBonus}
+          forgeDiscount={forgeDiscount}
           onClose={() => setOpenItem(null)}
         />
       )}

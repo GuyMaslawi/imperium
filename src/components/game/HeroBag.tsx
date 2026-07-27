@@ -19,6 +19,7 @@ import {
   canUpgradeItem,
   itemUpgradeCost,
 } from "@/lib/game/hero";
+import { FORGE_DISCOUNT_PCT, forgeDiscountedCost } from "@/lib/game/potions";
 import { itemDetails, uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 
 /**
@@ -33,12 +34,15 @@ export function HeroBag({
   heroLevel,
   gold,
   wheelSpinBonus = 0,
+  forgeDiscount = false,
 }: {
   items: HeroItemView[];
   heroLevel: number;
   gold: number;
   /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
   wheelSpinBonus?: number;
+  /** Whether שיקוי הנפח is running — halves every upgrade price quoted. */
+  forgeDiscount?: boolean;
 }) {
   const [filter, setFilter] = useState<HeroRarity | null>(null);
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
@@ -100,7 +104,10 @@ export function HeroBag({
   // total drives the confirmation dialog.
   const selectedUpgrades = items
     .filter((i) => selectedIdSet.has(i.id) && canUpgradeItem(heroLevel, i.level))
-    .map((i) => ({ item: i, cost: itemUpgradeCost(i.level) ?? 0 }));
+    .map((i) => ({
+      item: i,
+      cost: forgeDiscountedCost(itemUpgradeCost(i.level) ?? 0, forgeDiscount),
+    }));
   const selectedUpgradeable = selectedUpgrades.length;
   const totalUpgradeCost = selectedUpgrades.reduce((sum, u) => sum + u.cost, 0);
   const canAffordAll = gold >= totalUpgradeCost;
@@ -311,6 +318,7 @@ export function HeroBag({
           gold={gold}
           equipped={false}
           wheelSpinBonus={wheelSpinBonus}
+          forgeDiscount={forgeDiscount}
           onClose={() => setOpenItem(null)}
         />
       )}
@@ -354,6 +362,12 @@ export function HeroBag({
               </span>
             </div>
           </div>
+
+          {forgeDiscount && (
+            <p className="mt-3 text-xs font-semibold text-violet-300">
+              🧪 שיקוי הנפח פעיל — המחירים כאן כבר כוללים {FORGE_DISCOUNT_PCT}% הנחה.
+            </p>
+          )}
 
           {!canAffordAll && (
             <p className="mt-3 text-xs font-semibold text-amber-300">

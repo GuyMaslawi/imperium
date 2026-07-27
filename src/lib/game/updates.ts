@@ -15,6 +15,8 @@ import { turnsGainFromUpgrades } from "./turns";
 import { HERO_MAX_HEALTH, bonusMultiplier, heroBonuses, heroShouldRevive } from "./hero";
 import { getActiveGuildBuffPct } from "./guildBuffs";
 import { getActiveResourceBoosts } from "./diamondEffects";
+import { getActivePotionKinds } from "./potionEffects";
+import { POTION_DOUBLE } from "./potions";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -92,11 +94,21 @@ export async function applyPendingUpdates(
     // further per-resource multiplier on top of both.
     const guildResourcesPct = await getActiveGuildBuffPct(empire.id, "RESOURCES", tx, now);
     const resourceBoosts = await getActiveResourceBoosts(empire.id, tx, now);
+    // שיקוי השפע doubles raw mine output for its hour. It multiplies the ticks
+    // settled *by this call* — which is why drinkPotion settles the backlog
+    // before opening the window, so a night of unsettled ticks can't be doubled
+    // retroactively by drinking at dawn.
+    const potionResources = (await getActivePotionKinds(empire.id, tx, now)).has(
+      "DOUBLE_RESOURCES"
+    )
+      ? POTION_DOUBLE
+      : 1;
     // Cities multiply raw mine output: ×1 at one city, ×10 at ten. Derived from
     // the live count, so a city lost to siege drops production on the next tick.
     const baseMultiplier =
       bonusMultiplier(heroBonus.points.resources + heroBonus.classPct.resources) *
       bonusMultiplier(guildResourcesPct) *
+      potionResources *
       tunables.economy.mineProductionMultiplier *
       cityProductionMultiplier(empire.cities);
     for (const building of empire.buildings) {

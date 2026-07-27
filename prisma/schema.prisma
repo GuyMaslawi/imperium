@@ -250,6 +250,8 @@ model Empire {
   guildMembership    GuildMember?
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
+  potions            PotionStack[]
+  potionEffects      PotionEffect[]
   diamondPurchases   DiamondPurchase[]
   seasonPass         SeasonPassProgress?
   bossFights         BossFight[]
@@ -628,6 +630,53 @@ model HeroItem {
   @@index([heroId])
 }
 
+/* ------------------------------ potions ------------------------------ */
+
+/// The four brews looted from won battles. Each is a *timed* effect on the
+/// whole empire, not an item: drinking one starts (or extends) a window, and
+/// everything else in the game only ever asks "is this kind active right now?".
+/// Catalog, durations and drop odds: src/lib/game/potions.ts.
+enum PotionKind {
+  DOUBLE_XP
+  DOUBLE_RESOURCES
+  HERO_INVULNERABLE
+  FORGE_DISCOUNT
+}
+
+/// Unopened potions on the belt — one row per (empire, kind) holding how many
+/// are in hand. Counts, not one row per bottle: potions are fungible and the
+/// belt shows a stack with a badge, so a row per bottle would buy nothing.
+model PotionStack {
+  id        String     @id @default(cuid())
+  empireId  String
+  kind      PotionKind
+  count     Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, kind])
+}
+
+/// A potion currently in effect. One row per (empire, kind); drinking another
+/// of the same kind pushes `expiresAt` further out rather than being wasted.
+/// Expiry is lazy — every reader filters on `expiresAt > now`, so no sweeper
+/// job is needed and an offline player's buff runs out on its own.
+model PotionEffect {
+  id        String     @id @default(cuid())
+  empireId  String
+  kind      PotionKind
+  expiresAt DateTime
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  @@unique([empireId, kind])
+  @@index([empireId, expiresAt])
+}
+
 enum BuildingType {
   GOLD_MINE
   WOOD_CAMP
@@ -846,6 +895,9 @@ model BattleReport {
 
   // A winning attack can also award a wheel-of-fortune spin (wheel-luck upgrade).
   wonWheelSpin      Boolean  @default(false)
+
+  // Potion looted by the attacker on a win (denormalized snapshot, like the item).
+  droppedPotionKind PotionKind?
 
   attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)

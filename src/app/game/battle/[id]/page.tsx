@@ -8,6 +8,8 @@ import { AttackAgainButton } from "@/components/game/AttackAgainButton";
 import { Tip } from "@/components/ui/Tip";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
+import { PotionBottle } from "@/components/game/PotionBottle";
+import { POTION_META, potionDurationLabel } from "@/lib/game/potions";
 import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "תוצאת קרב | IMPERIUM" };
@@ -112,6 +114,8 @@ export default async function BattleResultPage({
       : null;
   // A winning attack can also award a wheel-of-fortune spin (wheel-luck upgrade).
   const wonWheelSpin = iAmAttacker && report.wonWheelSpin;
+  // …and a potion, which goes straight to the belt under the bag.
+  const capturedPotion = iAmAttacker ? report.droppedPotionKind : null;
 
   return (
     <div className="space-y-6">
@@ -230,7 +234,7 @@ export default async function BattleResultPage({
       )}
 
       {/* -------- hero rewards -------- */}
-      {(myHeroXp > 0 || capturedItem || wonWheelSpin) && (
+      {(myHeroXp > 0 || capturedItem || capturedPotion || wonWheelSpin) && (
         <div className="panel rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך</h3>
           <div className="flex flex-wrap items-center gap-4">
@@ -252,6 +256,28 @@ export default async function BattleResultPage({
                   זכית בסיבוב גלגל מזל!
                 </p>
               </Link>
+            )}
+            {capturedPotion && (
+              <div className="flex items-center gap-3">
+                <div className="w-16">
+                  <PotionBottle kind={capturedPotion} className="w-full" />
+                </div>
+                <div>
+                  <p
+                    className={`text-sm font-black ${POTION_META[capturedPotion].tone}`}
+                  >
+                    <Icon name="potion" size={16} className="inline-block align-middle" />{" "}
+                    נלכד שיקוי: {POTION_META[capturedPotion].label}
+                  </p>
+                  <p className="mt-0.5 text-xs text-zinc-400">
+                    {POTION_META[capturedPotion].tagline} ·{" "}
+                    {potionDurationLabel(capturedPotion)} · נוסף לתרמיל
+                  </p>
+                  <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
+                    <Icon name="potion" size={14} className="inline-block align-middle" /> לשיקויים
+                  </Link>
+                </div>
+              </div>
             )}
             {capturedItem && (
               <div className="flex items-center gap-3">
