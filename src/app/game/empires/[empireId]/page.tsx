@@ -1,9 +1,10 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { DuelBar } from "@/components/ui/Meter";
 import {
   getEmpireAttackPower,
@@ -11,8 +12,8 @@ import {
   getEmpireSpyPower,
   getEmpireGeneralPower,
 } from "@/lib/game/power";
-import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
+import { cityName } from "@/lib/game/cities";
 import { RankActions } from "@/components/game/RankActions";
 import { ShieldBadges } from "@/components/game/ShieldBadges";
 import { getActiveShields } from "@/lib/game/diamondEffects";
@@ -28,13 +29,6 @@ import {
 } from "@/lib/game/hero";
 
 export const metadata = { title: "פרופיל אימפריה | אימפריום" };
-
-/** A spy report counts as "recent" for this long. */
-const SPY_REPORT_TTL_MS = 24 * 60 * 60 * 1000;
-
-function recentSpyCutoff(): Date {
-  return new Date(Date.now() - SPY_REPORT_TTL_MS);
-}
 
 export default async function EmpireProfilePage({
   params,
@@ -69,22 +63,11 @@ export default async function EmpireProfilePage({
   const sameCity = empire.cities === myEmpire.cities;
   const canEngage = !isMe && sameCity;
 
-  const spyReport = isMe
-    ? null
-    : await prisma.spyReport.findFirst({
-        where: {
-          attackerEmpireId: myEmpire.id,
-          defenderEmpireId: empire.id,
-          success: true,
-          createdAt: { gte: recentSpyCutoff() },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-
-  // Power figures and population (general power, citizens, soldiers, gold…)
-  // are intel — hidden from strangers. Revealed only for your own empire, or
-  // once a recent successful spy report exists.
-  const showDetails = isMe || spyReport !== null;
+  // Power figures and population are intel, and this page never reveals them:
+  // a rival's strength is learned by spying on him or by fighting him, and the
+  // resulting report lives on the report itself — not cached on his dossier.
+  // Only your own profile shows its numbers.
+  const showDetails = isMe;
   const generalPower = getEmpireGeneralPower(empire.army, empire.weapons);
   const attackPower = getEmpireAttackPower(empire.army, empire.weapons);
   const defensePower = getEmpireDefensePower(empire.army, empire.weapons);
@@ -107,22 +90,68 @@ export default async function EmpireProfilePage({
   const shields = await getActiveShields(empire.id);
   const activeShields = SHIELDS.filter((s) => shields[s.key] !== null);
 
-  const publicStats = [
-    // "רמה" here means the hero's level. `empire.level` is a column nothing in
-    // the game increments, so it showed 1 on every honest profile.
-    { label: "רמת גיבור", value: formatNumber(heroLevel), tone: "text-gold-bright" },
-    { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
-    // Gold and soldier count are shown openly on every profile.
-    { label: "זהב", value: <><Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(Math.floor(empire.gold))}</>, tone: "text-gold-bright" },
-    { label: "חיילים", value: <><Icon name="army" size={14} className="inline-block align-middle" /> {formatNumber(empire.army?.soldiers ?? 0)}</>, tone: "text-zinc-100" },
-    // Power and citizen count are intelligence — visible only for your own
-    // empire or after a successful spy mission.
-    ...(showDetails
-      ? [
-          { label: "כוח כללי", value: <><Icon name="spark" size={14} className="inline-block align-middle" /> {formatNumber(generalPower)}</>, tone: "text-gold" },
-          { label: "אזרחים", value: formatNumber(empire.citizens), tone: "text-zinc-100" },
-        ]
-      : []),
+  // Treasury, army, power and population are all intelligence — the exact
+  // figures a spy mission is paid to bring back — so the tile row exists only
+  // on your own dossier. A rival's level and ruler are already on the banner
+  // and in the intel card below it; two lonely tiles only bought dead panel.
+  //
+  // Five tiles, so the track must be 1 or 5 wide: any other count leaves empty
+  // cells at the end of the last row.
+  const publicStats = showDetails
+    ? [
+        // "רמה" here means the hero's level. `empire.level` is a column nothing
+        // in the game increments, so it showed 1 on every honest profile.
+        { label: "רמת גיבור", value: formatNumber(heroLevel), tone: "text-gold-bright" },
+        { label: "זהב", value: <><Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(Math.floor(empire.gold))}</>, tone: "text-gold-bright" },
+        { label: "חיילים", value: <><Icon name="army" size={14} className="inline-block align-middle" /> {formatNumber(empire.army?.soldiers ?? 0)}</>, tone: "text-zinc-100" },
+        { label: "כוח כללי", value: <><Icon name="spark" size={14} className="inline-block align-middle" /> {formatNumber(generalPower)}</>, tone: "text-gold" },
+        { label: "אזרחים", value: formatNumber(empire.citizens), tone: "text-zinc-100" },
+      ]
+    : [];
+
+  // What a stranger's dossier does and does not carry, stated on the page
+  // itself. Without it the profile just looks thin, and a player has no way to
+  // tell "this empire is weak" from "this figure is being withheld".
+  const openBook: { icon: IconName; text: string }[] = [
+    { icon: "base", text: `העיר שבה יושבת האימפריה — ${cityName(empire.cities)}` },
+    { icon: "guild", text: guildName ? `הברית: ${guildName}` : "השתייכות לברית (ללא ברית כרגע)" },
+    { icon: "attack", text: `מחלקת הגיבור ורמתו — ${HERO_CLASS_META[heroClassKey].label}, רמה ${heroLevel}` },
+    {
+      icon: "shield",
+      text:
+        activeShields.length > 0
+          ? `מגני פשיטה פעילים: ${activeShields.map((s) => s.label).join(" ו")} — ניצחון עליה לא יניב שלל או שבויים`
+          : "מגני פשיטה — כרגע אין לה מגן פעיל, כך ששלל ושבויים זמינים",
+    },
+  ];
+  const dossierFacts: { label: string; value: ReactNode }[] = [
+    { label: "שליט", value: empire.user.name },
+    {
+      label: "האימפריה נוסדה",
+      value: (
+        <span className="nums" dir="ltr">
+          {formatDate(empire.createdAt)}
+        </span>
+      ),
+    },
+    ...(empire.season ? [{ label: "עונה", value: empire.season.name }] : []),
+    {
+      label: "ברית",
+      value: guildName ? (
+        <span className="inline-flex items-center gap-1 text-gold-bright">
+          <Icon name="guild" size={14} /> {guildName}
+        </span>
+      ) : (
+        <span className="text-zinc-500">ללא ברית</span>
+      ),
+    },
+  ];
+
+  const sealed: { icon: IconName; text: string }[] = [
+    { icon: "spark", text: "כוח התקפה, הגנה, מודיעין וכוח כללי" },
+    { icon: "army", text: "גודל הצבא, המרגלים ועבדי המכרות" },
+    { icon: "gold", text: "האוצר, המשאבים והבנק" },
+    { icon: "crown", text: "ציוד הגיבור שהוא לובש" },
   ];
 
   return (
@@ -133,7 +162,8 @@ export default async function EmpireProfilePage({
       {!isMe && !sameCity && (
         <div className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
           <Icon name="shield" size={16} className="mb-1 inline-block align-[-3px] text-gold-dim" />{" "}
-          אימפריה זו נמצאת בעיר אחרת (
+          אימפריה זו יושבת ב
+          <span className="font-bold text-bone">{cityName(empire.cities)}</span> (
           <span className="nums" dir="ltr">
             {empire.cities}
           </span>{" "}
@@ -220,8 +250,11 @@ export default async function EmpireProfilePage({
                   </span>
                 )}
               </h2>
+              {/* Class, then the seat — the same two facts the ladder row now
+                  carries under the name, so the dossier reads as its expansion. */}
               <p className="mt-0.5 text-sm text-zinc-400">
-                {HERO_CLASS_META[heroClassKey].label}
+                {HERO_CLASS_META[heroClassKey].label} · עיר{" "}
+                <span className="font-bold text-bone">{cityName(empire.cities)}</span>
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                 {showDetails && (
@@ -240,9 +273,15 @@ export default async function EmpireProfilePage({
                     איפוס ×{heroResets}
                   </span>
                 )}
-                <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
-                  100 <Icon name="heart" size={14} />
-                </span>
+                {/* Real health, and only on your own dossier — it used to be a
+                    hardcoded 100 on every profile, which read as a fact about
+                    the target while telling you nothing. A rival's remaining
+                    health is combat intel like the rest. */}
+                {isMe && (
+                  <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
+                    {hero?.health ?? 100} <Icon name="heart" size={14} />
+                  </span>
+                )}
                 {guildName && (
                   <span
                     className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
@@ -256,171 +295,158 @@ export default async function EmpireProfilePage({
             </div>
           </div>
 
+          {/* The dossier facts, folded into the banner's other half. They used
+              to sit in a "תיאור שחקן" card at the foot of the page, which left
+              this side of the banner as a wide empty band. */}
+          <dl className="grid flex-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:max-w-xl">
+            {dossierFacts.map((fact) => (
+              <div
+                key={fact.label}
+                className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2"
+              >
+                <dt className="whitespace-nowrap text-xs text-zinc-400">{fact.label}</dt>
+                <dd className="min-w-0 truncate font-medium text-zinc-100">{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
       </div>
 
-      {/* -------- public stat tiles -------- */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {publicStats.map((stat) => (
-          <div key={stat.label} className="panel rounded-xl p-4">
-            <p className="text-xs text-zinc-400">{stat.label}</p>
-            <p className={`nums mt-1 text-lg font-bold ${stat.tone}`} dir="ltr">
-              {stat.value}
-            </p>
-          </div>
-        ))}
-      </div>
+      {/* -------- your own stat tiles -------- */}
+      {publicStats.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-5">
+          {publicStats.map((stat) => (
+            <div key={stat.label} className="panel rounded-xl p-4">
+              <p className="text-xs text-zinc-400">{stat.label}</p>
+              <p className={`nums mt-1 text-lg font-bold ${stat.tone}`} dir="ltr">
+                {stat.value}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        {/* -------- power breakdown -------- */}
+      {/* -------- what this dossier does and does not carry --------
+          A rival's page is deliberately thin, so it says so out loud: which
+          facts are open, which are sealed, and what buys the sealed ones. It
+          also takes the slot the power breakdown used to fill, so the removal
+          leaves no hole. */}
+      {!isMe && (
+        <div className="panel-gold rounded-xl p-4 md:p-5">
+          <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="spy" size={20} className="text-crimson-bright" />
+            מה התיק הזה מגלה
+          </h3>
+          <div className="rule-gold my-3" />
+          <div className="grid gap-4 md:grid-cols-2">
+            <section>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-emerald-400/80">
+                גלוי לכל
+              </p>
+              <ul className="space-y-1.5 text-sm text-zinc-300">
+                {openBook.map((row) => (
+                  <li key={row.text} className="flex items-start gap-2">
+                    <Icon
+                      name={row.icon}
+                      size={14}
+                      className="mt-0.5 shrink-0 text-emerald-400"
+                    />
+                    <span>{row.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+            <section className="md:border-s md:border-border-subtle md:ps-4">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-crimson-bright/80">
+                חתום — נחשף רק בשטח
+              </p>
+              <ul className="space-y-1.5 text-sm text-zinc-400">
+                {sealed.map((row) => (
+                  <li key={row.text} className="flex items-start gap-2">
+                    <Icon
+                      name={row.icon}
+                      size={14}
+                      className="mt-0.5 shrink-0 text-zinc-600"
+                    />
+                    <span>{row.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </div>
+          <p className="mt-4 border-t border-border-subtle pt-3 text-xs leading-relaxed text-zinc-400">
+            {canEngage ? (
+              <>
+                <Icon name="spy" size={14} className="inline-block align-[-2px] text-gold" />{" "}
+                <span className="font-bold text-bone">כדי לדעת כמה הוא חזק — רגל או תקוף.</span>{" "}
+                ריגול מוצלח מחזיר תיק מלא עם הצבא, המשאבים והציוד; תקיפה מגלה את
+                יחסי הכוחות בשדה. הממצאים נשמרים בדוח עצמו תחת{" "}
+                <Link href="/game/reports" className="font-semibold text-gold hover:text-gold-bright">
+                  הדוחות
+                </Link>{" "}
+                — ולא כאן, כך שתיק ישן לא ממשיך לחשוף אותו.
+              </>
+            ) : (
+              <>
+                <Icon name="shield" size={14} className="inline-block align-[-2px] text-gold-dim" />{" "}
+                אימפריה זו יושבת בעיר אחרת, כך שאי אפשר לרגל או לתקוף אותה — ולכן
+                כוחה יישאר חתום עד שתגיעו לאותה עיר.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* -------- power breakdown --------
+          Own empire only — not even an empty placeholder on a rival's dossier.
+          His strength is learned in the field, by a spy mission or by trading
+          blows with him, and it lives on that report. */}
+      {showDetails && (
         <div className="panel rounded-xl p-4">
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="spark" size={20} className="text-crimson-bright" />
             כוח האימפריה
           </h3>
-          {showDetails ? (
-            <>
-              {spyReport && (
-                <p className="mb-3 text-xs text-zinc-500">
-                  מבוסס על דוח ריגול מ־
-                  <span className="nums" dir="ltr">
-                    {formatDate(spyReport.createdAt)}
-                  </span>
-                </p>
-              )}
-              <dl className="space-y-2.5 text-sm">
-                {powerRows.map((row) => (
-                  <div
-                    key={row.label}
-                    className="flex items-center justify-between border-b border-border-subtle pb-2.5 last:border-0"
-                  >
-                    <dt className="text-zinc-400">
-                      {row.icon} {row.label}
-                    </dt>
-                    <dd className={`nums font-bold ${row.tone}`} dir="ltr">
-                      {formatNumber(row.value)}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-
-              {/* attack vs defence duel bar */}
-              <div className="mt-4">
-                <div className="mb-1.5 flex items-center justify-between text-[11px]">
-                  <span className="text-red-400"><Icon name="attack" size={14} className="inline-block align-middle" /> התקפה</span>
-                  <span className="text-sky-300">הגנה <Icon name="shield" size={14} className="inline-block align-middle" /></span>
-                </div>
-                <DuelBar leftPct={attackShare} />
+          <dl className="space-y-2.5 text-sm">
+            {powerRows.map((row) => (
+              <div
+                key={row.label}
+                className="flex items-center justify-between border-b border-border-subtle pb-2.5 last:border-0"
+              >
+                <dt className="text-zinc-400">
+                  {row.icon} {row.label}
+                </dt>
+                <dd className={`nums font-bold ${row.tone}`} dir="ltr">
+                  {formatNumber(row.value)}
+                </dd>
               </div>
+            ))}
+          </dl>
 
-              {isMe && (
-                <Link
-                  href="/game/weapons"
-                  className="mt-4 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
-                >
-                  ניהול נשקים ←
-                </Link>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-zinc-400">
-              בצע ריגול כדי לחשוף מידע נוסף על האימפריה.
-            </p>
-          )}
-        </div>
-
-        {/* -------- intelligence / spy report -------- */}
-        {canEngage && (
-          <div className="panel-gold rounded-xl p-4">
-            <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-              <Icon name="spy" size={20} className="text-crimson-bright" />
-              תוצאת ריגול
-            </h3>
-            {spyReport ? (
-              <>
-                <p className="mb-3 text-xs text-zinc-500">
-                  מבוסס על דוח ריגול מ־
-                  <span className="nums" dir="ltr">
-                    {formatDate(spyReport.createdAt)}
-                  </span>
-                </p>
-
-                <h4 className="mb-2 text-xs font-bold tracking-wide text-gold">
-                  אוכלוסייה
-                </h4>
-                <div className="mb-4 grid grid-cols-3 gap-2 text-sm">
-                  <div className="panel-inset rounded-lg p-2.5">
-                    <p className="text-[11px] text-zinc-500"><Icon name="army" size={14} className="inline-block align-middle" /> חיילים</p>
-                    <p className="nums font-bold text-zinc-100" dir="ltr">
-                      {formatNumber(spyReport.revealedSoldiers ?? 0)}
-                    </p>
-                  </div>
-                  <div className="panel-inset rounded-lg p-2.5">
-                    <p className="text-[11px] text-zinc-500"><Icon name="spy" size={14} className="inline-block align-middle" /> מרגלים</p>
-                    <p className="nums font-bold text-zinc-100" dir="ltr">
-                      {formatNumber(spyReport.revealedSpies ?? 0)}
-                    </p>
-                  </div>
-                  <div className="panel-inset rounded-lg p-2.5">
-                    <p className="text-[11px] text-zinc-500"><Icon name="mine" size={14} className="inline-block align-middle" /> עבדי מכרות</p>
-                    <p className="nums font-bold text-zinc-100" dir="ltr">
-                      {formatNumber(spyReport.revealedMineSlaves ?? 0)}
-                    </p>
-                  </div>
-                </div>
-
-                <h4 className="mb-2 text-xs font-bold tracking-wide text-gold">
-                  משאבים
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(spyReport.revealedGold ?? 0)}
-                  </span>
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="wood" size={14} className="inline-block align-middle text-amber-600" /> {formatNumber(spyReport.revealedWood ?? 0)}
-                  </span>
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" /> {formatNumber(spyReport.revealedIron ?? 0)}
-                  </span>
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" /> {formatNumber(spyReport.revealedStone ?? 0)}
-                  </span>
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="attack" size={14} className="inline-block align-middle" /> {formatNumber(weaponsPower(empire.weapons, "ATTACK"))}
-                  </span>
-                  <span className="nums text-zinc-300" dir="ltr">
-                    <Icon name="shield" size={14} className="inline-block align-middle" /> {formatNumber(weaponsPower(empire.weapons, "DEFENSE"))}
-                  </span>
-                </div>
-
-                {/* This card is the headline only. The mission also brought back
-                    the vaults, the bank, the arsenal, the hero and every timed
-                    spell with its expiry — all of it on the report itself. */}
-                <Link
-                  href={`/game/spy/${spyReport.id}`}
-                  className="mt-4 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
-                >
-                  <Icon name="spy" size={15} className="inline-block align-middle" /> התיק המלא ←
-                </Link>
-              </>
-            ) : (
-              <p className="text-sm text-zinc-400">
-                בצע ריגול כדי לחשוף מידע נוסף על האימפריה.
-              </p>
-            )}
+          {/* attack vs defence duel bar */}
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-[11px]">
+              <span className="text-red-400"><Icon name="attack" size={14} className="inline-block align-middle" /> התקפה</span>
+              <span className="text-sky-300">הגנה <Icon name="shield" size={14} className="inline-block align-middle" /></span>
+            </div>
+            <DuelBar leftPct={attackShare} />
           </div>
-        )}
-      </div>
+
+          <Link
+            href="/game/weapons"
+            className="mt-4 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
+          >
+            ניהול נשקים ←
+          </Link>
+        </div>
+      )}
 
       {/* -------- hero equipment -------- */}
       {/*
-        Behind the same intel gate as the power breakdown above. Each ItemTile
+        Behind the same gate as the power breakdown above. Each ItemTile
         publishes the item's rarity, level and exact bonus value, so the nine
         slots together give the item component of the target's attack/defence
-        multiplier — the figure `spyOnEmpire` charges turns for and can fail to
-        obtain. Rendered ungated it was readable for any enumerable empire id,
-        including empires in another city that cannot be spied on or attacked
-        at all, which made the paid spy mission partly redundant.
+        multiplier — the figure a spy mission is paid to bring back.
       */}
       {showDetails && (
       <div className="panel rounded-xl p-4">
@@ -472,12 +498,11 @@ export default async function EmpireProfilePage({
         </div>
         {equippedBySlot.size === 0 && (
           <p className="mt-3 text-xs text-zinc-600">
-            {isMe
-              ? "הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד הגיבור."
-              : "הגיבור של היריב אינו לובש ציוד כרגע."}
+            הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד
+            הגיבור.
           </p>
         )}
-        {isMe && equippedBySlot.size > 0 && (
+        {equippedBySlot.size > 0 && (
           <Link
             href="/game/hero"
             className="mt-3 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
@@ -488,41 +513,6 @@ export default async function EmpireProfilePage({
       </div>
       )}
 
-      {/* -------- player description -------- */}
-      <div className="panel rounded-xl p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="reports" size={20} className="text-crimson-bright" />
-          תיאור שחקן
-        </h3>
-        <dl className="grid gap-2.5 text-sm sm:grid-cols-2">
-          <div className="flex justify-between gap-2 border-b border-border-subtle pb-2.5">
-            <dt className="text-zinc-400">שליט</dt>
-            <dd className="font-medium text-zinc-100">{empire.user.name}</dd>
-          </div>
-          <div className="flex justify-between gap-2 border-b border-border-subtle pb-2.5">
-            <dt className="text-zinc-400">האימפריה נוסדה</dt>
-            <dd className="nums font-medium text-zinc-100" dir="ltr">
-              {formatDate(empire.createdAt)}
-            </dd>
-          </div>
-          {empire.season && (
-            <div className="flex justify-between gap-2 border-b border-border-subtle pb-2.5">
-              <dt className="text-zinc-400">עונה</dt>
-              <dd className="font-medium text-zinc-100">{empire.season.name}</dd>
-            </div>
-          )}
-          <div className="flex justify-between gap-2 border-b border-border-subtle pb-2.5">
-            <dt className="text-zinc-400">ברית</dt>
-            {guildName ? (
-              <dd className="inline-flex items-center gap-1 font-medium text-gold-bright">
-                <Icon name="guild" size={14} /> {guildName}
-              </dd>
-            ) : (
-              <dd className="text-zinc-500">ללא ברית</dd>
-            )}
-          </div>
-        </dl>
-      </div>
     </div>
   );
 }

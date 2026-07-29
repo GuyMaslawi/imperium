@@ -31,6 +31,7 @@ import {
   storageUpgradeCost,
   wheelLuckBonus,
 } from "@/lib/game/constants";
+import { cityAt } from "@/lib/game/cities";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   TIERS_PER_CATEGORY,
@@ -560,7 +561,9 @@ export default async function GuidePage() {
               <Lead>
                 עיר היא קפיצת המדרגה הגדולה במשחק. כל עיר מכפילה את תפוקת המכרות,
                 פותחת עוד {CITIZEN_GROWTH_LEVELS_PER_CITY} רמות לשדרוג קבלת האזרחים —
-                ופותחת דרגות נשק חדשות במפעל.
+                ופותחת דרגות נשק חדשות במפעל. לכל אחת מעשר הערים שם משלה, מ
+                {cityAt(1).name} שעל הגבול ועד {cityAt(MAX_CITIES).name}, והדירוג
+                שאתה רואה הוא תמיד זה של העיר שבה אתה יושב.
               </Lead>
 
               <TableWrap maxHeight={400}>
@@ -579,8 +582,17 @@ export default async function GuidePage() {
                       const cost = city < MAX_CITIES ? cityCost(city) : null;
                       return (
                         <tr key={city}>
-                          <td className="nums font-black text-gold-bright" dir="ltr">
-                            {city}
+                          {/* The tier is the mechanic, the name is the place —
+                              the table is the one screen that owes the player
+                              both, since it is where they plan the climb. */}
+                          <td className="font-black text-gold-bright">
+                            <span className="nums" dir="ltr">
+                              {city}
+                            </span>{" "}
+                            <span className="font-bold text-bone">{cityAt(city).name}</span>
+                            <span className="block text-[11px] font-normal text-zinc-500">
+                              {cityAt(city).epithet}
+                            </span>
                           </td>
                           <td className="nums text-sky-300" dir="ltr">
                             ×{city}

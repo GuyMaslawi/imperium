@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/server/actions/auth";
@@ -57,8 +58,6 @@ export type SidebarProps = {
   inGuild?: boolean;
   /** A guild war is on the air right now: the row lights up for the half hour. */
   guildWarLive?: boolean;
-  /** Show the admin control-center link (admins only). */
-  isAdmin?: boolean;
 };
 
 /**
@@ -80,76 +79,140 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
+/** "Has this hydrated yet" as a store: false on the server, true in the browser. */
+const subscribeNever = () => () => {};
+
+/** The hamburger glyph, morphing into an X while the drawer is open. */
+function BurgerGlyph({ open }: { open: boolean }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d={open ? "M6 6l12 12" : "M3 6h18"}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+      <path
+        d="M3 12h18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        className={`origin-center transition-opacity duration-150 ${open ? "opacity-0" : "opacity-100"}`}
+      />
+      <path
+        d={open ? "M18 6L6 18" : "M3 18h18"}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /**
- * Mobile navigation: a hamburger trigger (rendered inside the sticky command
- * bar) plus a slide-in drawer holding the full sidebar. Hidden at lg+, where
- * the static <Sidebar> takes over.
+ * Mobile navigation: one hamburger button — the drawer's only control — plus a
+ * slide-in drawer holding the full sidebar. Hidden at lg+, where the static
+ * <Sidebar> takes over.
+ *
+ * Both live in a portal on <body>, not in the command bar where the trigger is
+ * laid out. The bar sets `backdrop-blur`, and a filtered ancestor becomes the
+ * containing block for `position: fixed` descendants — a drawer rendered inside
+ * it is clipped to the 3.75rem header strip and trapped under the bar's z-40
+ * stacking context. The bar keeps a same-size placeholder so the row's layout
+ * is unchanged, and the button re-anchors itself over that slot with the same
+ * fixed offsets the header uses (dir=ltr, so: leading edge on the left).
  */
 export function MobileMenu(props: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  // Portals cannot render on the server; until hydration the command bar paints
+  // an inert copy of the glyph so the bar never flashes a hole where it goes.
+  const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
 
-  // Lock background scroll while the drawer is open.
+  // While open: Escape closes, the back button closes (the only navigation that
+  // can start while the drawer covers everything — taps on its own links are
+  // handled below), and the page behind it does not scroll.
   useEffect(() => {
     if (!open) return;
+    const close = () => setOpen(false);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("popstate", close);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("popstate", close);
       document.body.style.overflow = prev;
     };
   }, [open]);
 
   return (
-    <div className="lg:hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="פתיחת תפריט"
-        aria-expanded={open}
-        className="relative flex h-10 w-10 items-center justify-center rounded-md border border-border-gold-strong bg-black/30 text-gold-bright transition-colors hover:border-gold"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {/* backdrop + drawer */}
-      <div
-        className={`fixed inset-0 z-[60] ${open ? "" : "pointer-events-none"}`}
-        aria-hidden={!open}
-      >
-        <div
-          onClick={() => setOpen(false)}
-          className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-200 ${
-            open ? "opacity-100" : "opacity-0"
-          }`}
-        />
-        <aside
-          dir="rtl"
-          // Any nav link tapped inside the drawer closes it (delegated click).
-          onClick={(e) => {
-            if ((e.target as HTMLElement).closest("a")) setOpen(false);
-          }}
-          className={`ornate-shell absolute inset-y-0 right-0 flex w-[86vw] max-w-xs flex-col gap-4 overflow-y-auto rounded-l-lg p-3 transition-transform duration-200 ${
-            open ? "translate-x-0" : "translate-x-full"
-          }`}
-        >
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="סגירת תפריט"
-              className="flex h-9 w-9 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-crimson/50 hover:text-crimson-bright"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </button>
+    <>
+      {/* The slot the button occupies in the command bar's flex row — a bare
+          spacer once the real (fixed) button is painted over it. */}
+      <div className="h-10 w-10 shrink-0 lg:hidden" aria-hidden>
+        {!mounted && (
+          <div className="flex h-10 w-10 items-center justify-center rounded-md border border-border-gold-strong bg-black/30 text-gold-bright">
+            <BurgerGlyph open={false} />
           </div>
-          <SidebarContent {...props} pathname={pathname} />
-        </aside>
+        )}
       </div>
-    </div>
+
+      {mounted &&
+        createPortal(
+          <div className={`fixed inset-0 z-[60] lg:hidden ${open ? "" : "pointer-events-none"}`}>
+            <div
+              onClick={() => setOpen(false)}
+              className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-200 ${
+                open ? "opacity-100" : "opacity-0"
+              }`}
+              aria-hidden
+            />
+
+            <aside
+              dir="rtl"
+              // Any nav link tapped inside the drawer closes it (delegated click).
+              onClick={(e) => {
+                if ((e.target as HTMLElement).closest("a")) setOpen(false);
+              }}
+              // Offscreen is not just invisible: while closed the drawer is out
+              // of the tab order and out of the accessibility tree entirely.
+              inert={!open}
+              className={`ornate-shell absolute inset-y-0 right-0 flex w-[86vw] max-w-xs flex-col gap-4 overflow-y-auto rounded-l-lg p-3 pt-[calc(var(--header-h)+0.75rem)] transition-transform duration-200 ${
+                open ? "translate-x-0" : "translate-x-full"
+              }`}
+            >
+              <SidebarContent {...props} pathname={pathname} />
+            </aside>
+
+            {/* Mirrors the command bar's own row box, so the button lands
+                exactly on the placeholder it replaces — and stays above the
+                backdrop and the drawer, the single thing that toggles them. */}
+            <div
+              dir="ltr"
+              className="pointer-events-none absolute inset-x-0 top-0 flex h-[var(--header-h)] items-center px-2 sm:px-3 md:px-5"
+            >
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-label={open ? "סגירת תפריט" : "פתיחת תפריט"}
+                aria-expanded={open}
+                className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-md border bg-black/30 backdrop-blur transition-colors ${
+                  open
+                    ? "border-crimson/60 text-crimson-bright"
+                    : "border-border-gold-strong text-gold-bright hover:border-gold"
+                }`}
+              >
+                <BurgerGlyph open={open} />
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -171,7 +234,6 @@ function SidebarContent({
   heroQuestReady = false,
   inGuild = false,
   guildWarLive = false,
-  isAdmin = false,
   pathname,
 }: SidebarProps & { pathname: string }) {
   // One flat list — no section headings. History lives in the top command bar
@@ -255,16 +317,8 @@ function SidebarContent({
         </div>
       </div>
 
-      {/* History + messages now live in the top command bar — see InboxNav. */}
-
-      {isAdmin && (
-        <Link
-          href="/admin"
-          className="btn btn-gold flex w-full items-center justify-center gap-1.5 px-2 py-2 text-xs font-bold"
-        >
-          <Icon name="shield" size={16} /> מרכז שליטה
-        </Link>
-      )}
+      {/* History, messages and the admin control center now live in the top
+          command bar — see InboxNav and AdminNav. */}
 
       {/* hero card */}
       <div className="panel-gold rounded-lg p-3">

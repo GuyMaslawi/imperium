@@ -6,6 +6,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
 import {
+  LabeledBool,
   LabeledInput,
   LabeledSelect,
   EditorSection,
@@ -43,10 +44,19 @@ import {
   updateHero,
   grantHeroItem,
   deleteHeroItem,
-  removeFromGuild,
+  updateHeroItem,
+  setGuildMembership,
   sendMessageToEmpire,
   sendGift,
 } from "@/server/actions/admin";
+import { MAX_CITIES } from "@/lib/game/constants";
+import { cityName } from "@/lib/game/cities";
+import { GUILD_ROLE_META } from "@/lib/game/guild";
+import { PlayerSecurity } from "@/components/admin/user/PlayerSecurity";
+import { PlayerEmpireState } from "@/components/admin/user/PlayerEmpireState";
+import { PlayerBuffs } from "@/components/admin/user/PlayerBuffs";
+import { PlayerProgress } from "@/components/admin/user/PlayerProgress";
+import { PlayerInbox } from "@/components/admin/user/PlayerInbox";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +66,40 @@ const RARITY_OPTIONS = [
   { value: "EPIC", label: "אפי" },
   { value: "LEGENDARY", label: "אגדי" },
 ];
+
+/** Totals for the mail/history panel — counts only, never the rows. */
+async function empireCounts(empireId: string) {
+  const [
+    messages,
+    unread,
+    battleReports,
+    spyReports,
+    bossFights,
+    purchases,
+    bankTransactions,
+  ] = await Promise.all([
+    prisma.message.count({ where: { empireId } }),
+    prisma.message.count({ where: { empireId, readAt: null } }),
+    prisma.battleReport.count({
+      where: { OR: [{ attackerEmpireId: empireId }, { defenderEmpireId: empireId }] },
+    }),
+    prisma.spyReport.count({
+      where: { OR: [{ attackerEmpireId: empireId }, { defenderEmpireId: empireId }] },
+    }),
+    prisma.bossFight.count({ where: { empireId } }),
+    prisma.diamondPurchase.count({ where: { empireId } }),
+    prisma.bankTransaction.count({ where: { empireId } }),
+  ]);
+  return {
+    messages,
+    unread,
+    battleReports,
+    spyReports,
+    bossFights,
+    purchases,
+    bankTransactions,
+  };
+}
 
 export default async function AdminUserDetail({
   params,
@@ -80,12 +124,40 @@ export default async function AdminUserDetail({
           hero: { include: { items: true } },
           guildMembership: { include: { guild: true } },
           season: true,
+          // The rest of the empire: every timed buff, every ladder, and the
+          // head of the mailbox. All of it is editable further down the page,
+          // and none of it was reachable from any other admin screen.
+          potions: true,
+          potionEffects: true,
+          diamondEffects: true,
+          guildBuffs: { orderBy: { expiresAt: "desc" } },
+          seasonPass: true,
+          heroQuest: true,
+          achievements: { select: { key: true } },
+          gloryAwards: { select: { key: true } },
+          messages: {
+            take: 25,
+            orderBy: { createdAt: "desc" },
+            include: { sender: { select: { name: true } } },
+          },
         },
       },
     },
   });
   if (!user) notFound();
   const empire = user.empire;
+
+  // Pickers and counters for the panels below. Guilds and seasons are small
+  // tables; the history counts are indexed and only the totals are needed, so
+  // none of the (potentially huge) report rows are loaded.
+  const [seasons, guilds, counts] = await Promise.all([
+    prisma.gameSeason.findMany({
+      orderBy: { startsAt: "desc" },
+      select: { id: true, name: true, isActive: true },
+    }),
+    prisma.guild.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    empire ? empireCounts(empire.id) : null,
+  ]);
 
   return (
     <div className="space-y-6">
@@ -159,6 +231,20 @@ export default async function AdminUserDetail({
         </div>
       </EditorSection>
 
+      <PlayerSecurity
+        user={{
+          id: user.id,
+          emailVerified: user.emailVerified,
+          lockedUntil: user.lockedUntil,
+          failedLogins: user.failedLogins,
+          googleId: user.googleId,
+          hasPassword: user.passwordHash != null,
+          bannedAt: user.bannedAt,
+          createdAt: user.createdAt,
+          hasEmpire: empire != null,
+        }}
+      />
+
       {!empire ? (
         <div className="panel-inset rounded-xl p-6 text-center text-zinc-400">
           למשתמש זה אין אימפריה.
@@ -181,9 +267,35 @@ export default async function AdminUserDetail({
                 <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} defaultValue={empire.citizens} />
                 <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} defaultValue={empire.turns} />
                 <LabeledInput label="🎡 סיבובי גלגל" name="wheelSpins" type="number" min={0} defaultValue={empire.wheelSpins} />
+                {/* Cities drive the citizen cap, the quest board and the
+                    ranking bucket — the single most load-bearing number here. */}
+                <LabeledInput
+                  label="🏛️ ערים"
+                  name="cities"
+                  type="number"
+                  min={1}
+                  defaultValue={empire.cities}
+                  hint={`1–${MAX_CITIES} · כרגע: ${cityName(empire.cities)}`}
+                />
               </div>
             </ActionForm>
           </EditorSection>
+
+          <PlayerEmpireState
+            empire={{
+              id: empire.id,
+              seasonId: empire.seasonId,
+              protectedUntil: empire.protectedUntil,
+              lastRegularUpdateAt: empire.lastRegularUpdateAt,
+              lastDailyUpdateAt: empire.lastDailyUpdateAt,
+              reportsSeenAt: empire.reportsSeenAt,
+              militaryPower: empire.militaryPower,
+              generalPower: empire.generalPower,
+              spyPower: empire.spyPower,
+            }}
+            userId={user.id}
+            seasons={seasons}
+          />
 
           {/* ---------------- army + bank ---------------- */}
           <div className="grid gap-4 lg:grid-cols-2">
@@ -406,23 +518,56 @@ export default async function AdminUserDetail({
             </ActionForm>
 
             {empire.hero && empire.hero.items.length > 0 && (
-              <div className="mb-4 flex flex-wrap gap-2">
+              <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {empire.hero.items.map((item) => (
-                  <ActionForm
-                    key={item.id}
-                    action={deleteHeroItem}
-                    submitLabel="🗑"
-                    submitVariant="danger"
-                    submitClassName="!px-2 !py-1 text-xs"
-                    className="flex items-center gap-2 panel-inset rounded-lg p-2"
-                  >
-                    <input type="hidden" name="itemId" value={item.id} />
-                    <input type="hidden" name="userId" value={user.id} />
-                    <span className="text-[11px] text-zinc-300">
-                      {item.slot} · {item.rarity} · רמה {item.level}
-                      {item.equipped && " · חבוש"}
-                    </span>
-                  </ActionForm>
+                  <div key={item.id} className="panel-inset space-y-2 rounded-lg p-3">
+                    {/* Editable in place: the whole point of gear support here
+                        is retuning a bad drop, not only deleting it. */}
+                    <ActionForm
+                      action={updateHeroItem}
+                      submitLabel="שמור פריט"
+                      submitVariant="secondary"
+                      submitClassName="w-full text-xs"
+                    >
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <input type="hidden" name="userId" value={user.id} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <LabeledSelect
+                          label="מיקום"
+                          name="slot"
+                          defaultValue={item.slot}
+                          options={SLOT_ORDER.map((s) => ({
+                            value: s,
+                            label: SLOT_META[s].label,
+                          }))}
+                        />
+                        <LabeledSelect
+                          label="נדירות"
+                          name="rarity"
+                          defaultValue={item.rarity}
+                          options={RARITY_OPTIONS}
+                        />
+                        <LabeledInput
+                          label="רמה"
+                          name="level"
+                          type="number"
+                          min={1}
+                          defaultValue={item.level}
+                        />
+                        <LabeledBool label="חבוש" name="equipped" defaultValue={item.equipped} />
+                      </div>
+                    </ActionForm>
+                    <ActionForm
+                      action={deleteHeroItem}
+                      submitLabel="🗑 מחק פריט"
+                      submitVariant="danger"
+                      submitClassName="w-full text-xs"
+                      confirm="למחוק את הפריט?"
+                    >
+                      <input type="hidden" name="itemId" value={item.id} />
+                      <input type="hidden" name="userId" value={user.id} />
+                    </ActionForm>
+                  </div>
                 ))}
               </div>
             )}
@@ -444,29 +589,72 @@ export default async function AdminUserDetail({
 
           {/* ---------------- guild ---------------- */}
           <EditorSection title="ברית" icon="🤝">
-            {empire.guildMembership ? (
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-zinc-300">
+            <p className="mb-3 text-sm text-zinc-300">
+              {empire.guildMembership ? (
+                <>
                   חבר בברית{" "}
                   <span className="font-bold text-gold-bright">
                     {empire.guildMembership.guild.name}
                   </span>{" "}
-                  בתפקיד {empire.guildMembership.role}
-                </p>
-                <ActionForm
-                  action={removeFromGuild}
-                  submitLabel="הסר מהברית"
-                  submitVariant="danger"
-                  confirm="להסיר את האימפריה מהברית?"
-                >
-                  <input type="hidden" name="empireId" value={empire.id} />
-                  <input type="hidden" name="userId" value={user.id} />
-                </ActionForm>
+                  בתפקיד {GUILD_ROLE_META[empire.guildMembership.role].label}
+                </>
+              ) : (
+                <span className="text-zinc-500">האימפריה אינה חברה בברית.</span>
+              )}
+            </p>
+            {/* Capacity is intentionally not enforced here — see setGuildMembership. */}
+            <ActionForm action={setGuildMembership} submitLabel="שמור שיוך לברית">
+              <input type="hidden" name="empireId" value={empire.id} />
+              <input type="hidden" name="userId" value={user.id} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <LabeledSelect
+                  label="ברית"
+                  name="guildId"
+                  defaultValue={empire.guildMembership?.guildId ?? ""}
+                  options={[
+                    { value: "", label: "ללא ברית (הסרה)" },
+                    ...guilds.map((g) => ({ value: g.id, label: g.name })),
+                  ]}
+                />
+                <LabeledSelect
+                  label="תפקיד"
+                  name="role"
+                  defaultValue={empire.guildMembership?.role ?? "MEMBER"}
+                  options={(["LEADER", "DEPUTY", "MEMBER"] as const).map((r) => ({
+                    value: r,
+                    label: `${GUILD_ROLE_META[r].icon} ${GUILD_ROLE_META[r].label}`,
+                  }))}
+                />
               </div>
-            ) : (
-              <p className="text-sm text-zinc-500">האימפריה אינה חברה בברית.</p>
-            )}
+            </ActionForm>
           </EditorSection>
+
+          <PlayerBuffs
+            empireId={empire.id}
+            userId={user.id}
+            potionStacks={empire.potions}
+            potionEffects={empire.potionEffects}
+            diamondEffects={empire.diamondEffects}
+            guildBuffs={empire.guildBuffs}
+          />
+
+          <PlayerProgress
+            empireId={empire.id}
+            userId={user.id}
+            seasonPass={empire.seasonPass}
+            heroQuest={empire.heroQuest}
+            claimedAchievements={empire.achievements.map((a) => a.key)}
+            gloryKeys={empire.gloryAwards.map((g) => g.key)}
+          />
+
+          {counts && (
+            <PlayerInbox
+              empireId={empire.id}
+              userId={user.id}
+              messages={empire.messages}
+              counts={counts}
+            />
+          )}
 
           {/* ---------------- message + gift to this player ---------------- */}
           <div className="grid gap-4 lg:grid-cols-2">

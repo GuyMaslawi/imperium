@@ -4,6 +4,7 @@ import { Tip } from "@/components/ui/Tip";
 import { formatNumber } from "@/lib/game/format";
 import { formatGameTime } from "@/lib/game/time";
 import { BOSS_REWARD_RESOURCES, bossImage } from "@/lib/game/bosses";
+import { cityFullName, cityName } from "@/lib/game/cities";
 import { RESOURCE_META } from "@/lib/game/constants";
 import { BossAttackButton } from "@/components/game/BossAttackButton";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
@@ -125,9 +126,13 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               <span className="rounded-full border border-red-500/50 bg-red-950/50 px-2 py-0.5 text-[10px] font-black uppercase tracking-widest text-red-300">
                 אויב על
               </span>
-              <span className="rounded-md border border-[rgb(var(--boss-accent))]/60 bg-black/60 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-[rgb(var(--boss-accent))]">
-                עיר {cities}
-              </span>
+              {/* The tyrant is named, so the city he rules is named too — the
+                  number stays in the tooltip, where the tier still matters. */}
+              <Tip tip={`${boss.name} שולט ב${cityFullName(cities)} — עיר מספר ${cities}.`}>
+                <span className="cursor-help rounded-md border border-[rgb(var(--boss-accent))]/60 bg-black/60 px-2 py-0.5 text-[10px] font-black tracking-[0.1em] text-[rgb(var(--boss-accent))]">
+                  עיר {cityName(cities)}
+                </span>
+              </Tip>
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { cityFullName, cityName } from "@/lib/game/cities";
 
 /**
  * The empire's cities, drawn as a skyline instead of a row of icons.
@@ -34,7 +35,7 @@ export function CitySkyline({ cities, maxCities }: CitySkylineProps) {
     <div
       className="skyline"
       role="img"
-      aria-label={`הממלכה שלך — ${cities} ערים מתוך ${maxCities}`}
+      aria-label={`הממלכה שלך — ${cities} ערים מתוך ${maxCities}, ומושבך ב${cityName(cities)}`}
     >
       <span className="skyline-moon" aria-hidden />
       <span className="skyline-stars" aria-hidden>
@@ -56,7 +57,7 @@ export function CitySkyline({ cities, maxCities }: CitySkylineProps) {
               key={i}
               className={`skyline-tower${held ? " skyline-held" : ""}`}
               style={{ "--h": `${height}%`, "--i": i } as CSSProperties}
-              title={`עיר ${i + 1}`}
+              title={`${i + 1}. ${cityFullName(i + 1)}`}
             >
               <span className="skyline-roof" />
               <span className="skyline-windows" />
@@ -68,7 +69,10 @@ export function CitySkyline({ cities, maxCities }: CitySkylineProps) {
 
       <span className="skyline-ground" aria-hidden />
 
+      {/* The plate used to count towers only. The lead line is now the city the
+          player actually sits in — the towers behind it already do the counting. */}
       <p className="skyline-plate">
+        {cityName(cities)} ·{" "}
         <span className="nums" dir="ltr">
           {cities} / {maxCities}
         </span>{" "}

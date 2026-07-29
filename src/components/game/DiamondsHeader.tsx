@@ -1,6 +1,20 @@
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
+
+/**
+ * Flecks of light off the cut stone. Fixed positions and delays, like every
+ * other scene on the site, so the server and the first client frame agree.
+ */
+const SPARKS = [
+  { x: "12%", y: "28%", d: "0s", dur: "6s" },
+  { x: "31%", y: "68%", d: "2.1s", dur: "7s" },
+  { x: "52%", y: "22%", d: "3.4s", dur: "6.5s" },
+  { x: "68%", y: "74%", d: "1.2s", dur: "7.5s" },
+  { x: "84%", y: "36%", d: "4.3s", dur: "6.2s" },
+  { x: "93%", y: "66%", d: "2.7s", dur: "8s" },
+];
 
 /**
  * Shared header for the two diamond screens — the balance on one side and a
@@ -8,6 +22,11 @@ import { formatNumber } from "@/lib/game/format";
  * (/game/diamonds/buy) on the other. Both pages render it so the player always
  * sees the balance and can hop between the screens without a stray link
  * dangling at the bottom of the page.
+ *
+ * It is also the one element both screens share, so the vault scene lives
+ * here: a cut stone turning on its axis, a wheel of light off its facets and
+ * sparks in the air. Cold blues, deliberately — everything else in IMPERIUM
+ * is gold and firelight, and diamonds are the one currency you cannot mine.
  */
 export function DiamondsHeader({
   diamonds,
@@ -20,31 +39,46 @@ export function DiamondsHeader({
   note?: string;
 }) {
   return (
-    <div className="panel-gold rounded-2xl px-4 py-3.5">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        {/* balance */}
-        <div className="flex items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-500/10">
-            <Icon name="diamond" size={24} className="text-cyan-300" />
-          </span>
-          <div className="leading-none">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-500">
-              היתרה שלך
-            </p>
-            <p className="nums mt-1.5 text-2xl font-black text-sky-300" dir="ltr">
-              {formatNumber(diamonds)}
-            </p>
+    <div className="panel-gold dia-vault rounded-2xl px-4 py-3.5">
+      <span className="dia-rays" aria-hidden />
+      <span className="dia-gem" aria-hidden />
+      <span className="dia-sparks" aria-hidden>
+        {SPARKS.map((spark) => (
+          <span
+            key={spark.x}
+            style={
+              { "--x": spark.x, "--y": spark.y, "--d": spark.d, "--dur": spark.dur } as CSSProperties
+            }
+          />
+        ))}
+      </span>
+
+      <div className="dia-body">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+          {/* balance */}
+          <div className="flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-cyan-400/30 bg-cyan-500/10">
+              <Icon name="diamond" size={24} className="text-cyan-300" />
+            </span>
+            <div className="leading-none">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-500">
+                היתרה שלך
+              </p>
+              <p className="nums dia-balance mt-1.5 text-2xl font-black text-sky-300" dir="ltr">
+                {formatNumber(diamonds)}
+              </p>
+            </div>
           </div>
+
+          {/* spend / buy switch */}
+          <nav className="flex gap-1 rounded-xl border border-border-subtle bg-panel-inset p-1">
+            <Tab href="/game/diamonds" icon="shop" label="הוצאת יהלומים" active={active === "spend"} />
+            <Tab href="/game/diamonds/buy" icon="gift" label="רכישת יהלומים" active={active === "buy"} />
+          </nav>
         </div>
 
-        {/* spend / buy switch */}
-        <nav className="flex gap-1 rounded-xl border border-border-subtle bg-panel-inset p-1">
-          <Tab href="/game/diamonds" icon="shop" label="הוצאת יהלומים" active={active === "spend"} />
-          <Tab href="/game/diamonds/buy" icon="gift" label="רכישת יהלומים" active={active === "buy"} />
-        </nav>
+        {note && <p className="mt-3 text-xs leading-relaxed text-zinc-400">{note}</p>}
       </div>
-
-      {note && <p className="mt-3 text-xs leading-relaxed text-zinc-400">{note}</p>}
     </div>
   );
 }

@@ -16,20 +16,23 @@ export function WheelCard({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className="panel-gold flex flex-col items-center justify-center gap-3 rounded-xl p-5 text-center">
-        <span className="relative text-4xl">
-          <Icon name="wheel" size={40} className="text-crimson-bright" />
+      {/* Laid out as a band, not a tower: it shares a row with the season
+          announcement, and a 200px-tall column beside a two-line banner left a
+          dead strip across the width of the screen. */}
+      <div className="panel-gold flex h-full items-center justify-between gap-4 rounded-xl px-4 py-3">
+        <span className="relative shrink-0">
+          <Icon name="wheel" size={32} className="text-crimson-bright" />
           {spinsAvailable > 0 && (
             <span className="absolute -right-2 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white">
               {spinsAvailable}
             </span>
           )}
         </span>
-        <div>
-          <p className="font-black text-gold-bright">גלגל המזל</p>
-          <p className="text-xs text-zinc-400">נסה את מזלך!</p>
+        <div className="min-w-0">
+          <p className="text-sm font-black leading-tight text-gold-bright">גלגל המזל</p>
+          <p className="text-[11px] leading-tight text-zinc-400">נסה את מזלך!</p>
         </div>
-        <button onClick={() => setOpen(true)} className="btn btn-dark flex items-center gap-1 px-5 py-1.5 text-xs">
+        <button onClick={() => setOpen(true)} className="btn btn-dark flex shrink-0 items-center gap-1 px-4 py-1.5 text-xs">
           <Icon name="wheel" size={14} /> סובב
         </button>
       </div>

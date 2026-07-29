@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { formatNumber } from "@/lib/game/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -77,7 +77,7 @@ function num(value: number) {
 
 function NewPill() {
   return (
-    <span className="mr-2 inline-block rounded-full bg-red-500 px-1.5 py-px align-middle text-[9px] font-black text-white">
+    <span className="disp-new mr-2 inline-block rounded-full bg-red-500 px-1.5 py-px align-middle text-[9px] font-black text-white">
       חדש
     </span>
   );
@@ -154,10 +154,11 @@ export function ReportsTabs({
                   </td>
                 </tr>
               ) : (
-                battleRows.map((r) => (
+                battleRows.map((r, i) => (
                   <tr
                     key={r.id}
-                    className="border-b border-border-subtle align-top last:border-b-0"
+                    style={{ "--i": Math.min(i, 12) } as CSSProperties}
+                    className="disp-row border-b border-border-subtle align-top last:border-b-0"
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
                       {r.isNew && <NewPill />}
@@ -253,10 +254,11 @@ export function ReportsTabs({
                   </td>
                 </tr>
               ) : (
-                spyRows.map((r) => (
+                spyRows.map((r, i) => (
                   <tr
                     key={r.id}
-                    className="border-b border-border-subtle align-top last:border-b-0"
+                    style={{ "--i": Math.min(i, 12) } as CSSProperties}
+                    className="disp-row border-b border-border-subtle align-top last:border-b-0"
                   >
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-zinc-500">
                       {r.isNew && <NewPill />}

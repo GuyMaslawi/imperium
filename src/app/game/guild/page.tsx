@@ -1,3 +1,4 @@
+import type { CSSProperties, ReactNode } from "react";
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -32,6 +33,52 @@ export const metadata = { title: "הברית שלי | IMPERIUM" };
 /** How many guilds the recruitment browser lists. */
 const GUILD_BROWSE_LIMIT = 100;
 
+/**
+ * The hall at the top of both guild views: war banners on the wall, a hearth
+ * in the middle of the table and one pennant per seat the guild has bought.
+ *
+ * The seat row is the whole reason the scene is worth drawing — it is live
+ * data, not decoration. A lit pennant is a member, a dark one is a vacancy,
+ * and the brightest one is you. A player with no guild yet gets the same hall
+ * cold and empty, so the recruiting screen never looks like a hall he already
+ * owns.
+ */
+function GuildHall({
+  seats,
+  taken,
+  mySeat,
+  children,
+}: {
+  seats: number;
+  taken: number;
+  /** Index of the viewer's own seat, or -1 when he has no guild yet. */
+  mySeat: number;
+  children: ReactNode;
+}) {
+  return (
+    <div className={`panel-gold gd-hall rounded-2xl p-4${taken === 0 ? " is-empty" : ""}`}>
+      <span className="gd-banner gd-banner-r" aria-hidden />
+      <span className="gd-banner gd-banner-l" aria-hidden />
+      <span className="gd-hearth" aria-hidden />
+
+      <div className="gd-body text-center">
+        {children}
+        <div className="mt-3 flex items-end justify-center gap-1.5" aria-hidden>
+          {Array.from({ length: seats }).map((_, i) => (
+            <span
+              key={i}
+              className={`gd-seat${i < taken ? " is-taken" : ""}${
+                i === mySeat ? " is-me" : ""
+              }`}
+              style={{ "--i": i } as CSSProperties}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* -------- no guild yet: create + browse open guilds -------- */
 
 async function NoGuildView({ diamonds }: { diamonds: number }) {
@@ -51,81 +98,94 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
   });
 
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-2">
-      {/* -------- active recruitment (right in RTL) -------- */}
-      <div className="panel rounded-xl p-4">
-        <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="citizens" size={18} className="text-crimson" />
-          גיוס בריתות פעיל
-        </h2>
+    <>
+      {/* The same hall the members see, drawn at the size a fully upgraded
+          guild reaches and with every seat dark. */}
+      <GuildHall seats={guildCapacity(GUILD_CAPACITY_MAX_LEVEL)} taken={0} mySeat={-1}>
+        <p className="text-base font-bold tracking-wide text-gold-bright">
+          אין לך ברית
+        </p>
+        <p className="mt-1 text-xs text-zinc-400">
+          האולם ריק — הצטרף לברית קיימת או הקם אחת משלך.
+        </p>
+      </GuildHall>
 
-        {guilds.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">
-            עדיין אין בריתות בממלכה — היה הראשון להקים אחת!
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border-subtle text-right text-xs text-gold-dim">
-                  <th className="pb-2 pr-2 font-semibold">שם הברית</th>
-                  <th className="pb-2 font-semibold">מנהיג</th>
-                  <th className="pb-2 font-semibold">חברים</th>
-                  <th className="pb-2 pl-2 font-semibold">הצטרפות</th>
-                </tr>
-              </thead>
-              <tbody>
-                {guilds.map((guild) => {
-                  const capacity = guildCapacity(guild.capacityLevel);
-                  const memberCount = guild._count.members;
-                  return (
-                    <tr
-                      key={guild.id}
-                      className="border-b border-border-subtle last:border-0"
-                    >
-                      <td className="py-3 pr-2">
-                        <span className="font-semibold text-zinc-100">
-                          {guild.name}
-                        </span>
-                      </td>
-                      <td className="py-3 text-zinc-300">
-                        {guild.members[0]?.empire.name ?? "—"}
-                      </td>
-                      <td className="py-3">
-                        <span className="nums text-zinc-200" dir="ltr">
-                          {memberCount}/{capacity}
-                        </span>
-                      </td>
-                      <td className="py-3 pl-2">
-                        <GuildJoinButton
-                          guildId={guild.id}
-                          full={memberCount >= capacity}
-                        />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* -------- create guild (left in RTL) -------- */}
-      <div className="panel-gold relative rounded-xl p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <Icon name="base" size={18} className="text-crimson" />
-            יצירת ברית
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        {/* -------- active recruitment (right in RTL) -------- */}
+        <div className="panel rounded-xl p-4">
+          <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="citizens" size={18} className="text-crimson" />
+            גיוס בריתות פעיל
           </h2>
-          <span className="nums flex items-center gap-1 rounded-full border border-gold/50 bg-panel-inset px-3 py-1 text-sm font-bold text-sky-300">
-            <Icon name="diamond" size={14} className="text-cyan-300" /> {GUILD_CREATION_COST_DIAMONDS}
-          </span>
+
+          {guilds.length === 0 ? (
+            <p className="py-6 text-center text-sm text-zinc-500">
+              עדיין אין בריתות בממלכה — היה הראשון להקים אחת!
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-subtle text-right text-xs text-gold-dim">
+                    <th className="pb-2 pr-2 font-semibold">שם הברית</th>
+                    <th className="pb-2 font-semibold">מנהיג</th>
+                    <th className="pb-2 font-semibold">חברים</th>
+                    <th className="pb-2 pl-2 font-semibold">הצטרפות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {guilds.map((guild) => {
+                    const capacity = guildCapacity(guild.capacityLevel);
+                    const memberCount = guild._count.members;
+                    return (
+                      <tr
+                        key={guild.id}
+                        className="border-b border-border-subtle last:border-0"
+                      >
+                        <td className="py-3 pr-2">
+                          <span className="font-semibold text-zinc-100">
+                            {guild.name}
+                          </span>
+                        </td>
+                        <td className="py-3 text-zinc-300">
+                          {guild.members[0]?.empire.name ?? "—"}
+                        </td>
+                        <td className="py-3">
+                          <span className="nums text-zinc-200" dir="ltr">
+                            {memberCount}/{capacity}
+                          </span>
+                        </td>
+                        <td className="py-3 pl-2">
+                          <GuildJoinButton
+                            guildId={guild.id}
+                            full={memberCount >= capacity}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        <GuildCreateForm diamonds={diamonds} />
+        {/* -------- create guild (left in RTL) -------- */}
+        <div className="panel-gold relative rounded-xl p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+              <Icon name="base" size={18} className="text-crimson" />
+              יצירת ברית
+            </h2>
+            <span className="nums flex items-center gap-1 rounded-full border border-gold/50 bg-panel-inset px-3 py-1 text-sm font-bold text-sky-300">
+              <Icon name="diamond" size={14} className="text-cyan-300" /> {GUILD_CREATION_COST_DIAMONDS}
+            </span>
+          </div>
+
+          <GuildCreateForm diamonds={diamonds} />
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -199,6 +259,22 @@ export default async function GuildPage() {
         ornament={<Icon name="base" size={22} className="text-crimson" />}
       />
 
+      <GuildHall
+        seats={capacity}
+        taken={members.length}
+        mySeat={members.findIndex((m) => m.empireId === empire.id)}
+      >
+        <p className="text-base font-bold tracking-wide text-gold-bright">
+          אולם הברית
+        </p>
+        <p className="mt-1 text-xs text-zinc-400">
+          <span className="nums font-bold text-gold-bright" dir="ltr">
+            {members.length}/{capacity}
+          </span>{" "}
+          מושבים תפוסים סביב השולחן
+        </p>
+      </GuildHall>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-400">
           התפקיד שלך:{" "}
@@ -224,12 +300,13 @@ export default async function GuildPage() {
           </h2>
 
           <ul className="space-y-2">
-            {members.map((member) => {
+            {members.map((member, index) => {
               const roleMeta = GUILD_ROLE_META[member.role];
               return (
                 <li
                   key={member.id}
-                  className="panel-inset flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
+                  className="panel-inset gd-row flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
+                  style={{ "--i": index } as CSSProperties}
                 >
                   <span className="text-sm font-semibold text-zinc-100">
                     {member.empire.name}

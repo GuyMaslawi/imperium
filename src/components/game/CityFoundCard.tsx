@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { CITIZEN_GROWTH_LEVELS_PER_CITY } from "@/lib/game/constants";
+import { cityAt } from "@/lib/game/cities";
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -54,27 +55,37 @@ export function CityFoundCard({
         </span>
         <div>
           <h3 className="font-bold text-gold-bright">עליית עיר</h3>
+          {/* Named, not numbered: the card is the moment the player decides to
+              make the climb, and "אשמורן → תרשיש" is a destination in a way
+              that "3 → 4" never was. The tier stays alongside — it is what the
+              costs and the hero gate are keyed to. */}
           <p className="text-xs font-semibold text-gold">
-            רמת עיר{" "}
-            <span className="nums" dir="ltr">
-              {cities}
-            </span>{" "}
-            →{" "}
-            <span className="nums" dir="ltr">
-              {cities + 1}
-            </span>{" "}
-            (מקסימום{" "}
-            <span className="nums" dir="ltr">
-              {maxCities}
+            <span className="text-bone">{cityAt(cities).name}</span>
+            {!isMax && (
+              <>
+                {" → "}
+                <span className="text-bone">{cityAt(cities + 1).name}</span>
+              </>
+            )}{" "}
+            <span className="font-normal text-gold-dim">
+              (עיר{" "}
+              <span className="nums" dir="ltr">
+                {cities}
+              </span>{" "}
+              מתוך{" "}
+              <span className="nums" dir="ltr">
+                {maxCities}
+              </span>
+              )
             </span>
-            )
           </p>
         </div>
       </div>
 
       {isMax ? (
         <p className="text-sm text-zinc-400">
-          הגעת לרמת העיר המרבית. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.
+          הגעת ל<span className="font-bold text-bone">{cityAt(cities).name}</span> — העיר
+          האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.
         </p>
       ) : (
         <>

@@ -169,10 +169,12 @@ export default async function BasePage() {
       )}
 
       {/* announcement + wheel */}
-      <div className="grid items-start gap-4 lg:grid-cols-[1fr_220px]">
-        <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
+      {/* Both halves are the same short band — `auto` lets the wheel size to its
+          own content instead of holding a fixed 220px column open. */}
+      <div className="grid items-stretch gap-4 lg:grid-cols-[1fr_auto]">
+        <div className="relative flex items-center overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
           <span className="absolute inset-y-0 right-0 w-1 bg-gold" />
-          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3">
             <p className="flex items-center gap-2 text-sm">
               <span aria-hidden>📣</span>
               <span className="font-bold text-gold-bright">

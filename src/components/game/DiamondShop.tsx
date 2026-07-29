@@ -94,12 +94,15 @@ function ShopCard({
 }) {
   return (
     <div className="panel-inset flex h-full flex-col rounded-xl p-3.5 transition-colors hover:border-gold/30">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-start justify-between gap-2">
+        {/* The title wraps rather than truncates: in two columns on a phone
+            these cards are ~150px wide, and "תוספת זהב" clipped to "תוספת …"
+            makes all four boost cards read the same. */}
         <p className="flex min-w-0 items-center gap-2 text-sm font-bold text-zinc-100">
           <span className="shrink-0" aria-hidden>
             {icon}
           </span>
-          <span className="truncate">{title}</span>
+          <span className="min-w-0">{title}</span>
         </p>
         {badge}
       </div>

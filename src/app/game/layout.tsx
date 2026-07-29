@@ -17,6 +17,8 @@ import { UpdateTimers } from "@/components/game/UpdateTimers";
 import { SeasonPassButton } from "@/components/game/SeasonPass";
 import { Sidebar, MobileMenu, type SidebarProps } from "@/components/game/Sidebar";
 import { InboxNav } from "@/components/game/InboxNav";
+import { AdminNav } from "@/components/game/AdminNav";
+import { ImpersonationBanner } from "@/components/game/ImpersonationBanner";
 import { WarAlerts } from "@/components/game/WarAlerts";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
@@ -134,11 +136,12 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     heroQuestReady: finishedQuest > 0,
     inGuild: guildMembership !== null,
     guildWarLive,
-    isAdmin: admin,
   };
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Only ever rendered when an admin is signed in as this player. */}
+      <ImpersonationBanner empireName={empire.name} />
       {/* Live toasts for incoming attacks / spies / messages. */}
       <WarAlerts />
       <ResourceBar
@@ -159,6 +162,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
             collectableAchievements={collectableAchievements}
           />
         }
+        admin={admin ? <AdminNav /> : null}
       />
 
       <div

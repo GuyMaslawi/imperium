@@ -73,6 +73,55 @@ export function LabeledSelect({
   );
 }
 
+/**
+ * A yes/no field. A select rather than a checkbox so it round-trips through
+ * FormData like every other field here — an unchecked checkbox sends nothing,
+ * which reads identically to "field absent" on the server.
+ */
+export function LabeledBool({
+  label,
+  name,
+  defaultValue,
+  trueLabel = "כן",
+  falseLabel = "לא",
+}: {
+  label: string;
+  name: string;
+  defaultValue?: boolean;
+  trueLabel?: string;
+  falseLabel?: string;
+}) {
+  return (
+    <LabeledSelect
+      label={label}
+      name={name}
+      defaultValue={defaultValue ? "1" : "0"}
+      options={[
+        { value: "1", label: trueLabel },
+        { value: "0", label: falseLabel },
+      ]}
+    />
+  );
+}
+
+/** Read-only "label: value" line, for the state a panel is about to edit. */
+export function StatLine({
+  label,
+  value,
+  tone = "text-zinc-200",
+}: {
+  label: string;
+  value: ReactNode;
+  tone?: string;
+}) {
+  return (
+    <p className="flex items-baseline justify-between gap-3 text-xs">
+      <span className="text-zinc-500">{label}</span>
+      <span className={`font-bold ${tone}`}>{value}</span>
+    </p>
+  );
+}
+
 /** A framed sub-section inside an editor panel. */
 export function EditorSection({
   title,

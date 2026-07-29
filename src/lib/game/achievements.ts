@@ -1088,10 +1088,34 @@ export const GLORY_NAME: Record<string, string> = {
 /** The line under each name — the concrete mechanic, never a repeat of it. */
 export const GLORY_TAGLINE: Record<string, string> = {
   cities_10: "האימפריה המלאה, כל עשר הערים",
-  [`citizenup_${CITIZEN_GROWTH_500}`]: `שדרוג "קבלת אזרחים" ברמה ${CITIZEN_GROWTH_500}`,
+  [`citizenup_${CITIZEN_GROWTH_500}`]: 'שדרוג "קבלת מגויסים" עד 500 אזרחים בכל עדכון',
   herolvl_100: "הרמה האחרונה של הגיבור",
   minelvl_250: `ארבעת המכרות ברמה ${MINE_MAX_LEVEL}`,
   arsenal_90: `כל ${WEAPON_TOTAL} הדגמים במחסן`,
+};
+
+/**
+ * Capstones whose *condition* is measured in one unit and whose *meaning* is in
+ * another, with the translation between the two.
+ *
+ * The citizen capstone is the only one so far. Its condition has to be the
+ * upgrade level, because that is the stat the game stores — but level 96 is an
+ * implementation detail of `citizensPerDailyUpdate` (20 + 5×level), not
+ * something the player ever thinks in. The record is "500 citizens on every
+ * daily update", so the ring, the bar and the counter all read in citizens per
+ * update and the level is never shown.
+ *
+ * Only the *display* is remapped; `unlocked` and the record itself still come
+ * from the level condition, so nothing about who holds the record changes.
+ */
+const GLORY_DISPLAY: Record<
+  string,
+  { progress: (raw: number) => number; goal: number }
+> = {
+  [`citizenup_${CITIZEN_GROWTH_500}`]: {
+    progress: citizensPerDailyUpdate,
+    goal: 500,
+  },
 };
 
 /** Who holds a capstone's world record, as the board renders it. */
@@ -1145,9 +1169,16 @@ export function selectGlory(
     const item = byKey.get(key);
     if (!item) return [];
     const held = records.get(key);
+    const display = GLORY_DISPLAY[key];
     return [
       {
         ...item,
+        ...(display
+          ? {
+              progress: Math.min(display.goal, display.progress(item.progress)),
+              goal: display.goal,
+            }
+          : null),
         name: GLORY_NAME[key] ?? item.name,
         tagline: GLORY_TAGLINE[key] ?? item.hint,
         record: held

@@ -128,7 +128,11 @@ export default async function HeroPage() {
           same panel fills the blank half the meters used to leave behind, and
           puts loot one glance away from the sockets it goes into. */}
       <div className="panel relative rounded-2xl border border-border-gold-strong">
-        <div className="grid md:grid-cols-[minmax(0,290px)_1fr] xl:grid-cols-[minmax(0,280px)_minmax(0,1fr)_25rem]">
+        {/* The bag column (15 sockets + the belt) is the tallest thing in this
+            row, so the figure is sized to reach it — a 13/19 portrait at 26rem
+            lands within a hair of the bag's height instead of stopping a third
+            of the way up and leaving dead panel under it. */}
+        <div className="grid md:grid-cols-[minmax(0,290px)_1fr] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)_25rem]">
           {/* paperdoll (right in RTL) — the 9 pieces sit on the figure itself */}
           <div className="relative">
             <HeroPaperdoll
@@ -186,7 +190,10 @@ export default async function HeroPage() {
             </div>
           </div>
 
-          {/* identity + class bonuses + xp + point allocation (left in RTL) */}
+          {/* identity + class bonuses + xp + point allocation (left in RTL).
+              Whatever height the row settles on, the bars-and-points block
+              takes the slack (`flex-1`) rather than leaving it under the
+              buttons. */}
           <div className="flex flex-col gap-3.5 p-4 md:p-5">
             {/* identity — one compact line; the long class blurb is a tooltip */}
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
@@ -215,7 +222,7 @@ export default async function HeroPage() {
             {/* -------- bars, then the points right under them --------
                 One narrow column: health and xp on top, the three stat rows
                 below them, with the bag filling the space to their left. */}
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
+            <div className="grid flex-1 content-center gap-3 md:grid-cols-2 xl:grid-cols-1">
               {/* the two bars that move between battles */}
               <div className="flex flex-col justify-center gap-3">
                 <div>

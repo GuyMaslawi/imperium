@@ -5,12 +5,15 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type {
   BuildingType,
+  DiamondEffectKind,
   EmpireUpgradeType,
   GuildRole,
+  GuildSpellType,
   HeroItemSlot,
   HeroRarity,
   MessageKind,
   MiniGameType,
+  PotionKind,
   Prisma,
   ResourceStorageType,
   Role,
@@ -22,6 +25,11 @@ import { weaponByKey } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
 import { HERO_MAX_HEALTH } from "@/lib/game/hero";
+import { MAX_CITIES } from "@/lib/game/constants";
+import { POTION_STACK_CAP } from "@/lib/game/potions";
+import { SEASON_PASS_XP_MAX } from "@/lib/game/seasonPass";
+import { ACHIEVEMENT_BY_KEY, GLORY_KEYS } from "@/lib/game/achievements";
+import { lastDailyUpdate } from "@/lib/game/time";
 import {
   DEFAULT_TUNABLES,
   getTunables,
@@ -465,6 +473,13 @@ export async function updateEmpireCore(
         citizens: Math.max(0, Math.round(num(formData, "citizens"))),
         turns: Math.max(0, Math.round(num(formData, "turns"))),
         wheelSpins: Math.max(0, Math.round(num(formData, "wheelSpins"))),
+        // Cities gate the whole progression (citizen cap, quest tiers, the
+        // ranking bucket), so it is clamped to the real ladder rather than
+        // trusted from the form.
+        cities: Math.max(
+          1,
+          Math.min(MAX_CITIES, Math.round(num(formData, "cities")))
+        ),
       },
     });
     await logAdmin(admin, {
@@ -836,8 +851,183 @@ export async function deleteHeroItem(
   }
 }
 
-/** Remove an empire from its guild. */
-export async function removeFromGuild(
+/* ============================================================= */
+/*                    PER-PLAYER FULL CONTROL                    */
+/* ============================================================= */
+
+/**
+ * Everything below edits ONE player and completes the editor above: account
+ * security, the empire clocks, timed buffs, the ladders, the mailbox and the
+ * history tables. Same contract as every action in this file — `requireAdmin`,
+ * `assertTargetEditable`, an audit row, a revalidate.
+ *
+ * These write game state directly and deliberately skip the costs, cooldowns
+ * and capacity rules the player-facing paths enforce; that is the point of an
+ * admin console. Nothing here pays out a reward as a side effect either —
+ * granting an achievement marks it collected, it does not credit its prize.
+ */
+
+/** Read a boolean carried as a "1"/"0" select (the forms have no checkboxes). */
+function flag(formData: FormData, key: string): boolean {
+  const raw = String(formData.get(key) ?? "");
+  return raw === "1" || raw === "on" || raw === "true";
+}
+
+/**
+ * Read an optional "hours ago" field as an absolute instant; blank → null.
+ *
+ * The clock fields are entered as an age rather than a wall-clock time on
+ * purpose: a `datetime-local` value is a bare "YYYY-MM-DDTHH:mm" with no zone,
+ * so the browser means the admin's timezone and `new Date()` on the server
+ * would read it as the server's (UTC in production) — a silent three-hour slip
+ * on every edit. An offset from now means the same thing on both ends.
+ */
+function hoursAgo(formData: FormData, key: string): Date | null {
+  const raw = str(formData, key);
+  if (!raw) return null;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) throw new AdminError(`ערך לא תקין בשדה ${key}`);
+  return new Date(Date.now() - clampNum(n) * 3_600_000);
+}
+
+/** A future instant `minutes` from now, or null for a non-positive duration. */
+function inMinutes(minutes: number): Date | null {
+  if (minutes <= 0) return null;
+  return new Date(Date.now() + minutes * 60_000);
+}
+
+/* ------------------------- account security ------------------------- */
+
+/** Mark the address verified, or revoke the verification (re-gates the game). */
+export async function toggleEmailVerified(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true, email: true },
+    });
+    if (!user) return { error: "המשתמש לא נמצא" };
+
+    const verify = user.emailVerified == null;
+    await prisma.user.update({
+      where: { id: userId },
+      data: { emailVerified: verify ? new Date() : null },
+    });
+    await logAdmin(admin, {
+      action: verify ? "user.verify_email" : "user.unverify_email",
+      targetType: "user",
+      targetId: userId,
+      summary: `${verify ? "אומת" : "בוטל אימות"} האימייל ${user.email}`,
+    });
+    revalidateEmpire(userId);
+    return { success: verify ? "האימייל סומן כמאומת" : "אימות האימייל בוטל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Clear a login lockout (failed-attempt counter + lock window). */
+export async function clearLoginLock(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { failedLogins: 0, lockedUntil: null },
+    });
+    await logAdmin(admin, {
+      action: "user.clear_lock",
+      targetType: "user",
+      targetId: userId,
+      summary: "נעילת ההתחברות נוקתה",
+    });
+    revalidateEmpire(userId);
+    return { success: "הנעילה הוסרה — המשתמש יכול להתחבר שוב" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Revoke every live session of a user (bumps the token version). */
+export async function forceLogoutUser(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId });
+    await prisma.user.update({
+      where: { id: userId },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    await logAdmin(admin, {
+      action: "user.force_logout",
+      targetType: "user",
+      targetId: userId,
+      summary: "כל החיבורים של המשתמש נותקו",
+    });
+    revalidateEmpire(userId);
+    return { success: "כל ההתחברויות הקיימות נותקו" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Unlink the Google identity from an account.
+ *
+ * Refused while the account has no password, because Google is then the only
+ * way in and unlinking would lock the player out of their own empire.
+ */
+export async function unlinkGoogleAccount(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId });
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { googleId: true, passwordHash: true },
+    });
+    if (!user) return { error: "המשתמש לא נמצא" };
+    if (!user.googleId) return { error: "לחשבון אין חיבור לגוגל" };
+    if (!user.passwordHash) {
+      return { error: "אין סיסמה לחשבון — קבע סיסמה לפני ניתוק גוגל" };
+    }
+
+    await prisma.user.update({ where: { id: userId }, data: { googleId: null } });
+    await logAdmin(admin, {
+      action: "user.unlink_google",
+      targetType: "user",
+      targetId: userId,
+      summary: "החיבור לגוגל נותק",
+    });
+    revalidateEmpire(userId);
+    return { success: "החיבור לגוגל נותק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------- empire clocks / season ------------------------- */
+
+/**
+ * Newbie/raid protection: set it a number of hours out, or clear it so the
+ * empire becomes attackable immediately.
+ */
+export async function updateEmpireProtection(
   _prev: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
@@ -845,16 +1035,801 @@ export async function removeFromGuild(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
-    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
-    await prisma.guildMember.deleteMany({ where: { empireId } });
+    await assertTargetEditable(admin, { userId, empireId });
+    const hours = optNum(formData, "hours", 0);
+    const protectedUntil = inMinutes(hours * 60);
+
+    await prisma.empire.update({ where: { id: empireId }, data: { protectedUntil } });
     await logAdmin(admin, {
-      action: "empire.guild_remove",
+      action: "empire.protection",
       targetType: "empire",
       targetId: empireId,
-      summary: "הוסר מהברית",
+      summary: protectedUntil
+        ? `הגנה נקבעה ל-${hours} שעות`
+        : "ההגנה הוסרה",
     });
     revalidateEmpire(userId);
-    return { success: "האימפריה הוסרה מהברית" };
+    return { success: protectedUntil ? "ההגנה עודכנה" : "ההגנה הוסרה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * The two lazy game clocks plus the reports-seen marker.
+ *
+ * Winding `lastRegularUpdateAt` / `lastDailyUpdateAt` back is how an admin
+ * hands a player their pending ticks: `applyPendingUpdates` settles everything
+ * between the stored instant and now on their next page load.
+ */
+export async function updateEmpireClocks(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const lastRegularUpdateAt = hoursAgo(formData, "regularHoursAgo");
+    const lastDailyUpdateAt = hoursAgo(formData, "dailyHoursAgo");
+    const reportsSeenAt = hoursAgo(formData, "reportsHoursAgo");
+    if (!lastRegularUpdateAt && !lastDailyUpdateAt && !reportsSeenAt) {
+      return { error: "יש למלא לפחות שדה אחד" };
+    }
+
+    await prisma.empire.update({
+      where: { id: empireId },
+      data: {
+        ...(lastRegularUpdateAt ? { lastRegularUpdateAt } : {}),
+        ...(lastDailyUpdateAt ? { lastDailyUpdateAt } : {}),
+        ...(reportsSeenAt ? { reportsSeenAt } : {}),
+      },
+    });
+    await logAdmin(admin, {
+      action: "empire.clocks",
+      targetType: "empire",
+      targetId: empireId,
+      summary: "שעוני העדכון של האימפריה עודכנו",
+      details: {
+        lastRegularUpdateAt: lastRegularUpdateAt?.toISOString() ?? null,
+        lastDailyUpdateAt: lastDailyUpdateAt?.toISOString() ?? null,
+        reportsSeenAt: reportsSeenAt?.toISOString() ?? null,
+      },
+    });
+    revalidateEmpire(userId);
+    return { success: "השעונים עודכנו" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Move an empire to another season, or detach it from every season. */
+export async function setEmpireSeason(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const seasonId = str(formData, "seasonId");
+    if (seasonId) {
+      const season = await prisma.gameSeason.findUnique({
+        where: { id: seasonId },
+        select: { id: true },
+      });
+      if (!season) return { error: "העונה לא נמצאה" };
+    }
+
+    await prisma.empire.update({
+      where: { id: empireId },
+      data: { seasonId: seasonId || null },
+    });
+    await logAdmin(admin, {
+      action: "empire.season",
+      targetType: "empire",
+      targetId: empireId,
+      summary: seasonId ? `הועבר לעונה ${seasonId}` : "נותק מכל עונה",
+    });
+    revalidateEmpire(userId);
+    return { success: "שיוך העונה עודכן" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Re-derive the denormalised power columns from the army and arsenal.
+ * The repair tool for a ladder that looks wrong — see the note on
+ * `Empire.militaryPower`.
+ */
+export async function recomputeEmpirePower(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    await syncEmpirePower(prisma, empireId);
+    await logAdmin(admin, {
+      action: "empire.resync_power",
+      targetType: "empire",
+      targetId: empireId,
+      summary: "עוצמת האימפריה חושבה מחדש",
+    });
+    revalidateEmpire(userId);
+    return { success: "העוצמה חושבה מחדש" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Wipe a player back to a brand-new empire.
+ *
+ * Deleting the row and re-creating it is what makes this a true reset: every
+ * child table (reports, messages, hero, gear, potions, buffs, achievements,
+ * purchases history…) hangs off it with `onDelete: Cascade`, so anything a
+ * hand-written per-table reset forgot would survive. The account itself, its
+ * name and its season are kept.
+ */
+export async function resetEmpireProgress(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    if (str(formData, "confirm") !== "RESET") {
+      return { error: "יש להקליד RESET לאישור האיפוס" };
+    }
+
+    const empire = await prisma.empire.findUnique({
+      where: { id: empireId },
+      select: {
+        name: true,
+        userId: true,
+        seasonId: true,
+        hero: { select: { heroClass: true } },
+      },
+    });
+    if (!empire) return { error: "האימפריה לא נמצאה" };
+
+    const tunables = await getTunables();
+    // Delete and re-create in one transaction: the empire name is unique, so a
+    // create-before-delete would collide with the row it is replacing.
+    await prisma.$transaction(async (tx) => {
+      await tx.empire.delete({ where: { id: empireId } });
+      await tx.empire.create({
+        data: newEmpireData(
+          empire.userId,
+          empire.name,
+          empire.seasonId ?? undefined,
+          tunables.starting,
+          empire.hero?.heroClass ?? "WARLORD"
+        ),
+      });
+    });
+    await logAdmin(admin, {
+      action: "empire.reset",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `האימפריה ${empire.name} אופסה להתחלה חדשה`,
+    });
+    revalidateEmpire(userId);
+    return { success: "האימפריה אופסה להתחלה חדשה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------------ hero extras ------------------------------ */
+
+/** Edit an existing hero item in place (slot, level, rarity, equipped). */
+export async function updateHeroItem(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const itemId = str(formData, "itemId");
+    const userId = str(formData, "userId");
+    const item = await prisma.heroItem.findUnique({
+      where: { id: itemId },
+      select: { heroId: true, hero: { select: { empireId: true } } },
+    });
+    await assertTargetEditable(admin, { userId, empireId: item?.hero.empireId });
+    if (!item) return { error: "הפריט לא נמצא" };
+
+    const slot = slotSchema.parse(formData.get("slot")) as HeroItemSlot;
+    const rarity = raritySchema.parse(formData.get("rarity")) as HeroRarity;
+    const level = Math.max(1, Math.round(num(formData, "level")));
+    const equipped = flag(formData, "equipped");
+
+    await prisma.$transaction(async (tx) => {
+      // One item per slot may be worn, exactly as the paperdoll enforces.
+      if (equipped) {
+        await tx.heroItem.updateMany({
+          where: { heroId: item.heroId, slot, NOT: { id: itemId } },
+          data: { equipped: false },
+        });
+      }
+      await tx.heroItem.update({
+        where: { id: itemId },
+        data: { slot, level, rarity, equipped },
+      });
+    });
+    await logAdmin(admin, {
+      action: "empire.hero_item_update",
+      targetType: "heroItem",
+      targetId: itemId,
+      summary: `פריט גיבור עודכן: ${slot} ${rarity} רמה ${level}${equipped ? " (חבוש)" : ""}`,
+    });
+    revalidateEmpire(userId);
+    return { success: "הפריט עודכן" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * The hero's expedition: end it now so it can be collected, or cancel it
+ * outright. Cancelling refunds nothing — the turns were spent at departure.
+ */
+export async function manageHeroQuest(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const op = z.enum(["finish", "cancel"]).parse(formData.get("op"));
+
+    if (op === "cancel") {
+      const { count } = await prisma.heroQuest.deleteMany({ where: { empireId } });
+      if (count === 0) return { error: "הגיבור אינו במסע" };
+    } else {
+      const { count } = await prisma.heroQuest.updateMany({
+        where: { empireId },
+        data: { endsAt: new Date() },
+      });
+      if (count === 0) return { error: "הגיבור אינו במסע" };
+    }
+    await logAdmin(admin, {
+      action: `empire.hero_quest_${op}`,
+      targetType: "empire",
+      targetId: empireId,
+      summary: op === "cancel" ? "מסע הגיבור בוטל" : "מסע הגיבור הסתיים מיידית",
+    });
+    revalidateEmpire(userId);
+    return { success: op === "cancel" ? "המסע בוטל" : "המסע הסתיים — ניתן לאיסוף" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------------- potions ------------------------------- */
+
+const potionKindSchema = z.enum([
+  "DOUBLE_XP",
+  "DOUBLE_RESOURCES",
+  "HERO_INVULNERABLE",
+  "FORGE_DISCOUNT",
+]);
+
+/** Set how many sealed bottles of one brew sit on the belt (0 removes them). */
+export async function setPotionStack(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = potionKindSchema.parse(formData.get("kind")) as PotionKind;
+    const count = Math.max(0, Math.min(POTION_STACK_CAP, Math.round(num(formData, "count"))));
+
+    await prisma.potionStack.upsert({
+      where: { empireId_kind: { empireId, kind } },
+      create: { empireId, kind, count },
+      update: { count },
+    });
+    await logAdmin(admin, {
+      action: "empire.potion_stack",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `שיקוי ${kind} → ${count} בקבוקים`,
+    });
+    revalidateEmpire(userId);
+    return { success: "מלאי השיקויים עודכן" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Start (or stop) a running potion effect. 0 minutes clears it. */
+export async function setPotionEffect(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = potionKindSchema.parse(formData.get("kind")) as PotionKind;
+    const minutes = Math.round(optNum(formData, "minutes", 0));
+    const expiresAt = inMinutes(minutes);
+
+    if (!expiresAt) {
+      await prisma.potionEffect.deleteMany({ where: { empireId, kind } });
+    } else {
+      await prisma.potionEffect.upsert({
+        where: { empireId_kind: { empireId, kind } },
+        create: { empireId, kind, expiresAt },
+        update: { expiresAt },
+      });
+    }
+    await logAdmin(admin, {
+      action: "empire.potion_effect",
+      targetType: "empire",
+      targetId: empireId,
+      summary: expiresAt ? `אפקט ${kind} פעיל ל-${minutes} דקות` : `אפקט ${kind} בוטל`,
+    });
+    revalidateEmpire(userId);
+    return { success: expiresAt ? "האפקט הופעל" : "האפקט בוטל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* -------------------- diamond effects / raid shields -------------------- */
+
+const diamondEffectKindSchema = z.enum([
+  "RESOURCE_BOOST_GOLD",
+  "RESOURCE_BOOST_WOOD",
+  "RESOURCE_BOOST_IRON",
+  "RESOURCE_BOOST_STONE",
+  "SHOP_DISCOUNT",
+  "BANK_INTEREST",
+  "TURN_PACK_1",
+  "TURN_PACK_2",
+  "TURN_PACK_3",
+  "TURN_PACK_4",
+  "SHIELD_RESOURCES",
+  "SHIELD_SOLDIERS",
+]);
+
+/**
+ * Grant, retune or clear one diamond effect — a production boost, a shop
+ * discount, a turn-pack cooldown or a raid shield.
+ *
+ * `activeUntil` and `readyAt` are the two independent axes the model carries:
+ * a buff runs until the first, a cooldown-only spell (bank interest, the turn
+ * packs) is usable again at the second. Blank/0 in either means "none", and
+ * clearing both deletes the row.
+ */
+export async function setDiamondEffect(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = diamondEffectKindSchema.parse(formData.get("kind")) as DiamondEffectKind;
+    const magnitude = Math.max(0, optNum(formData, "magnitude", 0));
+    const activeUntil = inMinutes(Math.round(optNum(formData, "activeMinutes", 0)));
+    const readyAt = inMinutes(Math.round(optNum(formData, "cooldownMinutes", 0)));
+
+    if (!activeUntil && !readyAt && magnitude <= 0) {
+      await prisma.diamondEffect.deleteMany({ where: { empireId, kind } });
+      await logAdmin(admin, {
+        action: "empire.diamond_effect_clear",
+        targetType: "empire",
+        targetId: empireId,
+        summary: `אפקט יהלומים ${kind} בוטל`,
+      });
+      revalidateEmpire(userId);
+      return { success: "האפקט בוטל" };
+    }
+
+    await prisma.diamondEffect.upsert({
+      where: { empireId_kind: { empireId, kind } },
+      create: { empireId, kind, magnitude, activeUntil, readyAt },
+      update: { magnitude, activeUntil, readyAt },
+    });
+    await logAdmin(admin, {
+      action: "empire.diamond_effect",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `אפקט יהלומים ${kind} (${magnitude}%) עודכן`,
+      details: {
+        activeUntil: activeUntil?.toISOString() ?? null,
+        readyAt: readyAt?.toISOString() ?? null,
+      },
+    });
+    revalidateEmpire(userId);
+    return { success: "האפקט עודכן" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+const guildSpellSchema = z.enum(["ATTACK", "DEFENSE", "SPY", "RESOURCES"]);
+
+/** Cast (or extend) a guild spell buff on this empire without a guild. */
+export async function grantGuildBuff(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const type = guildSpellSchema.parse(formData.get("type")) as GuildSpellType;
+    const bonusPct = Math.max(0, optNum(formData, "bonusPct", 0));
+    const hours = Math.max(0, optNum(formData, "hours", 0));
+    const expiresAt = inMinutes(hours * 60);
+    if (!expiresAt) return { error: "יש להזין משך בשעות" };
+
+    // The buff table is append-only by design (each cast is its own row and
+    // readers take the live ones), so replace this type rather than stack it.
+    await prisma.$transaction(async (tx) => {
+      await tx.guildSpellBuff.deleteMany({ where: { empireId, type } });
+      await tx.guildSpellBuff.create({ data: { empireId, type, bonusPct, expiresAt } });
+    });
+    await logAdmin(admin, {
+      action: "empire.guild_buff",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `קסם ברית ${type} ${bonusPct}% ל-${hours} שעות`,
+    });
+    revalidateEmpire(userId);
+    return { success: "הקסם הוענק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Strip every guild spell buff from this empire. */
+export async function clearGuildBuffs(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const { count } = await prisma.guildSpellBuff.deleteMany({ where: { empireId } });
+    await logAdmin(admin, {
+      action: "empire.guild_buffs_clear",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `הוסרו ${count} קסמי ברית`,
+    });
+    revalidateEmpire(userId);
+    return { success: `הוסרו ${count} קסמים` };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------- guild membership ------------------------- */
+
+/**
+ * Put the empire in a guild (or move it), with a role — an empty guild means
+ * "remove". Guild capacity is deliberately not checked: this is the override
+ * that fixes a guild the capacity rule has painted into a corner.
+ */
+export async function setGuildMembership(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const guildId = str(formData, "guildId");
+    const role = guildRoleSchema.parse(formData.get("role")) as GuildRole;
+
+    if (!guildId) {
+      await prisma.guildMember.deleteMany({ where: { empireId } });
+      await logAdmin(admin, {
+        action: "empire.guild_remove",
+        targetType: "empire",
+        targetId: empireId,
+        summary: "הוסר מהברית",
+      });
+      revalidateEmpire(userId);
+      return { success: "האימפריה הוסרה מהברית" };
+    }
+
+    const guild = await prisma.guild.findUnique({
+      where: { id: guildId },
+      select: { name: true },
+    });
+    if (!guild) return { error: "הברית לא נמצאה" };
+
+    await prisma.guildMember.upsert({
+      where: { empireId },
+      create: { empireId, guildId, role },
+      update: { guildId, role },
+    });
+    await logAdmin(admin, {
+      action: "empire.guild_set",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `שויך לברית ${guild.name} בתפקיד ${role}`,
+    });
+    revalidateEmpire(userId);
+    return { success: `האימפריה שויכה לברית ${guild.name}` };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------------ season pass ------------------------------ */
+
+/** Set the pass track, its XP, and optionally wipe this cycle's claims. */
+export async function updateSeasonPass(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const premium = flag(formData, "premium");
+    const xp = Math.max(0, Math.min(SEASON_PASS_XP_MAX, Math.round(num(formData, "xp"))));
+    const clearClaims = flag(formData, "clearClaims");
+
+    const activeSeason = await prisma.gameSeason.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+    });
+    const data = {
+      premium,
+      premiumAt: premium ? new Date() : null,
+      xp,
+      ...(clearClaims ? { claimedFree: [], claimedPremium: [] } : {}),
+    };
+    await prisma.seasonPassProgress.upsert({
+      where: { empireId },
+      create: {
+        empireId,
+        seasonId: activeSeason?.id ?? null,
+        cycleStartedAt: lastDailyUpdate(new Date()),
+        ...data,
+        claimedFree: [],
+        claimedPremium: [],
+      },
+      update: data,
+    });
+    await logAdmin(admin, {
+      action: "empire.season_pass",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `דרך התהילה: ${premium ? "פרימיום" : "חינם"}, ${xp} XP${clearClaims ? ", האיסופים אופסו" : ""}`,
+    });
+    revalidateEmpire(userId);
+    return { success: "דרך התהילה עודכנה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* --------------------- achievements / world records --------------------- */
+
+/**
+ * Mark an achievement collected, or take it back.
+ *
+ * Granting writes the receipt only — it does not pay the prize, so use the
+ * gift panel if the player is meant to receive the reward too.
+ */
+export async function toggleAchievement(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const key = str(formData, "key", 100);
+    if (!ACHIEVEMENT_BY_KEY.has(key)) return { error: "הישג לא קיים בקטלוג" };
+    const grant = flag(formData, "grant");
+
+    if (grant) {
+      await prisma.empireAchievement.upsert({
+        where: { empireId_key: { empireId, key } },
+        create: { empireId, key },
+        update: {},
+      });
+    } else {
+      await prisma.empireAchievement.deleteMany({ where: { empireId, key } });
+    }
+    await logAdmin(admin, {
+      action: grant ? "empire.achievement_grant" : "empire.achievement_revoke",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `${grant ? "הוענק" : "בוטל"} הישג ${key}`,
+    });
+    revalidateEmpire(userId);
+    return { success: grant ? "ההישג סומן כנאסף" : "ההישג בוטל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Stamp (or remove) a world-record decoration for this empire. */
+export async function toggleGloryAward(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const key = str(formData, "key", 100);
+    if (!GLORY_KEYS.includes(key)) return { error: "שיא לא קיים" };
+    const grant = flag(formData, "grant");
+
+    if (grant) {
+      await prisma.empireGloryAward.upsert({
+        where: { empireId_key: { empireId, key } },
+        create: { empireId, key },
+        update: {},
+      });
+    } else {
+      await prisma.empireGloryAward.deleteMany({ where: { empireId, key } });
+    }
+    await logAdmin(admin, {
+      action: grant ? "empire.glory_grant" : "empire.glory_revoke",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `${grant ? "הוענק" : "בוטל"} שיא ${key}`,
+    });
+    revalidateEmpire(userId);
+    return { success: grant ? "השיא הוענק" : "השיא בוטל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* --------------------------- inbox / history --------------------------- */
+
+/** Delete a single message from a player's inbox. */
+export async function deletePlayerMessage(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const messageId = str(formData, "messageId");
+    const userId = str(formData, "userId");
+    // The message id is the real subject — resolve the owner from it rather
+    // than trusting the userId the form carries for revalidation.
+    const message = await prisma.message.findUnique({
+      where: { id: messageId },
+      select: { empireId: true },
+    });
+    await assertTargetEditable(admin, { userId, empireId: message?.empireId });
+    if (!message) return { error: "ההודעה לא נמצאה" };
+
+    await prisma.message.delete({ where: { id: messageId } });
+    await logAdmin(admin, {
+      action: "empire.message_delete",
+      targetType: "message",
+      targetId: messageId,
+      summary: "הודעה נמחקה מתיבת השחקן",
+    });
+    revalidateEmpire(userId);
+    return { success: "ההודעה נמחקה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Bulk inbox operations: mark everything read, or empty the inbox. */
+export async function manageInbox(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const op = z.enum(["read_all", "clear"]).parse(formData.get("op"));
+
+    const count =
+      op === "clear"
+        ? (await prisma.message.deleteMany({ where: { empireId } })).count
+        : (
+            await prisma.message.updateMany({
+              where: { empireId, readAt: null },
+              data: { readAt: new Date() },
+            })
+          ).count;
+    await logAdmin(admin, {
+      action: op === "clear" ? "empire.inbox_clear" : "empire.inbox_read_all",
+      targetType: "empire",
+      targetId: empireId,
+      summary: op === "clear" ? `נמחקו ${count} הודעות` : `${count} הודעות סומנו כנקראו`,
+    });
+    revalidateEmpire(userId);
+    return {
+      success: op === "clear" ? `נמחקו ${count} הודעות` : `${count} הודעות סומנו כנקראו`,
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Erase this empire's history: battle reports, spy reports or boss fights.
+ *
+ * Reports are two-sided, so both directions go — a report the admin left on the
+ * other side would still show the deleted history from the opponent's screen.
+ * Achievements read these tables, so wiping them lowers derived progress.
+ */
+export async function clearEmpireHistory(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const what = z.enum(["battle", "spy", "boss", "all"]).parse(formData.get("what"));
+
+    let count = 0;
+    if (what === "battle" || what === "all") {
+      count += (
+        await prisma.battleReport.deleteMany({
+          where: {
+            OR: [{ attackerEmpireId: empireId }, { defenderEmpireId: empireId }],
+          },
+        })
+      ).count;
+    }
+    if (what === "spy" || what === "all") {
+      count += (
+        await prisma.spyReport.deleteMany({
+          where: {
+            OR: [{ attackerEmpireId: empireId }, { defenderEmpireId: empireId }],
+          },
+        })
+      ).count;
+    }
+    if (what === "boss" || what === "all") {
+      count += (await prisma.bossFight.deleteMany({ where: { empireId } })).count;
+    }
+    await logAdmin(admin, {
+      action: "empire.history_clear",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `נמחקו ${count} רשומות היסטוריה (${what})`,
+    });
+    revalidateEmpire(userId);
+    return { success: `נמחקו ${count} רשומות` };
   } catch (e) {
     return toErr(e);
   }

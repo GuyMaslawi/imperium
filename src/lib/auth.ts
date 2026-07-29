@@ -66,6 +66,77 @@ export async function destroySession(): Promise<void> {
   cookieStore.delete(SESSION_COOKIE);
 }
 
+/* --------------------------- impersonation --------------------------- */
+
+/**
+ * The admin's way back out of a player's account.
+ *
+ * "Sign in as this player" replaces the admin's session cookie with the
+ * player's, so without something else on the request there is nothing left to
+ * say who was there before — the admin would have to log in again, and any page
+ * showing "you are impersonating" would have no source of truth.
+ *
+ * The ticket is a *signed* JWT rather than a plain "admin id" cookie precisely
+ * because it grants a session for the id it names: an unsigned one would be a
+ * one-line privilege escalation for anyone who can set a cookie. It carries the
+ * admin's `tokenVersion` for the same reason the session does, so a password
+ * reset (or a ban) during the impersonation invalidates the way back too.
+ */
+const IMPERSONATION_COOKIE = "imperium_admin_return";
+/** Short-lived on purpose: an impersonation is a task, not a mode to live in. */
+const IMPERSONATION_DURATION_SECONDS = 60 * 60 * 4; // 4 hours
+
+export async function setImpersonationReturn(
+  adminUserId: string,
+  tokenVersion: number
+): Promise<void> {
+  const token = await new SignJWT({ sub: adminUserId, ver: tokenVersion, imp: true })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime(`${IMPERSONATION_DURATION_SECONDS}s`)
+    .sign(secretKey());
+
+  const cookieStore = await cookies();
+  cookieStore.set(IMPERSONATION_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: IMPERSONATION_DURATION_SECONDS,
+  });
+}
+
+/** The parked admin session, or null when this is an ordinary player visit. */
+export const readImpersonationReturn = cache(
+  async (): Promise<{ userId: string; tokenVersion: number } | null> => {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(IMPERSONATION_COOKIE)?.value;
+    if (!token) return null;
+    try {
+      const { payload } = await jwtVerify(token, secretKey(), {
+        algorithms: ["HS256"],
+      });
+      // `imp` keeps a stolen/copied *session* token from being replayed here as
+      // a return ticket: the two are signed with the same key, so the claim is
+      // what separates them.
+      if (payload.imp !== true) return null;
+      const userId = typeof payload.sub === "string" ? payload.sub : null;
+      if (!userId) return null;
+      return {
+        userId,
+        tokenVersion: typeof payload.ver === "number" ? payload.ver : 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+);
+
+export async function clearImpersonationReturn(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(IMPERSONATION_COOKIE);
+}
+
 export const getSessionUserId = cache(async (): Promise<string | null> => {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;

@@ -139,6 +139,7 @@ export default async function LeaderboardsPage({
           unit={<Icon name="mine" size={13} className="inline-block align-middle" />}
           rows={boards.slaves}
           myEmpireId={myEmpire.id}
+          hideValue
         />
         <Board
           title="הבנק הגדול ביותר"

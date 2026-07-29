@@ -147,21 +147,24 @@ export default async function BattleResultPage({
       </div>
 
       {/* -------- VS banner -------- */}
-      <div className="relative overflow-hidden rounded-xl border border-border-gold/40 bg-gradient-to-b from-[#1a1210] to-[#0c0908] p-6">
-        <div className="flex items-center justify-between gap-4">
+      <div className="relative overflow-hidden rounded-xl border border-border-gold/40 bg-gradient-to-b from-[#1a1210] to-[#0c0908] p-4 sm:p-6">
+        {/* The banner clips its overflow, so the two name columns have to be
+            allowed to shrink (min-w-0) and wrap: a phone leaves them ~90px
+            each, and an empire name is routinely wider than that. */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
           {/* my side */}
-          <div className="flex flex-1 flex-col items-center gap-2 text-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-emerald-500/50 bg-gradient-to-b from-emerald-900/30 to-black text-4xl shadow-[0_0_30px_-8px_rgba(52,211,153,0.5)]">
               <Icon name="hero" size={36} className="text-emerald-300" />
             </div>
-            <p className="font-black text-emerald-300">{myName}</p>
+            <p className="w-full break-words font-black text-emerald-300">{myName}</p>
             <p className="text-[11px] text-zinc-500">{iAmAttacker ? "תוקף" : "מגן"}</p>
           </div>
 
           {/* verdict */}
-          <div className="flex flex-col items-center">
+          <div className="flex shrink-0 flex-col items-center">
             <p
-              className={`text-4xl font-black ${
+              className={`text-3xl font-black sm:text-4xl ${
                 iWon ? "text-emerald-400" : "text-red-500"
               }`}
               style={{ textShadow: "0 2px 18px rgba(0,0,0,0.8)" }}
@@ -172,11 +175,11 @@ export default async function BattleResultPage({
           </div>
 
           {/* foe side */}
-          <div className="flex flex-1 flex-col items-center gap-2 text-center">
+          <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
             <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-red-500/50 bg-gradient-to-b from-red-950/40 to-black text-4xl shadow-[0_0_30px_-8px_rgba(239,68,68,0.5)]">
               <Icon name="crown" size={36} className="text-red-300" />
             </div>
-            <p className="font-black text-red-300">{foe.name}</p>
+            <p className="w-full break-words font-black text-red-300">{foe.name}</p>
             <p className="text-[11px] text-zinc-500">{iAmAttacker ? "מגן" : "תוקף"}</p>
           </div>
         </div>

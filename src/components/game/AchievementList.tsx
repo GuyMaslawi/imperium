@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { useAfterFirstPaint } from "@/components/ui/motion";
 import { claimAchievements } from "@/server/actions/achievements";
 import {
   ACHIEVEMENT_CATEGORIES,
@@ -228,6 +229,9 @@ export function AchievementList({ state }: { state: AchievementsState }) {
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<AchievementCategory | "all">("all");
   const [pending, startTransition] = useTransition();
+  // The completion bar grows into place from empty on the first paint rather
+  // than appearing already filled — the ladder's one bit of ceremony.
+  const painted = useAfterFirstPaint();
 
   // No local copy of the ladder: `claimAchievements` calls revalidatePath, and
   // the transition stays pending until that re-render lands, so `state` is
@@ -284,10 +288,10 @@ export function AchievementList({ state }: { state: AchievementsState }) {
             {donePct}%
           </span>
         </div>
-        <div className="relative mt-1.5 h-2.5 overflow-hidden rounded-full border border-gold/30 bg-black/50">
+        <div className="tro-bar relative mt-1.5 h-2.5 overflow-hidden rounded-full border border-gold/30 bg-black/50">
           <span
-            className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-gold to-gold-bright transition-[width] duration-500"
-            style={{ width: `${donePct}%` }}
+            className="absolute inset-y-0 right-0 rounded-full bg-gradient-to-l from-gold to-gold-bright"
+            style={{ width: painted ? `${donePct}%` : 0 }}
           />
         </div>
       </div>
@@ -354,8 +358,17 @@ export function AchievementList({ state }: { state: AchievementsState }) {
         <p className="py-6 text-center text-xs text-zinc-500">אין הישגים בקטגוריה הזו</p>
       ) : (
         <div className="grid gap-2.5 lg:grid-cols-2">
-          {visible.map((a) => (
-            <Card key={a.key} item={a} />
+          {/* The stagger is capped at the first screenful: the ladder runs to
+              dozens of rows, and an uncapped `--i` would still be dealing
+              cards out four seconds after the page arrived. */}
+          {visible.map((a, i) => (
+            <div
+              key={a.key}
+              className="tro-card"
+              style={{ "--i": Math.min(i, 12) } as CSSProperties}
+            >
+              <Card item={a} />
+            </div>
           ))}
         </div>
       )}

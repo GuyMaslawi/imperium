@@ -8,9 +8,26 @@ import { markMessagesRead } from "@/server/actions/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
 import { MessageCompose, type PlayerOption } from "@/components/game/MessageCompose";
 import type { MessageKind } from "@prisma/client";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 export const metadata = { title: "הודעות | אימפריום" };
+
+/** The night sky over the loft — fixed, so SSR and hydration agree. */
+const STARS = [
+  { x: "8%", y: "62%", d: "0s", dur: "4.5s" },
+  { x: "22%", y: "24%", d: "1.6s", dur: "5.5s" },
+  { x: "37%", y: "72%", d: "0.7s", dur: "4s" },
+  { x: "54%", y: "18%", d: "2.9s", dur: "6s" },
+  { x: "63%", y: "58%", d: "1.1s", dur: "5s" },
+  { x: "79%", y: "30%", d: "3.4s", dur: "4.8s" },
+  { x: "91%", y: "70%", d: "2.2s", dur: "5.7s" },
+];
+
+/** Couriers crossing the banner, right to left. */
+const BIRDS = [
+  { top: "26%", d: "0s", dur: "13s" },
+  { top: "58%", d: "6.5s", dur: "17s" },
+];
 
 const KIND_META: Record<MessageKind, { icon: ReactNode; label: string; tone: string }> = {
   SYSTEM: { icon: "📣", label: "מערכת", tone: "border-gold/40 text-gold" },
@@ -47,11 +64,73 @@ export default async function MessagesPage() {
   const freshCutoff = new Date(new Date().getTime() - 2 * 60 * 1000);
   const isNew = (m: (typeof messages)[number]) =>
     m.readAt === null || m.readAt > freshCutoff;
+  const unread = messages.filter(isNew).length;
 
   return (
     <div className="space-y-6">
       <MarkSeen action={markMessagesRead} />
       <SectionHeading title="הודעות" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
+
+      {/* -------- the loft --------
+          A night sky with couriers crossing it. The wax seal is the one part
+          that is not scenery: it rings only while something in the box has not
+          been opened, and this page marks everything read as it loads, so it
+          is showing what was waiting when you walked in. */}
+      <div className="panel-gold mail-loft rounded-2xl p-4">
+        <span className="mail-moon" aria-hidden />
+        <span className="mail-stars" aria-hidden>
+          {STARS.map((star) => (
+            <span
+              key={star.x}
+              style={
+                { "--x": star.x, "--y": star.y, "--d": star.d, "--dur": star.dur } as CSSProperties
+              }
+            />
+          ))}
+        </span>
+        {BIRDS.map((bird) => (
+          <span
+            key={bird.top}
+            className="mail-bird"
+            aria-hidden
+            style={{ "--top": bird.top, "--d": bird.d, "--dur": bird.dur } as CSSProperties}
+          />
+        ))}
+
+        <div className="mail-body flex items-center justify-center gap-3 text-center">
+          <span
+            className={`mail-seal grid h-11 w-11 shrink-0 place-items-center rounded-full border ${
+              unread > 0
+                ? "is-unread border-red-500/60 bg-red-950/50 text-red-300"
+                : "border-gold/40 bg-panel-inset text-gold-dim"
+            }`}
+            aria-hidden
+          >
+            <Icon name="messages" size={22} />
+          </span>
+          <div className="text-right">
+            <p className="text-base font-bold tracking-wide text-gold-bright">
+              מגדל היונים
+            </p>
+            <p className="mt-0.5 text-xs text-zinc-400">
+              {unread > 0 ? (
+                <>
+                  <span className="nums font-bold text-red-300" dir="ltr">
+                    {unread}
+                  </span>{" "}
+                  הודעות חדשות מתוך{" "}
+                </>
+              ) : (
+                "אין דואר חדש — "
+              )}
+              <span className="nums font-bold text-zinc-300" dir="ltr">
+                {messages.length}
+              </span>{" "}
+              בתיבה
+            </p>
+          </div>
+        </div>
+      </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-500">
@@ -70,7 +149,7 @@ export default async function MessagesPage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {messages.map((m) => {
+          {messages.map((m, index) => {
             const meta = KIND_META[m.kind];
             const fresh = isNew(m);
             // A PLAYER message whose author was deleted keeps its text but
@@ -80,13 +159,14 @@ export default async function MessagesPage() {
             return (
               <li
                 key={m.id}
-                className={`panel-gold rounded-xl p-4 ${
-                  fresh ? "border-gold/60 shadow-[inset_3px_0_0_var(--gold)]" : ""
+                style={{ "--i": Math.min(index, 12) } as CSSProperties}
+                className={`panel-gold mail-item rounded-xl p-4 ${
+                  fresh ? "is-fresh border-gold/60 shadow-[inset_3px_0_0_var(--gold)]" : ""
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <span
-                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border bg-panel-inset text-xl ${meta.tone}`}
+                    className={`mail-glyph flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border bg-panel-inset text-xl ${meta.tone}`}
                     aria-hidden
                   >
                     {meta.icon}

@@ -11,6 +11,7 @@ import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { RESOURCE_META } from "@/lib/game/constants";
 import { BOSS_REWARD_RESOURCES, bossByKey, bossImage } from "@/lib/game/bosses";
+import { cityName } from "@/lib/game/cities";
 
 export const metadata = { title: "קרב בוס | IMPERIUM" };
 
@@ -109,10 +110,7 @@ export default async function BossFightPage({
             </div>
             <p className="font-black text-[rgb(var(--boss-accent))]">{boss.name}</p>
             <p className="text-[11px] text-zinc-500">
-              {boss.title} · עיר{" "}
-              <span className="nums" dir="ltr">
-                {fight.cityTier}
-              </span>
+              {boss.title} · עיר {cityName(fight.cityTier)}
             </p>
           </div>
         </div>

@@ -91,7 +91,11 @@ export function WeaponCard({
         )}
       </div>
 
-      <p className="text-sm text-zinc-400">{weapon.description}</p>
+      {/* two lines are reserved so cards sharing a grid row line up block for
+          block — descriptions run one or two lines depending on the name */}
+      <p className="min-h-[2.5rem] text-sm text-zinc-400">
+        {weapon.description}
+      </p>
 
       <div className="grid grid-cols-2 gap-2 panel-inset rounded-lg p-3 text-xs">
         <span className="text-zinc-400">

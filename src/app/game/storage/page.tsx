@@ -87,7 +87,10 @@ export default async function StoragePage() {
               <Icon name="storage" size={20} className="text-crimson-bright wh-crate" />
               מערך המחסנים
             </h2>
-            <div className="grid flex-1 grid-cols-3 gap-3 sm:max-w-md">
+            {/* Full width on a phone so it drops below the heading: sharing the
+                row leaves each of the three columns ~40px, and a six-figure
+                capacity then runs straight into the number beside it. */}
+            <div className="grid w-full grid-cols-3 gap-3 sm:w-auto sm:max-w-md sm:flex-1">
               {summaryTotals.map((total, index) => (
                 <div
                   key={total.label}

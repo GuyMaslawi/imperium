@@ -131,20 +131,25 @@ export function WeaponsTabs({
         maxTier={active.maxTier}
       />
 
+      {/* The next unlock is a full-width banner, not a grid cell: it holds far
+          more than a purchase card (requirements, unlock cost, explanation), so
+          inside the grid it stretched its whole row and left the neighbouring
+          cards with a dead gap above their buy buttons. */}
+      {next && (
+        <NextWeaponCard
+          key={next.weapon.key}
+          weapon={next.weapon}
+          category={active.category}
+          unlockCost={active.unlockCost}
+          available={available}
+          gate={gate}
+          cities={cities}
+          heroLevel={heroLevel}
+          discountPct={discountPct}
+        />
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {next && (
-          <NextWeaponCard
-            key={next.weapon.key}
-            weapon={next.weapon}
-            category={active.category}
-            unlockCost={active.unlockCost}
-            available={available}
-            gate={gate}
-            cities={cities}
-            heroLevel={heroLevel}
-            discountPct={discountPct}
-          />
-        )}
         {unlocked.map(({ weapon, owned }) => (
           <WeaponCard
             key={weapon.key}
