@@ -66,7 +66,7 @@ async function sendVerificationEmail(user: {
   const recipientKey = createHash("sha256")
     .update(user.email.trim().toLowerCase())
     .digest("hex");
-  if (!rateLimit(`verify-mail-to:${recipientKey}`, 5, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`verify-mail-to:${recipientKey}`, 5, 60 * 60 * 1000))) {
     return false;
   }
 
@@ -230,7 +230,7 @@ export async function register(
   // Throttle mass account/empire creation from one origin (resource exhaustion,
   // empire-name squatting). Generous enough not to hinder a real person.
   const ip = await clientIp();
-  if (!rateLimit(`register:${ip}`, 5, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר." };
   }
 
@@ -326,10 +326,10 @@ export async function login(
 ): Promise<AuthState> {
   // Two-axis throttle against online brute force: a broad per-IP cap (a single
   // origin hammering many accounts) and a tighter per-email cap (many origins
-  // targeting one account). Either tripping refuses the attempt without a DB or
-  // bcrypt round, so throttled traffic stays cheap.
+  // targeting one account). Either tripping refuses the attempt before the user
+  // lookup and the bcrypt compare, which is where the real cost of a flood is.
   const ip = await clientIp();
-  if (!rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000)) {
+  if (!(await rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
   }
 
@@ -342,7 +342,11 @@ export async function login(
   }
   const { email, password } = parsed.data;
 
-  if (!rateLimit(`login-email:${email}`, 10, 15 * 60 * 1000)) {
+  // Hashed, not raw. The counters live in a table now, and a table of every
+  // address anyone has ever tried to log in as is a list worth stealing — the
+  // limiter only ever needs the key to be stable, never readable.
+  const emailKey = createHash("sha256").update(email).digest("hex");
+  if (!(await rateLimit(`login-email:${emailKey}`, 10, 15 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר." };
   }
 
@@ -485,7 +489,7 @@ export async function changePassword(
   // Password checks are expensive by design; throttle so a stolen session can't
   // be used to brute-force the current password from inside the account.
   const ip = await clientIp();
-  if (!rateLimit(`chpw:${userId}:${ip}`, 10, 15 * 60 * 1000)) {
+  if (!(await rateLimit(`chpw:${userId}:${ip}`, 10, 15 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
   }
 
@@ -568,7 +572,7 @@ export async function signOutEverywhere(): Promise<void> {
  */
 export async function googleSignIn(credential: string): Promise<AuthState> {
   const ip = await clientIp();
-  if (!rateLimit(`google:${ip}`, 20, 15 * 60 * 1000)) {
+  if (!(await rateLimit(`google:${ip}`, 20, 15 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
   }
 
@@ -696,7 +700,7 @@ export async function verifyEmailToken(
   // actions carry. The 256-bit token itself is not guessable; this bounds the
   // unauthenticated DB lookups an anonymous caller can drive.
   const ip = await clientIp();
-  if (!rateLimit(`verify-token:${ip}`, 30, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`verify-token:${ip}`, 30, 60 * 60 * 1000))) {
     return { ok: false, error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
   }
 
@@ -744,10 +748,10 @@ export async function resendVerificationEmail(
 
   // Mail costs money and inboxes are abusable; cap resends hard.
   const ip = await clientIp();
-  if (!rateLimit(`verify-resend:${userId}`, 5, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`verify-resend:${userId}`, 5, 60 * 60 * 1000))) {
     return { error: "נשלחו יותר מדי קישורים. נסה שוב בעוד שעה." };
   }
-  if (!rateLimit(`verify-resend-ip:${ip}`, 20, 60 * 60 * 1000)) {
+  if (!(await rateLimit(`verify-resend-ip:${ip}`, 20, 60 * 60 * 1000))) {
     return { error: "נשלחו יותר מדי קישורים. נסה שוב מאוחר יותר." };
   }
 

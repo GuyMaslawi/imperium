@@ -341,10 +341,18 @@ function Scoreboard({
 }) {
   return (
     <div className="panel rounded-xl p-4">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+      <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
         <Icon name="rankings" size={18} className="text-crimson" />
         טבלת הזירה
       </h2>
+      {/* Said out loud because the two numbers on each row pull in opposite
+          directions: the power is the roster's combined strength, but the arena
+          rotates one member in per round, so it scores by the average. A guild
+          with double the total and half the average is the underdog here. */}
+      <p className="mb-3 text-[11px] text-zinc-500">
+        כוח הברית הוא הכוח הצבאי המשולב של כל החברים. הזירה עצמה נמדדת לפי החבר
+        הממוצע — רוסטר גדול מעלה את הסכום, לא בהכרח את הסיכוי.
+      </p>
 
       {state.scoreboard.length === 0 ? (
         <p className="py-6 text-center text-sm text-zinc-500">
@@ -385,6 +393,12 @@ function Scoreboard({
                 </div>
 
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+                  <span>
+                    כוח הברית{" "}
+                    <span className="nums text-zinc-300" dir="ltr">
+                      {formatCompact(row.power)}
+                    </span>
+                  </span>
                   <span>
                     ניצחונות{" "}
                     <span className="nums text-emerald-300" dir="ltr">
@@ -554,14 +568,7 @@ function Feed({
               </p>
 
               <p className="mt-0.5 text-[10px] text-zinc-600">
-                <span className="nums" dir="ltr">
-                  {formatCompact(Math.round(item.attackerPower))}
-                </span>{" "}
-                מול{" "}
-                <span className="nums" dir="ltr">
-                  {formatCompact(Math.round(item.defenderPower))}
-                </span>{" "}
-                — הנקודות ל{item.won ? item.attackerGuildName : item.defenderGuildName}
+                הנקודות ל{item.won ? item.attackerGuildName : item.defenderGuildName}
               </p>
             </li>
           ))}

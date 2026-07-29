@@ -598,6 +598,14 @@ model GuildWarEntry {
   /// Clashes it lost on either side.
   losses Int @default(0)
 
+  /// The guild's combined military power, snapshotted at enrolment and
+  /// refreshed on every round the simulation materialises.
+  ///
+  /// Stored rather than computed on read because the board polls every six
+  /// seconds and summing it live means loading every member's army and every
+  /// weapon row on each poll. advanceWar already has the figures in hand.
+  power  Int @default(0)
+
   /// Final placement, written at settlement (1 = champion).
   rank        Int?
   /// Prize snapshot, written at settlement so the result page reads the same
@@ -1143,4 +1151,27 @@ model BossFight {
   // run; the rankings banner lists the conquerors of one city tier newest-first.
   @@index([empireId, createdAt])
   @@index([cityTier, victory, createdAt])
+}
+
+/// One fixed-window rate-limit counter, shared by every instance of the app.
+///
+/// The limiter used to live in module memory, which on a serverless fleet is
+/// not a limiter at all: every cold start hands the caller a fresh set of
+/// counters and every concurrent instance keeps its own, so the effective
+/// budget is `limit × instances` and resets whenever the platform feels like
+/// it. Login brute-force, mass registration and mass-mail all rode straight
+/// through it. Postgres is the one piece of shared state the app already has,
+/// so the counters live here.
+///
+/// Rows are self-expiring by comparison (`resetAt <= now` starts a new window
+/// in place); `sweepRateLimits` drops the dead ones opportunistically.
+model RateLimitBucket {
+  /// The caller-supplied bucket key, e.g. `login-email:someone@example.com`.
+  key     String   @id
+  count   Int      @default(0)
+  /// When the current window rolls over and `count` starts again at 1.
+  resetAt DateTime
+
+  /// Drives the opportunistic sweep of expired windows.
+  @@index([resetAt])
 }

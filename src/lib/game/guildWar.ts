@@ -313,6 +313,19 @@ export const GUILD_WAR_PHASE_LABEL: Record<GuildWarPhase, string> = {
 export interface GuildWarScoreRow {
   guildId: string;
   guildName: string;
+  /**
+   * The guild's combined military power — the *only* strength figure the war
+   * publishes, and the level the whole board reports at.
+   *
+   * The feed used to print each clash as "1.2M מול 900K" beside the two
+   * fighters' names. Those are the hero- and spell-multiplied numbers, per
+   * player, refreshed every minute for thirty minutes — finer intelligence than
+   * the rankings ladder gives away and finer than a paid spy mission returns on
+   * a single target, handed free to every viewer for every enrolled guild. A
+   * guild total leaks nothing: guild rosters are public and every member's
+   * military power is already on the ladder.
+   */
+  power: number;
   score: number;
   /** Clashes won on either side. */
   wins: number;
@@ -334,8 +347,9 @@ export interface GuildWarFeedItem {
   defenderName: string;
   defenderGuildName: string;
   defenderGuildId: string;
-  attackerPower: number;
-  defenderPower: number;
+  // No per-fighter power here — see GuildWarScoreRow.power. The clash rows keep
+  // both figures (they are what resolved the fight and belong in the record);
+  // they simply do not travel to the client.
   won: boolean;
   points: number;
   /** Epoch ms — the client renders the clock, never the server's string. */

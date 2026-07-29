@@ -86,6 +86,26 @@ export async function ensureWarForStart(startsAt: Date): Promise<string> {
   }
 }
 
+/**
+ * One guild's combined military power — the sum of what its members can field.
+ *
+ * Used to seed the scoreboard at enrolment, so a guild deciding whether to turn
+ * up can see the field before the bell. From the first round onward `advanceWar`
+ * keeps the figure fresh off the rosters it already loaded.
+ */
+export async function guildMilitaryPower(guildId: string): Promise<number> {
+  const members = await prisma.guildMember.findMany({
+    where: { guildId },
+    select: { empire: { select: { army: true, weapons: true } } },
+  });
+  return Math.round(
+    members.reduce(
+      (sum, m) => sum + getEmpireMilitaryPower(m.empire.army, m.empire.weapons),
+      0
+    )
+  );
+}
+
 /* ------------------------------ fighting the war ------------------------------ */
 
 /** One guild as the simulation sees it: a rotation of fighters plus its aid. */
@@ -108,6 +128,14 @@ interface WarSide {
     attackBuffPct: number;
     defenceBuffPct: number;
   }[];
+  /**
+   * The guild's combined military power — the one strength figure the board
+   * publishes. Per-fighter numbers stay server-side: they are the hero- and
+   * spell-multiplied values, which are finer intelligence than the public
+   * rankings ladder gives away, and nobody should learn what a rival's hero is
+   * worth by watching a war they were not part of.
+   */
+  totalPower: number;
   /**
    * Flat reinforcement every fighter of this guild brings, drawn from the
    * guild's **average** member power rather than its total.
@@ -176,18 +204,17 @@ async function loadSides(
   return entries.map((entry) => {
     const roster = members.filter((m) => m.guildId === entry.guildId);
     const aidPct = guildAidPct(roster[0]?.guild.aidLevel ?? 0);
-    const averagePower =
-      roster.length > 0
-        ? roster.reduce(
-            (sum, m) => sum + getEmpireMilitaryPower(m.empire.army, m.empire.weapons),
-            0
-          ) / roster.length
-        : 0;
+    const totalPower = roster.reduce(
+      (sum, m) => sum + getEmpireMilitaryPower(m.empire.army, m.empire.weapons),
+      0
+    );
+    const averagePower = roster.length > 0 ? totalPower / roster.length : 0;
 
     return {
       entryId: entry.id,
       guildId: entry.guildId,
       guildName: entry.guildName,
+      totalPower: Math.round(totalPower),
       aidPower: Math.round((averagePower * aidPct) / 100),
       members: roster.map((m) => {
         const { empire } = m;
@@ -333,13 +360,22 @@ export async function advanceWar(warId: string, now: Date): Promise<void> {
       if (advanced.count === 0) throw new Error("guild war advance conflict");
 
       if (clashes.length > 0) await tx.guildWarClash.createMany({ data: clashes });
-      for (const [entryId, row] of tally) {
+      // Every side, not just the ones that banked points this batch: the power
+      // figure is what the board shows for a guild whether or not it scored, and
+      // this is the only place the numbers are already loaded.
+      for (const side of sides) {
+        const row = tally.get(side.entryId);
         await tx.guildWarEntry.update({
-          where: { id: entryId },
+          where: { id: side.entryId },
           data: {
-            score: { increment: row.score },
-            wins: { increment: row.wins },
-            losses: { increment: row.losses },
+            power: side.totalPower,
+            ...(row
+              ? {
+                  score: { increment: row.score },
+                  wins: { increment: row.wins },
+                  losses: { increment: row.losses },
+                }
+              : {}),
           },
         });
       }
@@ -396,6 +432,12 @@ async function messageMembers(
 async function settleWar(warId: string, now: Date): Promise<void> {
   await prisma.$transaction(
     async (tx) => {
+      const war = await tx.guildWar.findUnique({
+        where: { id: warId },
+        select: { startsAt: true },
+      });
+      if (!war) return;
+
       // Entries are frozen the moment the bell rings — registration always
       // targets the *next* window (see registrationWarStart) — so reading them
       // before claiming the war is safe, and we need the count to know whether
@@ -413,13 +455,35 @@ async function settleWar(warId: string, now: Date): Promise<void> {
       // Someone else settled it while we were counting — their prizes stand.
       if (claimed.count === 0) return;
 
+      /**
+       * Who the war pays: the roster the guild *enrolled*, not the roster it
+       * happens to hold when the prizes are handed out.
+       *
+       * Paying the live roster was a straight steal. `joinGuild` is open to
+       * anyone holding a guild id, the live scoreboard hands every viewer the
+       * guild ids of the leaders, and settlement is lazy — it happens whenever
+       * the next reader turns up, which can be well after 20:00. So the play was:
+       * watch the board, leave your own guild at 19:59, join whoever is winning,
+       * and collect 500 citizens + 300 turns + 5 spins for a campaign you were
+       * not in — every night, from a guild that never agreed to carry you and
+       * cannot refuse. Then hop back out.
+       *
+       * Pinning the payout to `createdAt <= startsAt` closes it: the guild is
+       * paid for the war it turned up to. Someone who joins mid-campaign still
+       * *fights* — loadSides reads the roster live, so they rotate into the
+       * clashes and help their new guild score — they simply collect from the
+       * next bell rather than from one that had already rung. That asymmetry is
+       * the point: fighting is free, and the prize is what has to be earned.
+       */
+      const rosterAt = { createdAt: { lte: war.startsAt } };
+
       if (!valid) {
         // One guild answering the call is not a war. Whoever showed up is told
         // so plainly — silence here would read as a broken feature — and is
         // paid nothing at all.
         for (const entry of entries) {
           const members = await tx.guildMember.findMany({
-            where: { guildId: entry.guildId },
+            where: { guildId: entry.guildId, ...rosterAt },
             select: { empireId: true },
           });
           await messageMembers(
@@ -447,10 +511,14 @@ async function settleWar(warId: string, now: Date): Promise<void> {
         });
 
         const members = await tx.guildMember.findMany({
-          where: { guildId: entry.guildId },
+          where: { guildId: entry.guildId, ...rosterAt },
           select: { empireId: true },
         });
         const memberIds = members.map((m) => m.empireId);
+        // A guild whose entire enrolled roster has since left (or disbanded)
+        // still gets its rank written above — the night happened — but there is
+        // nobody left to pay or tell.
+        if (memberIds.length === 0) continue;
 
         if (!prize) {
           await messageMembers(tx, memberIds, {
@@ -616,6 +684,7 @@ export async function buildLiveState(params: {
   const scoreboard: GuildWarScoreRow[] = entries.map((entry, index) => ({
     guildId: entry.guildId,
     guildName: entry.guildName,
+    power: entry.power,
     score: entry.score,
     wins: entry.wins,
     losses: entry.losses,
@@ -640,8 +709,6 @@ export async function buildLiveState(params: {
     defenderName: clash.defenderName,
     defenderGuildName: clash.defenderGuildName,
     defenderGuildId: clash.defenderGuildId,
-    attackerPower: clash.attackerPower,
-    defenderPower: clash.defenderPower,
     won: clash.won,
     points: clash.points,
     at: clash.createdAt.getTime(),

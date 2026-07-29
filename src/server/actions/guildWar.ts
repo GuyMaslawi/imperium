@@ -14,6 +14,7 @@ import {
   buildLiveState,
   ensureWarForStart,
   getFocusWar,
+  guildMilitaryPower,
   settleDueWars,
 } from "@/server/guildWarState";
 import type { ActionState } from "./game";
@@ -73,6 +74,9 @@ export async function registerGuildForWar(): Promise<ActionState> {
           guildId: membership.guild.id,
           // Snapshotted so the war keeps its history through a rename.
           guildName: membership.guild.name,
+          // Seeded so the field is comparable before a shot is fired; refreshed
+          // every round once the bell rings.
+          power: await guildMilitaryPower(membership.guild.id),
         },
       });
     } catch {

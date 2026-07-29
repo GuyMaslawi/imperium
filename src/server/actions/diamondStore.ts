@@ -72,7 +72,7 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
   // Rate-limit the checkout itself: every attempt writes a PENDING
   // DiamondPurchase row (and, with PayPal, opens an order) before any money
   // moves, so an unthrottled caller can inflate the audit table indefinitely.
-  if (!rateLimit(`${limiterKey}:${user.id}`, 10, 15 * 60 * 1000)) {
+  if (!(await rateLimit(`${limiterKey}:${user.id}`, 10, 15 * 60 * 1000))) {
     return {
       ok: false,
       status: "error",
@@ -337,7 +337,7 @@ export async function captureDiamondOrder(orderId: string): Promise<CaptureOrder
     const user = await getSessionUser();
     if (!user) return { ok: false, message: "יש להתחבר כדי לרכוש" };
     if (user.bannedAt) return { ok: false, message: "החשבון חסום" };
-    if (!rateLimit(`capture:${user.id}`, 20, 15 * 60 * 1000)) {
+    if (!(await rateLimit(`capture:${user.id}`, 20, 15 * 60 * 1000))) {
       return { ok: false, message: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
     }
 

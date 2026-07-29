@@ -1,15 +1,29 @@
 import "server-only";
 import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
 
 /**
- * Minimal in-process fixed-window rate limiter for the auth endpoints.
+ * Fixed-window rate limiter, counted in Postgres so it holds across the whole
+ * fleet.
  *
- * The game has no Redis/KV dependency, so this keeps counters in module memory.
- * That is enough to blunt online password brute-force and mass-signup from a
- * single origin on a single instance; it is intentionally *not* a distributed
- * limiter. If the app is ever scaled to multiple instances or a serverless
- * fleet, move these counters to a shared store (Redis) — until then, per-process
- * limiting still meaningfully raises the cost of an attack.
+ * It used to count in module memory. On a single long-lived Node process that
+ * is a real limiter; on Vercel it is theatre. Every concurrent lambda keeps its
+ * own `Map`, so the effective budget is `limit × instances`, and every cold
+ * start hands the caller a clean slate — an attacker does not even have to try
+ * to evade it, the platform resets it for them. `login-email` (10 tries per 15
+ * minutes) was the one that mattered: the ceiling it advertised was not the
+ * ceiling anyone actually faced.
+ *
+ * Postgres is the only shared state this app has, and one indexed upsert on a
+ * single row is cheap next to the bcrypt compare it is guarding, so the
+ * counters moved there. The in-process map survives as a *pre-filter*: it can
+ * only ever be more permissive than the shared counter (each instance sees a
+ * fraction of the traffic), so when it says no, the shared counter would have
+ * said no too — and the request is refused without a round trip.
+ *
+ * Fails **open**. A limiter that takes signup and login down with the database
+ * is a worse outage than the one it prevents, and the pre-filter still caps
+ * what any single instance can pass through while the database is unreachable.
  */
 
 interface Window {
@@ -46,12 +60,8 @@ function sweep(now: number): void {
   }
 }
 
-/**
- * Consume one hit against `key`. Allows up to `limit` hits per `windowMs`;
- * returns `true` while under the limit and `false` once the window is exhausted,
- * until it rolls over.
- */
-export function rateLimit(key: string, limit: number, windowMs: number): boolean {
+/** Consume one hit against this instance's own copy of the window. */
+function localAllows(key: string, limit: number, windowMs: number): boolean {
   const now = Date.now();
   const existing = buckets.get(key);
 
@@ -64,6 +74,77 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
   if (existing.count >= limit) return false;
   existing.count += 1;
   return true;
+}
+
+/**
+ * How often (in hits) an instance bothers to clear expired rows. The sweep is
+ * a single indexed DELETE and rows are tiny, so this is housekeeping, not a
+ * correctness requirement — an expired row is already inert, since the upsert
+ * below restarts the window in place rather than reading a stale count.
+ */
+const SWEEP_EVERY = 500;
+let hitsSinceSweep = 0;
+
+async function sweepShared(): Promise<void> {
+  if (++hitsSinceSweep < SWEEP_EVERY) return;
+  hitsSinceSweep = 0;
+  try {
+    await prisma.rateLimitBucket.deleteMany({ where: { resetAt: { lte: new Date() } } });
+  } catch {
+    // Housekeeping only — a failed sweep costs nothing but disk.
+  }
+}
+
+/**
+ * Consume one hit against `key`. Allows up to `limit` hits per `windowMs`;
+ * resolves `true` while under the limit and `false` once the window is
+ * exhausted, until it rolls over.
+ *
+ * The counter moves in a single statement. `ON CONFLICT DO UPDATE` with the
+ * window rollover expressed as a `CASE` is what makes it safe: read-then-write
+ * would let N concurrent attempts all read the same count and each write
+ * count+1, which on the login path is exactly the burst the limit exists to
+ * stop. `RETURNING` hands back the post-increment count, so the decision is
+ * made from the value the database actually stored, not from what we hoped it
+ * would store.
+ */
+export async function rateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<boolean> {
+  // Cheap per-instance pre-filter — see the header.
+  if (!localAllows(key, limit, windowMs)) return false;
+
+  const resetAt = new Date(Date.now() + windowMs);
+  try {
+    const rows = await prisma.$queryRaw<{ count: number }[]>`
+      INSERT INTO "RateLimitBucket" ("key", "count", "resetAt")
+      VALUES (${key}, 1, ${resetAt})
+      ON CONFLICT ("key") DO UPDATE SET
+        "count" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN 1
+          ELSE "RateLimitBucket"."count" + 1
+        END,
+        "resetAt" = CASE
+          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN ${resetAt}
+          ELSE "RateLimitBucket"."resetAt"
+        END
+      RETURNING "count"
+    `;
+    // Awaited, not fired and forgotten: a serverless instance can be frozen the
+    // moment the action returns, so a dangling query is a query that may never
+    // run and may reject against a disconnected client. It does real work only
+    // once every SWEEP_EVERY hits.
+    await sweepShared();
+    const count = Number(rows[0]?.count ?? 1);
+    return count <= limit;
+  } catch (error) {
+    // Fail open — see the header. Logged rather than swallowed: a limiter that
+    // has quietly stopped limiting is worth knowing about.
+    console.error(`[rate-limit] shared counter unavailable for ${key}`, error);
+    return true;
+  }
 }
 
 /**

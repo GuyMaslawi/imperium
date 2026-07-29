@@ -103,7 +103,7 @@ export async function sendPlayerMessage(
   }
 
   // Blunt the obvious abuse: mass-mailing every player on a loop.
-  if (!rateLimit(`msg-send:${empireId}`, 10, 5 * 60 * 1000)) {
+  if (!(await rateLimit(`msg-send:${empireId}`, 10, 5 * 60 * 1000))) {
     return { error: "שלחת יותר מדי הודעות — נסה שוב בעוד כמה דקות" };
   }
 
