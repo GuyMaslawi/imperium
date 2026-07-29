@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import type { HeroItemSlot, HeroRarity } from "@prisma/client";
-import { ItemTile, formatBonus } from "@/components/game/ItemTile";
+import { ItemTile } from "@/components/game/ItemTile";
+import { formatBonus } from "@/lib/game/format";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { ItemDialog } from "@/components/game/ItemDialog";
 import { Dialog } from "@/components/ui/Dialog";

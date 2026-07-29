@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/admin";
+import { requireAdmin, ADMIN_INT_MAX } from "@/lib/admin";
+import { formatBanDate, isBanned } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
@@ -42,7 +43,6 @@ import {
 } from "@/lib/game/hero";
 import {
   updateUserAccount,
-  toggleUserBan,
   resetUserPassword,
   deleteUser,
   updateEmpireCore,
@@ -65,6 +65,7 @@ import { MAX_CITIES } from "@/lib/game/constants";
 import { cityName } from "@/lib/game/cities";
 import { GUILD_ROLE_META } from "@/lib/game/guild";
 import { PlayerSecurity } from "@/components/admin/user/PlayerSecurity";
+import { BanPanel } from "@/components/admin/user/BanPanel";
 import { PlayerEmpireState } from "@/components/admin/user/PlayerEmpireState";
 import { PlayerBuffs } from "@/components/admin/user/PlayerBuffs";
 import { PlayerProgress } from "@/components/admin/user/PlayerProgress";
@@ -173,11 +174,13 @@ export default async function AdminUserDetail({
   const [seasons, guilds, counts] = await Promise.all([
     prisma.gameSeason.findMany({
       orderBy: { startsAt: "desc" },
-      select: { id: true, name: true, isActive: true },
+      // endsAt rides along for the ban panel's "until the season ends" option.
+      select: { id: true, name: true, isActive: true, endsAt: true },
     }),
     prisma.guild.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     empire ? empireCounts(empire.id) : null,
   ]);
+  const activeSeason = seasons.find((s) => s.isActive && s.endsAt > new Date()) ?? null;
 
   return (
     <div className="space-y-6">
@@ -216,22 +219,18 @@ export default async function AdminUserDetail({
           </ActionForm>
 
           <div className="space-y-4">
-            <ActionForm
-              action={toggleUserBan}
-              submitLabel={user.bannedAt ? "בטל חסימה" : "חסום משתמש"}
-              submitVariant={user.bannedAt ? "secondary" : "danger"}
-              confirm={user.bannedAt ? undefined : "לחסום את המשתמש? הוא לא יוכל להתחבר."}
-            >
-              <input type="hidden" name="userId" value={user.id} />
-              <p className="text-xs text-zinc-400">
-                מצב נוכחי:{" "}
-                {user.bannedAt ? (
-                  <span className="font-bold text-red-300">חסום מאז {user.bannedAt.toLocaleString("he-IL")}</span>
-                ) : (
-                  <span className="font-bold text-emerald-300">פעיל</span>
-                )}
-              </p>
-            </ActionForm>
+            <BanPanel
+              userId={user.id}
+              banned={isBanned(user)}
+              hasBanRow={user.bannedAt != null}
+              bannedSince={user.bannedAt ? formatBanDate(user.bannedAt) : null}
+              bannedUntil={user.bannedUntil ? formatBanDate(user.bannedUntil) : null}
+              season={
+                activeSeason
+                  ? { name: activeSeason.name, endsAt: formatBanDate(activeSeason.endsAt) }
+                  : null
+              }
+            />
 
             <ActionForm action={resetUserPassword} submitLabel="אפס סיסמה" submitVariant="secondary">
               <input type="hidden" name="userId" value={user.id} />
@@ -278,15 +277,15 @@ export default async function AdminUserDetail({
               <input type="hidden" name="userId" value={user.id} />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 <LabeledInput label="שם אימפריה" name="name" defaultValue={empire.name} required />
-                <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={empire.level} />
+                <LabeledInput label="רמה" name="level" type="number" min={1} max={ADMIN_INT_MAX} defaultValue={empire.level} />
                 <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} defaultValue={Math.round(empire.gold)} />
                 <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} defaultValue={Math.round(empire.wood)} />
                 <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} defaultValue={Math.round(empire.iron)} />
                 <LabeledInput label={<ResourceFieldLabel resource="stone" text="אבן" />} name="stone" type="number" min={0} defaultValue={Math.round(empire.stone)} />
                 <LabeledInput label={<ResourceFieldLabel resource="diamonds" text="יהלומים" />} name="diamonds" type="number" min={0} defaultValue={Math.round(empire.diamonds)} />
-                <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} defaultValue={empire.citizens} />
-                <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} defaultValue={empire.turns} />
-                <LabeledInput label="🎡 סיבובי גלגל" name="wheelSpins" type="number" min={0} defaultValue={empire.wheelSpins} />
+                <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.citizens} />
+                <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.turns} />
+                <LabeledInput label="🎡 סיבובי גלגל" name="wheelSpins" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.wheelSpins} />
                 {/* Cities drive the citizen cap, the quest board and the
                     ranking bucket — the single most load-bearing number here. */}
                 <LabeledInput
@@ -325,9 +324,9 @@ export default async function AdminUserDetail({
                 <input type="hidden" name="empireId" value={empire.id} />
                 <input type="hidden" name="userId" value={user.id} />
                 <div className="grid grid-cols-3 gap-3">
-                  <LabeledInput label="🪖 חיילים" name="soldiers" type="number" min={0} defaultValue={empire.army?.soldiers ?? 0} />
-                  <LabeledInput label="🕵️ מרגלים" name="spies" type="number" min={0} defaultValue={empire.army?.spies ?? 0} />
-                  <LabeledInput label={<><Icon name="mine" size={13} className="inline align-[-2px]" /> עבדים</>} name="mineSlaves" type="number" min={0} defaultValue={empire.army?.mineSlaves ?? 0} />
+                  <LabeledInput label="🪖 חיילים" name="soldiers" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.army?.soldiers ?? 0} />
+                  <LabeledInput label="🕵️ מרגלים" name="spies" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.army?.spies ?? 0} />
+                  <LabeledInput label={<><Icon name="mine" size={13} className="inline align-[-2px]" /> עבדים</>} name="mineSlaves" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.army?.mineSlaves ?? 0} />
                 </div>
               </ActionForm>
             </EditorSection>
@@ -536,7 +535,7 @@ export default async function AdminUserDetail({
                       <p className="text-xs font-bold text-gold-bright">
                         {def ? `${def.name} (טיר ${def.tier})` : w.weaponKey}
                       </p>
-                      <LabeledInput label="כמות (0 = מחיקה)" name="quantity" type="number" min={0} defaultValue={w.quantity} />
+                      <LabeledInput label="כמות (0 = מחיקה)" name="quantity" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={w.quantity} />
                     </ActionForm>
                   );
                 })}
@@ -554,7 +553,7 @@ export default async function AdminUserDetail({
                     label: `${WEAPON_CATEGORY_META[w.category].icon} ${w.name} (טיר ${w.tier})`,
                   }))}
                 />
-                <LabeledInput label="כמות" name="quantity" type="number" min={0} defaultValue={1} />
+                <LabeledInput label="כמות" name="quantity" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={1} />
               </div>
             </ActionForm>
           </EditorSection>
@@ -597,7 +596,7 @@ export default async function AdminUserDetail({
                 <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.attackPoints ?? 0} />
                 <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.defensePoints ?? 0} />
                 <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.resourcePoints ?? 0} />
-                <LabeledInput label="איפוסים" name="resets" type="number" min={0} defaultValue={empire.hero?.resets ?? 0} />
+                <LabeledInput label="איפוסים" name="resets" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.hero?.resets ?? 0} />
                 {/* 0 = הגיבור מת (וכל הבונוסים שלו מושבתים); כל ערך גבוה יותר מחייה אותו */}
                 <LabeledInput label="חיים (0=מת)" name="health" type="number" min={0} max={HERO_MAX_HEALTH} defaultValue={empire.hero?.health ?? HERO_MAX_HEALTH} />
               </div>
@@ -781,9 +780,9 @@ export default async function AdminUserDetail({
                   <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} placeholder="0" />
                   <LabeledInput label={<ResourceFieldLabel resource="stone" text="אבן" />} name="stone" type="number" min={0} placeholder="0" />
                   <LabeledInput label={<ResourceFieldLabel resource="diamonds" text="יהלומים" />} name="diamonds" type="number" min={0} placeholder="0" />
-                  <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} placeholder="0" />
-                  <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} placeholder="0" />
-                  <LabeledInput label="🎡 סיבובים" name="wheelSpins" type="number" min={0} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="citizens" text="אזרחים" />} name="citizens" type="number" min={0} max={ADMIN_INT_MAX} placeholder="0" />
+                  <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} max={ADMIN_INT_MAX} placeholder="0" />
+                  <LabeledInput label="🎡 סיבובים" name="wheelSpins" type="number" min={0} max={ADMIN_INT_MAX} placeholder="0" />
                 </div>
                 <LabeledInput label="כותרת הודעה מצורפת (אופציונלי)" name="title" placeholder="🎁 מתנה מההנהלה" />
                 <LabeledInput label="תוכן ההודעה" name="body" placeholder="קבל את המתנה שלך!" />

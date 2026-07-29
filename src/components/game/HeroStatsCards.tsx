@@ -8,7 +8,7 @@ import {
   HERO_STAT_META,
   type HeroPointStat,
 } from "@/lib/game/hero";
-import { formatBonus } from "@/components/game/ItemTile";
+import { formatBonus } from "@/lib/game/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
@@ -21,14 +21,21 @@ import { Tip } from "@/components/ui/Tip";
  * A row shows ONLY the permanent % earned from allocated points; equipped items
  * no longer change these numbers, their combined yield lives in the power
  * summary below.
+ *
+ * `readOnly` is the dossier's view of somebody else's hero: the same three rows
+ * and the same percentages, but no allocation buttons, no free-point banner and
+ * copy that talks about "him" rather than "you".
  */
 export function HeroStatsCards({
   points,
   unspentPoints,
+  readOnly = false,
 }: {
   /** % from allocated points, per point stat. */
   points: Record<HeroPointStat, number>;
   unspentPoints: number;
+  /** Show-only: another player's allocation, with nothing to press. */
+  readOnly?: boolean;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(
     allocateHeroPoints,
@@ -37,7 +44,7 @@ export function HeroStatsCards({
 
   return (
     <div className="flex w-full flex-col gap-2">
-      {unspentPoints > 0 && (
+      {!readOnly && unspentPoints > 0 && (
         <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בשורת התכונה מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
           {/* One line, not a stacked hero block: every row this costs pushes
               the stat rows down. */}
@@ -67,9 +74,18 @@ export function HeroStatsCards({
                 <>
                   {meta.description}
                   <br />
-                  אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}%).
-                  חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל מהגיבור&quot;
-                  למטה.
+                  {readOnly ? (
+                    <>
+                      אחוז זה מגיע אך ורק מהנקודות שהקצה ({formatBonus(pointsPct)}
+                      %). חפצי הגיבור אינם משפיעים עליו — הם נספרים בנפרד.
+                    </>
+                  ) : (
+                    <>
+                      אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}
+                      %). חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל
+                      מהגיבור&quot; למטה.
+                    </>
+                  )}
                 </>
               }
             >
@@ -84,7 +100,7 @@ export function HeroStatsCards({
             >
               +{formatBonus(pointsPct)}%
             </p>
-            {unspentPoints > 0 && (
+            {!readOnly && unspentPoints > 0 && (
               <div className="flex items-center gap-1">
                 <form action={formAction}>
                   <input type="hidden" name="stat" value={stat} />

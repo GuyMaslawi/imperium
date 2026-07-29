@@ -19,11 +19,7 @@ import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
 import { HallOfGlory } from "@/components/game/HallOfGlory";
 import { getAchievementsState } from "@/server/achievementState";
-import {
-  getGloryChampions,
-  invalidateGloryChampions,
-  stampGloryAwards,
-} from "@/server/gloryBoard";
+import { getGloryChampions, stampGloryAwards } from "@/server/gloryBoard";
 import { selectGlory } from "@/lib/game/achievements";
 import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
@@ -120,18 +116,16 @@ export default async function BasePage() {
      None of it is expensive. `getAchievementsState` is React-cached and the
      game layout already calls it on every screen for the "rewards waiting"
      badge, so the conditions cost nothing extra here; the stamp is one indexed
-     read that usually writes nothing; the records are a single DISTINCT ON
-     behind a two-minute TTL, because a record once set can never change.
+     read that usually writes nothing; the records are a single DISTINCT ON that
+     returns seven rows, read live so a record set seconds ago is already here.
 
      The strip that used to live in this slot was gated on
      `empire.level >= 5..10` — a column no gameplay path increments, so all five
      of its milestones were locked forever, for everyone. */
   const achievements = await getAchievementsState(empire.id);
-  if (achievements) {
-    const stamped = await stampGloryAwards(empire.id, achievements);
-    // Only a fresh stamp can have moved a record; anything else is a cache hit.
-    if (stamped.length > 0) invalidateGloryChampions();
-  }
+  // Stamped before the records are read, so an empire that just qualified can
+  // take the record on this very load.
+  if (achievements) await stampGloryAwards(empire.id, achievements);
   const gloryRecords = await getGloryChampions();
   const glory = achievements
     ? selectGlory(achievements, gloryRecords, empire.id)

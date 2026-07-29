@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
+import { bannedWhere } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatIls } from "@/lib/game/diamondStore";
@@ -40,7 +41,7 @@ export default async function AdminDashboard() {
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { role: "ADMIN" } }),
-    prisma.user.count({ where: { bannedAt: { not: null } } }),
+    prisma.user.count({ where: bannedWhere() }),
     prisma.empire.count(),
     prisma.guild.count(),
     prisma.gameSeason.count(),
@@ -76,7 +77,7 @@ export default async function AdminDashboard() {
         <StatCard label="שחקנים" value={users} icon="👥" />
         <StatCard label="אימפריות" value={empires} icon="🏰" />
         <StatCard label="אדמינים" value={admins} icon="🛡️" />
-        <StatCard label="חסומים" value={banned} icon="🚫" />
+        <StatCard label="בבאן" value={banned} icon="🚫" />
         <StatCard label="בריתות" value={guilds} icon="🤝" />
         <StatCard label="עונות" value={seasons} icon="📅" />
         <StatCard label="עונה פעילה" value={activeSeason?.name ?? "—"} icon="⭐" />

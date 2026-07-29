@@ -1,8 +1,7 @@
 import type { ReactNode } from "react";
 import { HERO_STAT_META, type HeroBonuses, type HeroStat } from "@/lib/game/hero";
 import { RESOURCE_META, type StorableResource } from "@/lib/game/constants";
-import { formatNumber } from "@/lib/game/format";
-import { formatBonus } from "@/components/game/ItemTile";
+import { formatBonus, formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 

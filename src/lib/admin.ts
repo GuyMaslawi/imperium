@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
+import { isBanned } from "@/lib/ban";
 
 export interface SessionUser {
   id: string;
@@ -11,8 +12,60 @@ export interface SessionUser {
   name: string;
   role: Role;
   bannedAt: Date | null;
+  /** Null while `bannedAt` is set = permanent. See `isBanned`. */
+  bannedUntil: Date | null;
   /** Null until the address is confirmed. See `purchaseDiamondPackage`. */
   emailVerified: Date | null;
+}
+
+/**
+ * Ceiling for any admin-entered value that lands in a column Prisma declares as
+ * `Int` — turns, citizens, wheel spins, army counts, weapon quantities, levels.
+ *
+ * Postgres stores those as int4 (max 2,147,483,647) and *rejects* anything past
+ * it rather than truncating: the statement dies with an out-of-range conversion
+ * error, the action falls into its generic catch, and nothing is saved. The
+ * 1e12 bound the `Float` resources (gold/wood/iron/stone/diamonds) accept is
+ * 465× too large here.
+ *
+ * The limit sits a full billion *below* int4's max on purpose: these columns
+ * keep growing on their own after the edit — `applyPendingUpdates` increments
+ * `turns` on every regular update, the wheel and the diamond shop add more. An
+ * empire parked at exactly int4's max would fail that increment on its owner's
+ * next page load and stay broken, so the ceiling leaves the game room to keep
+ * adding.
+ */
+export const ADMIN_INT_MAX = 1_000_000_000; // 1e9
+
+/** Empire columns a gift adds to that are backed by an `Int` column. */
+export type EmpireIntField = "citizens" | "turns" | "wheelSpins";
+
+/**
+ * Add `amount` to an int4 empire column across a batch, saturating at
+ * ADMIN_INT_MAX.
+ *
+ * A plain `{ increment }` is evaluated by Postgres, so a single empire already
+ * near the ceiling would blow past int4 and fail the *entire* gift transaction
+ * — every other recipient included. Splitting it in three keeps one recipient
+ * from poisoning the gift: whoever has headroom takes the full amount, whoever
+ * doesn't is pinned to the ceiling, and anyone already above it is left alone
+ * (a gift must never subtract).
+ */
+export async function saturatingIncrement(
+  tx: Prisma.TransactionClient,
+  empireIds: string[],
+  field: EmpireIntField,
+  amount: number
+): Promise<void> {
+  const headroom = ADMIN_INT_MAX - amount;
+  await tx.empire.updateMany({
+    where: { id: { in: empireIds }, [field]: { lte: headroom } },
+    data: { [field]: { increment: amount } },
+  });
+  await tx.empire.updateMany({
+    where: { id: { in: empireIds }, [field]: { gt: headroom, lt: ADMIN_INT_MAX } },
+    data: { [field]: ADMIN_INT_MAX },
+  });
 }
 
 /** Emails that are auto-promoted to ADMIN (comma-separated ADMIN_EMAILS env). */
@@ -37,6 +90,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
       name: true,
       role: true,
       bannedAt: true,
+      bannedUntil: true,
       emailVerified: true,
     },
   });
@@ -46,7 +100,7 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
 /** Whether the current session belongs to an admin (no redirect). */
 export async function isAdmin(): Promise<boolean> {
   const user = await getSessionUser();
-  return user?.role === "ADMIN" && !user.bannedAt;
+  return user?.role === "ADMIN" && !isBanned(user);
 }
 
 /**
@@ -57,7 +111,7 @@ export async function isAdmin(): Promise<boolean> {
 export const requireAdmin = cache(async (): Promise<SessionUser> => {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  if (user.bannedAt) redirect("/login");
+  if (isBanned(user)) redirect("/login");
 
   if (user.role !== "ADMIN" && bootstrapAdminEmails().has(user.email.toLowerCase())) {
     // Strictly one-shot: promote only while the system has NO admin at all.

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
+import { banLabel, isBanned } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
@@ -15,6 +16,9 @@ export default async function AdminUsersPage({
   await requireAdmin();
   const { q } = await searchParams;
   const query = (q ?? "").trim();
+  // One clock for the whole table, so two rows never disagree about an expiry
+  // that lapsed mid-render.
+  const now = new Date();
 
   const users = await prisma.user.findMany({
     where: query
@@ -34,6 +38,7 @@ export default async function AdminUsersPage({
       email: true,
       role: true,
       bannedAt: true,
+      bannedUntil: true,
       empire: {
         select: { name: true, level: true, gold: true, diamonds: true, turns: true },
       },
@@ -120,9 +125,9 @@ export default async function AdminUsersPage({
                         אדמין
                       </span>
                     )}
-                    {u.bannedAt ? (
+                    {isBanned(u, now) ? (
                       <span className="rounded bg-red-500/20 px-1.5 py-0.5 text-[10px] font-bold text-red-300">
-                        חסום
+                        {banLabel(u, now)}
                       </span>
                     ) : (
                       <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300">

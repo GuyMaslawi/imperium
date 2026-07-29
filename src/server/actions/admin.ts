@@ -20,7 +20,14 @@ import type {
   WeaponCategory,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, logAdmin } from "@/lib/admin";
+import {
+  requireAdmin,
+  logAdmin,
+  saturatingIncrement,
+  ADMIN_INT_MAX,
+  type EmpireIntField,
+} from "@/lib/admin";
+import { BAN_DAYS_MAX, formatBanDate, isBanned } from "@/lib/ban";
 import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
@@ -102,6 +109,21 @@ const ADMIN_NUM_MAX = 1_000_000_000_000; // 1e12
 
 function clampNum(n: number): number {
   return Math.max(-ADMIN_NUM_MAX, Math.min(ADMIN_NUM_MAX, n));
+}
+
+/** Clamp to what an `Int` column can hold — see ADMIN_INT_MAX. */
+function clampInt(n: number): number {
+  return Math.max(-ADMIN_INT_MAX, Math.min(ADMIN_INT_MAX, Math.round(n)));
+}
+
+/** Read a required numeric field destined for an `Int` column (int4-bounded). */
+function intNum(formData: FormData, key: string): number {
+  return clampInt(num(formData, key));
+}
+
+/** Read an optional numeric field destined for an `Int` column (int4-bounded). */
+function intOptNum(formData: FormData, key: string, fallback = 0): number {
+  return clampInt(optNum(formData, key, fallback));
 }
 
 /** Read a required numeric form field (finite, bounded). Throws on invalid input. */
@@ -357,8 +379,17 @@ export async function updateUserAccount(
   }
 }
 
-/** Ban or unban a user (blocks login and all game access). */
-export async function toggleUserBan(
+/**
+ * Ban a user (blocks login and all game access) for a chosen span.
+ *
+ * Three shapes, all stored as the same pair of columns: `days` sets a deadline
+ * N days out, `season` borrows the active season's `endsAt` (the natural unit
+ * of punishment here — a cheat sits out the rest of the competition and starts
+ * clean with everyone else next season), and `permanent` leaves `bannedUntil`
+ * null. Nothing lifts a timed ban on a schedule; it simply stops matching
+ * `isBanned` once its deadline passes.
+ */
+export async function banUser(
   _prev: AdminActionState,
   formData: FormData
 ): Promise<AdminActionState> {
@@ -366,35 +397,92 @@ export async function toggleUserBan(
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
-    if (userId === admin.id) return { error: "אי אפשר לחסום את עצמך" };
+    if (userId === admin.id) return { error: "אי אפשר לתת באן לעצמך" };
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { bannedAt: true, email: true },
+      select: { bannedAt: true, bannedUntil: true, email: true },
     });
     if (!user) return { error: "המשתמש לא נמצא" };
 
-    const banned = user.bannedAt == null;
+    const now = new Date();
+    const mode = str(formData, "mode", 20);
+    let bannedUntil: Date | null = null;
+    if (mode === "days") {
+      // Clamped rather than rejected: the field is a number box, and a ban an
+      // admin meant as "a week" must never land as an accidental millennium.
+      const days = Math.max(1, Math.min(BAN_DAYS_MAX, Math.round(optNum(formData, "days", 7))));
+      bannedUntil = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+    } else if (mode === "season") {
+      const season = await prisma.gameSeason.findFirst({
+        where: { isActive: true },
+        select: { name: true, endsAt: true },
+      });
+      if (!season) return { error: "אין עונה פעילה — בחר משך אחר" };
+      if (season.endsAt <= now) return { error: "העונה הפעילה כבר הסתיימה — בחר משך אחר" };
+      bannedUntil = season.endsAt;
+    } else if (mode !== "permanent") {
+      return { error: "משך באן לא תקין" };
+    }
+
     await prisma.user.update({
       where: { id: userId },
       data: {
-        bannedAt: banned ? new Date() : null,
+        // Re-banning an account that is already serving one keeps the original
+        // stamp: the row records when the player was first punished, and only
+        // the deadline moves.
+        bannedAt: isBanned(user, now) ? user.bannedAt : now,
+        bannedUntil,
         // Bumping tokenVersion invalidates every JWT already issued to this
         // account, so the ban takes effect on the next request instead of
-        // relying on each call site to re-read bannedAt. Sessions are stateless
+        // relying on each call site to re-read the ban. Sessions are stateless
         // and last 30 days; any path that checks only the signature would
         // otherwise keep serving a banned user until the token expired.
-        ...(banned ? { tokenVersion: { increment: 1 } } : {}),
+        tokenVersion: { increment: 1 },
       },
     });
+    const span = bannedUntil ? `עד ${formatBanDate(bannedUntil)}` : "לצמיתות";
     await logAdmin(admin, {
-      action: banned ? "user.ban" : "user.unban",
+      action: "user.ban",
       targetType: "user",
       targetId: userId,
-      summary: `${banned ? "נחסם" : "הוסרה חסימה מ"} ${user.email}`,
+      summary: `ניתן באן ל-${user.email} ${span}`,
     });
     revalidateEmpire(userId);
-    return { success: banned ? "המשתמש נחסם" : "החסימה הוסרה" };
+    return { success: `הבאן ניתן — ${span}` };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Lift a ban (including one whose deadline has already passed). */
+export async function unbanUser(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!user) return { error: "המשתמש לא נמצא" };
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { bannedAt: null, bannedUntil: null },
+    });
+    await logAdmin(admin, {
+      action: "user.unban",
+      targetType: "user",
+      targetId: userId,
+      summary: `הוסר באן מ-${user.email}`,
+    });
+    revalidateEmpire(userId);
+    return { success: "הבאן הוסר" };
   } catch (e) {
     return toErr(e);
   }
@@ -496,15 +584,15 @@ export async function updateEmpireCore(
       where: { id: empireId },
       data: {
         name,
-        level: Math.max(1, Math.round(num(formData, "level"))),
+        level: Math.max(1, intNum(formData, "level")),
         gold: Math.max(0, num(formData, "gold")),
         wood: Math.max(0, num(formData, "wood")),
         iron: Math.max(0, num(formData, "iron")),
         stone: Math.max(0, num(formData, "stone")),
         diamonds: Math.max(0, num(formData, "diamonds")),
-        citizens: Math.max(0, Math.round(num(formData, "citizens"))),
-        turns: Math.max(0, Math.round(num(formData, "turns"))),
-        wheelSpins: Math.max(0, Math.round(num(formData, "wheelSpins"))),
+        citizens: Math.max(0, intNum(formData, "citizens")),
+        turns: Math.max(0, intNum(formData, "turns")),
+        wheelSpins: Math.max(0, intNum(formData, "wheelSpins")),
         // Cities gate the whole progression (citizen cap, quest tiers, the
         // ranking bucket), so it is clamped to the real ladder rather than
         // trusted from the form.
@@ -521,11 +609,28 @@ export async function updateEmpireCore(
       summary: `עודכנו נתוני ליבה של ${name}`,
     });
     revalidateEmpire(userId);
-    return { success: "נתוני האימפריה עודכנו" };
+    // The int4 ceiling is far lower than the one the resource fields accept, so
+    // a clamped turns/citizens value must not look like it saved as typed.
+    const clamped = INT_CORE_FIELDS.filter(
+      ([key]) => num(formData, key) > ADMIN_INT_MAX
+    ).map(([, label]) => label);
+    return {
+      success: clamped.length
+        ? `נתוני האימפריה עודכנו — ${clamped.join(", ")} הוגבלו למקסימום ${ADMIN_INT_MAX.toLocaleString("he-IL")}`
+        : "נתוני האימפריה עודכנו",
+    };
   } catch (e) {
     return toErr(e);
   }
 }
+
+/** Core empire fields backed by an `Int` column, with their Hebrew labels. */
+const INT_CORE_FIELDS = [
+  ["level", "רמה"],
+  ["citizens", "אזרחים"],
+  ["turns", "תורות"],
+  ["wheelSpins", "סיבובי גלגל"],
+] as const;
 
 /** Set the army counts. */
 export async function updateArmy(
@@ -538,9 +643,9 @@ export async function updateArmy(
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const data = {
-      soldiers: Math.max(0, Math.round(num(formData, "soldiers"))),
-      spies: Math.max(0, Math.round(num(formData, "spies"))),
-      mineSlaves: Math.max(0, Math.round(num(formData, "mineSlaves"))),
+      soldiers: Math.max(0, intNum(formData, "soldiers")),
+      spies: Math.max(0, intNum(formData, "spies")),
+      mineSlaves: Math.max(0, intNum(formData, "mineSlaves")),
     };
     await prisma.army.upsert({
       where: { empireId },
@@ -659,7 +764,7 @@ export async function updateStorage(
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const resourceType = str(formData, "resourceType") as ResourceStorageType;
-    const level = Math.max(1, Math.round(num(formData, "level")));
+    const level = Math.max(1, intNum(formData, "level"));
     const storedAmount = Math.max(0, num(formData, "storedAmount"));
     await prisma.resourceStorage.upsert({
       where: { empireId_resourceType: { empireId, resourceType } },
@@ -704,7 +809,7 @@ export async function updateUpgrade(
       type in EMPIRE_UPGRADE_META
         ? empireUpgradeMaxLevel(type as ActiveEmpireUpgradeType, cities)
         : undefined;
-    const level = clampLevel(num(formData, "level"), 1, maxLevel ?? ADMIN_NUM_MAX);
+    const level = clampLevel(num(formData, "level"), 1, maxLevel ?? ADMIN_INT_MAX);
     await prisma.empireUpgrade.upsert({
       where: { empireId_type: { empireId, type } },
       create: { empireId, type, level },
@@ -772,7 +877,7 @@ export async function setWeaponQuantity(
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const weaponKey = str(formData, "weaponKey");
     if (!weaponByKey(weaponKey)) return { error: "מפתח נשק לא קיים" };
-    const quantity = Math.max(0, Math.round(num(formData, "quantity")));
+    const quantity = Math.max(0, intNum(formData, "quantity"));
 
     if (quantity === 0) {
       await prisma.empireWeapon.deleteMany({ where: { empireId, weaponKey } });
@@ -819,7 +924,7 @@ export async function updateHero(
       Math.min(HERO_MAX_HEALTH, Math.round(num(formData, "health")))
     );
     const level = clampLevel(num(formData, "level"), 1, HERO_MAX_LEVEL);
-    const resets = Math.max(0, Math.round(num(formData, "resets")));
+    const resets = Math.max(0, intNum(formData, "resets"));
     // XP is consumed as it is earned — `applyHeroXp` subtracts each level's cost
     // as it cascades — so a live hero never holds more than the next level's
     // requirement, and a hero standing at the cap always sits at exactly 0.
@@ -2060,9 +2165,9 @@ export async function sendGift(
       iron: Math.max(0, optNum(formData, "iron")),
       stone: Math.max(0, optNum(formData, "stone")),
       diamonds: Math.max(0, optNum(formData, "diamonds")),
-      citizens: Math.max(0, Math.round(optNum(formData, "citizens"))),
-      turns: Math.max(0, Math.round(optNum(formData, "turns"))),
-      wheelSpins: Math.max(0, Math.round(optNum(formData, "wheelSpins"))),
+      citizens: Math.max(0, intOptNum(formData, "citizens")),
+      turns: Math.max(0, intOptNum(formData, "turns")),
+      wheelSpins: Math.max(0, intOptNum(formData, "wheelSpins")),
     };
     const anyResource = Object.values(bundle).some((v) => v > 0);
     const title = str(formData, "title", 200);
@@ -2080,14 +2185,21 @@ export async function sendGift(
     if (bundle.iron) increments.iron = { increment: bundle.iron };
     if (bundle.stone) increments.stone = { increment: bundle.stone };
     if (bundle.diamonds) increments.diamonds = { increment: bundle.diamonds };
-    if (bundle.citizens) increments.citizens = { increment: bundle.citizens };
-    if (bundle.turns) increments.turns = { increment: bundle.turns };
-    if (bundle.wheelSpins) increments.wheelSpins = { increment: bundle.wheelSpins };
+    const anyFloat = Object.keys(increments).length > 0;
+    // citizens/turns/wheelSpins are int4: a plain increment that lands past
+    // int4's max aborts the whole gift with an out-of-range error, so those
+    // three saturate at the ceiling instead (see saturatingIncrement).
+    const intGifts: EmpireIntField[] = (
+      ["citizens", "turns", "wheelSpins"] as const
+    ).filter((field) => bundle[field] > 0);
 
     await prisma.$transaction(async (tx) => {
       for (const batch of chunk(empireIds, BULK_BATCH_SIZE)) {
-        if (anyResource) {
+        if (anyFloat) {
           await tx.empire.updateMany({ where: { id: { in: batch } }, data: increments });
+        }
+        for (const field of intGifts) {
+          await saturatingIncrement(tx, batch, field, bundle[field]);
         }
         if (title) {
           await tx.message.createMany({
@@ -2506,9 +2618,9 @@ function readPrizeBundle(formData: FormData) {
     prizeIron: Math.max(0, optNum(formData, "prizeIron")),
     prizeStone: Math.max(0, optNum(formData, "prizeStone")),
     prizeDiamonds: Math.max(0, optNum(formData, "prizeDiamonds")),
-    prizeCitizens: Math.max(0, Math.round(optNum(formData, "prizeCitizens"))),
-    prizeTurns: Math.max(0, Math.round(optNum(formData, "prizeTurns"))),
-    prizeWheelSpins: Math.max(0, Math.round(optNum(formData, "prizeWheelSpins"))),
+    prizeCitizens: Math.max(0, intOptNum(formData, "prizeCitizens")),
+    prizeTurns: Math.max(0, intOptNum(formData, "prizeTurns")),
+    prizeWheelSpins: Math.max(0, intOptNum(formData, "prizeWheelSpins")),
   };
 }
 

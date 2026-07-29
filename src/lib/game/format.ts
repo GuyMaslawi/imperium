@@ -33,6 +33,20 @@ export function formatCompact(value: number): string {
   return nf.format(Math.floor(value));
 }
 
+/**
+ * A bonus figure, as it is printed everywhere gear is shown.
+ *
+ * Percentages are no longer whole: an extra on a low-rung item is genuinely
+ * worth a quarter of a percent, and it says so. Only the digits that carry
+ * information are printed — "+40%", not "+40.00%" — and flat counts, which are
+ * always whole, are unaffected by the decimals branch.
+ */
+export function formatBonus(value: number): string {
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(2)));
+}
+
 export function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("he-IL", {
     dateStyle: "short",

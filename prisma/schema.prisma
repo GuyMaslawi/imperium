@@ -51,8 +51,14 @@ model User {
   image         String?
   name          String
   role          Role      @default(USER)
-  /// When set, the user is banned — login is refused and game access blocked.
+  /// When the ban was handed down. Never a ban check on its own — see
+  /// `bannedUntil` and `isBanned()` in src/lib/ban.ts.
   bannedAt      DateTime?
+  /// When a ban lifts by itself; null while `bannedAt` is set means permanent.
+  /// A ban is live only while `bannedAt != null && (bannedUntil == null ||
+  /// bannedUntil > now)` — nothing sweeps expired rows, so every read evaluates
+  /// the deadline instead of trusting `bannedAt`.
+  bannedUntil   DateTime?
   /// Bumped to invalidate every previously-issued session JWT (stateless, so a
   /// token stays valid until expiry otherwise). Embedded as the `ver` claim at
   /// sign time and re-checked on every request; a password reset increments it,

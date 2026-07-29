@@ -394,7 +394,6 @@ export async function archiveSeasonStandings(seasonId: string): Promise<number> 
   const written = await prisma.$transaction((tx) => archiveSeason(tx, season), {
     timeout: 30_000,
   });
-  if (written > 0) invalidateHall();
   return written;
 }
 
@@ -437,7 +436,6 @@ export async function closeSeason(
     { timeout: 30_000 }
   );
 
-  if (closed) invalidateHall();
   return closed;
 }
 
@@ -551,11 +549,6 @@ export interface HallSeason {
   champions: HallChampion[];
 }
 
-/** How long the hall is served before it is re-read. */
-export const HALL_TTL_MS = 300_000;
-
-let hallCache: { seasons: HallSeason[]; builtAt: number } | null = null;
-
 /**
  * היכל התהילה — every archived season and who topped it, newest first.
  *
@@ -565,15 +558,13 @@ let hallCache: { seasons: HallSeason[]; builtAt: number } | null = null;
  * Every field the board draws lives on the champion row for exactly that
  * reason.
  *
- * A five-minute TTL on a board that changes a handful of times a year is
- * generous, not stingy: the rankings page rides a 30-second AutoRefresh, and
- * there is no reason for N spectators to re-read a frozen archive twice a
- * minute. `invalidateHall` covers the writes.
+ * Read live, like every other board. This one is the odd case — a frozen archive
+ * written three rows at a time, a handful of times a year — and it did sit behind
+ * a five-minute TTL. But it is three rows per season ordered off an index, so the
+ * cache was saving nothing worth the question "is this stale?", which is the one
+ * question no board in this game should raise.
  */
 export async function getHallOfFame(): Promise<HallSeason[]> {
-  const now = Date.now();
-  if (hallCache && now - hallCache.builtAt < HALL_TTL_MS) return hallCache.seasons;
-
   const rows = await prisma.seasonChampion.findMany({
     orderBy: [{ seasonEndsAt: "desc" }, { rank: "asc" }],
     select: {
@@ -615,12 +606,5 @@ export async function getHallOfFame(): Promise<HallSeason[]> {
     });
   }
 
-  const seasons = [...bySeason.values()];
-  hallCache = { seasons, builtAt: now };
-  return seasons;
-}
-
-/** Drop the cached hall — call after archiving or deleting a season. */
-export function invalidateHall(): void {
-  hallCache = null;
+  return [...bySeason.values()];
 }

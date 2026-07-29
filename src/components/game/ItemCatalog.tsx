@@ -1,6 +1,7 @@
 "use client";
 
-import { ItemTile, formatBonus } from "@/components/game/ItemTile";
+import { ItemTile } from "@/components/game/ItemTile";
+import { formatBonus } from "@/lib/game/format";
 import { catalogKey, itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { Icon } from "@/components/ui/Icon";
 import {

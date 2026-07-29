@@ -9,6 +9,8 @@ export function LabeledInput({
   label,
   name,
   defaultValue,
+  value,
+  onValueChange,
   type = "text",
   step,
   min,
@@ -21,6 +23,13 @@ export function LabeledInput({
   label: ReactNode;
   name: string;
   defaultValue?: string | number;
+  /**
+   * Controlled value. Only for the handful of forms whose *other* fields react
+   * to this one (the ban panel's duration); everything else stays uncontrolled
+   * and reads the DOM at submit.
+   */
+  value?: string;
+  onValueChange?: (value: string) => void;
   type?: "text" | "number" | "email" | "password" | "datetime-local";
   step?: number | string;
   min?: number | string;
@@ -44,7 +53,9 @@ export function LabeledInput({
         step={step}
         min={min}
         max={max}
-        defaultValue={defaultValue}
+        {...(value != null
+          ? { value, onChange: (e) => onValueChange?.(e.target.value) }
+          : { defaultValue })}
         placeholder={placeholder}
         required={required}
         dir={dir ?? (type === "number" ? "ltr" : undefined)}
@@ -60,17 +71,28 @@ export function LabeledSelect({
   label,
   name,
   defaultValue,
+  value,
+  onValueChange,
   options,
 }: {
   label: string;
   name: string;
   defaultValue?: string;
+  /** Controlled value — see `LabeledInput`. */
+  value?: string;
+  onValueChange?: (value: string) => void;
   options: { value: string; label: string }[];
 }) {
   return (
     <label className="block space-y-1">
       <span className="text-xs font-semibold text-gold-dim">{label}</span>
-      <select name={name} defaultValue={defaultValue} className={INPUT_CLASS}>
+      <select
+        name={name}
+        {...(value != null
+          ? { value, onChange: (e) => onValueChange?.(e.target.value) }
+          : { defaultValue })}
+        className={INPUT_CLASS}
+      >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}

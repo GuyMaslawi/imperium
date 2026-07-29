@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { applyPendingUpdates } from "@/lib/game/updates";
+import { isBanned } from "@/lib/ban";
 import { getSeasonGate } from "@/server/seasonClose";
 
 const SESSION_COOKIE = "imperium_session";
@@ -186,14 +187,14 @@ export const getActiveEmpireId = cache(async (): Promise<string | null> => {
     where: { userId },
     select: {
       id: true,
-      user: { select: { bannedAt: true, emailVerified: true } },
+      user: { select: { bannedAt: true, bannedUntil: true, emailVerified: true } },
     },
   });
   // Unverified accounts are gated here as well as at requireEmpire: page loads
   // are not the only way in, and every server action resolves its empire
   // through this function. Gating only the pages would leave the whole
   // mutation surface reachable by POST from an unverified account.
-  if (!empire || empire.user.bannedAt || !empire.user.emailVerified) return null;
+  if (!empire || isBanned(empire.user) || !empire.user.emailVerified) return null;
   // Between seasons the world is frozen. Same reasoning as the verification
   // check above: redirecting the pages alone would leave every server action
   // — bank, training, attacks, the diamond shop — POSTable after the final
@@ -218,8 +219,8 @@ export const requireEmpire = cache(async () => {
     include: { user: true },
   });
   if (!existing) redirect("/login");
-  // Banned users lose all game access.
-  if (existing.user.bannedAt) {
+  // Banned users lose all game access, until the ban's deadline passes.
+  if (isBanned(existing.user)) {
     await destroySession();
     redirect("/login");
   }

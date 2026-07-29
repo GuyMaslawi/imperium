@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, logAdmin } from "@/lib/admin";
+import { isBanned } from "@/lib/ban";
 import {
   clearImpersonationReturn,
   createSession,
@@ -41,6 +42,7 @@ export async function impersonatePlayer(
       email: true,
       role: true,
       bannedAt: true,
+      bannedUntil: true,
       emailVerified: true,
       tokenVersion: true,
       empire: { select: { id: true } },
@@ -54,7 +56,7 @@ export async function impersonatePlayer(
   // A banned or unverified account is bounced straight back out of /game, and
   // a ban destroys the session on the way — which would strand the admin with
   // no session and no obvious way back. Refuse rather than trap.
-  if (target.bannedAt) return { error: "המשתמש חסום — הסר את החסימה תחילה" };
+  if (isBanned(target)) return { error: "המשתמש בבאן — הסר את הבאן תחילה" };
   if (!target.emailVerified) return { error: "האימייל של המשתמש לא אומת" };
   if (!target.empire) return { error: "למשתמש אין אימפריה" };
 
@@ -83,7 +85,14 @@ export async function returnToAdmin(): Promise<void> {
 
   const adminUser = await prisma.user.findUnique({
     where: { id: ticket.userId },
-    select: { id: true, email: true, role: true, bannedAt: true, tokenVersion: true },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      bannedAt: true,
+      bannedUntil: true,
+      tokenVersion: true,
+    },
   });
 
   // The ticket is only as good as the account it names still being an admin —
@@ -92,7 +101,7 @@ export async function returnToAdmin(): Promise<void> {
   const usable =
     adminUser != null &&
     adminUser.role === "ADMIN" &&
-    adminUser.bannedAt == null &&
+    !isBanned(adminUser) &&
     adminUser.tokenVersion === ticket.tokenVersion;
 
   if (!usable) {

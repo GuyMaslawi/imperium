@@ -60,7 +60,14 @@ async function main(): Promise<void> {
 
   const user = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, role: true, emailVerified: true, bannedAt: true },
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      emailVerified: true,
+      bannedAt: true,
+      bannedUntil: true,
+    },
   });
   if (!user) {
     console.error(`\nNo user with that address on this database.`);
@@ -73,7 +80,12 @@ async function main(): Promise<void> {
     orderBy: { email: "asc" },
   });
   console.log(`Current admins: ${admins.map((a) => a.email).join(", ") || "(none)"}`);
-  console.log(`Current role  : ${user.role}${user.bannedAt ? " (BANNED)" : ""}`);
+  const banned = user.bannedAt != null && (user.bannedUntil == null || user.bannedUntil > new Date());
+  console.log(
+    `Current role  : ${user.role}${
+      banned ? ` (BANNED${user.bannedUntil ? ` until ${user.bannedUntil.toISOString()}` : ""})` : ""
+    }`
+  );
   console.log(`Email verified: ${user.emailVerified ? "yes" : "no"}`);
 
   if (!revoke && !user.emailVerified) {

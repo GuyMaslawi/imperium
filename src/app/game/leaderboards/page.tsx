@@ -104,16 +104,17 @@ export default async function LeaderboardsPage({
   // Every board here is GLOBAL — ranked across the whole game, not scoped to a
   // single city like the /game/rankings list.
   //
-  // All five boards are read through the shared cache in server/rankingsLadder:
-  // `spy` and `power` are JS figures, so the top-ten cut cannot move into SQL
-  // and the query is a full scan of Empire + its armies and arsenals. This page
-  // re-runs on every load and again every 30s per open tab with no rate limit on
-  // RSC GETs, which made it the cheapest way for any logged-in player to put the
-  // database under sustained full-scan load. The cache collapses every viewer in
-  // a 20-second window onto one scan; the numbers are a leaderboard, not a
-  // ledger, and were never live to the second anyway.
-  const boards = await getGlobalBoards();
-  const theftRows: BoardRow[] = await getTheftBoard(period, theftCutoff(period));
+  // All five boards are live — no cache anywhere behind them. They used to sit
+  // behind a 20-second TTL, because `spy` and `power` were JS figures: the
+  // top-ten cut could not move into SQL and every read was a full scan of Empire
+  // plus its armies and arsenals, on every load and again every 30s per open tab
+  // with no rate limit on RSC GETs. Now all five are indexed `ORDER BY … LIMIT
+  // 10` (or one aggregate), so fifty rows come back instead of the table and a
+  // balance that moved a second ago is already on the board.
+  const [boards, theftRows] = await Promise.all([
+    getGlobalBoards(),
+    getTheftBoard(theftCutoff(period)),
+  ]);
 
   return (
     <div className="space-y-6">

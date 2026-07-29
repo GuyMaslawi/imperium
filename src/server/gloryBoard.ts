@@ -26,21 +26,11 @@ import { GLORY_KEYS, type AchievementsState } from "@/lib/game/achievements";
  * gameplay path with a timestamp write, and it is the same rule for everybody.
  */
 
-/** How long a record board is served before it is rebuilt. */
-export const GLORY_TTL_MS = 120_000;
-
 export interface GloryChampion {
   empireId: string;
   empireName: string;
   awardedAt: Date;
 }
-
-interface Entry {
-  byKey: Map<string, GloryChampion>;
-  builtAt: number;
-}
-
-let cache: Entry | null = null;
 
 /**
  * Stamp every capstone this empire now qualifies for.
@@ -49,8 +39,8 @@ let cache: Entry | null = null;
  * required — so this reads the same flag the board draws, and the decoration
  * can never disagree with the medal beside it.
  *
- * Returns the keys stamped for the first time, so the caller can invalidate the
- * record cache when the board may have just changed.
+ * Returns the keys stamped for the first time, so the caller can tell the player
+ * what they just earned.
  */
 export async function stampGloryAwards(
   empireId: string,
@@ -82,7 +72,20 @@ export async function stampGloryAwards(
   return fresh;
 }
 
-async function build(): Promise<Map<string, GloryChampion>> {
+/**
+ * The record holder for each capstone, keyed by GLORY_KEYS entry. A key absent
+ * from the map has never been reached by anyone — that record is still open.
+ *
+ * Live, like every other board in the game. It used to sit behind a two-minute
+ * TTL with an explicit invalidation on the stamping path, which was sound as far
+ * as one server went — but the cache is per-instance, so a record set on one
+ * instance stayed invisible on the others until their own TTL ran out. Being
+ * first is the entire content of this board; it is not the place to be two
+ * minutes behind. What makes live cheap is the query: `DISTINCT ON` off the
+ * `(key, awardedAt)` index returns one row per capstone — seven rows, however
+ * many players the game has.
+ */
+export async function getGloryChampions(): Promise<Map<string, GloryChampion>> {
   // DISTINCT ON is the whole query: order by key then awardedAt and Postgres
   // hands back the first row of each key group, straight off the
   // (key, awardedAt) index. The Prisma-shaped alternative — a findFirst per
@@ -110,35 +113,3 @@ async function build(): Promise<Map<string, GloryChampion>> {
   );
 }
 
-/** Throw away the cached board — call after a stamp that may have set a record. */
-export function invalidateGloryChampions(): void {
-  cache = null;
-}
-
-/**
- * The record holder for each capstone, keyed by GLORY_KEYS entry. A key absent
- * from the map has never been reached by anyone — that record is still open.
- *
- * **Why this is cached.** A record, once set, never changes: the row is the
- * earliest stamp of that key and nothing later can be earlier. Only an *open*
- * capstone can move, and it moves at most once, ever — and `stampGloryAwards`
- * drops the cache on exactly those writes. Meanwhile the screen it sits on is
- * the game's landing page and is loaded constantly. Same per-instance TTL
- * argument as `rankingsLadder.ts`, only more so.
- */
-export async function getGloryChampions(): Promise<Map<string, GloryChampion>> {
-  const now = Date.now();
-  if (cache && now - cache.builtAt < GLORY_TTL_MS) return cache.byKey;
-
-  // A failed rebuild keeps serving the previous board rather than blanking the
-  // landing screen: these records are historical, so stale is strictly better
-  // than absent. With no previous board there is nothing to fall back to.
-  try {
-    const byKey = await build();
-    cache = { byKey, builtAt: now };
-    return byKey;
-  } catch (error) {
-    if (cache) return cache.byKey;
-    throw error;
-  }
-}

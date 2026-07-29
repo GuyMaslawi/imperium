@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getCityLadder, withViewerRow } from "@/server/rankingsLadder";
+import { getCityLadderPage } from "@/server/rankingsLadder";
 import { getHallOfFame } from "@/server/seasonClose";
 import { GUILD_ROLE_META } from "@/lib/game/guild";
 import { formatCompact, formatDate, formatNumber } from "@/lib/game/format";
@@ -17,9 +17,6 @@ import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
 export const metadata = { title: "דירוג | אימפריום" };
-
-/** Ranked rows per page. */
-const PAGE_SIZE = 10;
 
 /** Page links to draw around the current one, either side. */
 const PAGER_SPREAD = 2;
@@ -127,37 +124,20 @@ export default async function RankingsPage({
   // that everyone in the city shares, so it belongs above the ladder.
   const bossState = await getCityBossState(myEmpire);
 
-  // Ranked and cut in SQL off the denormalised militaryPower column. What keeps
-  // it off the database is the shared TTL in getCityLadder — see the header
-  // there — and what keeps it off the wire is the page slice below.
-  //
-  // That TTL is also why the viewer's own row is spliced back in from the empire
-  // requireEmpire already loaded: train an army and walk straight here, and the
-  // cached row is the one from before you trained. See withViewerRow.
-  const ranked = withViewerRow(await getCityLadder(myCity), {
-    id: myEmpire.id,
-    name: myEmpire.name,
-    gold: myEmpire.gold,
-    army: myEmpire.army && { soldiers: myEmpire.army.soldiers },
-    hero: myEmpire.hero && {
-      level: myEmpire.hero.level,
-      resets: myEmpire.hero.resets,
-    },
-    power: myEmpire.militaryPower,
-  });
-
-  // Exact, and computed against the whole ladder rather than the page.
-  const myRank = ranked.findIndex((e) => e.id === myEmpire.id) + 1;
-
-  const pageCount = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
-  // Land on the page holding your own row when none was asked for, so the
-  // default view answers "where am I" without paging to find out.
-  const defaultPage = myRank > 0 ? Math.ceil(myRank / PAGE_SIZE) : 1;
-  const page = Number.isInteger(requestedPage)
-    ? Math.min(pageCount, Math.max(1, requestedPage))
-    : defaultPage;
-  const firstIndex = (page - 1) * PAGE_SIZE;
-  const visible = ranked.slice(firstIndex, firstIndex + PAGE_SIZE);
+  // Live — nothing on this ladder is cached. Ranked, counted and cut in SQL, so
+  // it costs ten rows rather than the city bucket and an army trained a second
+  // ago is already on it, yours or anyone else's. requireEmpire has just settled
+  // this empire, so its own row is current before the ladder even reads it. See
+  // the header of server/rankingsLadder.ts.
+  const {
+    rows: visible,
+    total,
+    myRank,
+    page,
+    pageCount,
+    myPage,
+    firstRank,
+  } = await getCityLadderPage(myCity, myEmpire.id, requestedPage);
 
   // Raid shields and guild names for the rows actually rendered — scoped to the
   // ten visible rows rather than the whole bucket. The guild column shipped as
@@ -213,7 +193,7 @@ export default async function RankingsPage({
                 </span>{" "}
                 ·{" "}
                 <span className="nums font-bold text-emerald-400" dir="ltr">
-                  {ranked.length}
+                  {total}
                 </span>{" "}
                 אימפריות
               </span>
@@ -266,7 +246,7 @@ export default async function RankingsPage({
                 // Rank is the position in the whole ladder, not on this page —
                 // page 2 starts at 11, and the medals stay with the top three
                 // wherever the reader happens to be standing.
-                const rank = firstIndex + index + 1;
+                const rank = firstRank + index;
                 const medal =
                   rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
                 return (
@@ -426,7 +406,7 @@ export default async function RankingsPage({
           </table>
         </div>
 
-        <Pager page={page} pageCount={pageCount} myPage={defaultPage} />
+        <Pager page={page} pageCount={pageCount} myPage={myPage} />
       </div>
 
       {/* -------- hall of fame: the archive of finished seasons -------- */}

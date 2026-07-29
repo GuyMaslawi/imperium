@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
+import { notBannedWhere } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
@@ -50,7 +51,7 @@ export default async function MessagesPage() {
     // Only id + name leave the server — this is an address book, not a scouting
     // report.
     prisma.empire.findMany({
-      where: { id: { not: empire.id }, user: { bannedAt: null } },
+      where: { id: { not: empire.id }, user: notBannedWhere() },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
       take: 1000,

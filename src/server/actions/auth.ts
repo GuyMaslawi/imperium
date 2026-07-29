@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { HeroClass } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
+import { banNotice, isBanned } from "@/lib/ban";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { verifyGoogleIdToken } from "@/lib/google";
 import { newEmpireData } from "@/lib/game/createEmpire";
@@ -424,8 +425,8 @@ export async function login(
     // this address have an account?" with certainty.
     return { error: "אימייל או סיסמה שגויים" };
   }
-  if (user.bannedAt) {
-    return { error: "החשבון נחסם על ידי ההנהלה" };
+  if (isBanned(user)) {
+    return { error: banNotice(user) };
   }
 
   // Successful sign-in clears the streak (and any expired lock), and is also the
@@ -502,7 +503,7 @@ export async function changePassword(
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) redirect("/login");
-  if (user.bannedAt) {
+  if (isBanned(user)) {
     await destroySession();
     redirect("/login");
   }
@@ -666,8 +667,8 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
     }
   }
 
-  if (user.bannedAt) {
-    return { error: "החשבון נחסם על ידי ההנהלה" };
+  if (isBanned(user)) {
+    return { error: banNotice(user) };
   }
 
   await createSession(user.id, user.tokenVersion);
@@ -785,15 +786,15 @@ export async function createEmpireForCurrentUser(
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
-  // getSessionUserId only proves the JWT is valid — it does not read bannedAt,
+  // getSessionUserId only proves the JWT is valid — it does not read the ban,
   // and the /game guards this action bypasses are the ones that normally do.
   // Without this check a user banned before onboarding (a Google sign-up has no
   // empire yet) could still create one and squat an empire name.
   const account = await prisma.user.findUnique({
     where: { id: userId },
-    select: { bannedAt: true },
+    select: { bannedAt: true, bannedUntil: true },
   });
-  if (!account || account.bannedAt) {
+  if (!account || isBanned(account)) {
     await destroySession();
     redirect("/login");
   }

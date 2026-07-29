@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { notBannedWhere } from "@/lib/ban";
 import { rateLimit } from "@/lib/rateLimit";
 import {
   MESSAGE_BODY_MAX,
@@ -139,7 +140,7 @@ export async function sendPlayerMessage(
     const targets = await prisma.empire.findMany({
       where: {
         id: { in: parsed.data.recipients.filter((id) => id !== empireId) },
-        user: { bannedAt: null },
+        user: notBannedWhere(),
       },
       select: { id: true, name: true },
     });

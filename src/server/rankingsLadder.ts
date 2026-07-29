@@ -1,30 +1,29 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 /**
  * The city ladder: every empire in one city tier, ranked by military power.
  *
- * Ranked and cut **in SQL**, off the denormalised `Empire.militaryPower` column
- * and its `[cities, militaryPower]` index. It used to be impossible: the figure
- * was computed in JS from the army *and every row of the arsenal*, so the page
- * loaded the whole city bucket — and because `Empire.cities` defaults to 1, for
- * the whole early game that bucket was the entire table — sorted in memory and
- * threw away all but the visible rows. With AutoRefresh re-running it twice a
- * minute per open tab, ten idle spectators cost twenty full scans a minute.
- * See server/empirePower.ts for what keeps the column true.
+ * **Nothing here is cached.** This is a game where an attack lands, an army is
+ * trained and a rank changes between one breath and the next, so a board that is
+ * twenty seconds behind is a board that lies — and it lies worst about the
+ * viewer's own row, right after they acted, which reads as a lost action rather
+ * than as a stale cache.
  *
- * The cache stays, doing a smaller job: the page still needs `ranked.length`
- * and the viewer's exact rank, and those are two more round trips. One short
- * TTL means N spectators share one set. It is per-instance, which for a cache
- * is fine — a cold instance pays for one build, and two instances disagreeing
- * for a few seconds is indistinguishable from two players refreshing a few
- * seconds apart. (Contrast `lib/rateLimit.ts`, where per-instance state was the
- * bug: a limiter must agree across the fleet; a cache need not.)
+ * What makes live affordable is that every read below is **bounded**: ranked,
+ * counted and cut *in SQL*, off the denormalised `Empire.militaryPower` column
+ * and its `[cities, militaryPower]` index, returning the ten rows the page draws
+ * instead of the bucket. It used to be the opposite — power was computed in JS
+ * from the army *and every row of the arsenal*, so the page loaded the whole city
+ * bucket (and because `Empire.cities` defaults to 1, for the whole early game
+ * that bucket was the entire table), sorted it in memory and threw away all but
+ * the visible rows. That is what needed a cache in front of it: with AutoRefresh
+ * re-running twice a minute per open tab, ten idle spectators cost twenty full
+ * scans a minute. A bounded query does not need protecting from spectators.
+ *
+ * See server/empirePower.ts for what keeps `militaryPower` true.
  */
-
-/** How long a computed ladder is served before it is rebuilt. */
-export const LADDER_TTL_MS = 20_000;
 
 export interface LadderRow {
   id: string;
@@ -35,113 +34,156 @@ export interface LadderRow {
   power: number;
 }
 
-interface Entry {
+/** Ranked rows per page. */
+export const PAGE_SIZE = 10;
+
+export interface CityLadderPage {
+  /** The rows of the page actually served, in rank order. */
   rows: LadderRow[];
-  builtAt: number;
-}
-
-const cache = new Map<number, Entry>();
-
-/**
- * Bound the map. One entry per city tier, so it can never hold more than
- * MAX_CITIES rows in practice — the cap is a backstop against a stray tier
- * value, not a real pressure.
- */
-const MAX_TIERS = 64;
-
-/**
- * The ladder's ordering. Ties on raw military power break on the hero — his
- * level, then how many times he has run the curve to 100. Applied in JS because
- * it only ever reorders empires the `[cities, militaryPower]` index already
- * placed together, and `empire.level` (the old tiebreak) is a column gameplay
- * never writes: it was 1 for everyone, so ties fell through to whatever order
- * Postgres returned.
- *
- * Shared by `build` and `withViewerRow` so a re-inserted row lands exactly
- * where the query would have put it.
- */
-function compareRows(a: LadderRow, b: LadderRow): number {
-  return (
-    b.power - a.power ||
-    (b.hero?.level ?? 1) - (a.hero?.level ?? 1) ||
-    (b.hero?.resets ?? 0) - (a.hero?.resets ?? 0)
-  );
-}
-
-async function build(cities: number): Promise<LadderRow[]> {
-  // Ordered by the stored column, so Postgres walks the [cities, militaryPower]
-  // index instead of the app loading and sorting the bucket. The arsenal is not
-  // read at all any more — it was the bulk of the old query.
-  const empires = await prisma.empire.findMany({
-    where: { cities },
-    orderBy: { militaryPower: "desc" },
-    select: {
-      id: true,
-      name: true,
-      gold: true,
-      militaryPower: true,
-      army: { select: { soldiers: true } },
-      hero: { select: { level: true, resets: true } },
-    },
-  });
-
-  return empires
-    .map(({ militaryPower, ...e }) => ({ ...e, power: militaryPower }))
-    .sort(compareRows);
+  /** Every empire in the tier. */
+  total: number;
+  /** The viewer's exact rank against the whole tier, 1-based. */
+  myRank: number;
+  /** The page served — the request clamped to what exists. */
+  page: number;
+  pageCount: number;
+  /** The page holding the viewer's own row. */
+  myPage: number;
+  /** Rank of `rows[0]`, so the table can number rows by ladder position. */
+  firstRank: number;
 }
 
 /**
- * The cached ladder with the viewer's own row replaced by the figures the page
- * already holds fresh, re-placed at the rank that row now sorts to.
+ * The ladder's total order, as one SQL fragment, so the ranking count and the
+ * row query can never disagree about it.
  *
- * The TTL above is what keeps the ladder off the database, but it also means a
- * player who trains an army and walks straight to the ladder reads their own row
- * as it was up to twenty seconds ago — and `revalidatePath` cannot help, because
- * a module-level Map is not Next's cache. Everyone *else* being a few seconds
- * stale is the deal the TTL buys and nobody can tell; your own numbers being
- * stale right after you changed them reads as a lost action.
+ * Ties on raw military power break on the hero — his level, then how many times
+ * he has run the curve to 100 — and finally on `id`, which is arbitrary but
+ * *stable*: without it, empires tied on all three (every empire in the game at
+ * season start, all sitting at zero power) would come back in whatever order
+ * Postgres felt like and shuffle between refreshes. A heroless empire counts as
+ * level 1, reset 0, matching what the page shows for one.
  *
- * `requireEmpire` has already loaded the viewer's empire, settled, on every
- * /game page load, so the fresh row costs no query.
- *
- * Never mutates the cached array — it filters into a new one.
+ * `empire.level` was the old tiebreak — a column gameplay never writes, so it
+ * was 1 for everyone and broke nothing.
  */
-export function withViewerRow(
-  rows: readonly LadderRow[],
-  viewer: LadderRow
-): LadderRow[] {
-  const merged = rows.filter((r) => r.id !== viewer.id);
-  // Linear rather than a re-sort: the rest is already ordered, so this only
-  // finds the one seam the viewer's row belongs in. Also inserts an empire the
-  // cached build has never seen — one that just took its first city, and used to
-  // be missing from its new tier's ladder for a TTL.
-  let at = merged.findIndex((r) => compareRows(viewer, r) < 0);
-  if (at < 0) at = merged.length;
-  merged.splice(at, 0, viewer);
-  return merged;
-}
+const LADDER_ORDER = Prisma.sql`
+  e."militaryPower" DESC,
+  COALESCE(h.level, 1) DESC,
+  COALESCE(h.resets, 0) DESC,
+  e.id ASC
+`;
 
 /**
- * The ranked ladder for one city tier, rebuilt at most once per LADDER_TTL_MS.
+ * LADDER_ORDER again, spelled as a predicate: does the joined empire sort
+ * strictly ahead of `me`? Counting the rows that satisfy it gives the viewer's
+ * rank, minus one.
  *
- * Concurrent callers that arrive on a cold entry all build — no in-flight
- * dedup. Deliberate: sharing one promise means a build that fails takes every
- * waiter down with it, and the window it would save is the handful of
- * milliseconds between two requests landing on the same cold instance.
+ * The `me` row is the viewer's own, read by the same query rather than passed in
+ * by the caller. That is deliberate: the count and the row query must compare the
+ * *same* figures, and a caller handing over its own idea of the viewer's power —
+ * a settled snapshot, a recomputed total — is exactly how the two would come to
+ * disagree and print "rank 5" above a row sitting sixth.
  */
-export async function getCityLadder(cities: number): Promise<LadderRow[]> {
-  const now = Date.now();
-  const hit = cache.get(cities);
-  if (hit && now - hit.builtAt < LADDER_TTL_MS) return hit.rows;
+const AHEAD_OF_ME = Prisma.sql`
+  e."militaryPower" > me.power
+  OR (e."militaryPower" = me.power AND (
+    COALESCE(h.level, 1) > me.level
+    OR (COALESCE(h.level, 1) = me.level AND (
+      COALESCE(h.resets, 0) > me.resets
+      OR (COALESCE(h.resets, 0) = me.resets AND e.id < me.id)
+    ))
+  ))
+`;
 
-  const rows = await build(cities);
-  if (cache.size >= MAX_TIERS) {
-    // Map preserves insertion order; drop the oldest entry.
-    const oldest = cache.keys().next();
-    if (!oldest.done) cache.delete(oldest.value);
-  }
-  cache.set(cities, { rows, builtAt: now });
-  return rows;
+/**
+ * One page of the live city ladder, plus the tier's size and the viewer's exact
+ * rank in it.
+ *
+ * Two bounded round trips, and they must be in this order: the page to serve
+ * depends on the rank (asked for no page, you land on your own), and the rank
+ * comes from the count. Neither ships more than ten rows.
+ *
+ * `requestedPage` may be NaN — that is the "no page asked for" case, not an
+ * error.
+ */
+export async function getCityLadderPage(
+  cities: number,
+  viewerId: string,
+  requestedPage: number
+): Promise<CityLadderPage> {
+  // One pass over the tier that returns two integers: no rows cross the wire.
+  // The viewer never counts as ahead of themselves — their own row ties on all
+  // four terms — so `ahead + 1` is exactly their rank.
+  const [counts] = await prisma.$queryRaw<{ total: bigint; ahead: bigint }[]>`
+    WITH me AS (
+      SELECT e."militaryPower" AS power,
+             COALESCE(h.level, 1) AS level,
+             COALESCE(h.resets, 0) AS resets,
+             e.id AS id
+      FROM "Empire" e
+      LEFT JOIN "Hero" h ON h."empireId" = e.id
+      WHERE e.id = ${viewerId}
+    )
+    SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE ${AHEAD_OF_ME}) AS ahead
+    FROM "Empire" e
+    LEFT JOIN "Hero" h ON h."empireId" = e.id
+    -- LEFT, not CROSS: an unknown viewer must still be counted a tier, not
+    -- collapse it to nothing. Their comparisons go NULL and rank falls out as 1.
+    LEFT JOIN me ON TRUE
+    WHERE e.cities = ${cities}
+  `;
+  const total = Number(counts?.total ?? 0);
+  const myRank = Number(counts?.ahead ?? 0) + 1;
+
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  // Land on the page holding your own row when none was asked for, so the
+  // default view answers "where am I" without paging to find out.
+  const myPage = Math.min(pageCount, Math.ceil(myRank / PAGE_SIZE));
+  const page = Number.isInteger(requestedPage)
+    ? Math.min(pageCount, Math.max(1, requestedPage))
+    : myPage;
+  const firstRank = (page - 1) * PAGE_SIZE + 1;
+
+  // An index scan down [cities, militaryPower], stopping at the page's end. The
+  // arsenal is not read at all — it was the bulk of the old query.
+  const rows = await prisma.$queryRaw<
+    {
+      id: string;
+      name: string;
+      gold: number;
+      power: number;
+      soldiers: number | null;
+      level: number | null;
+      resets: number | null;
+    }[]
+  >`
+    SELECT e.id, e.name, e.gold, e."militaryPower" AS power,
+           a.soldiers, h.level, h.resets
+    FROM "Empire" e
+    LEFT JOIN "Army" a ON a."empireId" = e.id
+    LEFT JOIN "Hero" h ON h."empireId" = e.id
+    WHERE e.cities = ${cities}
+    ORDER BY ${LADDER_ORDER}
+    LIMIT ${PAGE_SIZE} OFFSET ${firstRank - 1}
+  `;
+
+  return {
+    rows: rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      gold: r.gold,
+      power: r.power,
+      army: r.soldiers === null ? null : { soldiers: r.soldiers },
+      hero: r.level === null ? null : { level: r.level, resets: r.resets ?? 0 },
+    })),
+    total,
+    myRank,
+    page,
+    pageCount,
+    myPage,
+    firstRank,
+  };
 }
 
 /* ------------------------------ global boards ------------------------------ */
@@ -166,27 +208,25 @@ export interface GlobalBoards {
 /** Rows each global board shows. */
 const BOARD_SIZE = 10;
 
-let boardsCache: { boards: GlobalBoards; builtAt: number } | null = null;
-
 /**
  * The four cross-game boards, top ten each — four indexed `ORDER BY … LIMIT 10`
- * queries.
+ * queries, live.
  *
  * This was the worst query in the app: **global**, not one city bucket, it
  * loaded every empire in the game with its army, arsenal and bank account,
  * mapped the lot, and threw away all but forty rows — on every page load and
  * again every thirty seconds per open tab, with no rate limit on RSC GETs. The
  * old comment said it plainly: the cheapest way for any logged-in player to put
- * the database under sustained full-scan load.
+ * the database under sustained full-scan load. That is what the TTL that used to
+ * sit here was defending.
  *
  * Two of the four boards (`slaves`, `bank`) could always have been ordered in
  * SQL; the other two could not, because `spy` and `power` were computed in JS.
- * Now that those live on indexed columns, all four are.
+ * Now that those live on indexed columns all four are, forty rows come back
+ * instead of the table, and there is nothing left to defend — so the boards move
+ * the moment the game does.
  */
 export async function getGlobalBoards(): Promise<GlobalBoards> {
-  const now = Date.now();
-  if (boardsCache && now - boardsCache.builtAt < LADDER_TTL_MS) return boardsCache.boards;
-
   const top = async (
     orderBy: Prisma.EmpireOrderByWithRelationInput,
     pick: (e: {
@@ -230,28 +270,16 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
     [...slaves, ...bank, ...spy, ...power].map((r) => [r.empireId, r.name])
   );
 
-  const boards: GlobalBoards = { slaves, bank, spy, power, names };
-  boardsCache = { boards, builtAt: now };
-  return boards;
+  return { slaves, bank, spy, power, names };
 }
 
 /**
  * Biggest thefts since `cutoff` — total gold plundered in winning attacks.
  *
- * Aggregated and cut in SQL, unlike the four boards above, so this one is
- * genuinely cheap; it is cached anyway because it rides the same 30-second
- * refresh and there is no reason for N tabs to run N aggregations over the same
- * window. Keyed by the period label rather than the cutoff instant, which moves
- * every millisecond and would never hit.
+ * Aggregated and cut in SQL off `BattleReport(createdAt)`, so a raid shows up on
+ * the board as soon as it is fought.
  */
-export async function getTheftBoard(
-  period: string,
-  cutoff: Date
-): Promise<BoardRow[]> {
-  const now = Date.now();
-  const hit = theftCache.get(period);
-  if (hit && now - hit.builtAt < LADDER_TTL_MS) return hit.rows;
-
+export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   const sums = await prisma.battleReport.groupBy({
     by: ["attackerEmpireId"],
     where: { createdAt: { gte: cutoff }, stolenGold: { gt: 0 } },
@@ -266,14 +294,9 @@ export async function getTheftBoard(
     select: { id: true, name: true },
   });
   const names = new Map(named.map((e) => [e.id, e.name]));
-  const rows = sums.map((t) => ({
+  return sums.map((t) => ({
     empireId: t.attackerEmpireId,
     name: names.get(t.attackerEmpireId) ?? "אימפריה",
     value: Math.floor(t._sum.stolenGold ?? 0),
   }));
-
-  theftCache.set(period, { rows, builtAt: now });
-  return rows;
 }
-
-const theftCache = new Map<string, { rows: BoardRow[]; builtAt: number }>();

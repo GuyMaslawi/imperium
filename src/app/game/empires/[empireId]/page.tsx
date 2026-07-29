@@ -21,17 +21,13 @@ import { getActiveShields } from "@/lib/game/diamondEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
+import { Tip } from "@/components/ui/Tip";
 import type { HeroItemView } from "@/components/game/heroItemView";
 import {
   HERO_CLASS_META,
-  HERO_STAT_META,
-  RARITY_META,
-  SLOT_META,
-  SLOT_ORDER,
+  HERO_MAX_HEALTH,
   heroClassImage,
-  itemDisplayName,
-  itemPrimaryBonus,
-  slotPrimaryStat,
+  isHeroDead,
   tierForLevel,
 } from "@/lib/game/hero";
 
@@ -62,7 +58,10 @@ export default async function EmpireProfilePage({
   const heroLevel = hero?.level ?? 1;
   const heroResets = hero?.resets ?? 0;
   const heroClassKey = hero?.heroClass ?? "WARLORD";
-  const equippedBySlot = new Map((hero?.items ?? []).map((item) => [item.slot, item]));
+  // Health is public along with his gear — it rides in the stat strip up top,
+  // since a dead hero's bonuses are all switched off.
+  const heroHealth = hero?.health ?? HERO_MAX_HEALTH;
+  const heroDead = isHeroDead(hero);
   // The paperdoll is a client component, so the rows have to cross as plain
   // data. Tier is always derived from level — never read off the row.
   const equippedView: HeroItemView[] = (hero?.items ?? []).map(({ id, slot, level }) => ({
@@ -131,6 +130,11 @@ export default async function EmpireProfilePage({
     { icon: "base", text: `העיר שבה יושבת האימפריה — ${cityName(empire.cities)}` },
     { icon: "guild", text: guildName ? `הברית: ${guildName}` : "השתייכות לברית (ללא ברית כרגע)" },
     { icon: "attack", text: `מחלקת הגיבור ורמתו — ${HERO_CLASS_META[heroClassKey].label}, רמה ${heroLevel}` },
+    // The gear used to be sealed intel. It is now on every dossier: what a hero
+    // wears is what he is seen wearing on the field, and a player picking a
+    // target should be able to read it the same way he reads his own hero page.
+    { icon: "crown", text: "ציוד הגיבור שהוא לובש — תשעת הסלוטים, דרגתם והבונוס של כל חלק" },
+    { icon: "heart", text: "בריאות הגיבור וחלוקת נקודות הגיבור שלו" },
     {
       icon: "shield",
       text:
@@ -166,7 +170,6 @@ export default async function EmpireProfilePage({
     { icon: "spark", text: "כוח התקפה, הגנה, מודיעין וכוח כללי" },
     { icon: "army", text: "גודל הצבא, המרגלים ועבדי המכרות" },
     { icon: "gold", text: "האוצר, המשאבים והבנק" },
-    { icon: "crown", text: "ציוד הגיבור שהוא לובש" },
   ];
 
   return (
@@ -296,15 +299,30 @@ export default async function EmpireProfilePage({
                     איפוס ×{heroResets}
                   </span>
                 )}
-                {/* Real health, and only on your own dossier — it used to be a
-                    hardcoded 100 on every profile, which read as a fact about
-                    the target while telling you nothing. A rival's remaining
-                    health is combat intel like the rest. */}
-                {isMe && (
-                  <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
-                    {hero?.health ?? 100} <Icon name="heart" size={14} />
+                {/* Real health, on every dossier. It shipped as a hardcoded 100
+                    (a fact about nobody), was then cut to your own profile as
+                    combat intel, and is now public along with the rest of the
+                    hero: a fallen hero grants his empire nothing, and that is
+                    worth being able to see before you spend turns. */}
+                <Tip
+                  tip={
+                    heroDead
+                      ? "הגיבור מת — כל הבונוסים שלו מושבתים עד שיקום לתחייה"
+                      : "בריאות הגיבור. באפס הוא מת וכל הבונוסים שהוא מעניק מושבתים."
+                  }
+                >
+                  <span
+                    className={`nums inline-flex cursor-help items-center gap-1 rounded-md border px-2 py-0.5 font-bold ${
+                      heroDead
+                        ? "border-red-500 bg-red-500/15 text-red-300"
+                        : "border-red-500/40 bg-red-500/10 text-red-400"
+                    }`}
+                    dir="ltr"
+                  >
+                    {heroDead ? <span aria-hidden>💀</span> : heroHealth}{" "}
+                    <Icon name="heart" size={14} />
                   </span>
-                )}
+                </Tip>
                 {guildName && (
                   <span
                     className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
@@ -402,7 +420,8 @@ export default async function EmpireProfilePage({
               <>
                 <Icon name="spy" size={14} className="inline-block align-[-2px] text-gold" />{" "}
                 <span className="font-bold text-bone">כדי לדעת כמה הוא חזק — רגל או תקוף.</span>{" "}
-                ריגול מוצלח מחזיר תיק מלא עם הצבא, המשאבים והציוד; תקיפה מגלה את
+                הציוד שהוא לובש כבר כאן למטה; ריגול מוצלח מחזיר את מה שנותר —
+                הצבא, המשאבים והאוצר; תקיפה מגלה את
                 יחסי הכוחות בשדה. הממצאים נשמרים בדוח עצמו תחת{" "}
                 <Link href="/game/reports" className="font-semibold text-gold hover:text-gold-bright">
                   הדוחות
@@ -466,17 +485,22 @@ export default async function EmpireProfilePage({
 
       {/* -------- hero equipment -------- */}
       {/*
-        Behind the same gate as the power breakdown above. Each ItemTile
-        publishes the item's rarity, level and exact bonus value, so the nine
-        slots together give the item component of the target's attack/defence
-        multiplier — the figure a spy mission is paid to bring back.
+        Public on every dossier, unlike the power breakdown above. It used to be
+        behind the same `showDetails` gate, on the reasoning that the nine tiles
+        together hand over the item component of a target's attack/defence
+        multiplier. That made a rival's profile a page about a hero you could
+        never see: clicking a name in the ladder is exactly when a player wants
+        to know what the other hero is wearing, and he is wearing it in public.
+        Still read-only, and still only the *equipped* rows are queried — the bag
+        stays his own business.
       */}
-      {showDetails && (
       <div className="panel rounded-xl p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="attack" size={20} className="text-crimson-bright" />
-            ציוד הגיבור
+            {/* "ציוד הגיבור" until the sheet joined the gear — the panel now
+                carries the hero himself, not only what he carries. */}
+            הגיבור וציודו
           </h3>
           <span className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
             <Icon name="attack" size={14} /> גיבור רמה{" "}
@@ -496,73 +520,29 @@ export default async function EmpireProfilePage({
             face — a flat 9-wide strip said what he owns without ever showing
             him. Read-only: dressing him stays on the hero page. */}
         {/* The sockets carry a 54px floor, so a frame much under 240px is all
-            medallion and no hero. */}
-        <div className="grid gap-4 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:items-start">
-          <div className="mx-auto w-full max-w-[240px]">
-            <HeroPaperdoll
-              readOnly
-              portrait={heroClassImage(heroClassKey)}
-              portraitAlt={HERO_CLASS_META[heroClassKey].label}
-              portraitAccent={HERO_CLASS_META[heroClassKey].accent}
-              equipped={equippedView}
-              heroLevel={heroLevel}
-            />
-          </div>
-
-          {/* The roster beside him — what each socket actually holds, in words.
-              The figure answers "how is he kitted out?" at a glance; this
-              answers "with what, exactly?" without a hover on every medallion. */}
-          <ul className="grid gap-x-4 gap-y-1.5 self-center text-sm sm:grid-cols-2">
-            {SLOT_ORDER.map((slot) => {
-              const meta = SLOT_META[slot];
-              const item = equippedBySlot.get(slot);
-              const stat = HERO_STAT_META[slotPrimaryStat(slot)];
-              if (!item) {
-                return (
-                  <li
-                    key={slot}
-                    className="flex items-center justify-between gap-2 border-b border-border-subtle pb-1.5 text-zinc-600"
-                  >
-                    <span className="truncate">
-                      <span aria-hidden className="opacity-40">{meta.icon}</span> {meta.label}
-                    </span>
-                    <span className="shrink-0 text-xs">ריק</span>
-                  </li>
-                );
-              }
-              const bonus = itemPrimaryBonus(slot, item.level);
-              const tier = RARITY_META[tierForLevel(item.level)];
-              return (
-                <li
-                  key={slot}
-                  className="flex items-center justify-between gap-2 border-b border-border-subtle pb-1.5"
-                >
-                  <span className="min-w-0 truncate">
-                    <span aria-hidden>{meta.icon}</span>{" "}
-                    <span className={`font-semibold ${tier.tone}`}>
-                      {itemDisplayName(slot, item.level)}
-                    </span>{" "}
-                    <span className="nums text-xs text-zinc-500" dir="ltr">
-                      Lv {item.level}
-                    </span>
-                  </span>
-                  <span className="nums shrink-0 text-xs font-bold text-emerald-400" dir="ltr">
-                    +{Math.round(bonus.value)}
-                    {bonus.flat ? "" : "%"}{" "}
-                    <Icon name={stat.icon} size={12} className="inline align-[-2px]" />
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+            medallion and no hero.
+            The figure stands alone: the health bar, the point stats and a
+            written roster of the nine slots all used to sit beside him, and all
+            three said again — in a second, duller form — what the medallions
+            already show. He gets the top of the panel, at the start edge. */}
+        <div className="w-full max-w-[320px] me-auto">
+          <HeroPaperdoll
+            readOnly
+            portrait={heroClassImage(heroClassKey)}
+            portraitAlt={HERO_CLASS_META[heroClassKey].label}
+            portraitAccent={HERO_CLASS_META[heroClassKey].accent}
+            equipped={equippedView}
+            heroLevel={heroLevel}
+          />
         </div>
-        {equippedBySlot.size === 0 && (
+        {equippedView.length === 0 && (
           <p className="mt-3 text-xs text-zinc-600">
-            הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד
-            הגיבור.
+            {isMe
+              ? "הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד הגיבור."
+              : "הגיבור הזה יוצא לקרב בלי ציוד — תשעת הסלוטים שלו ריקים."}
           </p>
         )}
-        {equippedBySlot.size > 0 && (
+        {isMe && equippedView.length > 0 && (
           <Link
             href="/game/hero"
             className="mt-3 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
@@ -571,7 +551,6 @@ export default async function EmpireProfilePage({
           </Link>
         )}
       </div>
-      )}
 
     </div>
   );

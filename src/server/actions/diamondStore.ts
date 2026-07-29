@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { getSessionUser, logAdmin, type SessionUser } from "@/lib/admin";
+import { isBanned } from "@/lib/ban";
 import { rateLimit } from "@/lib/rateLimit";
 import { getTunables } from "@/lib/game/config";
 import {
@@ -57,7 +58,7 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
 
   const user = await getSessionUser();
   if (!user) return { ok: false, status: "error", message: "יש להתחבר כדי לרכוש" };
-  if (user.bannedAt) return { ok: false, status: "error", message: "החשבון חסום" };
+  if (isBanned(user)) return { ok: false, status: "error", message: "החשבון חסום" };
   // Every other player-facing action resolves its actor through
   // `getActiveEmpireId`, which refuses unverified accounts. This one resolves
   // the empire itself, so it has to repeat the check — without it, an account
@@ -336,7 +337,7 @@ export async function captureDiamondOrder(orderId: string): Promise<CaptureOrder
   try {
     const user = await getSessionUser();
     if (!user) return { ok: false, message: "יש להתחבר כדי לרכוש" };
-    if (user.bannedAt) return { ok: false, message: "החשבון חסום" };
+    if (isBanned(user)) return { ok: false, message: "החשבון חסום" };
     if (!(await rateLimit(`capture:${user.id}`, 20, 15 * 60 * 1000))) {
       return { ok: false, message: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
     }

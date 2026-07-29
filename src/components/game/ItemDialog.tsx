@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
-import { formatNumber } from "@/lib/game/format";
-import { ItemTile, formatBonus } from "@/components/game/ItemTile";
+import { formatBonus, formatNumber } from "@/lib/game/format";
+import { ItemTile } from "@/components/game/ItemTile";
 import { uiRarity, type HeroItemView } from "@/components/game/heroItemView";
 import {
   discardHeroItem,

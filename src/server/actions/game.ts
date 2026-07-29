@@ -11,6 +11,7 @@ import type {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { isBanned } from "@/lib/ban";
 import { awardSeasonPassXp } from "@/server/seasonPassXp";
 import { captureSpyIntel } from "@/server/spyIntelCapture";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
@@ -609,9 +610,9 @@ async function targetBlockedReason(
   }
   const owner = await tx.empire.findUnique({
     where: { id: target.id },
-    select: { user: { select: { bannedAt: true } } },
+    select: { user: { select: { bannedAt: true, bannedUntil: true } } },
   });
-  if (owner?.user.bannedAt) return "האימפריה הזו אינה זמינה.";
+  if (owner && isBanned(owner.user, now)) return "האימפריה הזו אינה זמינה.";
   return null;
 }
 

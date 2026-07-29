@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { bannedWhere, notBannedWhere } from "@/lib/ban";
 import { ATTACK_TURN_COST, SPY_TURN_COST } from "@/lib/game/constants";
 
 /**
@@ -110,9 +111,9 @@ export async function getPulse(now: Date): Promise<MonitorPulse> {
     activeEmpireIds(day),
     activeEmpireIds(hour),
     prisma.user.count({ where: { createdAt: { gte: day } } }),
-    prisma.user.count({ where: { emailVerified: null, bannedAt: null } }),
+    prisma.user.count({ where: { emailVerified: null, ...notBannedWhere(now) } }),
     prisma.user.count({ where: { lockedUntil: { gt: now } } }),
-    prisma.user.count({ where: { bannedAt: { not: null } } }),
+    prisma.user.count({ where: bannedWhere(now) }),
     prisma.battleReport.count({ where: { createdAt: { gte: day } } }),
     prisma.spyReport.count({ where: { createdAt: { gte: day } } }),
     prisma.diamondPurchase.aggregate({

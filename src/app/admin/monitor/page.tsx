@@ -254,7 +254,7 @@ export default async function AdminMonitorPage() {
           value={pulse.lockedOut}
           tone={pulse.lockedOut > 0 ? "warn" : "gold"}
         />
-        <Stat label="חסומים" value={pulse.banned} tone={pulse.banned > 0 ? "bad" : "gold"} />
+        <Stat label="בבאן" value={pulse.banned} tone={pulse.banned > 0 ? "bad" : "gold"} />
         <Stat label="הכנסות היום" value={`₪${pulse.revenue24hIls.toFixed(2)}`} tone="good" />
       </div>
 
