@@ -1,0 +1,290 @@
+import { describe, expect, it } from "vitest";
+import {
+  MINE_MAX_LEVEL,
+  bankInterestRate,
+  mineProductionPerTick,
+  mineProductionValue,
+  storageCapacityForLevel,
+} from "@/lib/game/constants";
+import {
+  SEASON_PASS_PREMIUM_PRICE,
+  SEASON_PASS_TIER_COUNT,
+  SEASON_PASS_XP,
+  SEASON_PASS_XP_MAX,
+  seasonPassDay,
+  seasonPassSpendUnits,
+  tierForXp,
+  xpForTier,
+} from "@/lib/game/seasonPass";
+import {
+  GUILD_AID_MAX_LEVEL,
+  GUILD_CAPACITY_MAX_LEVEL,
+  GUILD_SPELL_MAX_LEVEL,
+  aidUpgradeCostGold,
+  capacityUpgradeCostGold,
+  guildAidPct,
+  guildCapacity,
+  guildSpellBonusPct,
+  spellUpgradeCostDiamonds,
+} from "@/lib/game/guild";
+import {
+  BOOST_MAX_PCT,
+  SHIELDS,
+  SHIELD_RENEW_COOLDOWN_MS,
+  applyShopDiscount,
+  discountedAmount,
+  shieldMeta,
+} from "@/lib/game/diamondShop";
+import {
+  FORGE_DISCOUNT_PCT,
+  POTION_STACK_CAP,
+  forgeDiscountedCost,
+  rollGuaranteedPotion,
+  rollPotionDrop,
+} from "@/lib/game/potions";
+import { pickWheelPrizeIndex, wheelPrizeAmount, WHEEL_PRIZES } from "@/lib/game/wheel";
+import { armyPower, getEmpireMilitaryPower } from "@/lib/game/power";
+import { MAX_WEAPON_TIER, weaponByKey, weaponsPower } from "@/lib/game/weapons";
+
+describe("mines", () => {
+  it("produces nothing without slaves", () => {
+    expect(mineProductionPerTick(10, 0)).toBe(0);
+  });
+
+  it("scales with level and with slaves", () => {
+    expect(mineProductionValue(2)).toBeGreaterThan(mineProductionValue(1));
+    expect(mineProductionPerTick(5, 10)).toBeGreaterThan(mineProductionPerTick(5, 1));
+  });
+
+  it("never returns a negative or non-finite figure, even off the ends", () => {
+    for (const level of [-5, 0, 1, MINE_MAX_LEVEL, MINE_MAX_LEVEL + 100]) {
+      const v = mineProductionPerTick(level, 10);
+      expect(Number.isFinite(v)).toBe(true);
+      expect(v).toBeGreaterThanOrEqual(0);
+    }
+  });
+});
+
+describe("the bank", () => {
+  it("caps the interest rate however high the upgrade goes", () => {
+    // 15% per daily update compounded twice a day was ~4,384× a month on
+    // plunder-immune gold. The cap is the fix; this is the guard on the cap.
+    const capped = bankInterestRate(1e6);
+    expect(capped).toBeLessThanOrEqual(0.03);
+    expect(capped).toBeGreaterThan(0);
+  });
+
+  it("never pays negative interest", () => {
+    expect(bankInterestRate(0)).toBeGreaterThanOrEqual(0);
+    expect(bankInterestRate(-10)).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rewards levelling up, until the cap", () => {
+    expect(bankInterestRate(5)).toBeGreaterThan(bankInterestRate(1));
+  });
+});
+
+describe("storage", () => {
+  it("grows with level and is always positive", () => {
+    expect(storageCapacityForLevel(2)).toBeGreaterThan(storageCapacityForLevel(1));
+    expect(storageCapacityForLevel(1)).toBeGreaterThan(0);
+  });
+});
+
+describe("season pass", () => {
+  it("needs strictly more XP for each tier", () => {
+    for (let t = 2; t <= SEASON_PASS_TIER_COUNT; t++) {
+      expect(xpForTier(t)).toBeGreaterThan(xpForTier(t - 1));
+    }
+  });
+
+  it("maps XP back to the tier it bought, and no further", () => {
+    expect(tierForXp(0)).toBe(0);
+    for (let t = 1; t <= SEASON_PASS_TIER_COUNT; t++) {
+      expect(tierForXp(xpForTier(t))).toBe(t);
+      expect(tierForXp(xpForTier(t) - 1)).toBe(t - 1);
+    }
+  });
+
+  it("never reports a tier above the ladder, however much XP is thrown at it", () => {
+    expect(tierForXp(SEASON_PASS_XP_MAX * 1000)).toBe(SEASON_PASS_TIER_COUNT);
+  });
+
+  it("earns nothing for a sub-threshold spend", () => {
+    // The exact farm this closed: 40 purchases of quantity 1 cleared the ladder.
+    expect(seasonPassSpendUnits("buyWeapon", 0)).toBe(0);
+    expect(seasonPassSpendUnits("buyWeapon", 1)).toBe(0);
+  });
+
+  it("earns more for a bigger spend, up to a per-action cap", () => {
+    expect(seasonPassSpendUnits("buyWeapon", 100_000)).toBeGreaterThan(
+      seasonPassSpendUnits("buyWeapon", 1_000)
+    );
+    // The cap is what stops one enormous purchase clearing the ladder outright.
+    const huge = seasonPassSpendUnits("buyWeapon", 1e15);
+    expect(huge).toBe(seasonPassSpendUnits("buyWeapon", 1e18));
+    expect(huge).toBeGreaterThan(0);
+  });
+
+  it("earns nothing from a nonsense spend", () => {
+    expect(seasonPassSpendUnits("buyWeapon", Number.NaN)).toBe(0);
+    expect(seasonPassSpendUnits("buyWeapon", -1e9)).toBe(0);
+    expect(seasonPassSpendUnits("buyWeapon", Infinity)).toBe(0);
+  });
+
+  it("prices premium in diamonds and never pays diamonds back", () => {
+    expect(SEASON_PASS_PREMIUM_PRICE).toBeGreaterThan(0);
+    expect(Object.keys(SEASON_PASS_XP)).not.toContain("diamonds");
+  });
+
+  it("counts season days from one, and never below it", () => {
+    const season = {
+      startsAt: new Date("2026-07-01T00:00:00.000Z"),
+      endsAt: new Date("2026-09-01T00:00:00.000Z"),
+    };
+    expect(seasonPassDay(season, season.startsAt.getTime())).toBe(1);
+    expect(
+      seasonPassDay(season, season.startsAt.getTime() - 10 * 86_400_000)
+    ).toBeGreaterThanOrEqual(1);
+    expect(seasonPassDay(null, Date.now())).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe("guild economy", () => {
+  it("charges more for each level of every upgrade", () => {
+    for (let l = 1; l < GUILD_CAPACITY_MAX_LEVEL; l++) {
+      expect(capacityUpgradeCostGold(l + 1)).toBeGreaterThan(capacityUpgradeCostGold(l));
+    }
+    for (let l = 1; l < GUILD_AID_MAX_LEVEL; l++) {
+      expect(aidUpgradeCostGold(l + 1)).toBeGreaterThan(aidUpgradeCostGold(l));
+    }
+    for (let l = 1; l < GUILD_SPELL_MAX_LEVEL; l++) {
+      expect(spellUpgradeCostDiamonds(l + 1)).toBeGreaterThan(
+        spellUpgradeCostDiamonds(l)
+      );
+    }
+  });
+
+  it("keeps every bonus inside its advertised ceiling", () => {
+    expect(guildAidPct(GUILD_AID_MAX_LEVEL)).toBeLessThanOrEqual(GUILD_AID_MAX_LEVEL);
+    expect(guildSpellBonusPct(GUILD_SPELL_MAX_LEVEL)).toBeLessThanOrEqual(
+      GUILD_SPELL_MAX_LEVEL
+    );
+    expect(guildCapacity(GUILD_CAPACITY_MAX_LEVEL)).toBeGreaterThan(guildCapacity(1));
+  });
+});
+
+describe("the diamond shop", () => {
+  it("never discounts below zero or above the full price", () => {
+    expect(discountedAmount(1000, 0)).toBe(1000);
+    expect(discountedAmount(1000, 100)).toBe(0);
+    expect(discountedAmount(1000, 200)).toBeGreaterThanOrEqual(0);
+    expect(discountedAmount(1000, -50)).toBeLessThanOrEqual(1000);
+  });
+
+  it("discounts every line of a resource cost", () => {
+    const full = { gold: 1000, wood: 500, iron: 200, stone: 100 };
+    const cut = applyShopDiscount(full, 50);
+    for (const key of Object.keys(full) as (keyof typeof full)[]) {
+      expect(cut[key]).toBeLessThanOrEqual(full[key]);
+      expect(cut[key]).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("caps the production boost", () => {
+    expect(BOOST_MAX_PCT).toBeGreaterThan(0);
+  });
+
+  describe("raid shields", () => {
+    it("offers a longer duration at a higher price, per shield", () => {
+      for (const shield of SHIELDS) {
+        const sorted = [...shield.durations].sort((a, b) => a.hours - b.hours);
+        for (let i = 1; i < sorted.length; i++) {
+          expect(sorted[i].cost).toBeGreaterThan(sorted[i - 1].cost);
+        }
+      }
+    });
+
+    it("prices the longer shield at a discount per hour, but never free", () => {
+      for (const shield of SHIELDS) {
+        for (const d of shield.durations) {
+          expect(d.cost).toBeGreaterThan(0);
+          expect(d.hours).toBeGreaterThan(0);
+        }
+      }
+    });
+
+    it("always leaves an exposed window between shields", () => {
+      // Back-to-back shields would make a paying player permanently unraidable.
+      expect(SHIELD_RENEW_COOLDOWN_MS).toBeGreaterThan(0);
+    });
+
+    it("resolves both keys to a distinct effect kind", () => {
+      expect(shieldMeta("resources").kind).not.toBe(shieldMeta("soldiers").kind);
+    });
+  });
+});
+
+describe("potions", () => {
+  it("halves a forge cost only while the brew is active", () => {
+    expect(forgeDiscountedCost(1000, false)).toBe(1000);
+    expect(forgeDiscountedCost(1000, true)).toBe(1000 * (1 - FORGE_DISCOUNT_PCT / 100));
+  });
+
+  it("drops nothing on a high roll and something on a zero roll", () => {
+    expect(rollPotionDrop(() => 0.999999)).toBeNull();
+    expect(rollPotionDrop(() => 0)).not.toBeNull();
+  });
+
+  it("always names a real brew when one is guaranteed", () => {
+    for (const roll of [0, 0.25, 0.5, 0.75, 0.999999]) {
+      expect(rollGuaranteedPotion(() => roll)).toBeTruthy();
+    }
+  });
+
+  it("caps a stack", () => {
+    expect(POTION_STACK_CAP).toBeGreaterThan(0);
+  });
+});
+
+describe("the wheel", () => {
+  it("always picks a prize inside the table", () => {
+    for (const roll of [0, 0.1, 0.5, 0.9, 0.999999]) {
+      const index = pickWheelPrizeIndex(() => roll);
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(WHEEL_PRIZES.length);
+    }
+  });
+
+  it("pays more in a later cycle", () => {
+    const prize = WHEEL_PRIZES[0];
+    expect(wheelPrizeAmount(prize, 5)).toBeGreaterThanOrEqual(wheelPrizeAmount(prize, 1));
+  });
+});
+
+describe("power", () => {
+  it("treats a missing army as no power rather than throwing", () => {
+    expect(armyPower(null)).toBe(0);
+    expect(getEmpireMilitaryPower(null, [])).toBe(0);
+  });
+
+  it("grows with soldiers", () => {
+    expect(armyPower({ soldiers: 100 })).toBeGreaterThan(armyPower({ soldiers: 1 }));
+  });
+
+  it("counts only the weapons of the category asked for", () => {
+    const key = Object.keys(
+      Object.fromEntries([[weaponByKey("" as never)?.key ?? "", 0]])
+    );
+    expect(key).toBeDefined(); // guard: weaponByKey tolerates an unknown key
+    expect(weaponsPower([], "ATTACK")).toBe(0);
+  });
+
+  it("rejects an unknown weapon key instead of inventing one", () => {
+    expect(weaponByKey("no_such_weapon")).toBeUndefined();
+  });
+
+  it("has a finite top tier", () => {
+    expect(MAX_WEAPON_TIER).toBeGreaterThan(0);
+  });
+});

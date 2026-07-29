@@ -259,16 +259,21 @@ async function computeIsRankOne(
     where: { cities },
     select: {
       id: true,
-      level: true,
       army: { select: { soldiers: true } },
       weapons: { select: { weaponKey: true, quantity: true } },
+      hero: { select: { level: true, resets: true } },
     },
   });
   if (bucket.length === 0) return false;
 
   const top = bucket
     .map((e) => ({ ...e, power: getEmpireMilitaryPower(e.army, e.weapons) }))
-    .sort((a, b) => b.power - a.power || b.level - a.level)[0];
+    .sort(
+      (a, b) =>
+        b.power - a.power ||
+        (b.hero?.level ?? 1) - (a.hero?.level ?? 1) ||
+        (b.hero?.resets ?? 0) - (a.hero?.resets ?? 0)
+    )[0];
   return top.id === empireId;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { reportClientError } from "@/server/actions/errors";
 
 /**
  * Last-resort boundary for errors thrown in the root layout / outside any
@@ -17,6 +18,14 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error(error);
+    // A client-side throw never reaches Next's onRequestError hook, so this is
+    // the only chance to record it. Fire-and-forget: a reporting failure must
+    // not take the recovery screen down with it.
+    void reportClientError(
+      error.message,
+      error.digest,
+      typeof window === "undefined" ? undefined : window.location.pathname
+    );
   }, [error]);
 
   return (

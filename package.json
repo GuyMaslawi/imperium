@@ -15,7 +15,12 @@
     "db:seed": "prisma db seed",
     "db:wipe": "tsx scripts/wipe-data.ts",
     "db:admin": "tsx scripts/grant-admin.ts",
-    "mail:test": "tsx scripts/test-mail.ts"
+    "mail:test": "tsx scripts/test-mail.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:db": "vitest run --config vitest.db.config.ts",
+    "db:power": "tsx scripts/backfill-power.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -38,10 +43,13 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/coverage-v8": "^4.1.10",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

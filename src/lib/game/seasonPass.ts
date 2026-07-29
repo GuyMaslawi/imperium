@@ -8,7 +8,7 @@ import type { GameSeason } from "@prisma/client";
  *
  * 1. **It resets every daily update.** DAILY_UPDATE_TIMES fires twice a day
  *    (07:30 and 19:30), so a player gets two full ladders per day and is meant
- *    to be able to clear all eight tiers inside one ~12h cycle. XP and claimed
+ *    to be able to clear all fifty tiers inside one ~12h cycle. XP and claimed
  *    tiers reset at each boundary; see `cycleStartOf`.
  * 2. **Payouts scale with the season day**, exactly like the wheel does — the
  *    ladder is worth little on day 1 and a lot on day 60, so a fresh empire is
@@ -28,10 +28,17 @@ import type { GameSeason } from "@prisma/client";
 /** Fraction of the base amount added for each day elapsed in the season. */
 export const SEASON_PASS_DAILY_GROWTH = 0.25;
 
-/** XP required for each successive tier — tier N unlocks at N × this. */
-export const SEASON_PASS_XP_PER_TIER = 50;
+/**
+ * XP required for each successive tier — tier N unlocks at N × this.
+ *
+ * The ladder is 50 tiers at 8 XP rather than the original 8 at 50, which is the
+ * *same* 400 XP for a full clear. The cycle's difficulty is unchanged; what
+ * changed is that it now pays out in many small steps instead of a few large
+ * ones, so nearly every action visibly moves the bar and pops a tier or two.
+ */
+export const SEASON_PASS_XP_PER_TIER = 8;
 
-export const SEASON_PASS_TIER_COUNT = 8;
+export const SEASON_PASS_TIER_COUNT = 50;
 
 /** Diamond cost of the premium track. Charged once per season. */
 export const SEASON_PASS_PREMIUM_PRICE = 2000;
@@ -40,8 +47,9 @@ export const SEASON_PASS_PREMIUM_PRICE = 2000;
 
 /**
  * Every gameplay action worth season-pass XP. The values are tuned so a
- * moderately active player clears all eight tiers (400 XP) within one ~12h
+ * moderately active player clears the whole ladder (400 XP) within one ~12h
  * cycle: a low-level empire banks ~144 turns per cycle, which is ~14 attacks.
+ * At 8 XP per tier that means one attack pops three tiers at a time.
  */
 export const SEASON_PASS_XP = {
   attack: 25,
@@ -159,57 +167,107 @@ export interface SeasonPassTier {
   premium: SeasonPassReward;
 }
 
+/** What the premium track multiplies the free track by. The upsell copy reads this. */
+export const SEASON_PASS_PREMIUM_MULTIPLIER = 3;
+
 /**
- * Eight tiers, premium paying 3× the free track — which is exactly what the
- * upsell in the modal promises ("פי 3 שלל").
+ * Total the **free** track pays across a whole cycle, per kind, at day 1.
+ *
+ * This is the balance knob — and it is deliberately the *same* total the old
+ * 8-tier ladder paid. Lengthening the ladder to 50 tiers must not multiply the
+ * payout by six: XP per clear is unchanged (400), so a bigger total would be
+ * pure inflation, and this pass has already had to be retuned once for being
+ * net-positive against its own inputs (see SEASON_PASS_SPEND_XP). Fifty tiers
+ * is a pacing change, not an economy change. Raise these numbers only if you
+ * mean to make the pass more generous.
+ */
+const CYCLE_BUDGET: Record<SeasonPassRewardKind, number> = {
+  gold: 9_000,
+  wood: 7_000,
+  iron: 2_500,
+  stone: 2_500,
+  turns: 40,
+  citizens: 25,
+};
+
+/** Rounding step per kind, so amounts read as clean numbers. */
+const REWARD_STEP: Record<SeasonPassRewardKind, number> = {
+  gold: 10,
+  wood: 10,
+  iron: 10,
+  stone: 10,
+  turns: 1,
+  citizens: 1,
+};
+
+/**
+ * Which kind each tier pays, cycling every 10 tiers. Two tiers each of the four
+ * resources plus one of turns and one of citizens per block, so over 50 tiers
+ * every kind appears at a rate matching its share of the budget — and the round
+ * tiers (10, 20, 30, 40, 50) all land on gold, so each block ends on the
+ * headline resource.
+ */
+const KIND_CYCLE: SeasonPassRewardKind[] = [
+  "gold",
+  "wood",
+  "iron",
+  "turns",
+  "stone",
+  "wood",
+  "citizens",
+  "iron",
+  "stone",
+  "gold",
+];
+
+/** How much more a late tier pays than tier 1, before the season-day growth. */
+const TIER_RAMP = 3;
+
+/**
+ * Build the ladder: 50 tiers, premium paying 3× the free track — which is
+ * exactly what the upsell in the modal promises ("פי 3 שלל").
+ *
+ * Amounts are *derived* from `CYCLE_BUDGET` rather than hand-written, because
+ * with fifty rows a hand-written table is impossible to keep balanced — one
+ * edited row silently shifts what a full clear is worth. Each tier's share of
+ * its kind's budget is proportional to a weight that ramps from 1× at tier 1 to
+ * TIER_RAMP× at tier 50, so climbing feels like it pays more while the cycle
+ * total stays put.
  *
  * No hero gear here on purpose. Hero items are meant to be won by fighting (a
  * captured drop from a won attack) or bought in the hero shop; handing a
  * guaranteed one out twice a day for clearing a ladder made the rarest tier
  * routine and undercut both sources.
  */
-export const SEASON_PASS_TIERS: SeasonPassTier[] = [
-  {
-    tier: 1,
-    free: { kind: "gold", base: 4000, step: 100 },
-    premium: { kind: "gold", base: 12000, step: 100 },
-  },
-  {
-    tier: 2,
-    free: { kind: "wood", base: 3000, step: 100 },
-    premium: { kind: "wood", base: 9000, step: 100 },
-  },
-  {
-    tier: 3,
-    free: { kind: "iron", base: 2500, step: 100 },
-    premium: { kind: "iron", base: 7500, step: 100 },
-  },
-  {
-    tier: 4,
-    free: { kind: "stone", base: 2500, step: 100 },
-    premium: { kind: "stone", base: 7500, step: 100 },
-  },
-  {
-    tier: 5,
-    free: { kind: "turns", base: 40, step: 5 },
-    premium: { kind: "turns", base: 120, step: 5 },
-  },
-  {
-    tier: 6,
-    free: { kind: "citizens", base: 25, step: 5 },
-    premium: { kind: "citizens", base: 75, step: 5 },
-  },
-  {
-    tier: 7,
-    free: { kind: "gold", base: 5000, step: 100 },
-    premium: { kind: "gold", base: 15000, step: 100 },
-  },
-  {
-    tier: 8,
-    free: { kind: "wood", base: 4000, step: 100 },
-    premium: { kind: "wood", base: 12000, step: 100 },
-  },
-];
+function buildLadder(): SeasonPassTier[] {
+  const n = SEASON_PASS_TIER_COUNT;
+  const kindOf = (tier: number) => KIND_CYCLE[(tier - 1) % KIND_CYCLE.length];
+  const weight = (tier: number) =>
+    1 + (TIER_RAMP - 1) * ((tier - 1) / Math.max(1, n - 1));
+
+  // Total weight sitting on each kind, so each kind's shares sum to its budget.
+  const weightPerKind = new Map<SeasonPassRewardKind, number>();
+  for (let tier = 1; tier <= n; tier++) {
+    const kind = kindOf(tier);
+    weightPerKind.set(kind, (weightPerKind.get(kind) ?? 0) + weight(tier));
+  }
+
+  const tiers: SeasonPassTier[] = [];
+  for (let tier = 1; tier <= n; tier++) {
+    const kind = kindOf(tier);
+    const step = REWARD_STEP[kind];
+    const share = (CYCLE_BUDGET[kind] * weight(tier)) / weightPerKind.get(kind)!;
+    const base = Math.max(step, Math.round(share / step) * step);
+    tiers.push({
+      tier,
+      free: { kind, base, step },
+      premium: { kind, base: base * SEASON_PASS_PREMIUM_MULTIPLIER, step },
+    });
+  }
+  return tiers;
+}
+
+export const SEASON_PASS_TIERS: SeasonPassTier[] = buildLadder();
 
 /** Hebrew label for a reward kind, used by both the UI and the claim toast. */
 export const SEASON_PASS_REWARD_LABEL: Record<SeasonPassRewardKind, string> = {

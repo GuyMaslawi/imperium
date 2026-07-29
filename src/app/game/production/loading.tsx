@@ -31,11 +31,11 @@ export default function ProductionLoading() {
         </div>
       </div>
 
-      {/* mine cards run tall — production breakdown, slave form, upgrade row */}
+      {/* mine cards run tall — the rig drawing, breakdown, slave form, upgrade */}
       <SkeletonGrid
         count={4}
         grid="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-        tile="h-[560px]"
+        tile="h-[660px]"
       />
     </SkeletonPage>
   );

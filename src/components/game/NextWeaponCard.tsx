@@ -5,6 +5,7 @@ import { unlockNextWeaponTier, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { WeaponArt } from "@/components/game/WeaponArt";
 import { formatNumber } from "@/lib/game/format";
 import { discountedAmount } from "@/lib/game/diamondShop";
 import type {
@@ -74,17 +75,20 @@ export function NextWeaponCard({
       </span>
 
       <div className="relative flex items-start justify-between gap-2">
-        <div>
-          <p className="mb-1 text-[11px] font-bold tracking-wide text-gold-bright">
-            ← הנשק הבא
-          </p>
-          <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
-          <p className="text-xs font-semibold text-gold-dim">
-            רמה{" "}
-            <span className="nums" dir="ltr">
-              {weapon.tier}
-            </span>
-          </p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <WeaponArt weapon={weapon} locked />
+          <div className="min-w-0">
+            <p className="mb-1 text-[11px] font-bold tracking-wide text-gold-bright">
+              ← הנשק הבא
+            </p>
+            <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
+            <p className="text-xs font-semibold text-gold-dim">
+              רמה{" "}
+              <span className="nums" dir="ltr">
+                {weapon.tier}
+              </span>
+            </p>
+          </div>
         </div>
         <span className="shrink-0 rounded-full border border-gold/40 bg-gold/10 px-2.5 py-1 text-xs font-bold text-gold-bright">
           🔒 נעול
@@ -152,9 +156,10 @@ export function NextWeaponCard({
                 gate.citiesMet ? "text-emerald-400" : "font-semibold text-red-400"
               }
             >
-              {gate.citiesMet ? "✓" : "🔒"} 🏰 {gate.cities} ערים{" "}
+              {gate.citiesMet ? "✓" : "🔒"} 🏰 עיר{" "}
+              <span className="nums" dir="ltr">{gate.cities}</span>{" "}
               <span className="text-zinc-500">
-                (יש לך <span className="nums" dir="ltr">{cities}</span>)
+                (אתה בעיר <span className="nums" dir="ltr">{cities}</span>)
               </span>
             </p>
           )}

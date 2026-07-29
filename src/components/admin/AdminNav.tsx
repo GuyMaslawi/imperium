@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/admin", label: "לוח בקרה", icon: "📊", exact: true },
+  { href: "/admin/monitor", label: "ניטור", icon: "📡" },
   { href: "/admin/users", label: "שחקנים", icon: "👥" },
   { href: "/admin/broadcast", label: "שידור ומתנות", icon: "📣" },
   { href: "/admin/minigame", label: "מיני-משחק", icon: "🎯" },

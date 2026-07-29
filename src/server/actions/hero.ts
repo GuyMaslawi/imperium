@@ -27,6 +27,7 @@ import {
 import { forgeDiscountedCost } from "@/lib/game/potions";
 import { isPotionActive } from "@/lib/game/potionEffects";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 /**
  * Serialize concurrent hero mutations by taking a row lock on the hero.
@@ -102,7 +103,8 @@ export async function allocateHeroPoints(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.allocateHeroPoints", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -160,7 +162,8 @@ export async function resetHero(): Promise<ActionState> {
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.resetHero", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -216,7 +219,8 @@ export async function equipHeroItem(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.equipHeroItem", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -263,7 +267,8 @@ export async function unequipHeroItem(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.unequipHeroItem", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -324,7 +329,8 @@ export async function discardHeroItem(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.discardHeroItem", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -406,7 +412,8 @@ export async function discardHeroItems(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.discardHeroItems", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -478,7 +485,8 @@ export async function upgradeHeroItem(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.upgradeHeroItem", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -575,7 +583,8 @@ export async function upgradeHeroItems(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("hero.upgradeHeroItems", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

@@ -37,7 +37,7 @@ import {
 import { ItemTile } from "@/components/game/ItemTile";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
-import { ExpiryCountdown } from "@/components/game/ExpiryCountdown";
+import { SpyEffectsBoard, type SpyEffectRow } from "@/components/game/SpyEffectsBoard";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 
 export const metadata = { title: "דוח ריגול | IMPERIUM" };
@@ -150,20 +150,12 @@ const BOOST_META: Partial<
  * spell, a brew, a paid shield or a dead hero's hour in the ground, a raider
  * reads all of them the same way: what it does, and how long is left of it.
  */
-interface EffectRow {
-  id: string;
-  icon: IconName;
-  glyph?: ReactNode;
-  label: string;
-  effect: string;
-  /** Epoch ms it runs out. */
-  expiresAt: number;
-  tone: string;
+interface EffectRow extends SpyEffectRow {
   /** Effects that decide whether raiding is worth a turn lead the board. */
   critical?: boolean;
 }
 
-function collectEffects(intel: SpyIntel): EffectRow[] {
+function collectEffects(intel: SpyIntel, now: number): EffectRow[] {
   const rows: EffectRow[] = [];
 
   // The new-player shield outranks everything: while it holds, there is no
@@ -258,12 +250,17 @@ function collectEffects(intel: SpyIntel): EffectRow[] {
     });
   }
 
-  // Critical first (they change whether to spend the turn), then soonest to end.
-  return rows.sort(
-    (a, b) =>
-      Number(Boolean(b.critical)) - Number(Boolean(a.critical)) ||
-      a.expiresAt - b.expiresAt
-  );
+  // The snapshot keeps whatever was running when the spies walked in; by the
+  // time the report is read, some of it has burned out. A raider only cares
+  // about what still stands in his way, so anything already expired is dropped.
+  return rows
+    .filter((row) => Number.isFinite(row.expiresAt) && row.expiresAt > now)
+    // Critical first (they change whether to spend the turn), then soonest to end.
+    .sort(
+      (a, b) =>
+        Number(Boolean(b.critical)) - Number(Boolean(a.critical)) ||
+        a.expiresAt - b.expiresAt
+    );
 }
 
 /* ============================ page ============================ */
@@ -464,7 +461,7 @@ function FullDossier({
   enslaveRate: number;
   enslaveMinSoldiers: number;
 }) {
-  const effects = collectEffects(intel);
+  const effects = collectEffects(intel, serverNow);
   const resourceKeys = ["gold", "wood", "iron", "stone"] as const;
   const shieldedResources = intel.shields.some((s) => s.key === "resources");
   const shieldedSoldiers = intel.shields.some((s) => s.key === "soldiers");
@@ -495,7 +492,10 @@ function FullDossier({
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
               <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright" dir="ltr">
-                <Icon name="crown" size={13} /> רמה {intel.level}
+                {/* The hero level, not `intel.level` — the empire column behind
+                    that field is never incremented, so it read 1 on every
+                    report an admin had not hand-edited. */}
+                <Icon name="crown" size={13} /> גיבור רמה {intel.hero?.level ?? 1}
               </span>
               <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">
                 <Icon name="spark" size={13} /> {formatNumber(intel.power.general)}
@@ -538,51 +538,12 @@ function FullDossier({
         </p>
       </div>
 
-      {/* ---------------- active magic & timers ---------------- */}
-      <Card
-        icon="spark"
-        title="קסמים ואפקטים פעילים"
-        gold
-        hint="כל אפקט מתוזמן שרץ על היעד ברגע הריגול, עם הזמן שנותר לו. הזמנים רצים חי — מה שפג, פג."
-        aside={
-          <span className="nums rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold" dir="ltr">
-            {effects.length}
-          </span>
-        }
-      >
-        {effects.length === 0 ? (
-          <p className="panel-inset rounded-lg p-4 text-center text-sm text-zinc-400">
-            שום קסם, שיקוי או מגן לא פועל עליו — היעד חשוף לחלוטין.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {effects.map((row) => (
-              <li
-                key={row.id}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3 py-2.5 ${row.tone}`}
-              >
-                <span className="flex min-w-0 items-center gap-2">
-                  {row.glyph ?? <Icon name={row.icon} size={18} />}
-                  <span className="min-w-0">
-                    <span className="block text-sm font-bold">{row.label}</span>
-                    <span className="block text-[11px] text-zinc-400">{row.effect}</span>
-                  </span>
-                </span>
-                <span className="text-left">
-                  <ExpiryCountdown
-                    expiresAt={row.expiresAt}
-                    serverNow={serverNow}
-                    className="block text-base"
-                  />
-                  <span className="nums block text-[10px] text-zinc-500" dir="ltr">
-                    עד {formatDate(new Date(row.expiresAt))}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
+      {/* ---------------- active magic & timers ----------------
+          A side note, not a section: only what is still burning, in a narrow
+          panel tucked against the left margin so it never eats the dossier. */}
+      <div className="flex justify-end">
+        <SpyEffectsBoard rows={effects} serverNow={serverNow} />
+      </div>
 
       {/* ---------------- population & stock ---------------- */}
       <Card icon="citizens" title="אוכלוסייה ומלאי">

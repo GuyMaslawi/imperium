@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { Icon } from "@/components/ui/Icon";
+import { useAfterFirstPaint, useCountUp } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import { useBankPulse } from "./BankFx";
 
@@ -60,62 +61,6 @@ const COINS = [
   { x: "82%", delay: 740, rot: 340, dx: "0.3rem" },
   { x: "6%", delay: 820, rot: -420, dx: "-0.2rem" },
 ];
-
-const prefersReducedMotion = () =>
-  typeof window !== "undefined" &&
-  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-/**
- * Counts from the previously shown value up to `value`. Starts at 0 so the
- * balance rolls in when the page first paints, then animates the delta after
- * every deposit / withdrawal.
- */
-function useCountUp(value: number, duration = 900): number {
-  const [display, setDisplay] = useState(0);
-  // The number the last painted frame actually showed. The roll always starts
-  // from here, so a cancelled run (StrictMode's double mount, or a balance that
-  // changes mid-count) resumes from the digits on screen instead of jumping —
-  // and, critically, never leaves the counter stranded on a value it only
-  // *intended* to reach.
-  const shown = useRef(0);
-
-  useEffect(() => {
-    const start = shown.current;
-    if (start === value) return;
-    // A zero-length roll lands on the final value in the very first frame,
-    // which is how the reduced-motion case skips the count.
-    const span = prefersReducedMotion() ? 0 : duration;
-    let raf = 0;
-    const t0 = performance.now();
-    const step = (now: number) => {
-      const t = span === 0 ? 1 : Math.min(1, (now - t0) / span);
-      const eased = 1 - (1 - t) ** 3;
-      const next = Math.round(start + (value - start) * eased);
-      shown.current = next;
-      setDisplay(next);
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [value, duration]);
-
-  return display;
-}
-
-/**
- * False for the first painted frame, true afterwards — the hook that lets the
- * gold *rise* into the vault instead of appearing already at its level. The
- * flag is flipped from a frame callback so the browser has committed the empty
- * state before the height transition starts.
- */
-function useAfterFirstPaint(): boolean {
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setReady(true));
-    return () => cancelAnimationFrame(frame);
-  }, []);
-  return ready;
-}
 
 export function BankVault({
   bankGold,

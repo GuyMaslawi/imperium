@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
-import { getEmpireMilitaryPower } from "@/lib/game/power";
+import { getCityLadder } from "@/server/rankingsLadder";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { CityBossBanner } from "@/components/game/CityBossBanner";
@@ -14,11 +13,96 @@ import { Tip } from "@/components/ui/Tip";
 
 export const metadata = { title: "דירוג | אימפריום" };
 
-/** How many ranked rows the table renders. Your own rank is still exact. */
-const RANKINGS_VISIBLE_ROWS = 100;
+/** Ranked rows per page. */
+const PAGE_SIZE = 10;
 
-export default async function RankingsPage() {
+/** Page links to draw around the current one, either side. */
+const PAGER_SPREAD = 2;
+
+/**
+ * The ladder's pager. Plain links, so a page survives a reload, a shared URL
+ * and the 30-second AutoRefresh (which re-fetches the current URL rather than
+ * resetting to the top).
+ *
+ * "הדף שלי" is the one control that matters on a long ladder: once the table
+ * shows ten rows at a time, an empire ranked 140th is fourteen clicks from
+ * home, and the page it lives on changes as other players rise and fall.
+ */
+function Pager({
+  page,
+  pageCount,
+  myPage,
+}: {
+  page: number;
+  pageCount: number;
+  myPage: number;
+}) {
+  if (pageCount <= 1) return null;
+
+  const href = (n: number) => `/game/rankings?page=${n}`;
+  const first = Math.max(1, Math.min(page - PAGER_SPREAD, pageCount - PAGER_SPREAD * 2));
+  const last = Math.min(pageCount, Math.max(page + PAGER_SPREAD, PAGER_SPREAD * 2 + 1));
+  const numbers = [];
+  for (let n = first; n <= last; n++) numbers.push(n);
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle px-4 py-3">
+      <span className="text-[11px] text-zinc-500">
+        עמוד{" "}
+        <span className="nums font-bold text-gold-bright" dir="ltr">
+          {page}
+        </span>{" "}
+        מתוך{" "}
+        <span className="nums font-bold text-zinc-300" dir="ltr">
+          {pageCount}
+        </span>
+      </span>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        {page > 1 && (
+          <Link href={href(page - 1)} className="btn btn-ghost px-2.5 py-1 text-xs">
+            ← הקודם
+          </Link>
+        )}
+        {first > 1 && <span className="px-1 text-xs text-zinc-600">…</span>}
+        {numbers.map((n) => (
+          <Link
+            key={n}
+            href={href(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`nums rounded-md border px-2.5 py-1 text-xs font-bold ${
+              n === page
+                ? "border-gold/60 bg-gold/15 text-gold-bright"
+                : "border-border-subtle text-zinc-400 hover:border-gold/40 hover:text-gold"
+            }`}
+            dir="ltr"
+          >
+            {n}
+          </Link>
+        ))}
+        {last < pageCount && <span className="px-1 text-xs text-zinc-600">…</span>}
+        {page < pageCount && (
+          <Link href={href(page + 1)} className="btn btn-ghost px-2.5 py-1 text-xs">
+            הבא →
+          </Link>
+        )}
+        {page !== myPage && (
+          <Link href={href(myPage)} className="btn btn-ghost px-2.5 py-1 text-xs text-gold">
+            <Icon name="crown" size={13} className="inline-block align-middle" /> הדף שלי
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default async function RankingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const myEmpire = await requireEmpire();
+  const requestedPage = Number((await searchParams).page);
 
   // The ranking is confined to your own city — you only see (and may attack or
   // spy) empires that hold the same number of cities as you.
@@ -32,51 +116,33 @@ export default async function RankingsPage() {
   // exhaust the connection pool and stall the whole app. Offline players show
   // their last-settled gold until they next log in — it self-heals on their next
   // load, and the numbers shown here (gold/soldiers) drift only slowly anyway.
-  // Only the columns this page actually renders, and only the relation fields
-  // `getEmpireMilitaryPower` reads. The previous `include: { army, weapons, hero }`
-  // pulled every column of four tables for every empire in the bucket — and
-  // because `Empire.cities` defaults to 1, for the whole early game that bucket
-  // IS the entire table. With <AutoRefresh intervalMs={30_000} /> below, each
-  // open tab re-ran that scan twice a minute.
-  //
-  // This is a mitigation, not the real fix: ranking is by a power figure
-  // computed in JS, so the sort cannot move into SQL until a denormalised power
-  // column exists on Empire. Until then the row count is still O(bucket).
   // The city boss headlines this screen — it is the one target on the page
   // that everyone in the city shares, so it belongs above the ladder.
   const bossState = await getCityBossState(myEmpire);
 
-  const empires = await prisma.empire.findMany({
-    where: { cities: myCity },
-    select: {
-      id: true,
-      name: true,
-      level: true,
-      gold: true,
-      army: { select: { soldiers: true } },
-      weapons: { select: { weaponKey: true, quantity: true } },
-      hero: { select: { level: true, resets: true } },
-    },
-  });
+  // Ranking is by a power figure computed in JS, so the sort cannot move into
+  // SQL and the scan stays O(bucket). What keeps that off the database is the
+  // shared TTL in getCityLadder — see the header there — and what keeps it off
+  // the wire is the page slice below.
+  const ranked = await getCityLadder(myCity);
 
-  const ranked = empires
-    .map((e) => ({
-      ...e,
-      power: getEmpireMilitaryPower(e.army, e.weapons),
-    }))
-    .sort((a, b) => b.power - a.power || b.level - a.level);
-
-  // Exact, and computed before the display slice below.
+  // Exact, and computed against the whole ladder rather than the page.
   const myRank = ranked.findIndex((e) => e.id === myEmpire.id) + 1;
 
   const podium = ranked.slice(0, 3);
 
-  // Cap the rendered table. Rendering every row made both the HTML payload and
-  // the render cost O(bucket) on top of the query.
-  const visible = ranked.slice(0, RANKINGS_VISIBLE_ROWS);
+  const pageCount = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
+  // Land on the page holding your own row when none was asked for, so the
+  // default view answers "where am I" without paging to find out.
+  const defaultPage = myRank > 0 ? Math.ceil(myRank / PAGE_SIZE) : 1;
+  const page = Number.isInteger(requestedPage)
+    ? Math.min(pageCount, Math.max(1, requestedPage))
+    : defaultPage;
+  const firstIndex = (page - 1) * PAGE_SIZE;
+  const visible = ranked.slice(firstIndex, firstIndex + PAGE_SIZE);
 
   // Raid shields for the rows actually rendered — one query for the whole page,
-  // and scoped to the visible slice so it stays O(100) rather than O(bucket).
+  // and scoped to the ten visible rows rather than the bucket.
   const shieldsByEmpire = await getShieldsForEmpires(visible.map((e) => e.id));
 
   return (
@@ -116,11 +182,10 @@ export default async function RankingsPage() {
           </h2>
           <div className="flex items-center gap-3">
             {/* Legend for the shield pills on the rows below. */}
-            <Tip tip="שחקן עם מגן משאבים (🛡️+מחסן) לא ניתן לביזה, ושחקן עם מגן חיילים (🛡️+קסדה) לא ניתן לשעבוד. אפשר עדיין לתקוף אותו — פשוט אין ממה להרוויח שלל.">
+            <Tip tip="שחקן עם מגן משאבים לא ניתן לביזה, ושחקן עם מגן חיילים לא ניתן לשעבוד. אפשר עדיין לתקוף אותו — פשוט אין ממה להרוויח שלל.">
               <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
-                <ShieldGlyph shieldKey="resources" />
-                <ShieldGlyph shieldKey="soldiers" />
-                מגנים
+                <ShieldGlyph shieldKey="resources" label />
+                <ShieldGlyph shieldKey="soldiers" label />
               </span>
             </Tip>
             <span className="text-xs text-zinc-400">
@@ -149,14 +214,12 @@ export default async function RankingsPage() {
             <tbody>
               {visible.map((empire, index) => {
                 const isMe = empire.id === myEmpire.id;
+                // Rank is the position in the whole ladder, not on this page —
+                // page 2 starts at 11, and the medals stay with the top three
+                // wherever the reader happens to be standing.
+                const rank = firstIndex + index + 1;
                 const medal =
-                  index === 0
-                    ? "🥇"
-                    : index === 1
-                      ? "🥈"
-                      : index === 2
-                        ? "🥉"
-                        : null;
+                  rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : null;
                 return (
                   <tr
                     key={empire.id}
@@ -166,7 +229,7 @@ export default async function RankingsPage() {
                   >
                     <td className="px-4 py-3">
                       <span className="nums font-black text-gold" dir="ltr">
-                        {medal ?? index + 1}
+                        {medal ?? rank}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -181,42 +244,42 @@ export default async function RankingsPage() {
                           >
                             {empire.name}
                           </Link>{" "}
-                          <span className="text-xs text-gold-dim">
-                            (רמה{" "}
-                            <span className="nums" dir="ltr">
-                              {empire.level}
+                          {/* The level beside the name is the *hero* level —
+                              the only one that moves. It used to print
+                              `empire.level`, a column no gameplay path ever
+                              increments: it read "רמה 1" for every real player
+                              and whatever number an admin (or a fixture) had
+                              typed for the rest, which is worse than useless on
+                              a ladder people read to pick targets. */}
+                          <span className="nums text-xs text-gold-dim">
+                            גיבור רמה{" "}
+                            <span className="font-bold text-gold-bright">
+                              {empire.hero?.level ?? 1}
                             </span>
-                            ) <Icon name="spark" size={14} className="inline-block align-middle" />
                           </span>
                           {isMe && (
                             <span className="mr-1.5 rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
                               הצבא שלך
                             </span>
                           )}
-                          <div className="mt-0.5 flex items-center gap-2">
-                            <span className="text-[11px] text-zinc-500">גיבור</span>
-                            <span
-                              className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-1.5 text-[10px] font-bold text-gold-bright"
-                              dir="ltr"
-                              title={`רמת הגיבור: ${empire.hero?.level ?? 1}`}
-                            >
-                              <Icon name="attack" size={12} className="inline-block align-middle" /> {empire.hero?.level ?? 1}
-                            </span>
+                          {/* One readable line under the name. It used to be a
+                              row of icon-only pills — a sword that meant "hero
+                              level" (and read as attack power), a ↻ counter, a
+                              hard-coded 100♥ the ladder never actually loaded,
+                              and a two-icon shield rebus. Everything that stayed
+                              now says what it is in words. */}
+                          <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 empty:mt-0">
                             {(empire.hero?.resets ?? 0) > 0 && (
                               <span
-                                className="nums rounded-full border border-purple-400/50 bg-purple-950/60 px-1.5 text-[10px] font-black text-purple-300"
-                                dir="ltr"
-                                title={`הגיבור אופס ${empire.hero!.resets} פעמים ברמה 100`}
+                                className="nums rounded-full border border-purple-400/50 bg-purple-950/60 px-1.5 font-bold text-purple-300"
+                                title={`הגיבור הגיע לרמה 100 ואופס ${empire.hero!.resets} פעמים`}
                               >
-                                ↻×{empire.hero!.resets}
+                                איפוס ×{empire.hero!.resets}
                               </span>
                             )}
-                            <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
-                              100 <Icon name="heart" size={12} className="inline-block align-middle" />
-                            </span>
                             {/* Paid raid shields — worth knowing before you
                                 spend turns on a target whose loot is locked. */}
-                            <ShieldBadges shields={shieldsByEmpire.get(empire.id)} />
+                            <ShieldBadges shields={shieldsByEmpire.get(empire.id)} label />
                           </div>
                         </div>
                       </div>
@@ -241,6 +304,8 @@ export default async function RankingsPage() {
             </tbody>
           </table>
         </div>
+
+        <Pager page={page} pageCount={pageCount} myPage={defaultPage} />
       </div>
 
       {/* -------- hall of fame -------- */}

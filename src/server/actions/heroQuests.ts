@@ -35,6 +35,8 @@ import {
   rollHeroQuestReward,
 } from "@/lib/game/heroQuests";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
+import { syncEmpirePower } from "@/server/empirePower";
 
 /**
  * The hero's expedition board — sending him out and bringing him home.
@@ -184,7 +186,8 @@ export async function startHeroQuest(
 
     revalidatePath("/game", "layout");
     return result;
-  } catch {
+  } catch (err) {
+    await logError("heroQuests.startHeroQuest", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -248,6 +251,9 @@ export async function collectHeroQuest(): Promise<ActionState> {
           create: { empireId, mineSlaves: quest.rewardSlaves },
           update: { mineSlaves: { increment: quest.rewardSlaves } },
         });
+        // Mine slaves carry no power, so this cannot move a figure — synced
+        // anyway so the rule has no exceptions a later reader has to know.
+        await syncEmpirePower(tx, empireId);
       }
 
       /* ---- the hero: what the road taught him, and what he found ---- */
@@ -324,7 +330,8 @@ export async function collectHeroQuest(): Promise<ActionState> {
 
     revalidatePath("/game", "layout");
     return result;
-  } catch {
+  } catch (err) {
+    await logError("heroQuests.collectHeroQuest", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

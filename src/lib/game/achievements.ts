@@ -1,5 +1,10 @@
 import type { IconName } from "@/components/ui/Icon";
-import { MAX_CITIES, MINE_MAX_LEVEL } from "./constants";
+import {
+  MAX_CITIES,
+  MINE_MAX_LEVEL,
+  citizenGrowthMaxLevel,
+  citizensPerDailyUpdate,
+} from "./constants";
 import { HERO_MAX_LEVEL } from "./hero";
 
 /**
@@ -96,8 +101,15 @@ export function mergeRewards(
   }));
 }
 
-/** Total diamonds the whole ladder can ever pay one empire. */
-export const ACHIEVEMENT_DIAMOND_BUDGET = 1_700;
+/**
+ * Total diamonds the whole ladder can ever pay one empire.
+ *
+ * Keep this equal to the sum of every `diamonds` reward below — it had drifted
+ * to 1,700 against an actual 2,000, and a payout budget nobody can trust is
+ * worse than no budget at all. Re-add it up when you add or retune a diamond
+ * capstone.
+ */
+export const ACHIEVEMENT_DIAMOND_BUDGET = 2_000;
 
 /* ------------------------------ categories ------------------------------ */
 
@@ -317,6 +329,26 @@ const he = (n: number) => n.toLocaleString("he-IL");
 
 /** Total distinct weapon models in the game — 30 tiers × 3 categories. */
 const WEAPON_TOTAL = 90;
+
+/**
+ * The absolute ceiling of the citizen-intake upgrade: 10 levels per city, so
+ * only an empire holding all ten cities can reach it. Pays 520 a day.
+ */
+const CITIZEN_GROWTH_CAP = citizenGrowthMaxLevel(MAX_CITIES);
+
+/**
+ * The level that first pays a round 500 citizens per daily update.
+ *
+ * Derived rather than written as `96`, so it follows if `citizensPerDailyUpdate`
+ * is ever retuned. It is four levels short of the cap — the two are different
+ * milestones and the base-screen board deliberately shows this one.
+ */
+const CITIZEN_GROWTH_500 = (() => {
+  for (let level = 1; level <= CITIZEN_GROWTH_CAP; level += 1) {
+    if (citizensPerDailyUpdate(level) >= 500) return level;
+  }
+  return CITIZEN_GROWTH_CAP;
+})();
 
 /**
  * The one achievement whose condition costs a full power scan of the city
@@ -707,6 +739,29 @@ const EMPIRE: AchievementDefinition[] = [
       { goal: 2, reward: ["citizens", 60], name: "לשדרג קבלת מגויסים", hint: 'שדרג את "קבלת מגויסים" לרמה 2' },
       { goal: 5, reward: ["citizens", 150] },
       { goal: 10, reward: ["citizens", 300] },
+      // The round number the design aims at, and the rung the base-screen board
+      // draws (see GLORY_KEYS). 500 a day is level 96, not the cap — the cap is
+      // four levels further on and pays 520.
+      {
+        goal: CITIZEN_GROWTH_500,
+        reward: ["citizens", 1_000],
+        name: "500 אזרחים ביום",
+        hint: `שדרג את "קבלת מגויסים" לרמה ${he(
+          CITIZEN_GROWTH_500
+        )} — 500 אזרחים בכל עדכון יומי`,
+      },
+      // Rule 3: a chain's top rung is pinned to the real ceiling. This one
+      // stopped at 10 while the upgrade actually runs to 10 levels *per city*,
+      // so the ladder ended a tenth of the way up. The cap needs all ten cities,
+      // which makes it one of the last things in the game to finish.
+      {
+        goal: CITIZEN_GROWTH_CAP,
+        reward: ["citizens", 1_500],
+        name: "עיר שוקקת",
+        hint: `שדרג את "קבלת מגויסים" לרמה ${he(CITIZEN_GROWTH_CAP)} — ${he(
+          citizensPerDailyUpdate(CITIZEN_GROWTH_CAP)
+        )} אזרחים בכל עדכון יומי`,
+      },
     ]
   ),
   ...chain(
@@ -969,6 +1024,143 @@ export interface AchievementsState {
 
 export function achievementRewardLabel(a: AchievementDefinition): string {
   return `${heNum(a.reward.amount)} ${ACHIEVEMENT_REWARD_LABEL[a.reward.kind]}`;
+}
+
+/* ------------------------------ hall of glory ------------------------------ */
+
+/**
+ * The capstones — five conditions pinned to the game's actual ceilings, shown
+ * as decorations on the base screen.
+ *
+ * **These are not collected.** The ladder above is a reward system: reaching a
+ * goal unlocks a button, and pressing it pays out. A capstone here is a
+ * decoration — it lights up the moment the empire meets the condition, with
+ * nothing to press and nothing to pay. `AchievementView.unlocked` is already
+ * the derived condition (`claimed || raw >= goal`), which is why the board can
+ * borrow this catalog for its *conditions* while `EmpireGloryAward` — not the
+ * claim receipt — records when each empire arrived. See src/server/gloryBoard.ts.
+ *
+ * The conditions are picked out by key rather than re-declared so they cannot
+ * drift from the ones the game already evaluates, and so no new stat has to be
+ * gathered. The strip this replaced was gated on `empire.level` — a column
+ * gameplay never writes — so all five of its milestones were locked forever.
+ *
+ * Order is the arc of a run: your first empire-wide ceiling, then the grinds,
+ * then the two that require beating other people.
+ */
+export const GLORY_KEYS: readonly string[] = [
+  "cities_10",
+  `citizenup_${CITIZEN_GROWTH_500}`,
+  "herolvl_100",
+  "minelvl_250",
+  "arsenal_90",
+];
+
+/**
+ * Three capstones were deliberately left off this board.
+ *
+ * `rank_one` is the important one: rank 1 of a city bucket is occupied from the
+ * moment the second player registers, so a "world record" for it would be set
+ * on day one by whoever happened to be ahead and would say nothing about
+ * reaching the end of anything. It is a *standing*, not a ceiling — the
+ * rankings page is where it belongs.
+ *
+ * `heroreset_1` and `all_bosses` are real ceilings but repeatable ones, and the
+ * board reads best at five. All three remain in the reward ladder above; only
+ * the decoration board is opinionated about them.
+ */
+
+/**
+ * What each capstone is *called on the board*, overriding the catalog name.
+ *
+ * The board names a goal to reach ("להגיע לעיר 10"); the reward ladder names an
+ * accolade earned ("קיסרות"). Both readings are right for their own screen, and
+ * one map keeps the two from having to agree.
+ */
+export const GLORY_NAME: Record<string, string> = {
+  cities_10: "להגיע לעיר 10",
+  [`citizenup_${CITIZEN_GROWTH_500}`]: "להגיע לשדרוג של 500 אזרחים בעדכון יומי",
+  herolvl_100: "גיבור הגיע לרמה 100",
+  minelvl_250: "להגיע למקסימום מכרות",
+  arsenal_90: "להגיע לכל דגמי הנשק",
+};
+
+/** The line under each name — the concrete mechanic, never a repeat of it. */
+export const GLORY_TAGLINE: Record<string, string> = {
+  cities_10: "האימפריה המלאה, כל עשר הערים",
+  [`citizenup_${CITIZEN_GROWTH_500}`]: `שדרוג "קבלת אזרחים" ברמה ${CITIZEN_GROWTH_500}`,
+  herolvl_100: "הרמה האחרונה של הגיבור",
+  minelvl_250: `ארבעת המכרות ברמה ${MINE_MAX_LEVEL}`,
+  arsenal_90: `כל ${WEAPON_TOTAL} הדגמים במחסן`,
+};
+
+/** Who holds a capstone's world record, as the board renders it. */
+export interface GloryRecord {
+  empireId: string;
+  empireName: string;
+  /**
+   * "12.07.26", formatted here rather than in the board.
+   *
+   * The board is a client component, and a date formatted on both sides of
+   * hydration is formatted in two different time zones — the server's and the
+   * reader's. Doing it once, on the server, makes the string authoritative.
+   */
+  awardedLabel: string;
+  /** True when the record holder is the empire currently looking at the board. */
+  isMe: boolean;
+}
+
+const gloryDate = new Intl.DateTimeFormat("he-IL", {
+  day: "2-digit",
+  month: "2-digit",
+  year: "2-digit",
+});
+
+/** One capstone as the showcase renders it. */
+export interface GloryView extends AchievementView {
+  /** The short epithet from GLORY_TAGLINE, falling back to the full hint. */
+  tagline: string;
+  /** First empire in the game to reach it; null while the record is open. */
+  record: GloryRecord | null;
+}
+
+/**
+ * Pull the capstones out of a built ladder, in GLORY_KEYS order, and attach the
+ * world record for each.
+ *
+ * Silently skips a key with no catalog entry, so retuning a condition (which
+ * mints a new key — see `chain`) degrades to a shorter board instead of
+ * throwing on the base screen, which every player loads.
+ */
+export function selectGlory(
+  state: AchievementsState,
+  records: ReadonlyMap<
+    string,
+    { empireId: string; empireName: string; awardedAt: Date }
+  >,
+  viewerEmpireId: string
+): GloryView[] {
+  const byKey = new Map(state.items.map((i) => [i.key, i]));
+  return GLORY_KEYS.flatMap((key) => {
+    const item = byKey.get(key);
+    if (!item) return [];
+    const held = records.get(key);
+    return [
+      {
+        ...item,
+        name: GLORY_NAME[key] ?? item.name,
+        tagline: GLORY_TAGLINE[key] ?? item.hint,
+        record: held
+          ? {
+              empireId: held.empireId,
+              empireName: held.empireName,
+              awardedLabel: gloryDate.format(held.awardedAt),
+              isMe: held.empireId === viewerEmpireId,
+            }
+          : null,
+      },
+    ];
+  });
 }
 
 /**

@@ -108,7 +108,9 @@ export default async function EmpireProfilePage({
   const activeShields = SHIELDS.filter((s) => shields[s.key] !== null);
 
   const publicStats = [
-    { label: "רמה", value: formatNumber(empire.level), tone: "text-gold-bright" },
+    // "רמה" here means the hero's level. `empire.level` is a column nothing in
+    // the game increments, so it showed 1 on every honest profile.
+    { label: "רמת גיבור", value: formatNumber(heroLevel), tone: "text-gold-bright" },
     { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
     // Gold and soldier count are shown openly on every profile.
     { label: "זהב", value: <><Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" /> {formatNumber(Math.floor(empire.gold))}</>, tone: "text-gold-bright" },
@@ -206,7 +208,7 @@ export default async function EmpireProfilePage({
                 className="nums absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-gold/50 bg-black px-2 text-[10px] font-bold text-gold-bright"
                 dir="ltr"
               >
-                רמה {empire.level}
+                רמה {heroLevel}
               </span>
             </div>
             <div>
@@ -227,20 +229,17 @@ export default async function EmpireProfilePage({
                     <Icon name="spark" size={14} /> {formatNumber(generalPower)}
                   </span>
                 )}
-                <span
-                  className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright"
-                  title="רמת הגיבור"
-                >
-                  <Icon name="attack" size={14} /> גיבור{" "}
-                  <span className="nums" dir="ltr">
-                    {heroLevel}
+                {/* The level itself is on the portrait badge — this pill only
+                    carries what the badge has no room for: how many times the
+                    hero has hit 100 and started over. */}
+                {heroResets > 0 && (
+                  <span
+                    className="nums inline-flex items-center gap-1 rounded-md border border-purple-400/50 bg-purple-950/60 px-2 py-0.5 font-bold text-purple-300"
+                    title={`הגיבור הגיע לרמה 100 ואופס ${heroResets} פעמים`}
+                  >
+                    איפוס ×{heroResets}
                   </span>
-                  {heroResets > 0 && (
-                    <span className="nums text-purple-300" dir="ltr" title={`הגיבור אופס ${heroResets} פעמים ברמה 100`}>
-                      ↻×{heroResets}
-                    </span>
-                  )}
-                </span>
+                )}
                 <span className="nums inline-flex items-center gap-1 rounded-md border border-red-500/40 bg-red-500/10 px-2 py-0.5 font-bold text-red-400" dir="ltr">
                   100 <Icon name="heart" size={14} />
                 </span>

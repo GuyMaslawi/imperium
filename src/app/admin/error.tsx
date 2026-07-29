@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { reportClientError } from "@/server/actions/errors";
 
 /** Graceful error boundary for /admin/* so a thrown error shows a recovery
  *  screen instead of the raw Next.js overlay. */
@@ -14,6 +15,14 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error(error);
+    // A client-side throw never reaches Next's onRequestError hook, so this is
+    // the only chance to record it. Fire-and-forget: a reporting failure must
+    // not take the recovery screen down with it.
+    void reportClientError(
+      error.message,
+      error.digest,
+      typeof window === "undefined" ? undefined : window.location.pathname
+    );
   }, [error]);
 
   return (

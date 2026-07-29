@@ -24,6 +24,7 @@ import {
 import { grantCitizens } from "@/lib/game/grants";
 import { getActivePotionKinds } from "@/lib/game/potionEffects";
 import { POTION_DOUBLE } from "@/lib/game/potions";
+import { syncEmpirePower } from "@/server/empirePower";
 import {
   BOSS_HERO_XP_DEFEAT,
   BOSS_ITEM_RARITY_FLOOR,
@@ -158,6 +159,7 @@ export async function runBossFight(empireId: string): Promise<BossFightOutcome> 
         ...(reward.slaves > 0 ? { mineSlaves: { increment: reward.slaves } } : {}),
       },
     });
+    await syncEmpirePower(tx, empireId);
 
     if (victory) {
       await tx.empire.update({

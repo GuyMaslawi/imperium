@@ -140,7 +140,17 @@ export default async function GuildPage() {
       guild: {
         include: {
           members: {
-            include: { empire: { select: { id: true, name: true, level: true } } },
+            include: {
+              empire: {
+                select: {
+                  id: true,
+                  name: true,
+                  // The roster shows the hero level, not `empire.level` — that
+                  // column is never incremented by gameplay.
+                  hero: { select: { level: true } },
+                },
+              },
+            },
           },
           spells: true,
         },
@@ -230,8 +240,9 @@ export default async function GuildPage() {
                   <span className="rounded-full border border-gold/40 bg-panel-inset px-2 py-0.5 text-[10px] font-bold text-gold-bright">
                     {roleMeta.icon} {roleMeta.label}
                   </span>
-                  <span className="nums text-[11px] text-zinc-500" dir="ltr">
-                    LV {member.empire.level}
+                  <span className="nums text-[11px] text-zinc-500" title="רמת הגיבור">
+                    גיבור רמה{" "}
+                    <span dir="ltr">{member.empire.hero?.level ?? 1}</span>
                   </span>
                   {member.empireId !== empire.id && (
                     <div className="mr-auto">

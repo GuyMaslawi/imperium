@@ -1,14 +1,18 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, type CSSProperties } from "react";
 import { upgradeEmpireUpgrade, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { usePulse } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
 import type { AvailableResources } from "@/components/game/WeaponCard";
+
+/** Shards thrown off the crest when an upgrade settles. */
+const BURST = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -47,17 +51,41 @@ export function UpgradeCard({
     {}
   );
 
+  // A settled upgrade flares the crest. The action state is a fresh object per
+  // submit, so an identical repeat still fires; `fire` is stable.
+  const [pulse, fire] = usePulse<"upgrade">();
+  useEffect(() => {
+    if (state.success) fire("upgrade");
+  }, [state, fire]);
+
   return (
-    <Card className="flex flex-col gap-4">
+    <Card className={`flex flex-col gap-4${pulse ? " forged" : ""}`}>
       <div className="flex items-center gap-3">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-gold/40 bg-panel-inset">
-          <Icon name={icon} size={26} className="text-gold-bright" />
+        {/* the emblem doubles as the level dial: it glows brighter the further
+            the upgrade has been pushed, and flares when one settles */}
+        <span
+          className="crest"
+          style={{ "--lit": `${Math.min(1, level / 25)}` } as CSSProperties}
+        >
+          <span className="crest-ring" />
+          <Icon name={icon} size={26} className="crest-mark text-gold-bright" />
+          {pulse && (
+            <span className="crest-burst" key={pulse.id} aria-hidden>
+              {BURST.map((angle) => (
+                <span
+                  key={angle}
+                  className="crest-shard"
+                  style={{ "--a": `${angle}deg` } as CSSProperties}
+                />
+              ))}
+            </span>
+          )}
         </span>
         <div>
           <h3 className="font-bold text-gold-bright">{label}</h3>
           <p className="text-xs font-semibold text-gold">
             רמה{" "}
-            <span className="nums" dir="ltr">
+            <span className="nums crest-level" key={level} dir="ltr">
               {level}
             </span>
           </p>

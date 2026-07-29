@@ -11,6 +11,7 @@ import {
   MESSAGE_TITLE_MAX,
 } from "@/lib/game/messages";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -155,7 +156,8 @@ export async function sendPlayerMessage(
           ? `ההודעה נשלחה אל ${targets[0]!.name}`
           : `ההודעה נשלחה אל ${targets.length} שחקנים`,
     };
-  } catch {
+  } catch (err) {
+    await logError("messages.sendPlayerMessage", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

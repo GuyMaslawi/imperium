@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { trainUnits, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { usePulse } from "@/components/ui/motion";
+import { MusterYard } from "./MusterYard";
 import { formatNumber } from "@/lib/game/format";
 
 export interface TrainCardProps {
@@ -27,6 +29,14 @@ export function TrainCard({
   availableCitizens,
 }: TrainCardProps) {
   const [state, action] = useActionState<ActionState, FormData>(trainUnits, {});
+
+  // Every settled training order marches the recruits into the yard. The
+  // action state is a fresh object per submit, so an identical repeat still
+  // fires; `fire` is stable, so it never re-triggers on its own.
+  const [pulse, fire] = usePulse<"train">();
+  useEffect(() => {
+    if (state.success) fire("train");
+  }, [state, fire]);
 
   return (
     <div className="panel-inset rounded-xl p-4 flex flex-col gap-4">
@@ -53,6 +63,9 @@ export function TrainCard({
           </span>
         )}
       </div>
+
+      {/* the parade ground: one silhouette rank standing for what you hold */}
+      <MusterYard unit={unit} label={label} owned={owned} power={power} pulse={pulse} />
 
       <p className="text-sm text-zinc-400">{description}</p>
 

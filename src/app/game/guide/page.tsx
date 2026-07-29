@@ -377,7 +377,7 @@ export default async function GuidePage() {
                     <li>
                       • <b className="nums">{tunables.daily.wheelSpins}</b> סיבובי גלגל מזל
                     </li>
-                    <li>• איפוס פס העונה ומכסת הניצחונות על שליט העיר</li>
+                    <li>• איפוס דרך התהילה ומכסת הניצחונות על שליט העיר</li>
                     <li>• אזרחים ותורות מחפצי הגיבור</li>
                   </ul>
                   <p className="mt-2 text-[11px] text-zinc-500">שעון ישראל, פעמיים ביום.</p>
@@ -873,8 +873,8 @@ export default async function GuidePage() {
                   פתיחת דרגה היא <b>משותפת לשלוש הקטגוריות</b> — פתחת דרגה 7? היא נפתחה
                   להתקפה, להגנה ולריגול יחד. מתחילים עם דרגות{" "}
                   <span className="nums">1–{INITIAL_WEAPON_UNLOCKED_TIER}</span> פתוחות, וכל{" "}
-                  <span className="nums">{WEAPON_GATE_EVERY}</span> דרגות נדרשת עיר חדשה
-                  ורמת גיבור גבוהה יותר.
+                  <span className="nums">{WEAPON_GATE_EVERY}</span> דרגות נדרשת רמת עיר
+                  גבוהה יותר ורמת גיבור גבוהה יותר.
                 </p>
                 <TableWrap maxHeight={420}>
                   <table className="guide-table">
@@ -2023,7 +2023,7 @@ export default async function GuidePage() {
 
                 <div className="panel-gold rounded-xl p-4">
                   <p className="mb-2 flex items-center gap-2 font-black text-gold-bright">
-                    <Icon name="gift" size={18} /> פס העונה
+                    <Icon name="gift" size={18} /> דרך התהילה
                   </p>
                   <p className="text-[11px] leading-relaxed text-zinc-400">
                     <b className="nums">{SEASON_PASS_TIER_COUNT}</b> דרגות, כל אחת ב־
@@ -2140,7 +2140,7 @@ export default async function GuidePage() {
               </Note>
 
               <Note tone="green" icon="diamond" title="למה אין יהלומים בפרסים החוזרים">
-                פס העונה, שליטי הערים והגלגל (מלבד ווג׳ קבוע של 3) לא מחלקים יהלומים
+                דרך התהילה, שליטי הערים והגלגל (מלבד ווג׳ קבוע של 3) לא מחלקים יהלומים
                 בכוונה: מקור חוזר של מטבע פרימיום היה מציף את המשחק ומרוקן מתוכן את כל
                 מה שנקנה בו.
               </Note>
@@ -2178,7 +2178,7 @@ export default async function GuidePage() {
                   },
                   {
                     title: "פתח דרגות נשק — הן משותפות",
-                    body: "פתיחה אחת מקדמת התקפה, הגנה וריגול יחד. כל 4 דרגות תצטרך עיר נוספת ורמת גיבור גבוהה יותר, אז ערים וגיבור הם התנאי האמיתי.",
+                    body: "פתיחה אחת מקדמת התקפה, הגנה וריגול יחד. כל 4 דרגות תצטרך לעלות עיר ורמת גיבור גבוהה יותר, אז העיר והגיבור הם התנאי האמיתי.",
                   },
                   {
                     title: "בחר יעדים חכם — לא חלשים",

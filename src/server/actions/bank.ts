@@ -10,6 +10,7 @@ import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -71,7 +72,8 @@ async function runBankAction(
 
     revalidatePath("/game", "layout");
     return result;
-  } catch {
+  } catch (err) {
+    await logError("bank.unknown", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

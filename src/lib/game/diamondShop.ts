@@ -40,7 +40,10 @@ export interface ResourceCost {
 /** Apply the shop discount % to a single amount, rounded up (matches purchase math). */
 export function discountedAmount(amount: number, discountPct: number): number {
   if (discountPct <= 0) return amount;
-  return Math.ceil(amount * (1 - discountPct / 100));
+  // Capped at a free item, never a paid one: above 100% the multiplier goes
+  // negative and the "cost" becomes a credit. No current write path can set a
+  // magnitude that high, which is exactly why it is worth pinning now.
+  return Math.ceil(amount * (1 - Math.min(100, discountPct) / 100));
 }
 
 /** Apply the shop discount % to a {gold,wood,iron,stone} cost, rounded up. */

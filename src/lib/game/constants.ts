@@ -132,7 +132,12 @@ export const MINE_MAX_LEVEL = 250;
  * nothing until it is upgraded.
  */
 export function mineProductionValue(level: number): number {
-  return level * 2;
+  // Floored. Nothing in the game writes a negative mine level today — the
+  // upgrade path is monotonic and the admin form clamps — but this figure is
+  // multiplied by the slave count and credited straight to the empire, so a
+  // negative level would *debit* resources on every tick. Clamping here costs
+  // nothing and means the next caller cannot reintroduce it.
+  return Math.max(0, level) * 2;
 }
 
 /** Production per regular update = assigned mine slaves * production value. */
@@ -338,7 +343,13 @@ export const BANK_INTEREST_MAX_RATE = 0.03;
  * instead of the level count. Retuning is this one constant.
  */
 export function bankInterestRate(level: number): number {
-  return Math.min(BANK_INTEREST_MAX_RATE, level * BANK_INTEREST_PER_LEVEL);
+  // Clamped at both ends: the ceiling is the fix for 15%-per-update compounding
+  // on plunder-immune gold, and the floor stops a negative level from quietly
+  // charging a player interest on their own savings.
+  return Math.min(
+    BANK_INTEREST_MAX_RATE,
+    Math.max(0, level) * BANK_INTEREST_PER_LEVEL
+  );
 }
 
 /* ------------------------------ cities ------------------------------ */

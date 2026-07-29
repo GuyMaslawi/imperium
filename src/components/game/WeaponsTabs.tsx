@@ -11,6 +11,7 @@ import {
   type AvailableResources,
 } from "@/components/game/WeaponCard";
 import { NextWeaponCard } from "@/components/game/NextWeaponCard";
+import { ArmoryForge } from "@/components/game/ArmoryForge";
 
 export interface WeaponsTabData {
   category: "ATTACK" | "DEFENSE" | "SPY";
@@ -117,28 +118,18 @@ export function WeaponsTabs({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-        <div className="flex items-center gap-2 text-xs text-gold-dim">
-          <span>מסלול התקדמות:</span>
-          <div className="flex items-center gap-1.5" aria-hidden>
-            {Array.from({ length: active.maxTier }, (_, i) => (
-              <span
-                key={i}
-                className={`h-2 w-2 rounded-full ${
-                  i < active.unlockedTier
-                    ? "bg-gold"
-                    : i === active.unlockedTier
-                      ? "border border-gold/60 bg-gold/20"
-                      : "bg-border-subtle"
-                }`}
-              />
-            ))}
-          </div>
-          <span className="nums font-bold text-gold-bright" dir="ltr">
-            {active.unlockedTier}/{active.maxTier}
-          </span>
-        </div>
-      </div>
+      {/* The smithy for the category on screen — it carries the tier ladder
+          and the category's total weapon power, which nothing showed before.
+          Keyed so switching tabs lights up a fresh forge. */}
+      <ArmoryForge
+        key={active.category}
+        category={active.category}
+        label={active.label}
+        powerLabel={active.totalPowerLabel}
+        totalPower={active.totalPower}
+        unlockedTier={active.unlockedTier}
+        maxTier={active.maxTier}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {next && (

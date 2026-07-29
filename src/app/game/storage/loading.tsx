@@ -25,10 +25,11 @@ export default function StorageLoading() {
 
       <Skeleton className="h-[68px] rounded-xl" />
 
+      {/* the silo drawing sits above the meter, so the cards run tall */}
       <SkeletonGrid
         count={4}
         grid="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
-        tile="h-[470px]"
+        tile="h-[630px]"
       />
     </SkeletonPage>
   );

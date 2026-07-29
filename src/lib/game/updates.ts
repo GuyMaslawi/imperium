@@ -16,6 +16,7 @@ import { getActiveGuildBuffPct } from "./guildBuffs";
 import { getActiveResourceBoosts } from "./diamondEffects";
 import { getActivePotionKinds } from "./potionEffects";
 import { POTION_DOUBLE } from "./potions";
+import { computePower } from "@/server/empirePower";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -198,6 +199,12 @@ export async function applyPendingUpdates(
       stone: { increment: gained.stone },
       citizens: { increment: citizensGained },
       turns: { increment: turnsGained },
+      // The denormalised power figures, re-derived from the army and arsenal
+      // this settle already loaded — no extra query, and it makes every settle
+      // a repair. A write path that changes an army and forgets to call
+      // syncEmpirePower therefore costs a stale ladder until this player's next
+      // page load, not a permanently wrong one. See server/empirePower.ts.
+      ...computePower(empire.army, empire.weapons),
       ...(missedDailies.length > 0 && wheelSpinsDelta > 0
         ? { wheelSpins: { increment: wheelSpinsDelta } }
         : {}),

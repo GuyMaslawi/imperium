@@ -5,6 +5,7 @@ import { buyWeapon, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { WeaponArt } from "@/components/game/WeaponArt";
 import { formatNumber } from "@/lib/game/format";
 import { discountedAmount } from "@/lib/game/diamondShop";
 import type { WeaponCost, WeaponDefinition } from "@/lib/game/weapons";
@@ -67,14 +68,17 @@ export function WeaponCard({
   return (
     <div className="panel rounded-xl p-3 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-2">
-        <div>
-          <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
-          <p className="text-xs font-semibold text-gold-dim">
-            רמה{" "}
-            <span className="nums" dir="ltr">
-              {weapon.tier}
-            </span>
-          </p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <WeaponArt weapon={weapon} />
+          <div className="min-w-0">
+            <h3 className="font-bold text-gold-bright">{weapon.name}</h3>
+            <p className="text-xs font-semibold text-gold-dim">
+              רמה{" "}
+              <span className="nums" dir="ltr">
+                {weapon.tier}
+              </span>
+            </p>
+          </div>
         </div>
         {hasDiscount && (
           <span

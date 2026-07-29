@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import {
   upgradeMine,
   upgradeMineToMax,
@@ -10,6 +10,8 @@ import {
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { usePulse } from "@/components/ui/motion";
+import { MineRig, type MineRigPulseKind } from "./MineRig";
 import { formatNumber } from "@/lib/game/format";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
 
@@ -59,6 +61,20 @@ export function MineCard({
 
   const isMaxLevel = level >= maxLevel;
 
+  // Every settled upgrade / re-assignment throws a burst out of the shaft. The
+  // action states are fresh objects per submit, so an identical repeat still
+  // fires; `fire` is stable, so it never re-triggers on its own.
+  const [pulse, fire] = usePulse<MineRigPulseKind>();
+  useEffect(() => {
+    if (upgradeState.success) fire("upgrade");
+  }, [upgradeState, fire]);
+  useEffect(() => {
+    if (maxState.success) fire("upgrade");
+  }, [maxState, fire]);
+  useEffect(() => {
+    if (assignState.success) fire("assign");
+  }, [assignState, fire]);
+
   return (
     <div className="panel rounded-xl p-4 flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -93,15 +109,22 @@ export function MineCard({
         </span>
       </div>
 
-      <div className="panel-inset rounded-lg p-3 text-center">
-        <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
-          +{nis(breakdown.total)}
-        </p>
-        <p className="text-xs text-gold-dim">
-          {resourceLabel} לעדכון רגיל
-          {breakdown.lines.length > 0 ? " (כולל בונוסים)" : ""}
-        </p>
-      </div>
+      {/* The machine itself: it runs at the speed of the crew standing on it,
+          and the plate on its frame carries the real per-update output. */}
+      <MineRig
+        resource={resource}
+        label={label}
+        resourceLabel={resourceLabel}
+        slaves={assignedSlaves}
+        level={level}
+        output={breakdown.total}
+        pulse={pulse}
+      />
+
+      <p className="text-center text-xs text-gold-dim">
+        תפוקה לעדכון רגיל
+        {breakdown.lines.length > 0 ? " (כולל בונוסים)" : ""}
+      </p>
 
       {/* min-height keeps the stat boxes and forms aligned across the four
           cards even when descriptions wrap to a different number of lines */}
@@ -210,7 +233,7 @@ export function MineCard({
 
       <FormMessage
         error={upgradeState.error ?? maxState.error ?? assignState.error}
-        success={assignState.success}
+        success={assignState.success ?? upgradeState.success ?? maxState.success}
       />
     </div>
   );

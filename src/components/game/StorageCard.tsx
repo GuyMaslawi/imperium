@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, type MouseEvent } from "react";
+import { useActionState, useEffect, useState, type MouseEvent } from "react";
 import {
   depositAllToStorage,
   depositToStorage,
@@ -15,6 +15,9 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { Meter } from "@/components/ui/Meter";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { usePulse } from "@/components/ui/motion";
+import { StorageSilo, type SiloPulseKind } from "./StorageSilo";
+import type { OreKind } from "./oreTint";
 import { formatNumber } from "@/lib/game/format";
 
 export interface StorageCardProps {
@@ -43,7 +46,7 @@ export function StorageCard({
   upgradeCost,
 }: StorageCardProps) {
   /** The resource this warehouse holds — drives its canonical icon and tint. */
-  const storedResource = resourceType.toLowerCase();
+  const storedResource = resourceType.toLowerCase() as OreKind;
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeStorage,
     {}
@@ -116,6 +119,23 @@ export function StorageCard({
   };
   const transferState = lastAction ? transferStates[lastAction] : {};
 
+  // Every settled transfer runs crates through the silo's hatch. The action
+  // states are fresh objects per submit, so an identical repeat still fires;
+  // `fire` is stable, so it never re-triggers on its own.
+  const [pulse, fire] = usePulse<SiloPulseKind>();
+  useEffect(() => {
+    if (depositState.success) fire("deposit");
+  }, [depositState, fire]);
+  useEffect(() => {
+    if (depositAllState.success) fire("deposit");
+  }, [depositAllState, fire]);
+  useEffect(() => {
+    if (withdrawState.success) fire("withdraw");
+  }, [withdrawState, fire]);
+  useEffect(() => {
+    if (withdrawAllState.success) fire("withdraw");
+  }, [withdrawAllState, fire]);
+
   return (
     <Card className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
@@ -146,6 +166,16 @@ export function StorageCard({
           {fillPercent}%
         </span>
       </div>
+
+      {/* The warehouse itself: the stock rises from empty on first paint, and
+          a settled transfer runs crates through the hatch. */}
+      <StorageSilo
+        resource={storedResource}
+        label={label}
+        stored={stored}
+        capacity={capacity}
+        pulse={pulse}
+      />
 
       <div>
         <Meter

@@ -27,6 +27,7 @@ import {
   shieldMeta,
 } from "@/lib/game/diamondShop";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -120,7 +121,8 @@ export async function buyResourceBoost(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.buyResourceBoost", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -162,7 +164,8 @@ export async function buyShopDiscount(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.buyShopDiscount", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -241,7 +244,8 @@ export async function buyRaidShield(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.buyRaidShield", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -308,7 +312,8 @@ export async function buyTurns(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.buyTurns", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -360,7 +365,8 @@ export async function resetHeroPointsWithDiamonds(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.resetHeroPointsWithDiamonds", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -407,7 +413,8 @@ export async function reviveHeroWithDiamonds(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.reviveHeroWithDiamonds", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -480,7 +487,8 @@ export async function castBankInterestSpell(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("diamondShop.castBankInterestSpell", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

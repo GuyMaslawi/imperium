@@ -22,6 +22,7 @@ import {
 import { HERO_BAG_CAPACITY, itemDisplayName, rollGuaranteedItem } from "@/lib/game/hero";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { FullEmpire } from "@/lib/game/updates";
+import { syncEmpirePower } from "@/server/empirePower";
 
 /** What a spin returns to the client so it can animate to the right wedge. */
 export type SpinResult =
@@ -118,6 +119,7 @@ async function grantPrize(
             create: { empireId, weaponKey: weapon.key, quantity: 1 },
             update: { quantity: { increment: 1 } },
           });
+          await syncEmpirePower(tx, empireId);
           granted += 1;
         }
       }

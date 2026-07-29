@@ -219,6 +219,15 @@ export function weaponByKey(key: string): WeaponDefinition | undefined {
   return WEAPON_BY_KEY.get(key);
 }
 
+/**
+ * Generated art for a weapon, as `public/weapons/<category>-t<tier>.webp`.
+ * Every one of the 90 weapons has a piece; the card still falls back to the
+ * category emoji if a file is ever missing, so art and code stay independent.
+ */
+export function weaponArtPath(weapon: WeaponDefinition): string {
+  return `/weapons/${weapon.category.toLowerCase()}-t${weapon.tier}.webp`;
+}
+
 /* ------------------------------ tier unlocks ------------------------------ */
 
 /** Every category starts with the first two weapon tiers unlocked. */
@@ -243,13 +252,13 @@ export function weaponTierUnlockCost(currentUnlockedTier: number): WeaponCost {
  * tier in one place (attack / defense / spy) advances all of them together.
  */
 
-/** A new city + hero-level requirement kicks in every this many tiers. */
+/** A higher city level + hero level requirement kicks in every this many tiers. */
 export const WEAPON_GATE_EVERY = 4;
 /** Hero level required grows by this much at every gate step. */
 export const WEAPON_GATE_HERO_STEP = 10;
 
 export interface WeaponTierGate {
-  /** Cities the empire must have founded to unlock this tier. */
+  /** City level the empire must have reached to unlock this tier. */
   cities: number;
   /** Hero level required to unlock this tier. */
   heroLevel: number;
@@ -257,8 +266,8 @@ export interface WeaponTierGate {
 
 /**
  * Requirements to unlock up to `tier`. Every {@link WEAPON_GATE_EVERY} tiers
- * demands both a newly founded city and a higher hero level, so weapons, hero
- * and cities all advance in lockstep. Between gate steps the requirement stays
+ * demands both a higher city level and a higher hero level, so weapons, hero
+ * and city all advance in lockstep. Between gate steps the requirement stays
  * flat, so once a step is crossed the next few tiers open on resources alone.
  */
 export function weaponTierGate(tier: number): WeaponTierGate {

@@ -19,18 +19,36 @@ export const SHIELD_TONE: Record<ShieldKey, string> = {
 };
 
 /**
- * The bare pill for one shield — a shield outline plus the glyph of what it
- * covers. Shared by the live badges below, the shop card and the ladder legend
- * so all three stay identical.
+ * The word each shield wears when it is drawn with a label — the `מגן` half of
+ * the name is already said by the shield outline, so the pill only has to name
+ * what is behind it.
+ */
+const SHIELD_WORD: Record<ShieldKey, string> = {
+  resources: "משאבים",
+  soldiers: "חיילים",
+};
+
+/**
+ * The bare pill for one shield — a shield outline plus what it covers. Shared by
+ * the live badges below, the shop card and the ladder legend so all three stay
+ * identical.
+ *
+ * `label` spells the cover out in a word rather than a second glyph. Two icons
+ * side by side is a rebus: readers saw a shield and a box and had to guess, and
+ * nothing on the row told them the guess was right. Anywhere there is room for
+ * three characters, prefer the word.
  */
 export function ShieldGlyph({
   shieldKey,
   size = 12,
   title,
+  label = false,
 }: {
   shieldKey: ShieldKey;
   size?: number;
   title?: string;
+  /** Name the cover in words instead of drawing a second icon. */
+  label?: boolean;
 }) {
   return (
     <span
@@ -38,7 +56,7 @@ export function ShieldGlyph({
       title={title}
     >
       <Icon name="shield" size={size} />
-      <Icon name={SHIELD_ICON[shieldKey]} size={size} />
+      {label ? SHIELD_WORD[shieldKey] : <Icon name={SHIELD_ICON[shieldKey]} size={size} />}
     </span>
   );
 }
@@ -61,10 +79,13 @@ function untilLabel(value: Date | string): string {
 export function ShieldBadges({
   shields,
   size = "sm",
+  label = false,
 }: {
   shields: ShieldState | undefined;
   /** `sm` for table rows, `md` for the profile header. */
   size?: "sm" | "md";
+  /** Name each shield's cover in words — see ShieldGlyph. */
+  label?: boolean;
 }) {
   if (!shields) return null;
   const active = SHIELDS.filter((s) => shields[s.key] != null);
@@ -77,6 +98,7 @@ export function ShieldBadges({
           key={s.key}
           shieldKey={s.key}
           size={size === "md" ? 15 : 12}
+          label={label}
           title={`${shieldMeta(s.key).badge} · עד ${untilLabel(shields[s.key]!)}`}
         />
       ))}

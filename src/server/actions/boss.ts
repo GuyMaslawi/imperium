@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getActiveEmpireId } from "@/lib/auth";
 import { runBossFight, type BossFightOutcome } from "@/server/bossFight";
+import { logError } from "@/server/errorLog";
 
 export interface BossActionState {
   error?: string;
@@ -23,7 +24,8 @@ export async function attackCityBoss(): Promise<BossActionState> {
     if (empireId === null) return { error: "לא מחובר" };
     outcome = await runBossFight(empireId);
     revalidatePath("/game", "layout");
-  } catch {
+  } catch (err) {
+    await logError("boss.attackCityBoss", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 

@@ -11,6 +11,7 @@ import {
   potionExpiryAfterDrink,
 } from "@/lib/game/potions";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -88,7 +89,8 @@ export async function drinkPotion(
 
     revalidatePath("/game", "layout");
     return result;
-  } catch {
+  } catch (err) {
+    await logError("potions.drinkPotion", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

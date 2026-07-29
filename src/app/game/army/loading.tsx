@@ -21,7 +21,7 @@ export default function ArmyLoading() {
         <SkeletonGrid
           count={3}
           grid="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3"
-          tile="h-64"
+          tile="h-[26rem]"
         />
       </div>
     </SkeletonPage>

@@ -14,8 +14,8 @@ export default function UpgradesLoading() {
       <section className="space-y-4">
         <Skeleton className="h-[92px] rounded-xl" />
         <div className="grid gap-4 lg:grid-cols-2">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
+          <Skeleton className="h-80 rounded-xl" />
+          <Skeleton className="h-80 rounded-xl" />
         </div>
       </section>
 

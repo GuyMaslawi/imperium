@@ -18,6 +18,7 @@ import {
   settleDueWars,
 } from "@/server/guildWarState";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 /**
  * The whole player-facing surface of the guild war: enrol, withdraw, watch.
@@ -88,7 +89,8 @@ export async function registerGuildForWar(): Promise<ActionState> {
     return {
       success: `${membership.guild.name} נרשמה למלחמת הבריתות! הקרב מתנהל אוטומטית בין ${GUILD_WAR_START_LABEL} ל־${GUILD_WAR_END_LABEL} — אין מה לעשות חוץ מלצפות.`,
     };
-  } catch {
+  } catch (err) {
+    await logError("guildWar.registerGuildForWar", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -125,7 +127,8 @@ export async function withdrawGuildFromWar(): Promise<ActionState> {
 
     revalidateWar();
     return { success: "ההרשמה למלחמה בוטלה." };
-  } catch {
+  } catch (err) {
+    await logError("guildWar.withdrawGuildFromWar", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

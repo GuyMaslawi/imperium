@@ -19,10 +19,8 @@ export default function WeaponsLoading() {
           ))}
         </div>
 
-        {/* tier progress track */}
-        <div className="flex justify-end">
-          <Skeleton className="h-4 w-52 rounded" />
-        </div>
+        {/* the smithy strip: furnace, anvil and the tier ladder */}
+        <Skeleton className="h-32 rounded-xl" />
 
         <SkeletonGrid
           count={8}

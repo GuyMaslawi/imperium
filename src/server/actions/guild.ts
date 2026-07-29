@@ -24,6 +24,7 @@ import {
   spellUpgradeCostDiamonds,
 } from "@/lib/game/guild";
 import type { ActionState } from "./game";
+import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -102,7 +103,8 @@ async function runMemberAction(
 
     revalidateGuild();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("guild.unknown", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -170,7 +172,8 @@ export async function createGuild(
 
     revalidateGuild();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("guild.createGuild", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

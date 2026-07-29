@@ -10,6 +10,7 @@ import {
 } from "@/lib/game/constants";
 import { UpgradeCard } from "@/components/game/UpgradeCard";
 import { CityFoundCard } from "@/components/game/CityFoundCard";
+import { CitySkyline } from "@/components/game/CitySkyline";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
@@ -56,20 +57,8 @@ export default async function UpgradesPage() {
               הממלכה שלך
             </CardTitle>
 
-            <div className="mb-4 flex items-center gap-1.5">
-              {Array.from({ length: MAX_CITIES }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`flex h-9 flex-1 items-center justify-center rounded border-2 text-sm ${
-                    i < cities
-                      ? "border-gold bg-gold/15 text-gold-bright"
-                      : "border-border-subtle bg-panel-inset opacity-50"
-                  }`}
-                  title={`עיר ${i + 1}`}
-                >
-                  <Icon name="base" size={16} />
-                </span>
-              ))}
+            <div className="mb-4">
+              <CitySkyline cities={cities} maxCities={MAX_CITIES} />
             </div>
 
             <dl className="space-y-3 text-sm">

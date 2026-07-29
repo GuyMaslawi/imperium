@@ -70,6 +70,8 @@ import {
   weaponsPower,
 } from "@/lib/game/weapons";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
+import { logError } from "@/server/errorLog";
+import { syncEmpirePower } from "@/server/empirePower";
 
 export interface ActionState {
   error?: string;
@@ -194,7 +196,8 @@ export async function upgradeMine(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.upgradeMine", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -315,7 +318,8 @@ export async function upgradeMineToMax(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.upgradeMineToMax", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -421,7 +425,8 @@ export async function assignMineSlavesToResource(
     return {
       success: `הוצבו ${amount} עבדי מכרות ב${BUILDING_META[mineType].label}`,
     };
-  } catch {
+  } catch (err) {
+    await logError("game.assignMineSlavesToResource", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -452,7 +457,8 @@ export async function assignAllMineSlavesToResource(
     return {
       success: `כל ${total} עבדי המכרות הוצבו ב${RESOURCE_META[resource].label}`,
     };
-  } catch {
+  } catch (err) {
+    await logError("game.assignAllMineSlavesToResource", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -475,7 +481,8 @@ export async function splitMineSlavesEqually(): Promise<ActionState> {
 
     revalidateGame();
     return { success: "עבדי המכרות חולקו שווה בשווה בין ארבעת המשאבים" };
-  } catch {
+  } catch (err) {
+    await logError("game.splitMineSlavesEqually", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -492,7 +499,8 @@ export async function clearMineSlaveAssignments(): Promise<ActionState> {
 
     revalidateGame();
     return { success: "החלוקה נוקתה — כל עבדי המכרות פנויים" };
-  } catch {
+  } catch (err) {
+    await logError("game.clearMineSlaveAssignments", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -546,6 +554,7 @@ export async function trainUnits(
         create: { empireId, [unit]: quantity },
         update: { [unit]: { increment: quantity } },
       });
+      await syncEmpirePower(tx, empireId);
       await awardSeasonPassXp(
         tx,
         empireId,
@@ -558,7 +567,8 @@ export async function trainUnits(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.trainUnits", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -740,6 +750,7 @@ export async function spyOnEmpire(
           where: { empireId, spies: { gte: 1 } },
           data: { spies: { decrement: 1 } },
         });
+        await syncEmpirePower(tx, empireId);
         // A caught spy blows the operation — the defender gets an alert.
         await tx.message.create({
           data: {
@@ -758,7 +769,8 @@ export async function spyOnEmpire(
     });
 
     revalidateGame();
-  } catch {
+  } catch (err) {
+    await logError("game.spyOnEmpire", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 
@@ -951,6 +963,12 @@ export async function attackEmpire(
           where: { empireId: targetEmpireId },
           data: { soldiers: { decrement: enslavedSoldiers } },
         });
+        // Only the defender's fighting strength moved — the attacker gained
+        // mine slaves, which no power figure counts — but both are synced so
+        // the rule stays "any army write re-syncs", with no exceptions to
+        // remember.
+        await syncEmpirePower(tx, empireId);
+        await syncEmpirePower(tx, targetEmpireId);
       }
 
       // A shielded defender skips the whole transfer — with every figure at
@@ -1252,7 +1270,8 @@ export async function attackEmpire(
     });
 
     revalidateGame();
-  } catch {
+  } catch (err) {
+    await logError("game.attackEmpire", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 
@@ -1347,7 +1366,8 @@ export async function upgradeStorage(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.upgradeStorage", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -1411,7 +1431,8 @@ async function runStorageTransfer(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.upgradeStorage", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -1645,7 +1666,8 @@ export async function upgradeEmpireUpgrade(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.upgradeEmpireUpgrade", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -1745,7 +1767,8 @@ export async function foundCity(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.foundCity", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -1850,6 +1873,7 @@ export async function buyWeapon(
         create: { empireId, weaponKey, quantity },
         update: { quantity: { increment: quantity } },
       });
+      await syncEmpirePower(tx, empireId);
       await awardSeasonPassXp(
         tx,
         empireId,
@@ -1867,7 +1891,8 @@ export async function buyWeapon(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.buyWeapon", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }
@@ -1990,7 +2015,8 @@ export async function unlockNextWeaponTier(
 
     revalidateGame();
     return result;
-  } catch {
+  } catch (err) {
+    await logError("game.unlockNextWeaponTier", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

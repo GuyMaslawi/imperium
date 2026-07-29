@@ -1,8 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
-import { getEmpireGeneralPower, getEmpireSpyPower } from "@/lib/game/power";
+import {
+  getGlobalBoards,
+  getTheftBoard,
+  type BoardRow,
+} from "@/server/rankingsLadder";
 import { formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -11,13 +14,6 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 export const metadata = { title: "טבלאות מובילים | IMPERIUM" };
 
 type Period = "day" | "week";
-
-/** One ranked entry on a leaderboard. */
-interface BoardRow {
-  empireId: string;
-  name: string;
-  value: number;
-}
 
 /** A single leaderboard, top players first. */
 function Board({
@@ -108,58 +104,16 @@ export default async function LeaderboardsPage({
   // Every board here is GLOBAL — ranked across the whole game, not scoped to a
   // single city like the /game/rankings list.
   //
-  // Narrowed to the columns the four boards read. `include: { army, weapons,
-  // bankAccount }` loaded every column of four tables for every empire in the
-  // game, mapped them, then discarded all but the top 10 — re-run on every page
-  // load and again every 30s by <AutoRefresh> below, with no rate limit on RSC
-  // GETs. That made this the cheapest way for any logged-in player to put the
-  // database under sustained full-scan load.
-  //
-  // Still O(total empires): `spy` and `power` are computed in JS, so the top-10
-  // cut cannot move into SQL without a denormalised power column on Empire.
-  // `slaves` and `bank` could be ordered in SQL today; they are left here so all
-  // four boards stay consistent with one read.
-  const empires = await prisma.empire.findMany({
-    select: {
-      id: true,
-      name: true,
-      army: { select: { soldiers: true, spies: true, mineSlaves: true } },
-      weapons: { select: { weaponKey: true, quantity: true } },
-      bankAccount: { select: { goldBalance: true } },
-    },
-  });
-
-  const named = empires.map((e) => ({
-    empireId: e.id,
-    name: e.name,
-    slaves: e.army?.mineSlaves ?? 0,
-    bank: Math.floor(e.bankAccount?.goldBalance ?? 0),
-    spy: getEmpireSpyPower(e.army, e.weapons),
-    power: getEmpireGeneralPower(e.army, e.weapons),
-  }));
-
-  const topBy = (key: "slaves" | "bank" | "spy" | "power"): BoardRow[] =>
-    named
-      .map((e) => ({ empireId: e.empireId, name: e.name, value: e[key] }))
-      .filter((r) => r.value > 0)
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-
-  // Biggest thefts: total gold plundered in winning attacks within the window.
-  const cutoff = theftCutoff(period);
-  const theftSums = await prisma.battleReport.groupBy({
-    by: ["attackerEmpireId"],
-    where: { createdAt: { gte: cutoff }, stolenGold: { gt: 0 } },
-    _sum: { stolenGold: true },
-    orderBy: { _sum: { stolenGold: "desc" } },
-    take: 10,
-  });
-  const theftNames = new Map(named.map((e) => [e.empireId, e.name]));
-  const theftRows: BoardRow[] = theftSums.map((t) => ({
-    empireId: t.attackerEmpireId,
-    name: theftNames.get(t.attackerEmpireId) ?? "אימפריה",
-    value: Math.floor(t._sum.stolenGold ?? 0),
-  }));
+  // All five boards are read through the shared cache in server/rankingsLadder:
+  // `spy` and `power` are JS figures, so the top-ten cut cannot move into SQL
+  // and the query is a full scan of Empire + its armies and arsenals. This page
+  // re-runs on every load and again every 30s per open tab with no rate limit on
+  // RSC GETs, which made it the cheapest way for any logged-in player to put the
+  // database under sustained full-scan load. The cache collapses every viewer in
+  // a 20-second window onto one scan; the numbers are a leaderboard, not a
+  // ledger, and were never live to the second anyway.
+  const boards = await getGlobalBoards();
+  const theftRows: BoardRow[] = await getTheftBoard(period, theftCutoff(period));
 
   return (
     <div className="space-y-6">
@@ -183,7 +137,7 @@ export default async function LeaderboardsPage({
           icon="mine"
           iconClass="text-crimson-bright"
           unit={<Icon name="mine" size={13} className="inline-block align-middle" />}
-          rows={topBy("slaves")}
+          rows={boards.slaves}
           myEmpireId={myEmpire.id}
         />
         <Board
@@ -191,7 +145,7 @@ export default async function LeaderboardsPage({
           icon="bank"
           iconClass="text-gold-bright"
           unit={<Icon name="gold" size={13} className="inline-block align-middle text-gold-bright" />}
-          rows={topBy("bank")}
+          rows={boards.bank}
           myEmpireId={myEmpire.id}
           hideValue
         />
@@ -200,7 +154,7 @@ export default async function LeaderboardsPage({
           icon="spy"
           iconClass="text-crimson-bright"
           unit={<Icon name="spy" size={13} className="inline-block align-middle" />}
-          rows={topBy("spy")}
+          rows={boards.spy}
           myEmpireId={myEmpire.id}
           hideValue
         />
@@ -209,7 +163,7 @@ export default async function LeaderboardsPage({
           icon="spark"
           iconClass="text-gold-bright"
           unit={<Icon name="spark" size={13} className="inline-block align-middle" />}
-          rows={topBy("power")}
+          rows={boards.power}
           myEmpireId={myEmpire.id}
           hideValue
         />

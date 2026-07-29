@@ -227,6 +227,24 @@ model Empire {
   /// attacked or spied. Set at registration; cleared early the moment the
   /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).
   protectedUntil      DateTime?
+  /// Denormalised power figures, kept in step by syncEmpirePower.
+  ///
+  /// These are pure functions of the army and the arsenal (see lib/game/power),
+  /// but they are computed in JS, so without them no ranked query could be
+  /// answered in SQL: every board had to load every empire in scope *plus every
+  /// row of its arsenal*, sort in memory, and throw away all but the top rows.
+  /// Storing them turns each board into an indexed ORDER BY … LIMIT.
+  ///
+  /// The risk they carry is drift: a write path that changes soldiers, spies or
+  /// weapons and forgets to re-sync leaves a silently wrong ladder with no error
+  /// anywhere. Two things contain that — every mutation goes through
+  /// `syncEmpirePower`, and `applyPendingUpdates` re-derives them on every
+  /// settle from data it has already loaded, so drift self-heals on the owner's
+  /// next page load.
+  militaryPower       Float     @default(0)
+  generalPower        Float     @default(0)
+  spyPower            Float     @default(0)
+
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -256,6 +274,7 @@ model Empire {
   seasonPass         SeasonPassProgress?
   bossFights         BossFight[]
   achievements       EmpireAchievement[]
+  gloryAwards        EmpireGloryAward[]
   heroQuest          HeroQuest?
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
@@ -263,6 +282,11 @@ model Empire {
   // base. The composite also serves the (now-removed) stale-daily settle query.
   @@index([cities, lastDailyUpdateAt])
   @@index([seasonId])
+  /// The city ladder: rank inside one city tier.
+  @@index([cities, militaryPower])
+  /// The cross-game boards.
+  @@index([generalPower])
+  @@index([spyPower])
 }
 
 /// A single collected achievement. The row IS the receipt: nothing is written
@@ -291,6 +315,42 @@ model EmpireAchievement {
 
   // Also serves the "which has this empire claimed" read — no separate index needed.
   @@unique([empireId, key])
+}
+
+/// Automatic world decorations — the capstone board on /game/base.
+///
+/// Deliberately NOT EmpireAchievement. That ladder is *collected*: reaching a
+/// goal only unlocks a button, and the reward is paid when the player presses
+/// it. These are decorations, not rewards — they light up on their own the
+/// moment the empire meets the condition, and there is nothing to press and
+/// nothing to pay out. Sharing the achievements table would have meant a player
+/// who hit a ceiling and left the reward sitting was shown as not having done
+/// it, and would have lost the world record to whoever clicked first.
+///
+/// A row is stamped the first time the empire is *observed* meeting the
+/// condition (see src/server/gloryBoard.ts). `awardedAt` is therefore the
+/// arrival time to the nearest page load, which is what makes the earliest row
+/// per key a fair world record.
+model EmpireGloryAward {
+  id        String   @id @default(cuid())
+  empireId  String
+  /// Key from GLORY_KEYS in src/lib/game/achievements.ts. A plain string for
+  /// the same reason EmpireAchievement.key is: adding a capstone is a code
+  /// change, not a migration. Keys that fall out of the set are ignored on read.
+  key       String
+  awardedAt DateTime @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  // Idempotent awarding: the writer inserts unconditionally and lets this
+  // constraint drop the repeat, so two concurrent observations cannot both
+  // stamp — and the first stamp is the one that survives.
+  @@unique([empireId, key])
+  // "Who got here first, server-wide". The unique above starts on empireId, so
+  // a key-filtered lookup cannot use it; without this the board sequentially
+  // scans on every base-screen load. Ordering by awardedAt makes each record a
+  // one-row index read.
+  @@index([key, awardedAt])
 }
 
 /// Per-empire season-pass state. Exactly one row per empire, reset in place on
@@ -1174,4 +1234,40 @@ model RateLimitBucket {
 
   /// Drives the opportunistic sweep of expired windows.
   @@index([resetAt])
+}
+
+/// A captured application error.
+///
+/// The app had nowhere to record one. Uncaught server errors went to the
+/// platform log and scrolled away, and — worse — the ~44 server actions that end
+/// in `catch { return { error: "אירעה שגיאה, נסה שוב" } }` swallowed the real
+/// exception entirely: the player saw a generic Hebrew sentence and the cause
+/// was gone. Every one of those is now recorded here first.
+///
+/// Deliberately not a general-purpose log: only errors, capped in size, and
+/// swept by age. It exists so /admin/monitor can answer "did anything break?"
+model ErrorLog {
+  id String @id @default(cuid())
+
+  /// Where it came from — a server action name, a route, or "render".
+  source  String
+  message String
+  /// Truncated; a stack is for recognising the bug, not for reading in full.
+  stack   String?
+  /// Request path, when one was in scope.
+  path    String?
+  /// Whose session hit it, when known. No FK: an error must survive the user.
+  userId   String?
+  empireId String?
+  /// How many times this same (source, message) pair has been seen since
+  /// `createdAt` — one bad deploy must not write ten thousand rows.
+  count    Int      @default(1)
+
+  createdAt DateTime @default(now())
+  lastSeen  DateTime @default(now())
+
+  /// The monitor reads newest-first; the sweep deletes by age.
+  @@index([lastSeen])
+  /// Dedupe lookups.
+  @@index([source, message])
 }

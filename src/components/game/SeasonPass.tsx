@@ -1,13 +1,110 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import {
+  SEASON_PASS_PREMIUM_MULTIPLIER,
+  SEASON_PASS_REWARD_LABEL,
+} from "@/lib/game/seasonPass";
 import {
   buySeasonPassPremium,
   claimSeasonPassRewards,
+  type SeasonPassHaulEntry,
   type SeasonPassState,
   type SeasonPassTierView,
 } from "@/server/actions/seasonPass";
+
+const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
+
+/**
+ * The premium-unlock cascade pops rows one after another. At 50 tiers a
+ * per-row delay would run for the better part of a minute, so only the first
+ * few rows — the ones actually on screen when the modal is at the top — are
+ * staggered; everything below opens together, off-screen.
+ */
+const UNLOCK_CASCADE_ROWS = 12;
+const UNLOCK_CASCADE_STEP = 55;
+const UNLOCK_CASCADE_MS = UNLOCK_CASCADE_ROWS * UNLOCK_CASCADE_STEP + 700;
+
+/**
+ * Remember that this cycle's clear has already been celebrated, and report
+ * whether this is the first time. Keyed by the cycle's end timestamp, so the
+ * next ladder celebrates again; the key changes twice a day, which also keeps
+ * the entry from accumulating meaningfully.
+ *
+ * Storage can throw (Safari private mode, blocked cookies) — a celebration is
+ * not worth breaking a claim over, so a failure just means it may show twice.
+ */
+function markCleared(cycleEndsAt: number): boolean {
+  const key = `sp-cleared:${cycleEndsAt}`;
+  try {
+    if (localStorage.getItem(key)) return false;
+    localStorage.setItem(key, "1");
+  } catch {
+    // ignore — fall through and celebrate
+  }
+  return true;
+}
+
+/**
+ * The spoils of a claim, one tile per resource kind.
+ *
+ * The server totals the haul per kind before it gets here, so this never shows
+ * the same resource twice — the old summary was a per-tier string join and read
+ * as "4,000 זהב · 12,000 זהב · … · 5,000 זהב", which looked like a bug.
+ */
+function HaulPanel({
+  haul,
+  tiers,
+  onDismiss,
+}: {
+  haul: SeasonPassHaulEntry[];
+  tiers: number;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="sp-haul mt-4 overflow-hidden rounded-xl border border-emerald-500/50 bg-gradient-to-b from-emerald-950/70 via-black/60 to-black/70 p-3 shadow-[0_0_28px_-10px_rgba(16,185,129,0.8)]">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          onClick={onDismiss}
+          aria-label="סגור סיכום"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 text-[11px] text-emerald-300/70 transition hover:bg-emerald-500/10 hover:text-emerald-200"
+        >
+          ✕
+        </button>
+        <p className="flex items-center gap-1.5 text-sm font-black text-emerald-300">
+          <Icon name="gift" size={15} />
+          השלל נאסף
+          <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black text-emerald-200 nums">
+            {tiers} דרגות
+          </span>
+        </p>
+      </div>
+
+      <div className="mt-2.5 grid grid-cols-3 gap-2">
+        {haul.map((entry, i) => (
+          <div
+            key={entry.kind}
+            style={{ animationDelay: `${i * 70}ms` }}
+            className="sp-loot flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2 text-center"
+          >
+            <Icon
+              name={RESOURCE_ICON[entry.kind]}
+              size={24}
+              className={RESOURCE_ICON_COLOR[entry.kind]}
+            />
+            <span className="text-sm font-black text-emerald-200 nums">
+              +{heNum(entry.amount)}
+            </span>
+            <span className="text-[10px] font-bold leading-none text-zinc-400">
+              {SEASON_PASS_REWARD_LABEL[entry.kind]}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function FreeTile({ tier }: { tier: SeasonPassTierView }) {
   const { reached } = tier;
@@ -121,6 +218,142 @@ function CycleCountdown({ endsAt }: { endsAt: number }) {
   return <span className="nums">{h}:{m}:{s}</span>;
 }
 
+/**
+ * Confetti positions. Hard-coded rather than randomised: this renders inside a
+ * client component that can be server-rendered on a later navigation, and a
+ * Math.random() here would produce a hydration mismatch.
+ */
+const CONFETTI = [
+  { left: 6, delay: 0, dur: 2.6, tone: "var(--gold-bright)" },
+  { left: 14, delay: 0.5, dur: 3.2, tone: "#34d399" },
+  { left: 23, delay: 0.15, dur: 2.9, tone: "var(--gold)" },
+  { left: 31, delay: 0.9, dur: 3.4, tone: "#f87171" },
+  { left: 39, delay: 0.3, dur: 2.7, tone: "var(--gold-bright)" },
+  { left: 47, delay: 1.1, dur: 3.1, tone: "#38bdf8" },
+  { left: 55, delay: 0.2, dur: 3.5, tone: "var(--gold)" },
+  { left: 63, delay: 0.75, dur: 2.8, tone: "#34d399" },
+  { left: 71, delay: 0.45, dur: 3.3, tone: "var(--gold-bright)" },
+  { left: 79, delay: 1.3, dur: 2.6, tone: "#f87171" },
+  { left: 87, delay: 0.6, dur: 3.0, tone: "var(--gold)" },
+  { left: 94, delay: 0.05, dur: 3.4, tone: "#38bdf8" },
+];
+
+/**
+ * The "you cleared the whole ladder" moment.
+ *
+ * Deliberately a sibling of the pass modal rather than a child: the per-claim
+ * haul panel dies with the modal, which meant finishing the ladder — the one
+ * thing worth celebrating — flashed past and vanished on the next ✕. This
+ * survives closing the pass and has to be dismissed on its own.
+ */
+function CycleClearedOverlay({
+  haul,
+  tierCount,
+  day,
+  cycleEndsAt,
+  owned,
+  multiplier,
+  onClose,
+}: {
+  haul: SeasonPassHaulEntry[];
+  tierCount: number;
+  day: number;
+  cycleEndsAt: number;
+  owned: boolean;
+  multiplier: number;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      dir="rtl"
+      onClick={onClose}
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
+    >
+      {/* confetti rains over the whole screen, behind the card */}
+      <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        {CONFETTI.map((c, i) => (
+          <span
+            key={i}
+            className="sp-confetti absolute top-[-8%] h-3 w-1.5 rounded-sm"
+            style={{
+              left: `${c.left}%`,
+              background: c.tone,
+              animationDelay: `${c.delay}s`,
+              animationDuration: `${c.dur}s`,
+            }}
+          />
+        ))}
+      </span>
+
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="sp-cheer ornate-shell relative flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl"
+      >
+        <div className="min-h-0 overflow-y-auto p-6 text-center">
+          <p className="sp-trophy text-5xl leading-none">🏆</p>
+          <h2 className="mt-3 text-2xl font-black text-gold-bright">
+            וואו! ניקית הכול 🔥
+          </h2>
+          <p className="mt-1.5 text-sm font-bold text-zinc-300">
+            סיימת את כל <span className="nums text-gold-bright">{tierCount}</span> הדרגות של
+            דרך התהילה — ביום <span className="nums">{day}</span> של העונה. משוגע.
+          </p>
+
+          <div className="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-950/30 p-3">
+            <p className="text-xs font-black text-emerald-300">כל השלל של הסבב הזה</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {haul.map((entry, i) => (
+                <div
+                  key={entry.kind}
+                  style={{ animationDelay: `${i * 70}ms` }}
+                  className="sp-loot flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2"
+                >
+                  <Icon
+                    name={RESOURCE_ICON[entry.kind]}
+                    size={24}
+                    className={RESOURCE_ICON_COLOR[entry.kind]}
+                  />
+                  <span className="text-sm font-black text-emerald-200 nums">
+                    +{heNum(entry.amount)}
+                  </span>
+                  <span className="text-[10px] font-bold leading-none text-zinc-400">
+                    {SEASON_PASS_REWARD_LABEL[entry.kind]}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-xl border border-gold/40 bg-amber-950/30 p-3">
+            <p className="text-xs font-bold text-amber-100/90">
+              סבב חדש נפתח בעדכון היומי הבא, בעוד{" "}
+              <b className="text-gold-bright">
+                <CycleCountdown key={cycleEndsAt} endsAt={cycleEndsAt} />
+              </b>
+            </p>
+            {/* Payouts are priced per season *day*, not per cycle — the ladder
+                refills twice a day but both refills are worth the same. Saying
+                "next cycle pays more" would be a promise the math doesn't keep. */}
+            <p className="mt-1 text-[11px] text-zinc-400">
+              הסולם יתמלא מחדש — וכל יום שעובר בעונה מגדיל את התגמולים בכל דרגה
+            </p>
+          </div>
+
+          {!owned && (
+            <p className="mt-3 text-[11px] font-bold text-gold-dim">
+              👑 עם פרימיום היית לוקח פי {multiplier} מזה — הצד הזהוב נשאר נעול
+            </p>
+          )}
+
+          <button onClick={onClose} className="btn btn-gold mt-4 w-full py-2.5 font-black">
+            יאללה, בחזרה לקרב
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(initial);
@@ -128,7 +361,22 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
   const [flash, setFlash] = useState(false);
   const [shake, setShake] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [haul, setHaul] = useState<{ entries: SeasonPassHaulEntry[]; tiers: number } | null>(null);
+  const [cleared, setCleared] = useState<SeasonPassHaulEntry[] | null>(null);
   const [pending, startTransition] = useTransition();
+  const ladderRef = useRef<HTMLDivElement | null>(null);
+  const currentRowRef = useRef<HTMLDivElement | null>(null);
+
+  // Open the ladder at the tier the player is actually on. Fifty rows means the
+  // part that matters — what just unlocked and what is next — is otherwise
+  // buried, and the top of the list is all long-since-collected tiers.
+  useEffect(() => {
+    if (!open) return;
+    const box = ladderRef.current;
+    const row = currentRowRef.current;
+    if (!box || !row) return;
+    box.scrollTop = row.offsetTop - box.clientHeight / 2 + row.clientHeight / 2;
+  }, [open]);
 
   // The layout re-renders with fresh server state after every claim/purchase
   // (revalidatePath), so adopt it rather than drifting on stale local state.
@@ -149,7 +397,10 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
   function reject(message?: string) {
     setShake(true);
     setTimeout(() => setShake(false), 450);
-    if (message) setNotice(message);
+    if (message) {
+      setHaul(null);
+      setNotice(message);
+    }
   }
 
   function handleUpgrade() {
@@ -167,6 +418,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         return;
       }
       setState(res.state);
+      setHaul(null);
       setNotice(res.message ?? null);
       // Celebrate only now: playing the cascade while the request was still in
       // flight made a *refused* sale look like a successful one, and the gold
@@ -174,7 +426,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
       setUnlocking(true);
       setFlash(true);
       setTimeout(() => setFlash(false), 700);
-      setTimeout(() => setUnlocking(false), (tiers.length - 1) * 90 + 700);
+      setTimeout(() => setUnlocking(false), UNLOCK_CASCADE_MS);
     });
   }
 
@@ -184,8 +436,22 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
       const res = await claimSeasonPassRewards();
       if (res.ok && res.state) {
         setState(res.state);
-        setNotice(res.message ?? null);
+        // The haul panel *is* the confirmation, so don't also print the
+        // plain-text fallback underneath it.
+        setHaul(res.haul?.length ? { entries: res.haul, tiers: res.haulTiers ?? res.haul.length } : null);
+        setNotice(res.haul?.length ? null : res.message ?? null);
+        setFlash(true);
+        setTimeout(() => setFlash(false), 700);
+
+        // Clearing the ladder gets its own takeover — but only once per cycle,
+        // remembered across reloads. Without the guard, every later render that
+        // still reads `cleared` would re-fire it, and the reward for finishing
+        // would be a popup that will not stay shut.
+        if (res.state.cleared && res.cycleHaul?.length && markCleared(res.state.cycleEndsAt)) {
+          setCleared(res.cycleHaul);
+        }
       } else {
+        setHaul(null);
         setNotice(res.error ?? "האיסוף נכשל");
       }
     });
@@ -197,7 +463,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         onClick={() => setOpen(true)}
         className={`btn gap-2 px-4 py-1.5 text-sm ${owned ? "btn-gold" : "btn-dark"}`}
       >
-        מסלול העונה
+        דרך התהילה
         {collectable > 0 && (
           <span aria-hidden className="rounded-full bg-emerald-500 px-1.5 text-[9px] font-black text-white">
             {collectable}
@@ -219,13 +485,18 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
+          // The overlay itself must NOT scroll. With one scroller here and
+          // another around a 50-row ladder, a wheel gesture moved whichever the
+          // browser felt like — the dialog drifting under the pointer while the
+          // ladder crawled. The shell is height-capped instead, and the ladder
+          // below is the single scroll region.
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
           onClick={() => setOpen(false)}
         >
           <div
             dir="rtl"
             onClick={(e) => e.stopPropagation()}
-            className="ornate-shell relative my-8 w-full max-w-lg rounded-xl p-6"
+            className="ornate-shell flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl"
           >
             {/* celebratory flash overlay */}
             {flash && (
@@ -235,6 +506,18 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
               />
             )}
 
+            {/* Pinned head: identity, progress, claim CTA. Stays put while the
+                ladder scrolls, so the collect button is reachable from row 50.
+                `shrink-0` is required, not cosmetic: the ladder is `flex-1`
+                (basis 0%), and a percentage basis against the shell's indefinite
+                height resolves to *content* — all 50 rows. That makes the flex
+                pass see huge negative free space and, if the head were
+                shrinkable, crush it to ~100px with its own scrollbar. Which is
+                precisely the two-scrollbars-at-once problem.
+                Below ~560px tall the head alone no longer fits, so there it does
+                shrink and scroll internally — better than clipping the collect
+                button out of reach. Normal viewports never hit that branch. */}
+            <div className="shrink-0 overflow-y-auto p-5 pb-4 [@media(max-height:560px)]:min-h-0 [@media(max-height:560px)]:shrink">
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setOpen(false)}
@@ -243,7 +526,8 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 ✕
               </button>
               <h2 className="flex items-center gap-2 text-2xl font-black text-zinc-100">
-                מסלול העונה
+                <Icon name="crown" size={20} className="text-gold" />
+                דרך התהילה
                 <span aria-hidden className="rounded bg-red-500 px-1.5 text-[10px] font-black text-white">
                   יום {state.day}
                 </span>
@@ -271,6 +555,15 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
               </p>
             </div>
 
+            {haul && (
+              <HaulPanel
+                key={haul.entries.map((e) => `${e.kind}:${e.amount}`).join()}
+                haul={haul.entries}
+                tiers={haul.tiers}
+                onDismiss={() => setHaul(null)}
+              />
+            )}
+
             {notice && (
               <p className="mt-3 rounded-lg border border-gold/40 bg-amber-950/40 p-2 text-center text-xs font-bold text-amber-100">
                 {notice}
@@ -281,20 +574,28 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
             {owned ? (
               <div className="mt-5 rounded-lg border border-emerald-500/50 bg-emerald-950/40 p-4 text-center">
                 <p className="font-black text-emerald-400">✅ מסלול הפרימיום פעיל לכל העונה — הצד הזהוב נפתח!</p>
-                <button
-                  onClick={handleClaim}
-                  disabled={collectable === 0 || pending}
-                  className="btn btn-gold mt-3 px-6 py-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {pending ? (
-                    "אוסף..."
-                  ) : collectable > 0 ? (
-                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אסוף {collectable} תגמולים שהגעת אליהם</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אין תגמולים לאיסוף</span>
-                  )}
-                </button>
-                <p className="mt-1.5 text-[10px] text-zinc-500">אפשר לאסוף רק תגמולים מדרגות שכבר עברת</p>
+                {/* A dead, greyed-out button reads as broken; when there is
+                    nothing to take, say so as a status line instead. */}
+                {collectable > 0 || pending ? (
+                  <>
+                    <button
+                      onClick={handleClaim}
+                      disabled={pending}
+                      className="btn btn-gold mt-3 px-6 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {pending ? (
+                        "אוסף..."
+                      ) : (
+                        <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אסוף שלל מ־{collectable} דרגות</span>
+                      )}
+                    </button>
+                    <p className="mt-1.5 text-[10px] text-zinc-500">אפשר לאסוף רק תגמולים מדרגות שכבר עברת</p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-xs font-bold text-zinc-400">
+                    ✓ אספת כל מה שנפתח — עלה דרגה כדי לפתוח עוד
+                  </p>
+                )}
               </div>
             ) : (
               <>
@@ -305,8 +606,9 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 >
                   <p className="flex items-center justify-center gap-1.5 text-lg font-black text-gold-bright"><Icon name="crown" size={18} /> שדרג לפרימיום</p>
                   <p className="mt-1 text-sm text-amber-100/90">
-                    פתח את <span className="font-black text-gold-bright">כל {tiers.length} התגמולים</span> — פי 3 שלל
-                    ופריט גיבור אגדי, <span className="font-black text-gold-bright">תשלום אחד לכל העונה</span> 🔥
+                    פתח את <span className="font-black text-gold-bright">כל {tiers.length} המתנות</span> בצד הזהוב —
+                    פי {SEASON_PASS_PREMIUM_MULTIPLIER} שלל בכל דרגה,{" "}
+                    <span className="font-black text-gold-bright">תשלום אחד לכל העונה</span> 🔥
                   </p>
                   <button
                     onClick={handleUpgrade}
@@ -335,24 +637,31 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 </div>
 
                 {/* The free track pays out without buying anything. */}
-                <button
-                  onClick={handleClaim}
-                  disabled={collectable === 0 || pending}
-                  className="btn btn-dark mt-3 w-full py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {pending ? (
-                    "אוסף..."
-                  ) : collectable > 0 ? (
-                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אסוף {collectable} תגמולים חינמיים</span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אין תגמולים לאיסוף</span>
-                  )}
-                </button>
+                {collectable > 0 || pending ? (
+                  <button
+                    onClick={handleClaim}
+                    disabled={pending}
+                    className="btn btn-dark mt-3 w-full py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {pending ? (
+                      "אוסף..."
+                    ) : (
+                      <span className="inline-flex items-center gap-1"><Icon name="gift" size={14} /> אסוף שלל חינמי מ־{collectable} דרגות</span>
+                    )}
+                  </button>
+                ) : (
+                  <p className="mt-3 text-center text-xs font-bold text-zinc-500">
+                    ✓ אספת כל מה שנפתח במסלול החינמי — עלה דרגה כדי לפתוח עוד
+                  </p>
+                )}
               </>
             )}
 
-            {/* Column headers: right = free, left = premium (RTL) */}
-            <div className="mt-6 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2">
+            {/* Column headers: right = free, left = premium (RTL). They live in
+                the pinned head rather than inside the scroller, so you can still
+                tell the two tracks apart forty rows down. The gutter below is
+                reserved on both so the columns stay aligned with these. */}
+            <div className="mt-5 grid grid-cols-[1fr_2.5rem_1fr] items-center gap-2 [scrollbar-gutter:stable]">
               <div className="flex items-center justify-center gap-1 rounded-lg border border-gold/50 bg-amber-950/50 py-1.5 text-center text-xs font-black text-gold-bright">
                 <Icon name="crown" size={13} className="inline-block align-text-bottom" /> פרימיום {!owned && <span aria-hidden>🔒</span>}
               </div>
@@ -361,27 +670,73 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 חינמי
               </div>
             </div>
+            </div>
 
+            {/* The one and only scroll region — the shell itself is height-capped
+                and `overflow-hidden`, so nothing else on the page can scroll while
+                this is open. `min-h-0` is what actually lets a flex child shrink
+                below its content height; without it fifty rows push the shell past
+                max-h and the overlay starts scrolling too.
+                `relative` is load-bearing as well: the auto-scroll measures
+                row.offsetTop, which is relative to the nearest positioned
+                ancestor — without it that would be .ornate-shell and every row
+                would measure the pinned head's height too low. */}
+            <div
+              ref={ladderRef}
+              className="relative min-h-36 flex-1 overflow-y-auto overscroll-contain px-5 pb-5 pt-3 [scrollbar-gutter:stable] [@media(max-height:560px)]:h-36 [@media(max-height:560px)]:flex-none"
+            >
             {/* Vertical track: each row is a tier — premium (left) + free (right) */}
-            <div className="mt-3 space-y-2">
-              {tiers.map((t, i) => (
-                <div key={t.tier} className="grid grid-cols-[1fr_2.5rem_1fr] items-stretch gap-2">
-                  <PremiumTile tier={t} owned={owned} unlocking={unlocking} delay={i * 90} />
-                  <div className="flex items-center justify-center">
-                    <span
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-black shadow ${
-                        t.reached ? "bg-gold text-black" : "bg-zinc-700 text-zinc-400"
-                      }`}
-                    >
-                      {t.tier}
-                    </span>
+            <div className="space-y-2">
+              {tiers.map((t, i) => {
+                // Every tenth rung is a landmark, so 50 rows still read as a
+                // journey with waypoints instead of an undifferentiated list.
+                const milestone = t.tier % 10 === 0;
+                const current = t.tier === Math.max(1, state.level);
+                return (
+                  <div
+                    key={t.tier}
+                    ref={current ? currentRowRef : undefined}
+                    className="grid grid-cols-[1fr_2.5rem_1fr] items-stretch gap-2"
+                  >
+                    <PremiumTile
+                      tier={t}
+                      owned={owned}
+                      unlocking={unlocking}
+                      delay={Math.min(i, UNLOCK_CASCADE_ROWS) * UNLOCK_CASCADE_STEP}
+                    />
+                    <div className="flex items-center justify-center">
+                      <span
+                        className={`flex items-center justify-center rounded-full font-black shadow ${
+                          milestone ? "h-9 w-9 text-sm ring-2 ring-gold/40" : "h-7 w-7 text-[11px]"
+                        } ${t.reached ? "bg-gold text-black" : "bg-zinc-800 text-zinc-500"} ${
+                          current ? "ring-2 ring-emerald-400/70" : ""
+                        }`}
+                      >
+                        {t.tier}
+                      </span>
+                    </div>
+                    <FreeTile tier={t} />
                   </div>
-                  <FreeTile tier={t} />
-                </div>
-              ))}
+                );
+              })}
+            </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Sibling of the pass modal, not a child — closing the pass must not take
+          the celebration with it. */}
+      {cleared && (
+        <CycleClearedOverlay
+          haul={cleared}
+          tierCount={tiers.length}
+          day={state.day}
+          cycleEndsAt={state.cycleEndsAt}
+          owned={owned}
+          multiplier={SEASON_PASS_PREMIUM_MULTIPLIER}
+          onClose={() => setCleared(null)}
+        />
       )}
     </>
   );

@@ -17,6 +17,14 @@ import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { attackPowerBreakdown, defensePowerBreakdown } from "@/lib/game/power";
 import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
+import { HallOfGlory } from "@/components/game/HallOfGlory";
+import { getAchievementsState } from "@/server/achievementState";
+import {
+  getGloryChampions,
+  invalidateGloryChampions,
+  stampGloryAwards,
+} from "@/server/gloryBoard";
+import { selectGlory } from "@/lib/game/achievements";
 import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
 
@@ -103,14 +111,31 @@ export default async function BasePage() {
     recentSpies.length > 0 ||
     recentBankTransactions.length > 0;
 
-  /* ---- season milestones (presentational, gated on empire progress) ---- */
-  const milestones = [
-    { icon: <Icon name="factory" size={24} className="text-bone" />, title: "מכונות רמה 100", need: 5 },
-    { icon: <Icon name="attack" size={24} className="text-bone" />, title: "כל הנשק", need: 6 },
-    { icon: <Icon name="citizens" size={24} className="text-bone" />, title: "אוכלוסייה 500", need: 7 },
-    { icon: <Icon name="shield" size={24} className="text-bone" />, title: "גיבור רמה 100", need: 8 },
-    { icon: <Icon name="base" size={24} className="text-bone" />, title: "עיר 10", need: 10 },
-  ].map((m) => ({ ...m, done: empire.level >= m.need }));
+  /* ---- world records: automatic capstone decorations ----
+     Nothing here is collected — a capstone lights up the moment the empire
+     meets it, so loading this screen is also what *stamps* the arrival (see
+     src/server/gloryBoard.ts). The stamp has to land before the records are
+     read, or an empire that just qualified would not appear on its own board.
+
+     None of it is expensive. `getAchievementsState` is React-cached and the
+     game layout already calls it on every screen for the "rewards waiting"
+     badge, so the conditions cost nothing extra here; the stamp is one indexed
+     read that usually writes nothing; the records are a single DISTINCT ON
+     behind a two-minute TTL, because a record once set can never change.
+
+     The strip that used to live in this slot was gated on
+     `empire.level >= 5..10` — a column no gameplay path increments, so all five
+     of its milestones were locked forever, for everyone. */
+  const achievements = await getAchievementsState(empire.id);
+  if (achievements) {
+    const stamped = await stampGloryAwards(empire.id, achievements);
+    // Only a fresh stamp can have moved a record; anything else is a cache hit.
+    if (stamped.length > 0) invalidateGloryChampions();
+  }
+  const gloryRecords = await getGloryChampions();
+  const glory = achievements
+    ? selectGlory(achievements, gloryRecords, empire.id)
+    : [];
 
   const resourceTiles = [
     { icon: <Icon name="turns" size={14} className="text-emerald-400" />, label: "תורות", value: empire.turns, tone: "text-emerald-400" },
@@ -137,71 +162,36 @@ export default async function BasePage() {
     <div className="space-y-6">
       <SectionHeading title="מרכז הפיקוד" ornament={<Icon name="base" size={22} className="text-crimson" />} />
 
-      {/* announcement */}
-      <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
-        <span className="absolute inset-y-0 right-0 w-1 bg-gold" />
-        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
-          <p className="flex items-center gap-2 text-sm">
-            <span aria-hidden>📣</span>
-            <span className="font-bold text-gold-bright">
-              {season ? `${season.name} התחילה!` : "העונה פעילה"}
-            </span>
-            <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! <Icon name="attack" size={14} className="inline-block align-middle" /></span>
-          </p>
-          {season && (
-            <p className="flex items-center gap-1.5 text-xs text-zinc-400">
-              <Icon name="turns" size={14} className="text-emerald-400" />
-              סיום עונה:
-              <span className="font-bold text-gold nums" dir="ltr">
-                {formatDate(season.endsAt)}
+      {/* World records lead the screen: they are the one thing here about the
+          whole game rather than about this one empire. */}
+      {glory.length > 0 && (
+        <HallOfGlory items={glory} daysOnServer={daysOnServer} />
+      )}
+
+      {/* announcement + wheel */}
+      <div className="grid items-start gap-4 lg:grid-cols-[1fr_220px]">
+        <div className="relative overflow-hidden rounded-lg border border-border-subtle bg-gradient-to-l from-transparent to-gold/5 pr-4">
+          <span className="absolute inset-y-0 right-0 w-1 bg-gold" />
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+            <p className="flex items-center gap-2 text-sm">
+              <span aria-hidden>📣</span>
+              <span className="font-bold text-gold-bright">
+                {season ? `${season.name} התחילה!` : "העונה פעילה"}
               </span>
+              <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! <Icon name="attack" size={14} className="inline-block align-middle" /></span>
             </p>
-          )}
+            {season && (
+              <p className="flex items-center gap-1.5 text-xs text-zinc-400">
+                <Icon name="turns" size={14} className="text-emerald-400" />
+                סיום עונה:
+                <span className="font-bold text-gold nums" dir="ltr">
+                  {formatDate(season.endsAt)}
+                </span>
+              </p>
+            )}
+          </div>
         </div>
-      </div>
-
-      {/* wheel + season events */}
-      <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
         <WheelCard spinsAvailable={empire.wheelSpins} seasonCycle={wheelCycle} />
-
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <CardTitle className="mb-0" icon="🌍">התקדמות עולם המשחק</CardTitle>
-              <p className="text-xs text-zinc-500">אירועי העונה</p>
-            </div>
-            <div className="text-center">
-              <p className="text-2xl font-black text-gold nums" dir="ltr">{daysOnServer}</p>
-              <p className="text-[10px] text-zinc-500">ימי שרת</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1 overflow-x-auto pb-2">
-            {milestones.map((m, i) => (
-              <div key={m.title} className="flex items-center gap-1">
-                <div className="flex w-24 shrink-0 flex-col items-center gap-1.5 text-center">
-                  <span
-                    className={`relative flex h-14 w-14 items-center justify-center rounded-full border-2 text-xl ${
-                      m.done
-                        ? "border-gold bg-gold/15"
-                        : "border-border-subtle bg-panel-inset opacity-60"
-                    }`}
-                  >
-                    {m.icon}
-                    {m.done && (
-                      <span className="absolute -bottom-1 -left-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[10px] text-white">
-                        ✓
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-semibold text-zinc-300">{m.title}</span>
-                </div>
-                {i < milestones.length - 1 && (
-                  <span className={`h-0.5 w-6 ${m.done ? "bg-gold/60" : "bg-border-subtle"}`} />
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
       </div>
 
       {/* empire power */}
@@ -217,10 +207,9 @@ export default async function BasePage() {
         <Card>
           <CardTitle><Icon name="base" size={20} className="text-crimson-bright" />פרטי בסיס</CardTitle>
           <dl className="space-y-3 text-sm">
-            <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-              <dt className="text-zinc-400">דירוג עולמי</dt>
-              <dd className="text-lg font-black text-zinc-100 nums" dir="ltr">{empire.level}</dd>
-            </div>
+            {/* "דירוג עולמי" used to sit here reading `empire.level` — a column
+                gameplay never writes, so it printed 1 on every account. The real
+                standing lives on /game/rankings; a fake one is worse than none. */}
             <div className="flex items-center justify-between border-b border-border-subtle pb-2">
               <dt className="text-zinc-400">עונה</dt>
               <dd className="font-bold text-gold">{season?.name ?? "—"}</dd>

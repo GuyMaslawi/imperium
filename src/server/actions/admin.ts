@@ -30,6 +30,7 @@ import {
 } from "@/lib/game/config";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
+import { syncEmpirePower } from "@/server/empirePower";
 
 export interface AdminActionState {
   error?: string;
@@ -499,6 +500,7 @@ export async function updateArmy(
       create: { empireId, ...data },
       update: data,
     });
+    await syncEmpirePower(prisma, empireId);
     await logAdmin(admin, {
       action: "empire.army",
       targetType: "empire",
@@ -686,6 +688,9 @@ export async function setWeaponQuantity(
         update: { quantity },
       });
     }
+    // Both branches change the arsenal, so the sync sits after the whole
+    // if/else rather than inside either arm.
+    await syncEmpirePower(prisma, empireId);
     await logAdmin(admin, {
       action: "empire.weapon",
       targetType: "empire",

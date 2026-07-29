@@ -136,6 +136,12 @@ export interface SeasonPassState {
   /** When the ladder resets and the next, larger one opens. */
   cycleEndsAt: number;
   collectable: number;
+  /**
+   * The cycle is done: every tier reached *and* everything reachable collected.
+   * For a free player that means the whole free track — the locked gold tiles
+   * are not "uncollected", they were never on offer.
+   */
+  cleared: boolean;
   tiers: SeasonPassTierView[];
 }
 
@@ -187,8 +193,37 @@ function buildState(
     day,
     cycleEndsAt: nextDailyUpdate(now).getTime(),
     collectable,
+    cleared: level >= SEASON_PASS_TIERS.length && collectable === 0,
     tiers,
   };
+}
+
+/**
+ * Everything the empire has banked from this cycle's ladder so far, totalled per
+ * kind. Priced at the current day, same as the tiles — so a clear-the-ladder
+ * celebration can show the run's whole take, not just the final claim's slice.
+ */
+function claimedHaul(
+  progress: SeasonPassProgress,
+  day: number
+): SeasonPassHaulEntry[] {
+  const claimedFree = new Set(progress.claimedFree);
+  const claimedPremium = new Set(progress.claimedPremium);
+  const totals = new Map<SeasonPassRewardKind, number>();
+  const add = (reward: SeasonPassReward) =>
+    totals.set(
+      reward.kind,
+      (totals.get(reward.kind) ?? 0) + seasonPassRewardAmount(reward, day)
+    );
+
+  for (const t of SEASON_PASS_TIERS) {
+    if (claimedFree.has(t.tier)) add(t.free);
+    if (claimedPremium.has(t.tier)) add(t.premium);
+  }
+  return HAUL_ORDER.filter((kind) => totals.has(kind)).map((kind) => ({
+    kind,
+    amount: totals.get(kind)!,
+  }));
 }
 
 /** Current ladder for the signed-in empire. Returns null when not signed in. */
@@ -216,10 +251,32 @@ export async function getSeasonPassState(): Promise<SeasonPassState | null> {
 
 /* ------------------------------ premium purchase ------------------------------ */
 
+/** One line of a claim summary: a resource kind and the total collected of it. */
+export interface SeasonPassHaulEntry {
+  kind: SeasonPassRewardKind;
+  amount: number;
+}
+
 export interface SeasonPassResult {
   ok: boolean;
   error?: string;
   message?: string;
+  /**
+   * What a claim actually paid, **totalled per kind**. The ladder awards the
+   * same kind on several tiers (gold on 1 and 7, wood on 2 and 8) on both
+   * tracks, so a per-tier list reads as a wall of near-duplicates
+   * ("4,000 זהב · 12,000 זהב · … · 5,000 זהב · 15,000 זהב"). One entry per kind
+   * is both shorter and the number the player actually cares about.
+   */
+  haul?: SeasonPassHaulEntry[];
+  /** How many ladder tiers the claim collected, across both tracks. */
+  haulTiers?: number;
+  /**
+   * Set only on the claim that *finishes* the cycle: the empire's whole take
+   * from this ladder, totalled per kind. The per-claim `haul` above is just the
+   * last slice, which undersells a full clear.
+   */
+  cycleHaul?: SeasonPassHaulEntry[];
   state?: SeasonPassState;
 }
 
@@ -308,13 +365,13 @@ class InsufficientDiamonds extends Error {}
 
 /* ------------------------------ claiming ------------------------------ */
 
-/** Credit one reward to the empire. Returns the text for the claim summary. */
+/** Credit one reward to the empire. Returns the quantity actually granted. */
 async function grantReward(
   tx: Prisma.TransactionClient,
   empireId: string,
   reward: SeasonPassReward,
   day: number
-): Promise<string> {
+): Promise<number> {
   const amount = seasonPassRewardAmount(reward, day);
   const field = reward.kind; // gold | wood | iron | stone | turns | citizens
   if (field === "citizens") {
@@ -327,8 +384,18 @@ async function grantReward(
       data: { [field]: { increment: amount } },
     });
   }
-  return `${heNum(amount)} ${SEASON_PASS_REWARD_LABEL[reward.kind]}`;
+  return amount;
 }
+
+/** Canonical display order for a haul, so two claims never reshuffle the chips. */
+const HAUL_ORDER: SeasonPassRewardKind[] = [
+  "gold",
+  "wood",
+  "iron",
+  "stone",
+  "turns",
+  "citizens",
+];
 
 /**
  * Collect every unlocked, unclaimed reward on both tracks.
@@ -357,7 +424,16 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
         return { ok: false as const, error: "עדיין לא הגעת לאף דרגה במחזור הזה" };
       }
 
-      const granted: string[] = [];
+      // Totalled per kind rather than appended per tier — see SeasonPassResult.
+      const granted = new Map<SeasonPassRewardKind, number>();
+      // Distinct ladder rungs collected — a tier paying on both tracks is one
+      // tier, not two, since that is the count the modal reports as "דרגות".
+      const tiersTaken = new Set<number>();
+      const credit = (kind: SeasonPassRewardKind, amount: number, tier: number) => {
+        granted.set(kind, (granted.get(kind) ?? 0) + amount);
+        tiersTaken.add(tier);
+      };
+
       for (const t of SEASON_PASS_TIERS) {
         if (t.tier > level) break;
 
@@ -370,8 +446,7 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
           data: { claimedFree: { push: t.tier } },
         });
         if (tookFree.count > 0) {
-          const text = await grantReward(tx, empireId, t.free, day);
-          if (text) granted.push(text);
+          credit(t.free.kind, await grantReward(tx, empireId, t.free, day), t.tier);
         }
 
         if (!progress.premium) continue;
@@ -380,12 +455,11 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
           data: { claimedPremium: { push: t.tier } },
         });
         if (tookPremium.count > 0) {
-          const text = await grantReward(tx, empireId, t.premium, day);
-          if (text) granted.push(text);
+          credit(t.premium.kind, await grantReward(tx, empireId, t.premium, day), t.tier);
         }
       }
 
-      if (granted.length === 0) {
+      if (granted.size === 0) {
         return {
           ok: false as const,
           error: "אין תגמולים חדשים לאיסוף",
@@ -399,10 +473,22 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
         }),
         tx.seasonPassProgress.findUniqueOrThrow({ where: { empireId } }),
       ]);
+      const haul = HAUL_ORDER.filter((kind) => granted.has(kind)).map((kind) => ({
+        kind,
+        amount: granted.get(kind)!,
+      }));
+      const state = buildState(fresh, empire.diamonds, day, now, season !== null);
       return {
         ok: true as const,
-        message: `נאספו: ${granted.join(" · ")}`,
-        state: buildState(fresh, empire.diamonds, day, now, season !== null),
+        // Kept as a plain-text fallback for anything that only reads `message`;
+        // the modal renders `haul` instead.
+        message: `נאספו: ${haul
+          .map((h) => `${heNum(h.amount)} ${SEASON_PASS_REWARD_LABEL[h.kind]}`)
+          .join(" · ")}`,
+        haul,
+        haulTiers: tiersTaken.size,
+        cycleHaul: state.cleared ? claimedHaul(fresh, day) : undefined,
+        state,
       };
     });
 
