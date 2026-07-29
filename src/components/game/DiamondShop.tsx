@@ -5,12 +5,12 @@ import type { StorableResource } from "@/lib/game/constants";
 import { RESOURCE_META } from "@/lib/game/constants";
 import type { ActionState } from "@/server/actions/game";
 import {
+  buyRaidShield,
   buyResourceBoost,
   buyShopDiscount,
   buyTurns,
   castBankInterestSpell,
   resetHeroPointsWithDiamonds,
-  reviveHeroWithDiamonds,
 } from "@/server/actions/diamondShop";
 import {
   BOOST_MAX_PCT,
@@ -18,14 +18,17 @@ import {
   BOOST_STEP_PCT,
   BANK_INTEREST_SPELL_COST,
   HERO_POINTS_RESET_COST,
-  HERO_REVIVE_COST,
+  SHIELDS,
+  SHIELD_RENEW_COOLDOWN_MINUTES,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_PCT,
   TURN_PACKAGES,
+  type ShieldKey,
 } from "@/lib/game/diamondShop";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { SHIELD_ICON, SHIELD_TONE } from "@/components/game/ShieldBadges";
 import { formatNumber } from "@/lib/game/format";
 
 /**
@@ -273,6 +276,88 @@ function TurnPackageCard({
   );
 }
 
+/* ------------------------------ raid shields ------------------------------ */
+
+/**
+ * One raid shield with a buy button per duration. A running shield can be
+ * neither renewed nor extended — the buttons come back only once it has expired
+ * and its ten-minute cooldown has run out, which is the window in which the
+ * city gets its chance to raid.
+ */
+function ShieldCard({
+  shieldKey,
+  activeUntil,
+  readyAt,
+  diamonds,
+}: {
+  shieldKey: ShieldKey;
+  activeUntil: string | null;
+  /** When the next purchase unlocks, while the cooldown is still running. */
+  readyAt: string | null;
+  diamonds: number;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(buyRaidShield, {});
+  const meta = SHIELDS.find((s) => s.key === shieldKey)!;
+
+  return (
+    <ShopCard
+      icon={
+        <span className={`inline-flex items-center gap-0.5 ${SHIELD_TONE[shieldKey]} rounded-md border px-1`}>
+          <Icon name="shield" size={15} />
+          <Icon name={SHIELD_ICON[shieldKey]} size={15} />
+        </span>
+      }
+      title={meta.label}
+      badge={
+        activeUntil ? (
+          <span className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-black text-emerald-300">
+            פעיל
+          </span>
+        ) : null
+      }
+      desc={
+        <>
+          {meta.desc} התקיפה עצמה עדיין מתרחשת. לא ניתן לחדש בזמן שהמגן פעיל —
+          רק {SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שהוא נגמר.
+          {activeUntil && (
+            <span className="mt-1 block text-emerald-400/90">
+              🛡️ מגן עד {whenLabel(activeUntil)}
+            </span>
+          )}
+        </>
+      }
+    >
+      {activeUntil ? (
+        <ActiveBadge label={`🛡️ פעיל עד ${whenLabel(activeUntil)}`} />
+      ) : readyAt ? (
+        <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-[11px] font-semibold text-zinc-400">
+          חלון חשוף · ניתן לחדש ב־{whenLabel(readyAt)}
+        </span>
+      ) : (
+        // A form per duration rather than one form with two submitters: the
+        // hours then travel as a plain hidden field, which survives both React's
+        // action dispatch and a no-JS submit.
+        <div className="grid grid-cols-2 gap-1.5">
+          {meta.durations.map((d) => (
+            <form key={d.hours} action={action}>
+              <input type="hidden" name="shield" value={shieldKey} />
+              <input type="hidden" name="hours" value={d.hours} />
+              <SubmitButton
+                className="btn btn-gold w-full px-2 py-2 text-xs"
+                disabled={diamonds < d.cost}
+                pendingText="רוכש..."
+              >
+                {d.hours}ש׳ · <Price cost={d.cost} />
+              </SubmitButton>
+            </form>
+          ))}
+        </div>
+      )}
+      <FormMessage error={state.error} success={state.success} />
+    </ShopCard>
+  );
+}
+
 /* ------------------------------ hero points reset ------------------------------ */
 
 function HeroResetCard({
@@ -316,49 +401,6 @@ function HeroResetCard({
           >
             אפס · <Price cost={HERO_POINTS_RESET_COST} />
           </SubmitButton>
-        )}
-      </form>
-      <FormMessage error={state.error} success={state.success} />
-    </ShopCard>
-  );
-}
-
-/* ------------------------------ hero revival ------------------------------ */
-
-function HeroReviveCard({ dead, diamonds }: { dead: boolean; diamonds: number }) {
-  const [state, action] = useActionState<ActionState, FormData>(
-    reviveHeroWithDiamonds,
-    {}
-  );
-  return (
-    <ShopCard
-      icon={<span className="text-lg">💀</span>}
-      title="החייאת גיבור"
-      badge={
-        <span
-          className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-black ${
-            dead
-              ? "border-red-500/50 bg-red-500/10 text-red-300"
-              : "border-emerald-400/40 bg-emerald-500/10 text-emerald-300"
-          }`}
-        >
-          {dead ? "מת" : "חי"}
-        </span>
-      }
-      desc={`מקים גיבור שנפל בקרב מיד ל־100% חיים, במקום להמתין שעה. כל עוד הוא מת — הנקודות, החפצים ובונוס המחלקה שלו מושבתים.`}
-    >
-      <form>
-        {dead ? (
-          <SubmitButton
-            className="btn btn-gold w-full px-3 py-2 text-sm"
-            formAction={action}
-            disabled={diamonds < HERO_REVIVE_COST}
-            pendingText="מחייה..."
-          >
-            החייה · <Price cost={HERO_REVIVE_COST} />
-          </SubmitButton>
-        ) : (
-          <ActiveBadge label="✨ הגיבור שלך חי ובועט" />
         )}
       </form>
       <FormMessage error={state.error} success={state.success} />
@@ -428,8 +470,11 @@ export interface DiamondShopProps {
   pointsResetUsed: boolean;
   interestPreview: number;
   bankReadyAt: string | null;
-  /** The hero has fallen — the revival card is live. */
-  heroDead: boolean;
+  /**
+   * Per raid shield: when it expires (null where none is running) and, once it
+   * has, when the renewal cooldown lifts.
+   */
+  shields: Record<ShieldKey, { activeUntil: string | null; readyAt: string | null }>;
 }
 
 export function DiamondShop({
@@ -441,7 +486,7 @@ export function DiamondShop({
   pointsResetUsed,
   interestPreview,
   bankReadyAt,
-  heroDead,
+  shields,
 }: DiamondShopProps) {
   return (
     <div className="space-y-7">
@@ -454,6 +499,25 @@ export function DiamondShop({
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {boosts.map((b) => (
             <ResourceBoostCard key={b.resource} {...b} diamonds={diamonds} />
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle
+          icon={<Icon name="shield" size={20} className="text-crimson" />}
+          title="מגני תקיפה"
+          hint={`24 או 48 שעות · חידוש רק ${SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שנגמר`}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {SHIELDS.map((s) => (
+            <ShieldCard
+              key={s.key}
+              shieldKey={s.key}
+              activeUntil={shields[s.key].activeUntil}
+              readyAt={shields[s.key].readyAt}
+              diamonds={diamonds}
+            />
           ))}
         </div>
       </section>
@@ -496,7 +560,6 @@ export function DiamondShop({
             used={pointsResetUsed}
             diamonds={diamonds}
           />
-          <HeroReviveCard dead={heroDead} diamonds={diamonds} />
         </div>
       </section>
     </div>

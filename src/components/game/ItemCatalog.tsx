@@ -12,7 +12,10 @@ import {
   RARITY_ORDER,
   SLOT_META,
   SLOT_ORDER,
-  itemBonusValue,
+  itemPrimaryBonus,
+  itemStatBonus,
+  statIsFlat,
+  slotPrimaryStat,
 } from "@/lib/game/hero";
 
 /** "12%" / "1.5%" — a decimal only when the odds are not a whole percent. */
@@ -75,8 +78,18 @@ export function ItemCatalog({
       {/* one section per slot, full level progression */}
       {SLOT_ORDER.map((slot) => {
         const slotMeta = SLOT_META[slot];
-        const statMeta = HERO_STAT_META[slotMeta.stat];
-        const maxBonus = itemBonusValue(slot, 100);
+        const statMeta = HERO_STAT_META[slotPrimaryStat(slot)];
+        const maxBonus = itemPrimaryBonus(slot, 100);
+        // One entry per extra stat (not per resource line), deduped, so the
+        // header reads "ועוד משאבים · אזרחים" rather than repeating "משאבים"
+        // once for each of the four resources a legendary piece covers.
+        const extras = SLOT_META[slot].stats
+          .slice(1)
+          .map((s) => ({
+            stat: s.stat,
+            flat: statIsFlat(s.stat),
+            value: itemStatBonus(slot, 100, s.stat),
+          }));
         return (
           <section key={slot} className="panel rounded-xl p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -91,6 +104,18 @@ export function ItemCatalog({
                   {maxBonus.flat ? "" : "%"}
                 </span>{" "}
                 ברמה 100
+                {/* the extras this slot carries alongside its headline stat */}
+                {extras.length > 0 && (
+                  <span className="text-zinc-600">
+                    {" · ועוד "}
+                    {extras
+                      .map(
+                        (e) =>
+                          `${HERO_STAT_META[e.stat].label} +${formatBonus(e.value)}${e.flat ? "" : "%"}`
+                      )
+                      .join(" · ")}
+                  </span>
+                )}
               </span>
             </div>
             <div className="grid grid-cols-4 gap-2.5 sm:grid-cols-7 lg:grid-cols-11">

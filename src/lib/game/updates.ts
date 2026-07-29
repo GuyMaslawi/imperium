@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import {
   BUILDING_META,
   bankInterestRate,
-  citizenCapacity,
   cityProductionMultiplier,
   mineProductionPerTick,
   type StorableResource,
@@ -80,8 +79,9 @@ export async function applyPendingUpdates(
 
   // Hero bonuses: the resources *points* still multiply mine production, while
   // equipped items now add flat amounts — extra resources per tick, and extra
-  // turns/citizens/diamonds per update (whole units, not percentages). A hero
-  // who is still dead at this point contributes none of it (heroBonuses).
+  // turns/citizens per daily update (whole units, not percentages). Gear never
+  // pays diamonds; see HeroFlatStat. A hero who is still dead at this point
+  // contributes none of it (heroBonuses).
   const heroBonus = heroBonuses(empire.hero);
 
   /* ---- regular ticks: mine-slave production + turns ---- */
@@ -125,35 +125,40 @@ export async function applyPendingUpdates(
     for (const res of Object.keys(gained) as StorableResource[]) {
       gained[res] += heroBonus.itemsFlatByResource[res] * ticks;
     }
-    // Full ticks only — no partial-tick turns, no cap for now. Turn items add a
-    // flat number of turns per tick (not a percentage).
-    turnsGained =
-      Math.round(ticks * turnsGainFromUpgrades(empire.upgrades)) +
-      heroBonus.itemsFlat.turns * ticks;
+    // Full ticks only — no partial-tick turns, no cap for now. The hero's turn
+    // items are NOT paid here; they ride the daily update below.
+    turnsGained = Math.round(ticks * turnsGainFromUpgrades(empire.upgrades));
   }
 
-  /* ---- daily updates: citizens + diamonds + bank interest + deposit-period reset ---- */
+  /* ---- daily updates: citizens + turns + bank interest + deposit-period reset ---- */
   const missedDailies = dailyUpdatesBetween(empire.lastDailyUpdateAt, now);
   let citizensGained = 0;
-  let diamondsGained = 0;
   if (missedDailies.length > 0) {
     const growthLevel =
       empire.upgrades.find((u) => u.type === "CITIZEN_GROWTH")?.level ?? 1;
     const citizensPerDaily =
       tunables.daily.citizensBase + growthLevel * tunables.daily.citizensPerLevel;
-    // Citizen/diamond items add a flat count per daily update (not a %).
+    // Citizen items add a flat count per daily update (not a %).
+    //
+    // No ceiling: the whole backlog lands, so a week away is a week's citizens
+    // rather than one update's worth. Cities still shape this figure through the
+    // CITIZEN_GROWTH levels they unlock — they just no longer cap the pool.
     citizensGained =
       Math.round(citizensPerDaily * missedDailies.length) +
       heroBonus.itemsFlat.citizens * missedDailies.length;
 
-    // Cities cap the population: the daily intake fills up to the city ceiling
-    // (cities × 100) and no further. Already at or above the ceiling → no gain.
-    const capacity = citizenCapacity(empire.cities);
-    citizensGained = Math.max(0, Math.min(citizensGained, capacity - empire.citizens));
-
-    // Diamonds now come only from hero items on the daily update; the retired
-    // DIAMOND_YIELD upgrade no longer contributes.
-    diamondsGained = heroBonus.itemsFlat.diamonds * missedDailies.length;
+    // Turn items pay per daily update, alongside citizens — NOT per 5-minute
+    // tick, which is where this used to live.
+    //
+    // That was a 144× cadence error, and the worst live exploit in the economy:
+    // at 40 per *tick* a level-100 WINGS paid 40 × 288 = 11,520 turns/day
+    // against a designed ceiling of 1,440 (TURNS_UPGRADE_MAX_LEVEL 5 × 288).
+    // One item was worth eight times the entire turn economy — and turns are
+    // the only rate limit on attacking, which is what gates plunder, hero XP,
+    // item drops and wheel spins. The comment at the head of this function has
+    // always said "extra resources per tick, and extra turns/citizens per
+    // update"; the code disagreed.
+    turnsGained += heroBonus.itemsFlat.turns * missedDailies.length;
   }
 
   // Top up wheel spins once per missed daily update. Spins bank without limit
@@ -173,8 +178,8 @@ export async function applyPendingUpdates(
   // Claim this settlement atomically. The guard pins the clock columns to the
   // exact snapshot we read; if a concurrent settlement of the same empire has
   // already advanced the clock, this updateMany matches zero rows and we bail
-  // out without re-crediting. Without this guard the derived production, turns,
-  // citizens and diamonds would be credited N times when N requests settle the
+  // out without re-crediting. Without this guard the derived production, turns
+  // and citizens would be credited N times when N requests settle the
   // same backlog at once — and this runs *without* an outer transaction on
   // every page load (see requireEmpire in lib/auth.ts) and across many empires
   // concurrently on the rankings page.
@@ -191,7 +196,6 @@ export async function applyPendingUpdates(
       wood: { increment: gained.wood },
       iron: { increment: gained.iron },
       stone: { increment: gained.stone },
-      diamonds: { increment: diamondsGained },
       citizens: { increment: citizensGained },
       turns: { increment: turnsGained },
       ...(missedDailies.length > 0 && wheelSpinsDelta > 0

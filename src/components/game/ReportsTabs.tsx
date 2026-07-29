@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { formatNumber } from "@/lib/game/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
@@ -320,6 +321,15 @@ export function ReportsTabs({
                           <span><Icon name="army" size={14} className="inline-block align-middle" /> {num(r.revealedSoldiers)}</span>
                           <span><Icon name="spy" size={14} className="inline-block align-middle" /> {num(r.revealedSpies)}</span>
                           <span><Icon name="mine" size={14} className="inline-block align-middle" /> {num(r.revealedMineSlaves)}</span>
+                          {/* The row is only the headline — the mission also
+                              brought back the vaults, the arsenal, the hero and
+                              every running spell. That lives on the report page. */}
+                          <Link
+                            href={`/game/spy/${r.id}`}
+                            className="col-span-2 mt-1 font-semibold text-gold hover:text-gold-bright sm:col-span-3"
+                          >
+                            התיק המלא ←
+                          </Link>
                         </div>
                       ) : (
                         <span className="text-xs text-zinc-500">

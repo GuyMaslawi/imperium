@@ -5,6 +5,8 @@ import { getEmpireMilitaryPower } from "@/lib/game/power";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { CityBossBanner } from "@/components/game/CityBossBanner";
+import { ShieldBadges, ShieldGlyph } from "@/components/game/ShieldBadges";
+import { getShieldsForEmpires } from "@/lib/game/diamondEffects";
 import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
@@ -73,6 +75,10 @@ export default async function RankingsPage() {
   // the render cost O(bucket) on top of the query.
   const visible = ranked.slice(0, RANKINGS_VISIBLE_ROWS);
 
+  // Raid shields for the rows actually rendered — one query for the whole page,
+  // and scoped to the visible slice so it stays O(100) rather than O(bucket).
+  const shieldsByEmpire = await getShieldsForEmpires(visible.map((e) => e.id));
+
   return (
     <div className="space-y-6">
       {/* Other players train, attack and rise in rank — keep the table live. */}
@@ -109,6 +115,14 @@ export default async function RankingsPage() {
             </Tip>
           </h2>
           <div className="flex items-center gap-3">
+            {/* Legend for the shield pills on the rows below. */}
+            <Tip tip="שחקן עם מגן משאבים (🛡️+מחסן) לא ניתן לביזה, ושחקן עם מגן חיילים (🛡️+קסדה) לא ניתן לשעבוד. אפשר עדיין לתקוף אותו — פשוט אין ממה להרוויח שלל.">
+              <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
+                <ShieldGlyph shieldKey="resources" />
+                <ShieldGlyph shieldKey="soldiers" />
+                מגנים
+              </span>
+            </Tip>
             <span className="text-xs text-zinc-400">
               הדירוג שלך:{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
@@ -200,6 +214,9 @@ export default async function RankingsPage() {
                             <span className="nums inline-flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/10 px-1.5 text-[10px] font-bold text-red-400" dir="ltr">
                               100 <Icon name="heart" size={12} className="inline-block align-middle" />
                             </span>
+                            {/* Paid raid shields — worth knowing before you
+                                spend turns on a target whose loot is locked. */}
+                            <ShieldBadges shields={shieldsByEmpire.get(empire.id)} />
                           </div>
                         </div>
                       </div>

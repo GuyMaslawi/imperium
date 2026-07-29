@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTip } from "@/components/ui/Tip";
 
 export type Rarity = "legendary" | "epic" | "rare" | "common";
@@ -71,22 +71,30 @@ const SPARK_SPOTS: { top: string; left: string; size: number; delay: string }[] 
   { top: "40%", left: "83%", size: 6, delay: "1.7s" },
 ];
 
+/** One thing an item grants, as the tooltip renders it. */
+export interface ItemTileBonus {
+  /** Icon for the line — a stat glyph, or a resource glyph for a resource line. */
+  icon: IconName;
+  label: string;
+  value: number;
+  /** Whole units (turns/citizens/resources) rather than a percentage. */
+  flat: boolean;
+  /** The slot's headline stat, rendered larger and first. */
+  primary: boolean;
+  /** Tailwind colour class for the icon (resource lines carry their own tint). */
+  iconClass?: string;
+}
+
 /** Everything the hover tooltip shows about an item. */
 export interface ItemTileDetails {
   name: string;
   rarityLabel: string;
-  /** What the item grants, e.g. +12% התקפה or +40 תורות. */
-  statIcon: IconName;
-  statLabel: string;
-  /** The bonus amount — a percentage, unless `bonusIsFlat` is set. */
-  bonusValue: number;
-  /** When true, the bonus is a flat count of units (turns/diamonds/…), not a %. */
-  bonusIsFlat?: boolean;
   /**
-   * For resource items: one line per resource granted (icon + word + amount).
-   * When present it replaces the single stat line.
+   * Everything the item grants, primary first. Items carry one generous stat
+   * plus a couple of smaller ones, so this is a list rather than the single
+   * stat + optional resource-lines pair it replaced.
    */
-  resourceLines?: { resource: string; label: string; value: number }[];
+  bonuses: ItemTileBonus[];
   /** Requirement: the hero must be at least this level to equip. */
   requiredLevel: number;
   /** Whether the current hero meets the requirement. */
@@ -160,35 +168,35 @@ export function ItemTile({
 
       <div className="rule-gold my-2" />
 
-      {/* what the item grants */}
-      {details.resourceLines && details.resourceLines.length > 0 ? (
-        <div className="space-y-0.5 text-xs text-zinc-300">
-          {details.resourceLines.map((line) => (
-            <p key={line.label} className="flex items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1">
-                <Icon
-                  name={RESOURCE_ICON[line.resource]}
-                  size={13}
-                  className={RESOURCE_ICON_COLOR[line.resource]}
-                />
-                {line.label}
-              </span>
-              <span className="nums font-black text-emerald-400" dir="ltr">
-                +{formatBonus(line.value)}
-              </span>
-            </p>
-          ))}
-        </div>
-      ) : (
-        <p className="text-xs text-zinc-300">
-          <Icon name={details.statIcon} size={13} className="inline align-[-2px]" />{" "}
-          <span className="nums font-black text-emerald-400" dir="ltr">
-            +{formatBonus(details.bonusValue)}
-            {details.bonusIsFlat ? "" : "%"}
-          </span>{" "}
-          {details.statLabel}
-        </p>
-      )}
+      {/* what the item grants — headline stat first, extras beneath it */}
+      <div className="space-y-0.5 text-xs text-zinc-300">
+        {details.bonuses.map((line, i) => (
+          <p
+            key={`${line.label}-${i}`}
+            className={`flex items-center justify-between gap-2 ${
+              line.primary ? "" : "text-[11px] text-zinc-400"
+            }`}
+          >
+            <span className="inline-flex items-center gap-1">
+              <Icon
+                name={line.icon}
+                size={line.primary ? 13 : 12}
+                className={line.iconClass ?? "align-[-2px]"}
+              />
+              {line.label}
+            </span>
+            <span
+              className={`nums font-black ${
+                line.primary ? "text-emerald-400" : "text-emerald-500/80"
+              }`}
+              dir="ltr"
+            >
+              +{formatBonus(line.value)}
+              {line.flat ? "" : "%"}
+            </span>
+          </p>
+        ))}
+      </div>
 
       {/* requirement */}
       <p

@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
-import { secureRandom } from "@/lib/game/random";
 import {
   WHEEL_PRIZES,
   pickWheelPrizeIndex,

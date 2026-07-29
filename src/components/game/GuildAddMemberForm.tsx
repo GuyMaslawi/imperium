@@ -14,7 +14,8 @@ export interface GuildAddMemberFormProps {
 
 /**
  * Leadership recruitment box: a leader or deputy types a guildless player's
- * empire name and adds them straight into the guild.
+ * empire name and sends them an invitation. The player joins themselves — see
+ * addGuildMember for why this is no longer a direct add.
  */
 export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
   const [state, action] = useActionState<ActionState, FormData>(
@@ -30,7 +31,7 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
             htmlFor="add-member-name"
             className="mb-1.5 block text-xs font-semibold text-gold"
           >
-            שם האימפריה לצירוף
+            שם האימפריה להזמנה
           </label>
           <input
             id="add-member-name"
@@ -46,16 +47,16 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
         <SubmitButton
           className="btn btn-dark"
           disabled={full}
-          pendingText="מצרף..."
+          pendingText="שולח..."
         >
-          <Icon name="citizens" size={14} className="inline-block align-text-bottom text-bone" /> צרף לברית
+          <Icon name="citizens" size={14} className="inline-block align-text-bottom text-bone" /> שלח הזמנה
         </SubmitButton>
       </div>
 
       <p className="text-[11px] text-zinc-500">
         {full
-          ? "הברית מלאה — הרחב את הקיבולת כדי לצרף עוד שחקנים."
-          : "מנהיג וסגן יכולים לצרף שחקנים שאינם בברית אחרת, ולהרחיק חברים."}
+          ? "הברית מלאה — הרחב את הקיבולת כדי להזמין עוד שחקנים."
+          : "מנהיג וסגן יכולים להזמין שחקנים שאינם בברית אחרת, ולהרחיק חברים. ההזמנה נשלחת לתיבת ההודעות והשחקן בוחר אם להצטרף."}
       </p>
 
       <FormMessage error={state.error} success={state.success} />

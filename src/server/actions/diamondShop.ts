@@ -18,10 +18,13 @@ import {
   HERO_POINTS_RESET_COST,
   HERO_REVIVE_COST,
   RESOURCE_BOOST_KIND,
+  SHIELD_RENEW_COOLDOWN_MINUTES,
+  SHIELD_RENEW_COOLDOWN_MS,
   SHOP_DISCOUNT_COST,
   SHOP_DISCOUNT_DURATION_MS,
   SHOP_DISCOUNT_PCT,
   TURN_PACKAGES,
+  shieldMeta,
 } from "@/lib/game/diamondShop";
 import type { ActionState } from "./game";
 
@@ -155,6 +158,85 @@ export async function buyShopDiscount(
       });
 
       return { success: `הנחת ${SHOP_DISCOUNT_PCT}% על נשק ושדרוגים פעילה ל־24 שעות!` };
+    });
+
+    revalidateGame();
+    return result;
+  } catch {
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/* ------------------------------ raid shields ------------------------------ */
+
+// The duration is looked up in the shield's own table rather than trusted from
+// the form, so a hand-rolled POST can't ask for 48 hours at the 24-hour price
+// (or for a duration that was never on sale at all).
+const shieldSchema = z.object({
+  shield: z.enum(["resources", "soldiers"]),
+  hours: z
+    .string()
+    .min(1)
+    .transform((s) => Number(s))
+    .pipe(z.number().int().positive()),
+});
+
+/** Buy (or extend) a raid shield for a fixed number of hours. */
+export async function buyRaidShield(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = shieldSchema.safeParse({
+    shield: formData.get("shield"),
+    hours: formData.get("hours"),
+  });
+  if (!parsed.success) return { error: "מגן לא תקין" };
+  const meta = shieldMeta(parsed.data.shield);
+  const duration = meta.durations.find((d) => d.hours === parsed.data.hours);
+  if (!duration) return { error: "משך מגן לא תקין" };
+
+  try {
+    const empireId = await requireOwnEmpireId();
+    const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
+      await applyPendingUpdates(empireId, tx);
+      const now = new Date();
+
+      // A shield has to run its course before it can be bought again: no
+      // renewing and no extending while one is up, and then a further
+      // SHIELD_RENEW_COOLDOWN_MINUTES in which the empire is exposed. Otherwise
+      // a paying player could chain shields back to back and never be raidable.
+      const existing = await tx.diamondEffect.findUnique({
+        where: { empireId_kind: { empireId, kind: meta.kind } },
+      });
+      if (existing?.activeUntil && existing.activeUntil > now) {
+        return {
+          error: `${meta.label} עדיין פעיל — ניתן לרכוש מחדש רק ${SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שיסתיים`,
+        };
+      }
+      if (existing?.readyAt && existing.readyAt > now) {
+        const mins = Math.ceil((existing.readyAt.getTime() - now.getTime()) / 60_000);
+        return { error: `${meta.label} בקירור — ניתן לחדש בעוד כ־${mins} דקות` };
+      }
+
+      if (!(await spendDiamonds(tx, empireId, duration.cost))) {
+        return { error: "אין מספיק יהלומים" };
+      }
+
+      // Both stamps are written together: `activeUntil` is the protection,
+      // `readyAt` is when the next purchase unlocks — the exposed window is the
+      // gap between them.
+      const activeUntil = new Date(now.getTime() + duration.hours * 3_600_000);
+      const readyAt = new Date(activeUntil.getTime() + SHIELD_RENEW_COOLDOWN_MS);
+      await tx.diamondEffect.upsert({
+        where: { empireId_kind: { empireId, kind: meta.kind } },
+        create: { empireId, kind: meta.kind, activeUntil, readyAt },
+        update: { activeUntil, readyAt },
+      });
+
+      return {
+        success: `${meta.label} פעיל ל־${duration.hours} השעות הבאות!`,
+      };
     });
 
     revalidateGame();

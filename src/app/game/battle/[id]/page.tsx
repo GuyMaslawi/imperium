@@ -11,6 +11,8 @@ import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { PotionBottle } from "@/components/game/PotionBottle";
 import { POTION_META, potionDurationLabel } from "@/lib/game/potions";
 import { Icon } from "@/components/ui/Icon";
+import { ShieldGlyph } from "@/components/game/ShieldBadges";
+import { shieldMeta } from "@/lib/game/diamondShop";
 
 export const metadata = { title: "תוצאת קרב | IMPERIUM" };
 
@@ -59,6 +61,14 @@ export default async function BattleResultPage({
 
   // Plunder: attacker gains it on a win, defender loses it.
   const plunderTotal = report.stolenGold + report.stolenWood + report.stolenIron + report.stolenStone;
+
+  // A won raid that came home empty: the defender's diamond shields held. Shown
+  // to both sides — the attacker learns why there was no haul, the defender
+  // sees what the purchase actually saved.
+  const shieldsHeld = [
+    ...(report.defenderResourceShielded ? (["resources"] as const) : []),
+    ...(report.defenderSoldierShielded ? (["soldiers"] as const) : []),
+  ];
 
   const breakdown = (
     soldiers: number | null,
@@ -342,6 +352,26 @@ export default async function BattleResultPage({
           </div>
         ))}
       </div>
+
+      {shieldsHeld.length > 0 && (
+        <div className="panel-inset rounded-xl border-emerald-500/40 p-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm">
+            {shieldsHeld.map((key) => (
+              <ShieldGlyph key={key} shieldKey={key} size={14} />
+            ))}
+            <span className="font-bold text-emerald-300">
+              {iAmAttacker ? "היעד היה מוגן" : "המגן שלך עמד"}
+            </span>
+            <span className="text-zinc-400">
+              {shieldsHeld.map((key) => shieldMeta(key).label).join(" ו")} חסמו{" "}
+              {shieldsHeld
+                .map((key) => (key === "resources" ? "את הביזה" : "את השעבוד"))
+                .join(" ו")}
+              {iAmAttacker ? " — הקרב נוצח, אך לא נלקח דבר." : " — לא נלקח ממך דבר."}
+            </span>
+          </div>
+        </div>
+      )}
 
       {plunderTotal > 0 && (
         <div className="panel-gold rounded-xl p-4">

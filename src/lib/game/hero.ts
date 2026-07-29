@@ -171,10 +171,17 @@ export type HeroPercentStat = "attack" | "defense" | "spy";
 
 /**
  * Stats whose item bonus is a **flat count**, not a percentage — an item that
- * grants turns/diamonds/citizens gives whole units, and a resources item adds
- * a flat amount to each mined resource.
+ * grants turns/citizens gives whole units, and a resources item adds a flat
+ * amount to each mined resource.
+ *
+ * Diamonds are deliberately absent. They are the real-money currency, and the
+ * game already refuses to mint them anywhere else that scales: the season-pass
+ * ladder excludes them by design, and the wheel pins its diamond wedge to a
+ * `fixed` amount so it cannot grow with the economy. Gear was the one faucet
+ * that broke that rule — a maxed PANTS paid 80 a day, roughly a paid package a
+ * fortnight, forever. The slot now carries resources instead.
  */
-export type HeroFlatStat = "resources" | "turns" | "diamonds" | "citizens";
+export type HeroFlatStat = "resources" | "turns" | "citizens";
 
 /** Every stat the hero surfaces: the percentage stats + the flat-count stats. */
 export type HeroStat = HeroPercentStat | HeroFlatStat;
@@ -187,11 +194,14 @@ export interface HeroStatMeta {
   /** Present only on stats that accept allocated hero points. */
   pointsField?: "attackPoints" | "defensePoints" | "resourcePoints";
   description: string;
+  /** Short noun for the line under an item, e.g. "התקפה" / "תורות לעדכון יומי". */
+  itemLabel: string;
 }
 
 export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   attack: {
     label: "התקפה",
+    itemLabel: "התקפה",
     icon: "attack",
     tone: "text-red-400",
     pointsField: "attackPoints",
@@ -199,6 +209,7 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   },
   defense: {
     label: "הגנה",
+    itemLabel: "הגנה",
     icon: "shield",
     tone: "text-sky-300",
     pointsField: "defensePoints",
@@ -206,6 +217,7 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   },
   resources: {
     label: "משאבים",
+    itemLabel: "משאבים לעדכון רגיל",
     icon: "mine",
     tone: "text-emerald-400",
     pointsField: "resourcePoints",
@@ -214,24 +226,24 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
   },
   spy: {
     label: "ריגול",
+    itemLabel: "ריגול",
     icon: "spy",
     tone: "text-fuchsia-300",
     description: "כל אחוז מחפצים מגדיל את סיכוי הצלחת משימת הריגול שלך.",
   },
   turns: {
     label: "תורות",
+    itemLabel: "תורות לעדכון יומי",
     icon: "turns",
     tone: "text-amber-300",
-    description: "חפצים מוסיפים תורות בכמות קבועה בכל עדכון רגיל (לא באחוזים).",
-  },
-  diamonds: {
-    label: "יהלומים",
-    icon: "diamond",
-    tone: "text-cyan-300",
-    description: "חפצים מוסיפים יהלומים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
+    // Per *daily* update, like citizens — see the turn-item note in updates.ts.
+    // This string used to say "עדכון רגיל" (the 5-minute tick) and was the only
+    // place in the codebase that claimed so.
+    description: "חפצים מוסיפים תורות בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
   citizens: {
     label: "אזרחים",
+    itemLabel: "אזרחים לעדכון יומי",
     icon: "citizens",
     tone: "text-lime-300",
     description: "חפצים מוסיפים אזרחים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
@@ -247,7 +259,7 @@ export const HERO_POINT_STATS: HeroPointStat[] = ["attack", "defense", "resource
 export const HERO_PERCENT_STATS: HeroPercentStat[] = ["attack", "defense", "spy"];
 
 /** Stats whose item bonus is a flat count of whole units. */
-export const HERO_FLAT_STATS: HeroFlatStat[] = ["resources", "turns", "diamonds", "citizens"];
+export const HERO_FLAT_STATS: HeroFlatStat[] = ["resources", "turns", "citizens"];
 
 /** Whether a stat's item bonus is a flat count (true) or a percentage (false). */
 export function statIsFlat(stat: HeroStat): stat is HeroFlatStat {
@@ -373,14 +385,22 @@ export function itemUpgradeCost(level: number): number | null {
 
 /* ------------------------------ item slots ------------------------------ */
 
+/** One stat an item's slot grants, and how heavily it weighs it. */
+export interface SlotStatWeight {
+  stat: HeroStat;
+  weight: number;
+}
+
 export interface SlotMeta {
   label: string;
   icon: string;
   /** Art file at /hero/<slug>.png overlays the emoji when present. */
   slug: string;
-  stat: HeroStat;
-  /** Economy stats have a single slot each, so those slots pack a double bonus. */
-  statMultiplier: number;
+  /**
+   * What this slot grants: the **primary** stat first (full weight), then the
+   * secondaries (a quarter each). Never empty.
+   */
+  stats: readonly SlotStatWeight[];
 }
 
 /** Fixed 3x3 equipment layout order. */
@@ -397,25 +417,107 @@ export const SLOT_ORDER: HeroItemSlot[] = [
 ];
 
 /**
- * Slot → stat distribution:
- * - Offense (swords/gauntlets) and protection (armor/shield) give percentages.
- * - The helmet's visor scouts the field — it grants the spy percentage.
- * - Each flat-count stat lives in exactly one thematic slot — the relic's magic
- *   conjures resources, wings grant speed (turns), pants have deep pockets
- *   (diamonds), and boots march among the people (citizens) — so those
- *   single slots carry a double bonus.
+ * Weight of a slot's headline stat vs. the extras riding along with it.
+ *
+ * Every item used to grant exactly one stat, which made gear a set of nine
+ * single-purpose sliders: a sword was worth wearing or it wasn't, and there was
+ * no reason to ever compare two items in different slots. Giving each slot one
+ * generous stat plus a couple of smaller ones means a piece reads as a
+ * character — "the sword that also drags home loot and captives" — and two
+ * builds at the same hero level can differ.
+ *
+ * A quarter is deliberately not a token amount: at the level cap a secondary is
+ * +10% attack/defense/spy, or 50 resources / 10 turns / 150 citizens. Enough to
+ * shape a build, not enough to outshine the slot that actually owns the stat.
+ */
+export const PRIMARY_WEIGHT = 1;
+export const SECONDARY_WEIGHT = 0.25;
+
+const primary = (stat: HeroStat): SlotStatWeight => ({ stat, weight: PRIMARY_WEIGHT });
+const extra = (stat: HeroStat): SlotStatWeight => ({ stat, weight: SECONDARY_WEIGHT });
+
+/**
+ * Slot → stat profile. Each line reads "primary ‖ extras".
+ *
+ * The thematic logic: what a piece of equipment *does* decides what it pays.
+ * Blades and gauntlets strike; armour and shields hold; the visor scouts; the
+ * relic conjures; wings carry you further in a day; pockets and boots are the
+ * quartermaster's slots. The extras are the second-order consequence of the
+ * same idea — a sword drags home loot and captives, a shield's wall buys time,
+ * the relic's magic sharpens the hand and the eye that wield it.
+ *
+ * Every one of the six stats is the primary of at least one slot, so no build
+ * can corner a stat by hoarding a single slot, and each appears as an extra
+ * somewhere else so there is always more than one route to it.
  */
 export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
-  SWORD: { label: "חרב", icon: "🗡️", slug: "sword", stat: "attack", statMultiplier: 1 },
-  GAUNTLETS: { label: "כפפות", icon: "🧤", slug: "gauntlet", stat: "attack", statMultiplier: 1 },
-  HELMET: { label: "קסדה", icon: "🪖", slug: "helmet", stat: "spy", statMultiplier: 1 },
-  ARMOR: { label: "שריון", icon: "🛡️", slug: "armor", stat: "defense", statMultiplier: 1 },
-  SHIELD: { label: "מגן", icon: "🔰", slug: "buckler", stat: "defense", statMultiplier: 1 },
-  RELIC: { label: "פרי שטן", icon: "😈", slug: "demon-fruit", stat: "resources", statMultiplier: 2 },
-  WINGS: { label: "כנפיים", icon: "🪽", slug: "wings", stat: "turns", statMultiplier: 2 },
-  PANTS: { label: "מכנסיים", icon: "👖", slug: "pants", stat: "diamonds", statMultiplier: 2 },
-  BOOTS: { label: "נעליים", icon: "🥾", slug: "boots", stat: "citizens", statMultiplier: 2 },
+  SWORD: {
+    label: "חרב",
+    icon: "🗡️",
+    slug: "sword",
+    stats: [primary("attack"), extra("resources"), extra("citizens")],
+  },
+  GAUNTLETS: {
+    label: "כפפות",
+    icon: "🧤",
+    slug: "gauntlet",
+    stats: [primary("attack"), extra("defense")],
+  },
+  HELMET: {
+    label: "קסדה",
+    icon: "🪖",
+    slug: "helmet",
+    stats: [primary("spy"), extra("defense"), extra("turns")],
+  },
+  ARMOR: {
+    label: "שריון",
+    icon: "🛡️",
+    slug: "armor",
+    stats: [primary("defense"), extra("citizens")],
+  },
+  SHIELD: {
+    label: "מגן",
+    icon: "🔰",
+    slug: "buckler",
+    stats: [primary("defense"), extra("resources"), extra("turns")],
+  },
+  RELIC: {
+    label: "פרי שטן",
+    icon: "😈",
+    slug: "demon-fruit",
+    stats: [primary("resources"), extra("attack"), extra("spy")],
+  },
+  WINGS: {
+    label: "כנפיים",
+    icon: "🪽",
+    slug: "wings",
+    stats: [primary("turns"), extra("spy"), extra("attack")],
+  },
+  PANTS: {
+    // Was the diamond slot. Diamonds are the paid currency and no longer drop
+    // from gear at all (see HeroFlatStat), so the pockets carry resources now.
+    label: "מכנסיים",
+    icon: "👖",
+    slug: "pants",
+    stats: [primary("resources"), extra("defense"), extra("citizens")],
+  },
+  BOOTS: {
+    label: "נעליים",
+    icon: "🥾",
+    slug: "boots",
+    stats: [primary("citizens"), extra("turns"), extra("resources")],
+  },
 };
+
+/** The stat a slot exists for — its headline, shown on the tile. */
+export function slotPrimaryStat(slot: HeroItemSlot): HeroStat {
+  return SLOT_META[slot].stats[0].stat;
+}
+
+/** Whether a slot grants `stat` at all, primary or extra. */
+export function slotGrants(slot: HeroItemSlot, stat: HeroStat): boolean {
+  return SLOT_META[slot].stats.some((s) => s.stat === stat);
+}
 
 /* ------------------------------ item catalog ------------------------------ */
 
@@ -433,30 +535,39 @@ export const ITEM_LEVELS: number[] = UPGRADE_LEVELS;
  */
 
 /**
- * Percentage added per upgrade rung (before the slot's multiplier), for the
- * percentage stats. 1%/rung → a level-100 combat item grants 40% (up from the
- * old ~25%), so every one of the 40 upgrades is a visible +1%.
+ * Percentage added per upgrade rung, at PRIMARY_WEIGHT, for the percentage
+ * stats. 1%/rung → a level-100 item grants 40% in its primary stat and 10% in
+ * each extra.
  */
 export const PCT_PER_STEP = 1;
 
 /**
- * Flat units granted per upgrade rung (before the slot's ×2), for the flat-count
+ * Flat units granted per upgrade rung at PRIMARY_WEIGHT, for the flat-count
  * stats. Units differ wildly (a turn is not a citizen), so each scales at its
- * own rate; every value clears 1/rung *after* the ×2, so no upgrade is a no-op.
- * ×2 × 40 rungs gives the cap: turns 40, diamonds 40, resources 200, citizens 600.
+ * own rate. × 40 rungs gives the primary cap: turns 40, resources 200,
+ * citizens 600 — and a quarter of each for a slot that carries it as an extra.
+ *
+ * These absorbed the old per-slot `statMultiplier: 2`, which existed only
+ * because each flat stat used to live in exactly one slot. Now that a stat can
+ * appear as a primary in one slot and an extra in another, the doubling belongs
+ * to the stat, not the slot.
  */
 export const FLAT_PER_STEP: Record<HeroFlatStat, number> = {
-  resources: 2.5, // ×2 = +5 per rung → 200 at the cap
-  turns: 0.5, // ×2 = +1 per rung → 40 at the cap
-  diamonds: 0.5, // ×2 = +1 per rung → 40 at the cap
-  citizens: 7.5, // ×2 = +15 per rung → 600 at the cap
+  resources: 5, // → 200 primary / 50 as an extra
+  turns: 1, // → 40 primary / 10 as an extra
+  // Citizens are the largest number on the board because they are the cheapest
+  // unit of anything: one citizen buys one soldier, spy or mine slave. A full
+  // level-100 set pays 3,150 per daily update (1,800 from BOOTS plus 450 from
+  // each of SWORD/ARMOR/PANTS). There is no population ceiling, so all of it
+  // lands — what bounds citizens is the update cadence, not a cap.
+  citizens: 45, // → 1,800 primary / 450 as an extra
 };
 
 /**
- * Which storable resources a resource-item (the relic slot) produces grows
- * with its tier: a פשוט relic conjures a single specific resource, and each
- * tier up adds another, until an אגדי relic yields all four. So some resource
- * items bring several resources and some only a specific one — by their tier.
+ * Which storable resources a resource-granting item produces grows with its
+ * tier: a פשוט piece conjures a single specific resource, and each tier up adds
+ * another, until an אגדי piece yields all four — each at the item's full
+ * resource value, not a split of it.
  */
 export const RESOURCE_ITEM_COVERAGE: Record<HeroRarity, StorableResource[]> = {
   COMMON: ["gold"],
@@ -465,43 +576,108 @@ export const RESOURCE_ITEM_COVERAGE: Record<HeroRarity, StorableResource[]> = {
   LEGENDARY: ["gold", "wood", "iron", "stone"],
 };
 
-/** The resources a resource-item of the given level produces (by its tier). */
+/** The resources a resource-granting item of the given level produces. */
 export function resourceItemResources(level: number): StorableResource[] {
   return RESOURCE_ITEM_COVERAGE[tierForLevel(level)];
 }
 
-/**
- * The % bonus an item grants to its (percentage) slot's stat — a pure function
- * of slot and level, so every item of the same slot+level is identical. Always
- * a whole %. Meaningful only for HERO_PERCENT_STATS slots.
- */
-export function itemBonusPct(slot: HeroItemSlot, level: number): number {
-  const raw = upgradeStep(level) * PCT_PER_STEP * SLOT_META[slot].statMultiplier;
-  // Percentages are always whole numbers; every real item is worth at least 1%.
-  return Math.max(1, Math.round(raw));
+/** The weight `slot` puts on `stat`, or 0 when it does not grant it at all. */
+function slotWeight(slot: HeroItemSlot, stat: HeroStat): number {
+  return SLOT_META[slot].stats.find((s) => s.stat === stat)?.weight ?? 0;
 }
 
 /**
- * The flat unit bonus an item grants to its (flat) slot's stat — whole units,
- * at least 1. Meaningful only for HERO_FLAT_STATS slots.
+ * The bonus an item grants in one specific stat — a pure function of slot,
+ * level and stat, so every item of the same slot+level is identical. Whole
+ * units (or whole percent); 0 when the slot does not carry that stat.
+ *
+ * The `Math.max(1, …)` floor means a stat an item genuinely grants is never
+ * printed as +0. It also means an *extra* climbs in steps rather than on every
+ * rung — at a quarter weight a percentage stat gains a point every four
+ * upgrades. That is deliberate: the primary still moves on every single upgrade,
+ * so no upgrade is ever a no-op, and rounding the extras up to keep them
+ * strictly increasing would have made them as valuable as the primary.
  */
-export function itemBonusFlat(slot: HeroItemSlot, level: number): number {
-  const stat = SLOT_META[slot].stat;
-  const perStep = statIsFlat(stat) ? FLAT_PER_STEP[stat] : 0;
-  const raw = upgradeStep(level) * perStep * SLOT_META[slot].statMultiplier;
-  return Math.max(1, Math.round(raw));
+export function itemStatBonus(
+  slot: HeroItemSlot,
+  level: number,
+  stat: HeroStat
+): number {
+  const weight = slotWeight(slot, stat);
+  if (weight === 0) return 0;
+  const perStep = statIsFlat(stat) ? FLAT_PER_STEP[stat] : PCT_PER_STEP;
+  return Math.max(1, Math.round(upgradeStep(level) * perStep * weight));
 }
 
 /**
- * The bonus an item grants, tagged with whether it is a flat count or a %.
- * The single entry point the UI should use to render an item's value.
+ * The item's headline number — its primary stat's value, tagged flat/percent.
+ * For anywhere that shows one figure per item (catalog headers, pick lists);
+ * `itemBonusLines` is what shows the whole profile.
  */
-export function itemBonusValue(
+export function itemPrimaryBonus(
   slot: HeroItemSlot,
   level: number
-): { flat: boolean; value: number } {
-  const flat = statIsFlat(SLOT_META[slot].stat);
-  return { flat, value: flat ? itemBonusFlat(slot, level) : itemBonusPct(slot, level) };
+): { stat: HeroStat; flat: boolean; value: number } {
+  const stat = slotPrimaryStat(slot);
+  return { stat, flat: statIsFlat(stat), value: itemStatBonus(slot, level, stat) };
+}
+
+/** One line of what an item grants, ready to render. */
+export interface ItemBonusLine {
+  stat: HeroStat;
+  /** True for whole-unit stats, false for percentages. */
+  flat: boolean;
+  value: number;
+  /** True for the slot's headline stat — the UI leads with it. */
+  primary: boolean;
+  /**
+   * Set only on the resource lines an item splits into, so the tooltip can name
+   * gold/wood/iron/stone individually instead of saying "משאבים" four times.
+   */
+  resource?: StorableResource;
+  /** Display word for this line. */
+  label: string;
+}
+
+/**
+ * Everything an item grants, primary first — the single entry point the UI
+ * renders from.
+ *
+ * A resource stat expands into one line per resource its tier covers, because
+ * that is what the player actually receives: an אגדי relic is not "+200
+ * משאבים", it is +200 of each of the four.
+ */
+export function itemBonusLines(
+  slot: HeroItemSlot,
+  level: number
+): ItemBonusLine[] {
+  const lines: ItemBonusLine[] = [];
+  for (const { stat } of SLOT_META[slot].stats) {
+    const value = itemStatBonus(slot, level, stat);
+    if (value === 0) continue;
+    const primary = stat === slotPrimaryStat(slot);
+    if (stat === "resources") {
+      for (const resource of resourceItemResources(level)) {
+        lines.push({
+          stat,
+          flat: true,
+          value,
+          primary,
+          resource,
+          label: RESOURCE_META[resource].label,
+        });
+      }
+      continue;
+    }
+    lines.push({
+      stat,
+      flat: statIsFlat(stat),
+      value,
+      primary,
+      label: HERO_STAT_META[stat].itemLabel,
+    });
+  }
+  return lines;
 }
 
 /** One resource line an item grants: its icon, its name, and the flat amount. */
@@ -513,16 +689,15 @@ export interface ItemResourceLine {
 }
 
 /**
- * The per-resource breakdown a resource-item grants — one line per covered
- * resource, each with its key, its word, and its flat amount (e.g. iron/"ברזל"
- * /20). Empty for non-resource items (which show a single stat line).
+ * The per-resource breakdown a resource-granting item provides — one line per
+ * covered resource. Empty for items that grant no resources at all.
  */
 export function itemResourceBreakdown(
   slot: HeroItemSlot,
   level: number
 ): ItemResourceLine[] {
-  if (SLOT_META[slot].stat !== "resources") return [];
-  const value = itemBonusFlat(slot, level);
+  const value = itemStatBonus(slot, level, "resources");
+  if (value === 0) return [];
   return resourceItemResources(level).map((r) => ({
     resource: r,
     label: RESOURCE_META[r].label,
@@ -657,7 +832,7 @@ export interface HeroBonuses {
   points: Record<HeroPointStat, number>;
   /** % from equipped items, for the percentage stats (attack/defense/spy). */
   itemsPct: Record<HeroPercentStat, number>;
-  /** Flat unit counts from equipped items (resources/turns/diamonds/citizens). */
+  /** Flat unit counts from equipped items (resources/turns/citizens). */
   itemsFlat: Record<HeroFlatStat, number>;
   /**
    * Flat resource units from equipped resource-items, split across the specific
@@ -685,7 +860,7 @@ export function zeroHeroBonuses(): HeroBonuses {
   return {
     points: { attack: 0, defense: 0, resources: 0 },
     itemsPct: { attack: 0, defense: 0, spy: 0 },
-    itemsFlat: { resources: 0, turns: 0, diamonds: 0, citizens: 0 },
+    itemsFlat: { resources: 0, turns: 0, citizens: 0 },
     itemsFlatByResource: { gold: 0, wood: 0, iron: 0, stone: 0 },
     classPct: { attack: 0, defense: 0, resources: 0, spy: 0 },
     totalPct: { attack: 0, defense: 0, spy: 0 },
@@ -709,8 +884,12 @@ export function heroBonuses(hero: HeroWithItems | null): HeroBonuses {
 /**
  * Aggregate the hero's bonuses, ignoring whether he is alive. Percentage stats
  * (attack/defense/spy) combine allocated points with item %; flat stats
- * (resources/turns/diamonds/citizens) come from equipped items only, as whole
- * unit counts. Every value is an integer, so no rounding is needed here.
+ * (resources/turns/citizens) come from equipped items only, as whole unit
+ * counts. Every value is an integer, so no rounding is needed here.
+ *
+ * Each equipped item contributes through *every* stat its slot carries — its
+ * primary and its extras alike — so a build is the sum of nine profiles rather
+ * than nine independent sliders.
  */
 export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
   const points: Record<HeroPointStat, number> = {
@@ -722,7 +901,6 @@ export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
   const itemsFlat: Record<HeroFlatStat, number> = {
     resources: 0,
     turns: 0,
-    diamonds: 0,
     citizens: 0,
   };
   const itemsFlatByResource: Record<StorableResource, number> = {
@@ -733,15 +911,21 @@ export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
   };
   for (const item of hero?.items ?? []) {
     if (!item.equipped) continue;
-    const stat = SLOT_META[item.slot].stat;
-    if (statIsFlat(stat)) {
-      const flat = itemBonusFlat(item.slot, item.level);
-      itemsFlat[stat] += flat;
-      // A resource item feeds only the specific resources its tier covers.
-      if (stat === "resources") {
-        for (const r of resourceItemResources(item.level)) itemsFlatByResource[r] += flat;
-      }
-    } else itemsPct[stat] += itemBonusPct(item.slot, item.level);
+    for (const { stat } of SLOT_META[item.slot].stats) {
+      const value = itemStatBonus(item.slot, item.level, stat);
+      if (value === 0) continue;
+      if (statIsFlat(stat)) {
+        itemsFlat[stat] += value;
+        // A resource bonus feeds only the resources the item's tier covers —
+        // each at the full amount, which is what makes an אגדי piece worth four
+        // times a פשוט one beyond the raw number.
+        if (stat === "resources") {
+          for (const r of resourceItemResources(item.level)) {
+            itemsFlatByResource[r] += value;
+          }
+        }
+      } else itemsPct[stat] += value;
+    }
   }
   const cls = heroClassBonuses(hero?.heroClass);
   const classPct = {

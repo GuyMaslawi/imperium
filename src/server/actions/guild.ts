@@ -231,6 +231,12 @@ export async function leaveGuild(): Promise<ActionState> {
     const { guild } = membership;
 
     if (membership.role === "LEADER") {
+      // Lock the guild row before counting. GuildMember cascades on guild
+      // delete, so a join that commits between an unlocked count and the delete
+      // is silently destroyed — the newcomer pays nothing but loses the guild
+      // they just joined, with no message. joinGuild/addGuildMember already take
+      // this lock, so taking it here is what actually makes them serialize.
+      await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${guild.id} FOR UPDATE`;
       const memberCount = await tx.guildMember.count({
         where: { guildId: guild.id },
       });
@@ -254,9 +260,21 @@ const addMemberSchema = z.object({
 });
 
 /**
- * Leadership recruitment: a leader or deputy adds a guildless player straight
- * into the guild by empire name. The newcomer gets a system message and can
- * leave at any time, so this is a shortcut for the open join — not a lock-in.
+ * Leadership recruitment: a leader or deputy **invites** a guildless player by
+ * empire name. The invitation lands in their inbox and they join themselves.
+ *
+ * This used to write the GuildMember row directly — conscription, no consent
+ * asked. That was not merely rude: `getGuildAidBonus` reinforces every member in
+ * battle with a flat percentage of the guild's *combined* military power, so
+ * press-ganging the strongest guildless empires in the city was a straight power
+ * multiplier for the whole guild, applied without the conscripts ever opening
+ * the game. They could leave, but only after noticing, and the aid was live from
+ * the moment the row existed.
+ *
+ * Nothing is lost by asking: `joinGuild` is open to anyone who has the guild id,
+ * so an invitee can act on the message immediately. The recruiter simply no
+ * longer decides for them. Capacity is therefore checked at join time (where it
+ * always was), not here — an invitation is not a reservation.
  */
 export async function addGuildMember(
   _prev: ActionState,
@@ -285,14 +303,13 @@ export async function addGuildMember(
       return { error: `${target.name} כבר חבר בברית אחרת.` };
     }
 
-    // Lock the guild row so concurrent adds/joins serialize — see joinGuild for
-    // why an unlocked capacity check can overfill the guild.
-    await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${membership.guildId} FOR UPDATE`;
-
     const guild = await tx.guild.findUniqueOrThrow({
       where: { id: membership.guildId },
       select: { name: true, capacityLevel: true },
     });
+    // Reported as a courtesy so a leader isn't inviting into a guild that has no
+    // seat left; the binding check is still the one inside joinGuild, under its
+    // row lock.
     const memberCount = await tx.guildMember.count({
       where: { guildId: membership.guildId },
     });
@@ -300,20 +317,17 @@ export async function addGuildMember(
       return { error: "הברית מלאה — הרחב את הקיבולת קודם." };
     }
 
-    await tx.guildMember.create({
-      data: { guildId: membership.guildId, empireId: target.id },
-    });
     await tx.message.create({
       data: {
         empireId: target.id,
         kind: "SYSTEM",
-        title: "🏰 צורפת לברית",
-        body: `צורפת לברית "${guild.name}".`,
+        title: "🏰 הוזמנת לברית",
+        body: `${membership.guild.name} מזמינה אותך להצטרף. פתח את מסך הברית כדי להצטרף — ההחלטה שלך.`,
         href: "/game/guild",
       },
     });
 
-    return { success: `${target.name} צורף לברית.` };
+    return { success: `נשלחה הזמנה ל${target.name}.` };
   });
 }
 
@@ -428,15 +442,25 @@ export async function transferGuildLeadership(
     const target = await loadTargetMember(tx, membership.guildId, targetEmpireId);
     if (!target) return { error: "החבר לא נמצא בברית." };
 
-    // The old leader steps down to deputy.
-    await tx.guildMember.update({
-      where: { id: membership.id },
+    // Step down first, guarded on still holding the crown. Two concurrent
+    // transfers by the same leader (to different members) both read role=LEADER
+    // from their own snapshot, both demoted the leader, and each promoted its
+    // own target — leaving the guild with two LEADERs, either of whom could then
+    // kick the other. The guard means only one transfer can consume the office.
+    const steppedDown = await tx.guildMember.updateMany({
+      where: { id: membership.id, role: "LEADER" },
       data: { role: "DEPUTY" },
     });
-    await tx.guildMember.update({
-      where: { id: target.id },
+    if (steppedDown.count === 0) {
+      return { error: "רק המנהיג יכול להעביר את ההנהגה." };
+    }
+    // Guarded on the role we read, so the promotion cannot clobber a concurrent
+    // kick/role change of the target; throwing rolls the step-down back.
+    const promoted = await tx.guildMember.updateMany({
+      where: { id: target.id, role: target.role },
       data: { role: "LEADER" },
     });
+    if (promoted.count === 0) throw new Error("leadership transfer conflict");
     await tx.message.create({
       data: {
         empireId: targetEmpireId,
@@ -569,6 +593,14 @@ export async function castGuildSpell(
       where: { guildId_type: { guildId: membership.guildId, type } },
     });
     if (!spell) return { error: "הקסם לא נמצא." };
+
+    // Serialize this player's own casts before the "already active" check.
+    // Read-check-write under READ COMMITTED let two taps on the button both see
+    // no live buff, both spend the diamonds, and both insert a buff row —
+    // charging twice for one window (getActiveGuildBuffPct takes the strongest
+    // row, so the second cast bought literally nothing). Mirrors lockEmpire in
+    // diamondShop.ts, which exists for exactly this class of double-charge.
+    await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
 
     const now = new Date();
     const active = await tx.guildSpellBuff.findFirst({

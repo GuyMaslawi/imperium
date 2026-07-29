@@ -6,7 +6,6 @@ import {
   empireUpgradeMaxLevel,
   cityHeroLevelRequired,
   MAX_CITIES,
-  citizenCapacity,
   cityCost,
 } from "@/lib/game/constants";
 import { UpgradeCard } from "@/components/game/UpgradeCard";
@@ -29,10 +28,7 @@ export default async function UpgradesPage() {
   };
 
   const cities = empire.cities;
-  const capacity = citizenCapacity(cities);
-  const nextCapacity = citizenCapacity(Math.min(cities + 1, MAX_CITIES));
   const citizens = empire.citizens;
-  const fillPct = Math.min(100, Math.round((citizens / capacity) * 100));
 
   return (
     <div className="space-y-6">
@@ -44,16 +40,12 @@ export default async function UpgradesPage() {
       {/* -------- cities (עליית עיר) -------- */}
       <section className="space-y-4">
         <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
-          כל עלייה בעיר מכפילה את תפוקת המכרות (×מספר העיר) ומוסיפה 100 לקיבולת
-          האזרחים — עד{" "}
+          כל עלייה בעיר מכפילה את תפוקת המכרות (×מספר העיר) ופותחת עוד רמות
+          לשדרוג קבלת האזרחים — עד{" "}
           <span className="font-bold text-gold-bright nums" dir="ltr">
             ×{MAX_CITIES}
           </span>{" "}
-          תפוקה ו־
-          <span className="font-bold text-gold-bright nums" dir="ltr">
-            {formatNumber(citizenCapacity(MAX_CITIES))}
-          </span>{" "}
-          אזרחים ברמת עיר {MAX_CITIES}.
+          תפוקה ברמת עיר {MAX_CITIES}. אין תקרה לכמות האזרחים שאפשר לצבור.
         </p>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -87,28 +79,13 @@ export default async function UpgradesPage() {
                   {cities} / {MAX_CITIES}
                 </dd>
               </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <dt className="text-zinc-400">
-                    <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> אזרחים
-                  </dt>
-                  <dd className="font-bold text-zinc-100 nums" dir="ltr">
-                    {formatNumber(citizens)} / {formatNumber(capacity)}
-                  </dd>
-                </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-panel-inset">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-l from-gold to-gold-bright"
-                    style={{ width: `${fillPct}%` }}
-                  />
-                </div>
-                {citizens >= capacity && (
-                  <p className="mt-1.5 text-xs font-semibold text-crimson-bright">
-                    {cities < MAX_CITIES
-                      ? "קיבולת מלאה — קבלת אזרחים נעולה עד שתעלה עיר."
-                      : "קיבולת מלאה — הגעת לרמת העיר המרבית."}
-                  </p>
-                )}
+              <div className="flex items-center justify-between">
+                <dt className="text-zinc-400">
+                  <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> אזרחים
+                </dt>
+                <dd className="font-bold text-zinc-100 nums" dir="ltr">
+                  {formatNumber(citizens)}
+                </dd>
               </div>
             </dl>
           </Card>
@@ -117,7 +94,6 @@ export default async function UpgradesPage() {
           <CityFoundCard
             cities={cities}
             maxCities={MAX_CITIES}
-            nextCapacity={nextCapacity}
             heroLevel={empire.hero?.level ?? 1}
             heroRequired={cityHeroLevelRequired(cities)}
             cost={cityCost(cities)}

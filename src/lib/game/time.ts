@@ -63,12 +63,51 @@ function wallTimeToUtc(wall: Omit<WallParts, "second">): Date {
   return new Date(ts);
 }
 
+/** A Jerusalem wall-clock time of day, e.g. the 19:30 guild-war bell. */
+export interface WallTime {
+  hour: number;
+  minute: number;
+}
+
+/** The instant at Jerusalem wall time `wall`, `dayOffset` days from `date`. */
+function wallInstantForDay(date: Date, dayOffset: number, wall: WallTime): Date {
+  const base = zonedParts(new Date(date.getTime() + dayOffset * 86_400_000));
+  return wallTimeToUtc({
+    year: base.year,
+    month: base.month,
+    day: base.day,
+    hour: wall.hour,
+    minute: wall.minute,
+  });
+}
+
 /** The daily-update instants for the Jerusalem calendar day containing `date`, shifted by `dayOffset` days. */
 function dailyInstantsForDay(date: Date, dayOffset: number): Date[] {
-  const base = zonedParts(new Date(date.getTime() + dayOffset * 86_400_000));
-  return DAILY_UPDATE_TIMES.map(({ hour, minute }) =>
-    wallTimeToUtc({ year: base.year, month: base.month, day: base.day, hour, minute })
-  );
+  return DAILY_UPDATE_TIMES.map((wall) => wallInstantForDay(date, dayOffset, wall));
+}
+
+/**
+ * The first occurrence of Jerusalem wall time `wall` strictly after `after`.
+ * Used by fixtures that fire once a day at their own hour rather than on a
+ * daily-update boundary — the guild war bell (see src/lib/game/guildWar.ts).
+ */
+export function nextWallTime(after: Date, wall: WallTime): Date {
+  for (let offset = 0; offset < 3; offset++) {
+    const instant = wallInstantForDay(after, offset, wall);
+    if (instant.getTime() > after.getTime()) return instant;
+  }
+  // Unreachable: within 2 days the time always comes round.
+  return new Date(after.getTime() + 86_400_000);
+}
+
+/** The most recent occurrence of Jerusalem wall time `wall` at or before `date`. */
+export function lastWallTime(date: Date, wall: WallTime): Date {
+  for (let offset = 0; offset >= -2; offset--) {
+    const instant = wallInstantForDay(date, offset, wall);
+    if (instant.getTime() <= date.getTime()) return instant;
+  }
+  // Unreachable: within 2 days back the time has always just passed.
+  return new Date(date.getTime() - 86_400_000);
 }
 
 /**

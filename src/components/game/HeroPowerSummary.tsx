@@ -9,7 +9,7 @@ import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
  * "סך הכל מהגיבור" — the combined yield the player actually gets from the hero,
  * points and equipped items together. It is laid out as two clearly labelled
  * blocks: the battle percentages (attack/defense/spy — points and item % folded
- * in) and the flat per-tick yield the equipped items grant (turns, diamonds,
+ * in) and the flat yield the equipped items grant (turns,
  * citizens, resources). Each line reads left-to-right value ↔ right-to-left
  * label so the numbers align in a single detailed column.
  */
@@ -203,11 +203,11 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
     },
   ];
 
-  // תורות/יהלומים/אזרחים — כמות קבועה מהחפצים, לא באחוזים. משאבים מטופלים בנפרד
-  // כי הם ניזונים משני מקורות שונים: אחוז מהנקודות (מכפיל מכרות) + כמות מהחפץ.
+  // תורות/אזרחים — כמות קבועה מהחפצים, לא באחוזים. משאבים מטופלים בנפרד כי הם
+  // ניזונים משני מקורות שונים: אחוז מהנקודות (מכפיל מכרות) + כמות מהחפץ.
+  // יהלומים אינם ברשימה: חפצים אינם מייצרים יהלומים כלל (ראו HeroFlatStat).
   const flatRows: { stat: HeroStat; value: number; note: string }[] = [
-    { stat: "turns", value: itemsFlat.turns, note: "נוסף בכל עדכון רגיל" },
-    { stat: "diamonds", value: itemsFlat.diamonds, note: "נוסף בכל עדכון יומי" },
+    { stat: "turns", value: itemsFlat.turns, note: "נוסף בכל עדכון יומי" },
     { stat: "citizens", value: itemsFlat.citizens, note: "נוסף בכל עדכון יומי" },
   ];
 
@@ -238,7 +238,7 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
           </div>
         </section>
 
-        {/* flat per-tick yield from items: turns / diamonds / citizens */}
+        {/* flat per-update yield from items: turns / citizens */}
         <section className="lg:border-e lg:border-s lg:border-border-subtle lg:px-6">
           <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
           <div className="flex flex-col gap-1.5">

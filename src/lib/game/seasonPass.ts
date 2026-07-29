@@ -61,6 +61,13 @@ export const SEASON_PASS_XP = {
    * ladder: the boss is the cycle's centrepiece, not a way to skip the cycle.
    */
   bossFight: 120,
+  /**
+   * Sending the hero on an expedition. Paid at *departure*, not on collect: the
+   * turns are spent then, and paying on collect would let a player bank a
+   * finished quest across a cycle boundary to choose which ladder it feeds.
+   * Modest — the cheapest run costs 22 turns, about two attacks.
+   */
+  heroQuest: 20,
 } as const;
 
 export type SeasonPassAction = keyof typeof SEASON_PASS_XP;

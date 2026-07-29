@@ -2,7 +2,6 @@
 
 import { randomInt } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import type {
   BuildingType,
@@ -30,6 +29,7 @@ import {
   type GameTunables,
 } from "@/lib/game/config";
 import { newEmpireData } from "@/lib/game/createEmpire";
+import { hashPassword } from "@/lib/password";
 
 export interface AdminActionState {
   error?: string;
@@ -117,6 +117,36 @@ async function assertNotPeerAdmin(
   if (target?.role === "ADMIN") {
     throw new AdminError("אין הרשאה לפעול על חשבון אדמין אחר");
   }
+}
+
+/**
+ * The single choke point every target-scoped admin action funnels through.
+ *
+ * `assertNotPeerAdmin` was called from 4 of the 17 actions that carry a target,
+ * which is worse than not having it at all: it stopped one admin renaming or
+ * banning another, while leaving them free to empty that admin's treasury, wipe
+ * their army, strip their hero, delete their gear or kick them out of their
+ * guild. A guard covering a quarter of the surface is false assurance, so it now
+ * hangs off the one line all 17 already shared.
+ *
+ * The owner is resolved from `empireId` in preference to the `userId` the form
+ * also carries. That field exists only so the action can revalidate the right
+ * page, and the two are never cross-checked — so an admin hand-rolling the POST
+ * could pair a peer's `empireId` with their own `userId` and walk straight past
+ * a userId-only check.
+ */
+async function assertTargetEditable(
+  admin: { id: string },
+  target: { userId?: string; empireId?: string }
+): Promise<void> {
+  if (target.empireId) {
+    const owner = await prisma.empire.findUnique({
+      where: { id: target.empireId },
+      select: { userId: true },
+    });
+    if (owner) return assertNotPeerAdmin(admin, owner.userId);
+  }
+  if (target.userId) return assertNotPeerAdmin(admin, target.userId);
 }
 
 /**
@@ -234,6 +264,7 @@ export async function updateUserAccount(
   try {
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const name = str(formData, "name");
     const email = str(formData, "email").toLowerCase();
     const role = roleSchema.parse(formData.get("role")) as Role;
@@ -243,8 +274,6 @@ export async function updateUserAccount(
     if (userId === admin.id && role !== "ADMIN") {
       return { error: "אי אפשר להסיר לעצמך הרשאות אדמין" };
     }
-    // Can't edit (rename / re-email / demote) another admin's account.
-    await assertNotPeerAdmin(admin, userId);
 
     const clash = await prisma.user.findFirst({
       where: { email, NOT: { id: userId } },
@@ -295,8 +324,8 @@ export async function toggleUserBan(
   try {
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     if (userId === admin.id) return { error: "אי אפשר לחסום את עצמך" };
-    await assertNotPeerAdmin(admin, userId);
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -338,11 +367,11 @@ export async function resetUserPassword(
   try {
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
-    await assertNotPeerAdmin(admin, userId);
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const password = String(formData.get("password") ?? "");
     if (password.length < 8) return { error: "סיסמה חייבת להכיל לפחות 8 תווים" };
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
     // Bump tokenVersion so every session issued under the old password is
     // revoked — a reset must lock out anyone holding a stale/leaked cookie.
     await prisma.user.update({
@@ -376,8 +405,8 @@ export async function deleteUser(
   try {
     const admin = await requireAdmin();
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     if (userId === admin.id) return { error: "אי אפשר למחוק את עצמך" };
-    await assertNotPeerAdmin(admin, userId);
     const confirm = str(formData, "confirm");
     if (confirm !== "DELETE") return { error: 'יש להקליד DELETE לאישור המחיקה' };
 
@@ -412,6 +441,7 @@ export async function updateEmpireCore(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const name = str(formData, "name");
     if (name.length < 2) return { error: "שם אימפריה קצר מדי" };
 
@@ -458,6 +488,7 @@ export async function updateArmy(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const data = {
       soldiers: Math.max(0, Math.round(num(formData, "soldiers"))),
       spies: Math.max(0, Math.round(num(formData, "spies"))),
@@ -490,6 +521,7 @@ export async function updateBank(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const goldBalance = Math.max(0, num(formData, "goldBalance"));
     await prisma.bankAccount.upsert({
       where: { empireId },
@@ -518,6 +550,7 @@ export async function updateBuilding(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const type = str(formData, "type") as BuildingType;
     const level = Math.max(0, Math.round(num(formData, "level")));
     const slavesAssigned = Math.max(0, Math.round(optNum(formData, "slavesAssigned")));
@@ -548,6 +581,7 @@ export async function updateStorage(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const resourceType = str(formData, "resourceType") as ResourceStorageType;
     const level = Math.max(1, Math.round(num(formData, "level")));
     const storedAmount = Math.max(0, num(formData, "storedAmount"));
@@ -578,6 +612,7 @@ export async function updateUpgrade(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const type = str(formData, "type") as EmpireUpgradeType;
     const level = Math.max(1, Math.round(num(formData, "level")));
     await prisma.empireUpgrade.upsert({
@@ -607,6 +642,7 @@ export async function updateWeaponUnlock(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const category = str(formData, "category") as WeaponCategory;
     const unlockedTier = Math.max(1, Math.round(num(formData, "unlockedTier")));
     await prisma.empireWeaponUnlock.upsert({
@@ -636,6 +672,7 @@ export async function setWeaponQuantity(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const weaponKey = str(formData, "weaponKey");
     if (!weaponByKey(weaponKey)) return { error: "מפתח נשק לא קיים" };
     const quantity = Math.max(0, Math.round(num(formData, "quantity")));
@@ -671,6 +708,7 @@ export async function updateHero(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const heroClass = z
       .enum(["WARLORD", "GUARDIAN", "MERCHANT", "SHADOW"])
       .parse(formData.get("heroClass"));
@@ -732,6 +770,7 @@ export async function grantHeroItem(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const slot = slotSchema.parse(formData.get("slot")) as HeroItemSlot;
     const rarity = raritySchema.parse(formData.get("rarity")) as HeroRarity;
     const level = Math.max(1, Math.round(num(formData, "level")));
@@ -767,6 +806,17 @@ export async function deleteHeroItem(
     const admin = await requireAdmin();
     const itemId = str(formData, "itemId");
     const userId = str(formData, "userId");
+    // The only target-scoped action that names its target by neither empireId
+    // nor a trustworthy userId — the item id is the real subject, so walk it
+    // back to the empire that owns it rather than trusting the form's userId.
+    const owner = await prisma.heroItem.findUnique({
+      where: { id: itemId },
+      select: { hero: { select: { empireId: true } } },
+    });
+    await assertTargetEditable(admin, {
+      userId,
+      empireId: owner?.hero.empireId,
+    });
     await prisma.heroItem.delete({ where: { id: itemId } });
     await logAdmin(admin, {
       action: "empire.hero_item_delete",
@@ -790,6 +840,7 @@ export async function removeFromGuild(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     await prisma.guildMember.deleteMany({ where: { empireId } });
     await logAdmin(admin, {
       action: "empire.guild_remove",
@@ -817,6 +868,7 @@ export async function sendMessageToEmpire(
     const admin = await requireAdmin();
     const empireId = str(formData, "empireId");
     const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const title = str(formData, "title", 200);
     const body = str(formData, "body", 4000);
     const href = optHref(formData, "href");

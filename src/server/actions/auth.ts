@@ -12,6 +12,11 @@ import { verifyGoogleIdToken } from "@/lib/google";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
 import { appBaseUrl, sendMail } from "@/server/mailer";
+import {
+  LOGIN_TIMING_DUMMY_HASH,
+  hashPassword,
+  isStaleHash,
+} from "@/lib/password";
 
 export interface AuthState {
   error?: string;
@@ -94,6 +99,73 @@ async function sendVerificationEmail(user: {
       <p style="color:#666;font-size:13px">הקישור תקף ל-24 שעות. אם לא נרשמת לאימפריום, אפשר להתעלם מההודעה.</p>
     </div>`,
   });
+}
+
+/**
+ * How long an unverified password account keeps its email address and empire
+ * name before either can be reclaimed by a new registration.
+ *
+ * Comfortably longer than VERIFY_TOKEN_TTL_MS, so a real person who lets the
+ * first link expire can still resend one against their existing row.
+ */
+const UNVERIFIED_ACCOUNT_TTL_MS = 72 * 60 * 60 * 1000;
+
+/**
+ * Release abandoned registrations that are squatting an address or empire name.
+ *
+ * `register` writes the User and Empire rows before anything proves the
+ * registrant controls the address — it has to, because the verification link is
+ * mailed to that row. The side effect was a permanent denial of service against
+ * any third party: sign up as victim@gmail.com and the real owner can never
+ * register (unique email), can never take the row over with Google (googleSignIn
+ * correctly refuses to adopt a row that has a passwordHash), and has no
+ * self-service path at all. The same trick squatted any empire name.
+ *
+ * Expiring the rows turns a permanent squat into a 72-hour one. Nothing of value
+ * is destroyed: an unverified account is barred from every part of the game by
+ * `requireEmpire`/`getActiveEmpireId`, so its empire has never been playable.
+ *
+ * Deliberately scoped to rows that have no other credential and no money
+ * attached — a Google-linked row is verified by definition, and the purchase
+ * check is belt-and-braces, since `preflight` already refuses to sell to an
+ * unverified account.
+ *
+ * Runs opportunistically from `register` rather than on a schedule: the app has
+ * no cron, and a registration attempt is exactly the moment the space is
+ * contended. Failures are swallowed — a sweep that cannot run must not take
+ * signup down with it.
+ */
+async function releaseAbandonedRegistrations(email: string, empireName: string): Promise<void> {
+  try {
+    const cutoff = new Date(Date.now() - UNVERIFIED_ACCOUNT_TTL_MS);
+    const stale = await prisma.user.findMany({
+      where: {
+        emailVerified: null,
+        googleId: null,
+        createdAt: { lt: cutoff },
+        OR: [
+          { email },
+          { empire: { name: { equals: empireName, mode: "insensitive" } } },
+        ],
+      },
+      select: { id: true },
+    });
+    if (stale.length === 0) return;
+
+    const ids = stale.map((u) => u.id);
+    const paid = await prisma.diamondPurchase.findMany({
+      where: { userId: { in: ids }, status: { in: ["PAID", "REFUNDED"] } },
+      select: { userId: true },
+    });
+    const spent = new Set(paid.map((p) => p.userId));
+    const deletable = ids.filter((id) => !spent.has(id));
+    if (deletable.length === 0) return;
+
+    // Empire, hero, items and tokens all cascade from User.
+    await prisma.user.deleteMany({ where: { id: { in: deletable } } });
+  } catch (e) {
+    console.error("[register] abandoned-registration sweep failed", e);
+  }
 }
 
 /** Minimal escaping for the one user-controlled value in the email body. */
@@ -182,7 +254,11 @@ export async function register(
   // both the taken and free paths do the same work. (The friendly "email taken"
   // message is still returned on the constraint hit — full enumeration hardening
   // would need out-of-band email verification, which the app has no infra for.)
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await hashPassword(password);
+
+  // Reclaim an address or empire name held by an abandoned unverified signup
+  // before we try to take it — otherwise the squat below is permanent.
+  await releaseAbandonedRegistrations(email, empireName);
 
   const [activeSeason, tunables] = await Promise.all([
     prisma.gameSeason.findFirst({ where: { isActive: true }, select: { id: true } }),
@@ -231,13 +307,6 @@ const loginSchema = z.object({
   password: z.string().min(1, "יש להזין סיסמה"),
 });
 
-// A valid bcrypt hash (cost 10) of a throwaway string. When no account matches
-// the email we still run a bcrypt.compare against this so the response takes the
-// same time as a real password check — otherwise an attacker could tell which
-// emails are registered purely from login latency (the compare is skipped for a
-// missing user via short-circuit).
-const LOGIN_TIMING_DUMMY_HASH =
-  "$2b$10$e3STZXV8u3ZN76vG9DTWbOdwJq4HByWmLRugxd/ULnd.vXxy/R2V2";
 
 /**
  * An id no row can hold (cuids never contain a colon), used to spend one cheap
@@ -304,7 +373,19 @@ export async function login(
     password,
     user?.passwordHash ?? LOGIN_TIMING_DUMMY_HASH
   );
-  if (!user || !passwordOk) {
+  // A password-less account must never be authenticated by this compare.
+  //
+  // Google-only rows carry `passwordHash: null`, so they fell through to the
+  // timing dummy — and a dummy that *matches* is a successful login. One known
+  // plaintext would therefore have signed the attacker into every Google account
+  // in the game at once, and the digest it must match is a public constant in
+  // this file. The plaintext was never written down, but "nobody remembers the
+  // password" is not an access control: it is a single master key whose only
+  // protection is that it has not been recovered yet. The compare above still
+  // runs so the timing stays flat; its result is simply not allowed to grant a
+  // session to a row that has no password of its own.
+  const hasPassword = user?.passwordHash != null;
+  if (!user || !hasPassword || !passwordOk) {
     if (user) {
       // Count the miss and lock once the threshold is crossed. The increment is
       // unconditional so concurrent guesses all register; `lockedUntil` is set
@@ -343,11 +424,22 @@ export async function login(
     return { error: "החשבון נחסם על ידי ההנהלה" };
   }
 
-  // Successful sign-in clears the streak (and any expired lock).
-  if (user.failedLogins !== 0 || user.lockedUntil) {
+  // Successful sign-in clears the streak (and any expired lock), and is also the
+  // one moment we hold the plaintext for an existing account — so it is where a
+  // digest written at an older, weaker cost gets upgraded in place. Without this
+  // the cost bump would only ever apply to accounts created after the deploy,
+  // and every pre-existing password would sit at the old factor forever.
+  const rehash = isStaleHash(user.passwordHash!)
+    ? await hashPassword(password)
+    : null;
+  if (user.failedLogins !== 0 || user.lockedUntil || rehash) {
     await prisma.user.update({
       where: { id: user.id },
-      data: { failedLogins: 0, lockedUntil: null },
+      data: {
+        failedLogins: 0,
+        lockedUntil: null,
+        ...(rehash ? { passwordHash: rehash } : {}),
+      },
     });
   }
 
@@ -429,7 +521,7 @@ export async function changePassword(
   const updated = await prisma.user.update({
     where: { id: userId },
     data: {
-      passwordHash: await bcrypt.hash(newPassword, 10),
+      passwordHash: await hashPassword(newPassword),
       tokenVersion: { increment: 1 },
       // Rotating your own password clears the failure streak and any lock, the
       // same way an admin reset does. Otherwise a user who was being guessed at

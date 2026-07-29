@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { bankInterestRate } from "@/lib/game/constants";
-import { isHeroDead } from "@/lib/game/hero";
 import { DiamondShop } from "@/components/game/DiamondShop";
 import { DiamondsHeader } from "@/components/game/DiamondsHeader";
 import {
   BOOSTABLE_RESOURCES,
   RESOURCE_BOOST_KIND,
+  SHIELDS,
   TURN_PACKAGES,
+  type ShieldKey,
 } from "@/lib/game/diamondShop";
 
 export const metadata = { title: "יהלומים | IMPERIUM" };
@@ -47,6 +48,23 @@ export default async function DiamondsPage() {
       ? discountEffect.activeUntil.toISOString()
       : null;
 
+  // Raid shields — one DiamondEffect row each, carrying both the protection
+  // window (activeUntil) and the renewal cooldown that follows it (readyAt).
+  const shields = Object.fromEntries(
+    SHIELDS.map((s) => {
+      const e = byKind.get(s.kind);
+      const active = e?.activeUntil != null && e.activeUntil > now;
+      const cooling = !active && e?.readyAt != null && e.readyAt > now;
+      return [
+        s.key,
+        {
+          activeUntil: active ? e!.activeUntil!.toISOString() : null,
+          readyAt: cooling ? e!.readyAt!.toISOString() : null,
+        },
+      ];
+    })
+  ) as Record<ShieldKey, { activeUntil: string | null; readyAt: string | null }>;
+
   const hero = empire.hero;
   const allocatedPoints =
     (hero?.attackPoints ?? 0) + (hero?.defensePoints ?? 0) + (hero?.resourcePoints ?? 0);
@@ -76,7 +94,7 @@ export default async function DiamondsPage() {
       <DiamondsHeader
         diamonds={diamonds}
         active="spend"
-        note="הוצא יהלומים על האצות ייצור, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה."
+        note="הוצא יהלומים על האצות ייצור, מגני תקיפה, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה."
       />
 
       <DiamondShop
@@ -88,7 +106,7 @@ export default async function DiamondsPage() {
         pointsResetUsed={pointsResetUsed}
         interestPreview={interestPreview}
         bankReadyAt={bankReadyAt}
-        heroDead={isHeroDead(hero)}
+        shields={shields}
       />
     </div>
   );

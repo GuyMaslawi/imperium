@@ -38,40 +38,40 @@ enum Role {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
   /// Null for accounts that only sign in with Google (no password set). A
   /// password account and a Google identity can coexist on one row once linked
   /// by verified email — see src/server/actions/auth.ts (googleSignIn).
-  passwordHash String?
+  passwordHash  String?
   /// Google account subject (`sub` claim), set when the user links/signs up with
   /// Google. Unique so one Google account maps to at most one user.
-  googleId     String?   @unique
+  googleId      String?   @unique
   /// Optional avatar URL supplied by Google at sign-in.
-  image        String?
-  name         String
-  role         Role      @default(USER)
+  image         String?
+  name          String
+  role          Role      @default(USER)
   /// When set, the user is banned — login is refused and game access blocked.
-  bannedAt     DateTime?
+  bannedAt      DateTime?
   /// Bumped to invalidate every previously-issued session JWT (stateless, so a
   /// token stays valid until expiry otherwise). Embedded as the `ver` claim at
   /// sign time and re-checked on every request; a password reset increments it,
   /// logging out all existing sessions. See src/lib/auth.ts.
-  tokenVersion Int       @default(0)
+  tokenVersion  Int       @default(0)
   /// Consecutive failed password attempts since the last success. Reset to 0 on
   /// a successful login. Backs the account lockout in src/server/actions/auth.ts
   /// — the in-process rate limiter cannot throttle brute force on a serverless
   /// fleet, because each instance keeps its own counters and loses them on cold
   /// start, so the durable counter lives here instead.
-  failedLogins Int       @default(0)
+  failedLogins  Int       @default(0)
   /// Set while the account is locked out; login is refused until it passes.
-  lockedUntil  DateTime?
+  lockedUntil   DateTime?
   /// When the user proved control of this address. Null = unverified, which
   /// blocks all gameplay (see requireEmpire / getActiveEmpireId). Google
   /// sign-ins are verified on arrival via the provider's email_verified claim.
   emailVerified DateTime?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   empire             Empire?
   verificationTokens EmailVerificationToken[]
@@ -81,7 +81,7 @@ model User {
 model EmailVerificationToken {
   id String @id @default(cuid())
 
-  userId String
+  userId     String
   /// SHA-256 of the token that was emailed — the raw value is never stored, so
   /// read access to this table cannot be replayed into an account takeover.
   /// Unique so a lookup by hash is a single indexed read.
@@ -201,34 +201,34 @@ model GameSeason {
 }
 
 model Empire {
-  id                  String   @id @default(cuid())
-  userId              String   @unique
+  id                  String    @id @default(cuid())
+  userId              String    @unique
   seasonId            String?
-  name                String   @unique
-  level               Int      @default(1)
-  gold                Float    @default(2000)
-  wood                Float    @default(1500)
-  iron                Float    @default(1000)
-  stone               Float    @default(1000)
-  diamonds            Float    @default(10)
-  citizens            Int      @default(50)
+  name                String    @unique
+  level               Int       @default(1)
+  gold                Float     @default(2000)
+  wood                Float     @default(1500)
+  iron                Float     @default(1000)
+  stone               Float     @default(1000)
+  diamonds            Float     @default(10)
+  citizens            Int       @default(50)
   /// Cities the empire holds (1..MAX_CITIES). Each city adds 100 to the
   /// citizen capacity, so ten cities ceiling the population at 1,000.
-  cities              Int      @default(1)
-  turns               Int      @default(0)
+  cities              Int       @default(1)
+  turns               Int       @default(0)
   /// Remaining wheel-of-fortune spins. Consumed on each spin, topped up on
   /// every daily update (capped) — see WHEEL_DAILY_SPINS / WHEEL_SPINS_CAP.
-  wheelSpins          Int      @default(4)
-  lastRegularUpdateAt DateTime @default(now())
-  lastDailyUpdateAt   DateTime @default(now())
+  wheelSpins          Int       @default(4)
+  lastRegularUpdateAt DateTime  @default(now())
+  lastDailyUpdateAt   DateTime  @default(now())
   /// Last time the player opened the reports page — drives the "new reports" badge.
-  reportsSeenAt       DateTime @default(now())
+  reportsSeenAt       DateTime  @default(now())
   /// New-player shield: while this is in the future the empire cannot be
   /// attacked or spied. Set at registration; cleared early the moment the
   /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).
   protectedUntil      DateTime?
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   season        GameSeason?          @relation(fields: [seasonId], references: [id], onDelete: SetNull)
@@ -241,12 +241,12 @@ model Empire {
   weaponUnlocks EmpireWeaponUnlock[]
   hero          Hero?
 
-  spyReportsSent     SpyReport[]    @relation("SpyAttacker")
-  spyReportsReceived SpyReport[]    @relation("SpyDefender")
-  battlesAttacked    BattleReport[] @relation("BattleAttacker")
-  battlesDefended    BattleReport[] @relation("BattleDefender")
-  messages           Message[]      @relation("MessageInbox")
-  messagesSent       Message[]      @relation("MessageSender")
+  spyReportsSent     SpyReport[]         @relation("SpyAttacker")
+  spyReportsReceived SpyReport[]         @relation("SpyDefender")
+  battlesAttacked    BattleReport[]      @relation("BattleAttacker")
+  battlesDefended    BattleReport[]      @relation("BattleDefender")
+  messages           Message[]           @relation("MessageInbox")
+  messagesSent       Message[]           @relation("MessageSender")
   guildMembership    GuildMember?
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
@@ -256,6 +256,7 @@ model Empire {
   seasonPass         SeasonPassProgress?
   bossFights         BossFight[]
   achievements       EmpireAchievement[]
+  heroQuest          HeroQuest?
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
   // season. Without these, both are full-table scans that grow with the player
@@ -329,7 +330,9 @@ model SeasonPassProgress {
   empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
 }
 
-/* --------------------------- diamond store (real money) --------------------------- */
+/**
+ * --------------------------- diamond store (real money) ---------------------------
+ */
 
 /// Lifecycle of a real-money diamond-package purchase.
 enum PurchaseStatus {
@@ -356,55 +359,55 @@ enum PurchaseStatus {
 /// purchase history. `isTest` marks charges that moved no real money (the mock
 /// provider), so real revenue can be reported separately.
 model DiamondPurchase {
-  id           String         @id @default(cuid())
-  empireId     String?
+  id            String         @id @default(cuid())
+  empireId      String?
   /// Snapshot of the buyer's user id (survives empire/account deletion).
-  userId       String?
+  userId        String?
   /// Snapshot of the buyer's email at purchase time (for receipts/support).
-  userEmail    String?
+  userEmail     String?
   /// Snapshot of the empire name at purchase time.
-  empireName   String?
+  empireName    String?
   /// Package id from DIAMOND_PACKAGES.
-  packageId    String
+  packageId     String
   /// Total diamonds granted (base + bonus), snapshotted at purchase time.
-  diamonds     Int
+  diamonds      Int
   /// Base diamonds of the package (without the bonus).
-  baseDiamonds Int            @default(0)
+  baseDiamonds  Int            @default(0)
   /// Bonus diamonds thrown in on top.
-  bonusDiamonds Int           @default(0)
+  bonusDiamonds Int            @default(0)
   /// Price actually charged, after any admin discount.
-  priceIls     Float
+  priceIls      Float
   /// Full list price before the admin discount (for the receipt).
-  basePriceIls Float          @default(0)
+  basePriceIls  Float          @default(0)
   /// Discount percent applied at purchase time.
-  discountPct  Float          @default(0)
+  discountPct   Float          @default(0)
   /// ISO-4217 currency of the charge.
-  currency     String         @default("ILS")
+  currency      String         @default("ILS")
   /// Payment provider that handled the charge ("mock" until a real one is wired).
-  provider     String
+  provider      String
   /// Provider-side transaction reference, once charged. Unique so the same
   /// reference can never settle twice: today's in-process flow is idempotent on
   /// the internal purchase id, but the documented go-live path is a provider
   /// webhook, and a replayed webhook carrying a reference we have already
   /// credited would otherwise settle a second row and double-credit diamonds.
   /// The future webhook handler must look the purchase up BY THIS FIELD.
-  providerRef  String?        @unique
+  providerRef   String?        @unique
   /// Provider-side id of the money movement itself — for PayPal the *capture*
   /// id, which is what a refund is issued against and what refund/chargeback
   /// webhooks identify the payment by (`providerRef` holds the order id).
   /// Unique for the same anti-replay reason as `providerRef`.
-  captureRef   String?        @unique
+  captureRef    String?        @unique
   /// True when no real money moved (mock provider / PayPal sandbox).
-  isTest       Boolean        @default(false)
-  status       PurchaseStatus @default(PENDING)
+  isTest        Boolean        @default(false)
+  status        PurchaseStatus @default(PENDING)
   /// Why the charge failed (only set on FAILED).
   failureReason String?
   /// When the charge settled as PAID.
-  paidAt       DateTime?
+  paidAt        DateTime?
   /// When a settled charge was refunded or reversed.
-  refundedAt   DateTime?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  refundedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   empire Empire? @relation(fields: [empireId], references: [id], onDelete: SetNull)
 
@@ -414,7 +417,9 @@ model DiamondPurchase {
   @@index([createdAt])
 }
 
-/* ------------------------------ diamond shop ------------------------------ */
+/**
+ * ------------------------------ diamond shop ------------------------------
+ */
 
 /// A purchasable diamond effect on an empire. Timed buffs (resource boosts,
 /// shop discount) use `magnitude` + `activeUntil`; cooldown-only spells
@@ -430,6 +435,10 @@ enum DiamondEffectKind {
   TURN_PACK_2
   TURN_PACK_3
   TURN_PACK_4
+  /// Paid raid shields: while active, a winning attacker takes no plunder
+  /// (RESOURCES) / captures no soldiers (SOLDIERS) from this empire.
+  SHIELD_RESOURCES
+  SHIELD_SOLDIERS
 }
 
 model DiamondEffect {
@@ -451,7 +460,9 @@ model DiamondEffect {
   @@index([empireId, activeUntil])
 }
 
-/* ------------------------------ guilds ------------------------------ */
+/**
+ * ------------------------------ guilds ------------------------------
+ */
 
 enum GuildRole {
   LEADER
@@ -527,6 +538,122 @@ model GuildSpellBuff {
   @@index([empireId, expiresAt])
 }
 
+/**
+ * ---------------------------- guild war ----------------------------
+ */
+
+enum GuildWarStatus {
+  /// Registered, running, or waiting to be settled.
+  SCHEDULED
+  /// Finished with enough guilds; ranks and prizes are written.
+  SETTLED
+  /// Finished with fewer than GUILD_WAR_MIN_GUILDS entrants. Nobody scores,
+  /// nobody is paid — a single guild showing up wins nothing.
+  CANCELLED
+}
+
+/// One nightly guild campaign: a 30-minute window (19:30-20:00 Jerusalem) that
+/// the game fights **by itself**. Guilds enrol and then watch: every minute the
+/// system throws one clash per guild, resolves it with the real battle maths
+/// and posts it to the live feed. No player ever presses anything.
+///
+/// Rows are created lazily by the first guild to register, advanced lazily by
+/// any request that arrives during the window, and settled lazily by the first
+/// one after it closes. The game has no cron and nothing here may assume one.
+model GuildWar {
+  id             String         @id @default(cuid())
+  /// Window open. Unique so concurrent registrations converge on one row per
+  /// night instead of racing two wars into existence.
+  startsAt       DateTime       @unique
+  endsAt         DateTime
+  status         GuildWarStatus @default(SCHEDULED)
+  /// How many of the GUILD_WAR_ROUNDS minute-rounds have been fought. This is
+  /// the resume point for the lazy simulation: a request materialises every
+  /// round that has come due since, under a row lock and guarded on this
+  /// counter, so two readers arriving together can never fight one round twice.
+  resolvedRounds Int            @default(0)
+  settledAt      DateTime?
+  createdAt      DateTime       @default(now())
+
+  entries GuildWarEntry[]
+  clashes GuildWarClash[]
+
+  /// Drives both the "wars in progress" and "wars due for settlement" sweeps.
+  @@index([status, endsAt])
+}
+
+/// A guild's enrolment in one war, and its running score.
+model GuildWarEntry {
+  id        String @id @default(cuid())
+  warId     String
+  /// Soft reference - deliberately no foreign key. A guild that disbands the
+  /// morning after must not erase the night it won, so the war keeps its own
+  /// snapshot of the name and simply finds no members left to pay.
+  guildId   String
+  guildName String
+
+  score  Int @default(0)
+  /// Clashes this guild won — broke through as attacker, or held as defender.
+  wins   Int @default(0)
+  /// Clashes it lost on either side.
+  losses Int @default(0)
+
+  /// Final placement, written at settlement (1 = champion).
+  rank        Int?
+  /// Prize snapshot, written at settlement so the result page reads the same
+  /// after the prize table is retuned.
+  rewardLabel String?
+
+  createdAt DateTime @default(now())
+
+  war GuildWar @relation(fields: [warId], references: [id], onDelete: Cascade)
+
+  @@unique([warId, guildId])
+  @@index([warId, score])
+}
+
+/// One clash the system fought inside a war — the live feed, and the source of
+/// every score. Both sides are snapshotted so the war reads the same a month
+/// later, whoever has since left, renamed or disbanded.
+model GuildWarClash {
+  id    String @id @default(cuid())
+  warId String
+  /// Which minute of the campaign this was fought in (0-based).
+  round Int
+
+  attackerGuildId   String
+  attackerGuildName String
+  defenderGuildId   String
+  defenderGuildName String
+
+  attackerEmpireId String
+  attackerName     String
+  defenderEmpireId String
+  defenderName     String
+
+  attackerPower Float
+  defenderPower Float
+  /// True when the attacker broke through. Points go to the attacker on a
+  /// breakthrough and to the defender on a hold — one field, two owners.
+  won           Boolean
+  points        Int
+
+  /// The round's scheduled instant, not the moment the row was written: rounds
+  /// are materialised late whenever nobody was watching, and a feed stamped
+  /// with the catch-up time would show half an hour of war in one second.
+  createdAt DateTime
+
+  war GuildWar @relation(fields: [warId], references: [id], onDelete: Cascade)
+
+  /// The live feed.
+  @@index([warId, createdAt])
+  /// Idempotent catch-up + the per-round replay.
+  @@index([warId, round])
+  /// The fighter board.
+  @@index([warId, attackerEmpireId])
+  @@index([warId, defenderEmpireId])
+}
+
 enum MessageKind {
   SYSTEM
   BATTLE
@@ -539,19 +666,19 @@ enum MessageKind {
 /// ("you were attacked", "a spy was caught in your territory") and mail sent
 /// by other players.
 model Message {
-  id       String      @id @default(cuid())
-  empireId String
+  id             String      @id @default(cuid())
+  empireId       String
   /// Author of a PLAYER message. Null for anything the game itself wrote.
   /// SetNull (not Cascade) so a deleted sender does not erase the recipient's
   /// inbox — the message survives as "שחקן שנמחק".
   senderEmpireId String?
-  kind      MessageKind @default(SYSTEM)
-  title     String
-  body      String
+  kind           MessageKind @default(SYSTEM)
+  title          String
+  body           String
   /// Optional in-game link, e.g. the full battle report page.
-  href      String?
-  readAt    DateTime?
-  createdAt DateTime    @default(now())
+  href           String?
+  readAt         DateTime?
+  createdAt      DateTime    @default(now())
 
   empire Empire  @relation("MessageInbox", fields: [empireId], references: [id], onDelete: Cascade)
   sender Empire? @relation("MessageSender", fields: [senderEmpireId], references: [id], onDelete: SetNull)
@@ -590,27 +717,27 @@ enum HeroItemSlot {
 }
 
 model Hero {
-  id             String    @id @default(cuid())
-  empireId       String    @unique
-  heroClass      HeroClass @default(WARLORD)
-  level          Int      @default(1)
-  xp             Int      @default(0)
-  unspentPoints  Int      @default(0)
-  attackPoints   Int      @default(0)
-  defensePoints  Int      @default(0)
-  resourcePoints Int      @default(0)
-  resets         Int      @default(0)
+  id                  String    @id @default(cuid())
+  empireId            String    @unique
+  heroClass           HeroClass @default(WARLORD)
+  level               Int       @default(1)
+  xp                  Int       @default(0)
+  unspentPoints       Int       @default(0)
+  attackPoints        Int       @default(0)
+  defensePoints       Int       @default(0)
+  resourcePoints      Int       @default(0)
+  resets              Int       @default(0)
   /// Hero health, 0–100. Every attack that breaches this empire's defence
   /// wounds the hero (see HERO_DAMAGE_PER_LOST_DEFENSE); at 0 he is dead.
-  health         Int      @default(100)
+  health              Int       @default(100)
   /// When the hero fell (health hit 0), else null. He rises by himself an hour
   /// later — applied lazily by applyPendingUpdates — or instantly for diamonds.
   /// While dead he grants **no** bonuses at all (see heroBonuses).
-  diedAt         DateTime?
+  diedAt              DateTime?
   /// The season in which the diamond points-reset was last used (once/season).
   pointsResetSeasonId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   empire Empire     @relation(fields: [empireId], references: [id], onDelete: Cascade)
   items  HeroItem[]
@@ -630,7 +757,54 @@ model HeroItem {
   @@index([heroId])
 }
 
-/* ------------------------------ potions ------------------------------ */
+/// The expedition the hero is currently away on, or the finished one waiting to
+/// be collected. Catalog and every balance formula: src/lib/game/heroQuests.ts.
+///
+/// **At most one row per empire, and that is the feature's core rule** — there
+/// is one hero, so he can only be in one place. The unique index on `empireId`
+/// is what enforces it: `startHeroQuest` also takes the empire row lock before
+/// it checks, but the index is the backstop that holds even if a future caller
+/// forgets to.
+///
+/// The payout is snapshotted at *departure* rather than derived on collect, so
+/// the board can promise an exact haul before the player commits turns to it,
+/// and a city founded (or lost) mid-quest cannot change the deal. The loot roll
+/// is the one thing left to collect time — it needs the hero's level *then*.
+///
+/// The row IS the claim: collecting deletes it under a guard on `endsAt`, so a
+/// double-click cannot pay twice.
+model HeroQuest {
+  id       String @id @default(cuid())
+  empireId String @unique
+
+  /// Quest tier (1..MAX_CITIES) — decides duration, turn cost, XP and loot odds.
+  tier Int
+
+  startedAt  DateTime @default(now())
+  endsAt     DateTime
+  turnsSpent Int
+
+  /// The haul, rolled and frozen at departure — never sent to the client, so
+  /// the board cannot leak what is coming (see lib/game/heroQuests.ts).
+  /// `fortune` is the luck band that was drawn; the homecoming line names it.
+  fortune        String @default("plain")
+  rewardGold     Float  @default(0)
+  rewardWood     Float  @default(0)
+  rewardIron     Float  @default(0)
+  rewardStone    Float  @default(0)
+  rewardCitizens Int    @default(0)
+  rewardSlaves   Int    @default(0)
+  rewardXp       Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+}
+
+/**
+ * ------------------------------ potions ------------------------------
+ */
 
 /// The four brews looted from won battles. Each is a *timed* effect on the
 /// whole empire, not an item: drinking one starts (or extends) a window, and
@@ -841,6 +1015,15 @@ model SpyReport {
   attackerIntel      Float?
   /// Defender's effective intelligence power at resolution (deterministic spy).
   defenderIntel      Float?
+  /// The FULL intelligence dossier, frozen at the moment the spy got out:
+  /// vaults, bank, arsenal, buildings, upgrades, hero, and every timed spell
+  /// with its expiry. Shape and versioning: src/lib/game/spyIntel.ts.
+  ///
+  /// A snapshot rather than a live read on purpose — a report is what the spy
+  /// saw, so re-opening it a day later must not silently show today's numbers.
+  /// Null on a failed mission, and on every report written before this column
+  /// existed (the result page falls back to the `revealed*` columns).
+  revealed           Json?
   turnsSpent         Int      @default(5)
   createdAt          DateTime @default(now())
 
@@ -855,27 +1038,27 @@ model SpyReport {
 }
 
 model BattleReport {
-  id                   String   @id @default(cuid())
-  attackerEmpireId     String
-  defenderEmpireId     String
-  attackerPower        Float
-  defenderPower        Float
+  id                    String   @id @default(cuid())
+  attackerEmpireId      String
+  defenderEmpireId      String
+  attackerPower         Float
+  defenderPower         Float
   attackerSoldiersPower Float?
   attackerWeaponsPower  Float?
   defenderSoldiersPower Float?
   defenderWeaponsPower  Float?
-  winnerEmpireId       String
-  attackerSoldiersLost Int
-  defenderSoldiersLost Int
+  winnerEmpireId        String
+  attackerSoldiersLost  Int
+  defenderSoldiersLost  Int
   // Defender soldiers captured by a winning attacker — they join the
   // attacker's free mine-slave pool.
-  enslavedSoldiers     Int      @default(0)
-  stolenGold           Float
-  stolenWood           Float
-  stolenIron           Float
-  stolenStone          Float
-  turnsSpent           Int      @default(10)
-  createdAt            DateTime @default(now())
+  enslavedSoldiers      Int      @default(0)
+  stolenGold            Float
+  stolenWood            Float
+  stolenIron            Float
+  stolenStone           Float
+  turnsSpent            Int      @default(10)
+  createdAt             DateTime @default(now())
 
   // Hero: battle XP awarded to each side and the % power bonus each hero added.
   attackerHeroBonusPct Float?
@@ -885,8 +1068,8 @@ model BattleReport {
   // for the attacker, defense buff for the defender).
   attackerGuildBonusPct Float?
   defenderGuildBonusPct Float?
-  attackerHeroXp       Int      @default(0)
-  defenderHeroXp       Int      @default(0)
+  attackerHeroXp        Int    @default(0)
+  defenderHeroXp        Int    @default(0)
 
   // Hero item captured by the attacker on a win (denormalized snapshot).
   droppedItemSlot   HeroItemSlot?
@@ -894,10 +1077,15 @@ model BattleReport {
   droppedItemRarity HeroRarity?
 
   // A winning attack can also award a wheel-of-fortune spin (wheel-luck upgrade).
-  wonWheelSpin      Boolean  @default(false)
+  wonWheelSpin Boolean @default(false)
 
   // Potion looted by the attacker on a win (denormalized snapshot, like the item).
   droppedPotionKind PotionKind?
+
+  // Diamond raid shields the defender held when the blow landed — they are why
+  // a won battle can still end with an empty haul.
+  defenderResourceShielded Boolean @default(false)
+  defenderSoldierShielded  Boolean @default(false)
 
   attackerEmpire Empire @relation("BattleAttacker", fields: [attackerEmpireId], references: [id], onDelete: Cascade)
   defenderEmpire Empire @relation("BattleDefender", fields: [defenderEmpireId], references: [id], onDelete: Cascade)

@@ -15,7 +15,8 @@ import {
   SLOT_META,
   canEquipItem,
   itemDisplayName,
-  itemBonusValue,
+  itemPrimaryBonus,
+  slotPrimaryStat,
 } from "@/lib/game/hero";
 import {
   itemDetails,
@@ -129,7 +130,7 @@ export function HeroPaperdoll({
       {PAPERDOLL_SLOTS.map((slot) => {
         const a = SLOT_ANCHORS[slot];
         const meta = SLOT_META[slot];
-        const statMeta = HERO_STAT_META[meta.stat];
+        const statMeta = HERO_STAT_META[slotPrimaryStat(slot)];
         const item = bySlot.get(slot);
         const waiting = bag.filter((i) => i.slot === slot).length;
 
@@ -303,7 +304,7 @@ function SlotPicker({
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<ActionState>({});
   const meta = SLOT_META[slot];
-  const statMeta = HERO_STAT_META[meta.stat];
+  const statMeta = HERO_STAT_META[slotPrimaryStat(slot)];
 
   // Same slot+level items look and perform identically — show one tile per level.
   const stackMap = new Map<string, PickStack>();
@@ -366,7 +367,7 @@ function SlotPicker({
       ) : (
         <div className="grid max-h-[50vh] grid-cols-3 gap-3 overflow-y-auto pr-0.5">
           {stacks.map((stack) => {
-            const bonus = itemBonusValue(slot, stack.level);
+            const bonus = itemPrimaryBonus(slot, stack.level);
             const allowed = canEquipItem(heroLevel, stack.level);
             return (
               <button

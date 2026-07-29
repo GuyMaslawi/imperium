@@ -313,22 +313,35 @@ export function allowedDepositsPerDailyPeriod(level: number): number {
   return Math.min(BANK_DEPOSIT_MAX, 1 + level);
 }
 
-/** Top level of the interest upgrade — each level adds 1%, capped at 15%. */
+/** Top level of the interest upgrade — 15 levels, 0.2% each, capped at 3%. */
 export const BANK_DAILY_INTEREST_MAX_LEVEL = 15;
 
+/** Interest added per upgrade level, and the ceiling the ladder reaches. */
+export const BANK_INTEREST_PER_LEVEL = 0.002;
+export const BANK_INTEREST_MAX_RATE = 0.03;
+
 /**
- * Bank interest per daily update: 1% per upgrade level, capped at 15% (reached at
- * level 15). The upgrade is also blocked once it hits `BANK_DAILY_INTEREST_MAX_LEVEL`,
- * so the rate never plateaus with wasted upgrades.
+ * Bank interest per daily update: 0.2% per upgrade level, capped at 3% (reached
+ * at level 15). The upgrade is also blocked once it hits
+ * `BANK_DAILY_INTEREST_MAX_LEVEL`, so the rate never plateaus with wasted upgrades.
+ *
+ * The rate used to be 1%/level capped at **15% per daily update**, and there are
+ * two daily updates a day — so the real figure was 32.25% a day, compounding,
+ * with no ceiling on the principal. Over a 60-day season that is 1.3225^60 ≈
+ * 8×10^6, and bank gold is the one pool `attackEmpire` cannot plunder: the
+ * intended safe-haven mechanic was strictly better than playing the game. At 3%
+ * the same season compounds to ~33×, which still rewards banking heavily without
+ * making every other gold source irrelevant.
+ *
+ * The ladder keeps all 15 levels rather than being truncated to 3 — the levels
+ * are a gold sink players have already paid into, so the per-level step moved
+ * instead of the level count. Retuning is this one constant.
  */
 export function bankInterestRate(level: number): number {
-  return Math.min(0.15, level * 0.01);
+  return Math.min(BANK_INTEREST_MAX_RATE, level * BANK_INTEREST_PER_LEVEL);
 }
 
 /* ------------------------------ cities ------------------------------ */
-
-/** Citizen capacity contributed by each city. */
-export const CITIZENS_PER_CITY = 100;
 
 /** Highest number of cities a single empire can hold. */
 export const MAX_CITIES = 10;
@@ -343,15 +356,6 @@ export const CITY_HERO_LEVEL_PER_TIER = 10;
  */
 export function cityHeroLevelRequired(cities: number): number {
   return cities * CITY_HERO_LEVEL_PER_TIER;
-}
-
-/**
- * Total citizen capacity for an empire holding `cities` cities. The first city
- * holds 100, the second raises the ceiling to 200, and so on up to 1,000 at ten
- * cities. The daily citizen intake is clamped to this ceiling.
- */
-export function citizenCapacity(cities: number): number {
-  return cities * CITIZENS_PER_CITY;
 }
 
 /**
@@ -445,7 +449,10 @@ export const EMPIRE_UPGRADE_META: Record<
     label: "ריבית בנק",
     icon: "gold",
     description: "מגדיל את הריבית שמתקבלת בבנק בכל עדכון יומי.",
-    effectLabel: (level) => `${Math.round(bankInterestRate(level) * 100)}% ריבית בכל עדכון יומי`,
+    // One decimal, not Math.round: the per-level step is 0.2%, so rounding to a
+    // whole percent showed the first two levels as a flat "0% ריבית".
+    effectLabel: (level) =>
+      `${(bankInterestRate(level) * 100).toFixed(1)}% ריבית בכל עדכון יומי`,
     maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
   },
   TURNS_PER_REGULAR_UPDATE: {

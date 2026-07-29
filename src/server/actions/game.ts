@@ -12,12 +12,14 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { awardSeasonPassXp } from "@/server/seasonPassXp";
+import { captureSpyIntel } from "@/server/spyIntelCapture";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
 import { secureRandom } from "@/lib/game/random";
 import {
   BUILDING_META,
   cityHeroLevelRequired,
   EMPIRE_UPGRADE_META,
+  EMPIRE_UPGRADE_TYPES,
   empireUpgradeMaxLevel,
   MAX_CITIES,
   MINE_MAX_LEVEL,
@@ -40,7 +42,7 @@ import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
-import { getShopDiscountPct } from "@/lib/game/diamondEffects";
+import { getActiveShields, getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { getActivePotionKinds, grantPotion } from "@/lib/game/potionEffects";
 import { POTION_DOUBLE, rollPotionDrop } from "@/lib/game/potions";
@@ -67,6 +69,7 @@ import {
   weaponTierUnlockCost,
   weaponsPower,
 } from "@/lib/game/weapons";
+import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
 
 export interface ActionState {
   error?: string;
@@ -695,6 +698,15 @@ export async function spyOnEmpire(
       );
       const success = attackerIntel > defenderIntel;
 
+      // A spy who gets out brings back the whole city, not a headline: coffers,
+      // vaults, the bank ledger, the arsenal, the mines, the upgrades, the hero
+      // and every timed spell with the hour it runs out. Captured as a frozen
+      // snapshot on the report (see lib/game/spyIntel.ts) so re-opening the
+      // report tomorrow shows what the spy saw, not today's live numbers.
+      const revealed = success
+        ? await captureSpyIntel(tx, defender, now, defenderIntel)
+        : undefined;
+
       const report = await tx.spyReport.create({
         data: {
           attackerEmpireId: empireId,
@@ -706,6 +718,8 @@ export async function spyOnEmpire(
           turnsSpent: SPY_TURN_COST,
           ...(success
             ? {
+                // The flat columns stay the report's index: the reports table
+                // and the profile card read them without parsing the dossier.
                 revealedGold: Math.floor(defender.gold),
                 revealedWood: Math.floor(defender.wood),
                 revealedIron: Math.floor(defender.iron),
@@ -713,6 +727,7 @@ export async function spyOnEmpire(
                 revealedSoldiers: defender.army?.soldiers ?? 0,
                 revealedSpies: defender.army?.spies ?? 0,
                 revealedMineSlaves: defender.army?.mineSlaves ?? 0,
+                revealed,
               }
             : {}),
         },
@@ -818,6 +833,14 @@ export async function attackEmpire(
       const attackerPotions = await getActivePotionKinds(empireId, tx, now);
       const defenderPotions = await getActivePotionKinds(targetEmpireId, tx, now);
 
+      // Paid raid shields, read under the same locks for the same reason. They
+      // don't stop the raid — the battle resolves, the hero takes his blow and
+      // the attacker still earns XP and loot rolls — they only put the
+      // defender's property out of reach: no plunder, no enslavement.
+      const defenderShields = await getActiveShields(targetEmpireId, tx, now);
+      const resourceShielded = defenderShields.resources !== null;
+      const soldierShielded = defenderShields.soldiers !== null;
+
       const attackerArmy = attacker.army;
       const defenderArmy = defender.army;
 
@@ -887,8 +910,10 @@ export async function attackEmpire(
       // soldiers captures a share of them. The haul scales with the
       // defender's army size and joins the attacker's free mine-slave pool
       // (not citizens).
+      // …unless מגן חיילים is up, in which case not one of them changes hands.
       const enslavedSoldiers =
         attackerWins &&
+        !soldierShielded &&
         defenderArmy &&
         defenderArmy.soldiers >= ENSLAVE_MIN_SOLDIERS
           ? Math.min(
@@ -904,14 +929,16 @@ export async function attackEmpire(
       const plunderRate =
         PLUNDER_RATE *
         (attackerPotions.has("DOUBLE_RESOURCES") ? POTION_DOUBLE : 1);
-      const stolen = attackerWins
-        ? {
-            gold: Math.floor(defender.gold * plunderRate),
-            wood: Math.floor(defender.wood * plunderRate),
-            iron: Math.floor(defender.iron * plunderRate),
-            stone: Math.floor(defender.stone * plunderRate),
-          }
-        : { gold: 0, wood: 0, iron: 0, stone: 0 };
+      // מגן משאבים zeroes the haul outright — the raid is won, the vaults hold.
+      const stolen =
+        attackerWins && !resourceShielded
+          ? {
+              gold: Math.floor(defender.gold * plunderRate),
+              wood: Math.floor(defender.wood * plunderRate),
+              iron: Math.floor(defender.iron * plunderRate),
+              stone: Math.floor(defender.stone * plunderRate),
+            }
+          : { gold: 0, wood: 0, iron: 0, stone: 0 };
 
       // Only the enslaved change hands — no casualties to write on either side.
       if (enslavedSoldiers > 0) {
@@ -926,7 +953,9 @@ export async function attackEmpire(
         });
       }
 
-      if (attackerWins) {
+      // A shielded defender skips the whole transfer — with every figure at
+      // zero there is nothing to clamp, debit or credit.
+      if (attackerWins && !resourceShielded) {
         // Re-read the defender's live balances inside the transaction and clamp
         // the plunder to what is actually available, so overlapping attacks on
         // the same defender can never drive it negative or mint resources for
@@ -1167,6 +1196,10 @@ export async function attackEmpire(
           attackerHeroXp,
           defenderHeroXp,
           wonWheelSpin,
+          // Recorded on a win only: on a repelled raid nothing was at stake, so
+          // flagging the shields would credit them with a save they never made.
+          defenderResourceShielded: attackerWins && resourceShielded,
+          defenderSoldierShielded: attackerWins && soldierShielded,
           ...(droppedItem
             ? {
                 droppedItemSlot: droppedItem.slot,
@@ -1188,10 +1221,16 @@ export async function attackEmpire(
             : `🛡️ הדפת התקפה של ${attacker.name}!`,
           body: attackerWins
             ? `${
-                enslavedSoldiers > 0
-                  ? `${enslavedSoldiers} חיילים נלקחו לעבדות ו`
-                  : ""
-              }נבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן. צבאך לא ספג אבדות.${
+                soldierShielded
+                  ? "🛡️ מגן החיילים שלך מנע שעבוד — אף חייל לא נלקח. "
+                  : enslavedSoldiers > 0
+                    ? `${enslavedSoldiers} חיילים נלקחו לעבדות. `
+                    : ""
+              }${
+                resourceShielded
+                  ? "🛡️ מגן המשאבים שלך חסם את הביזה — לא נלקח ממך ולו משאב אחד."
+                  : `נבזזו ממך ${stolen.gold} זהב, ${stolen.wood} עץ, ${stolen.iron} ברזל ו־${stolen.stone} אבן.`
+              } צבאך לא ספג אבדות.${
                 defenderHeroShielded
                   ? ` 🧪 שיקוי החסינות הגן על הגיבור שלך — הוא יצא מהקרב ללא פגע.`
                   : defenderHeroFell
@@ -1503,13 +1542,16 @@ export async function withdrawAllFromStorage(
 
 /* ------------------------------ empire upgrades ------------------------------ */
 
-const empireUpgradeTypeSchema = z.enum([
-  "CITIZEN_GROWTH",
-  "INTELLIGENCE",
-  "BANK_DEPOSIT_COUNT",
-  "BANK_DAILY_INTEREST",
-  "TURNS_PER_REGULAR_UPDATE",
-]);
+// Derived from EMPIRE_UPGRADE_TYPES rather than hand-listed.
+//
+// The hand-written list silently went stale when WHEEL_LUCK was added: the
+// upgrades page renders one card per EMPIRE_UPGRADE_TYPES entry, so the card was
+// there, priced and clickable — and every click died on "סוג שדרוג לא תקין"
+// because the schema had never heard of the type. Deriving both from the same
+// constant means a new upgrade is buyable the moment it is defined.
+const empireUpgradeTypeSchema = z.enum(
+  EMPIRE_UPGRADE_TYPES as [ActiveEmpireUpgradeType, ...ActiveEmpireUpgradeType[]]
+);
 
 export async function upgradeEmpireUpgrade(
   _prev: ActionState,
@@ -1908,13 +1950,38 @@ export async function unlockNextWeaponTier(
         };
       }
       // Advance every category together — the unlock is cross-cutting.
+      //
+      // Guarded and monotonic. The old unconditional `update: { unlockedTier:
+      // targetTier }` was an absolute write off a snapshot, which broke two ways
+      // at once: two concurrent unlocks both passed the (guarded) payment, both
+      // wrote the same tier, and the player paid twice for one tier; and a slow
+      // request that had read an older tier clobbered a newer one on commit,
+      // *removing* a tier that had already been bought. `lt: targetTier` fixes
+      // both — a racer that finds nothing below the target matches zero rows.
+      let advanced = 0;
       for (const cat of WEAPON_CATEGORIES) {
-        await tx.empireWeaponUnlock.upsert({
-          where: { empireId_category: { empireId, category: cat } },
-          create: { empireId, category: cat, unlockedTier: targetTier },
-          update: { unlockedTier: targetTier },
+        const bumped = await tx.empireWeaponUnlock.updateMany({
+          where: { empireId, category: cat, unlockedTier: { lt: targetTier } },
+          data: { unlockedTier: targetTier },
         });
+        advanced += bumped.count;
       }
+      // Empires predating the weapons system carry no unlock rows at all — seed
+      // the missing ones. `skipDuplicates` (ON CONFLICT DO NOTHING) rather than
+      // create: a failed INSERT aborts the whole transaction in Postgres, and
+      // catching it in JS does not recover the connection.
+      const seeded = await tx.empireWeaponUnlock.createMany({
+        data: WEAPON_CATEGORIES.map((category) => ({
+          empireId,
+          category,
+          unlockedTier: targetTier,
+        })),
+        skipDuplicates: true,
+      });
+      advanced += seeded.count;
+      // Nothing moved: a concurrent unlock already bought this tier. Throw so
+      // the payment above rolls back rather than charging twice for one tier.
+      if (advanced === 0) throw new Error("weapon tier unlock conflict");
 
       return {
         success: `נפתחה רמה ${targetTier} לכל הנשקים — התקפה, הגנה וריגול!`,

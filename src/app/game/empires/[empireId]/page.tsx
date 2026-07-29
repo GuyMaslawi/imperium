@@ -14,6 +14,9 @@ import {
 import { weaponsPower } from "@/lib/game/weapons";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { RankActions } from "@/components/game/RankActions";
+import { ShieldBadges } from "@/components/game/ShieldBadges";
+import { getActiveShields } from "@/lib/game/diamondEffects";
+import { SHIELDS } from "@/lib/game/diamondShop";
 import { ItemTile } from "@/components/game/ItemTile";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
@@ -99,6 +102,11 @@ export default async function EmpireProfilePage({
 
   const guildName = empire.guildMembership?.guild.name ?? null;
 
+  // Raid shields are public knowledge — no spy report needed. Knowing there is
+  // nothing to take is precisely what should stop you wasting turns here.
+  const shields = await getActiveShields(empire.id);
+  const activeShields = SHIELDS.filter((s) => shields[s.key] !== null);
+
   const publicStats = [
     { label: "רמה", value: formatNumber(empire.level), tone: "text-gold-bright" },
     { label: "שליט", value: empire.user.name, tone: "text-zinc-100" },
@@ -134,6 +142,19 @@ export default async function EmpireProfilePage({
       {/* -------- command bar: attack actions live on top, ready to fire -------- */}
       {canEngage && (
         <div className="panel-gold rounded-xl p-4">
+          {/* Spelled out above the buttons, not just as a pill: turns spent on a
+              shielded target buy XP and loot rolls, but never spoils. */}
+          {activeShields.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+              <ShieldBadges shields={shields} />
+              <span>
+                לאימפריה הזו {activeShields.map((s) => s.label).join(" ו")} — ניצחון
+                עליה לא יניב{" "}
+                {activeShields.map((s) => (s.key === "resources" ? "שלל" : "שבויים")).join(" או ")}
+                . התקיפה עצמה עדיין אפשרית (ניסיון, חפצים ושיקויים).
+              </span>
+            </div>
+          )}
           <div className="flex flex-wrap items-center justify-between gap-4">
             <RankActions
               targetEmpireId={empire.id}
@@ -231,6 +252,7 @@ export default async function EmpireProfilePage({
                     <Icon name="guild" size={14} /> {guildName}
                   </span>
                 )}
+                <ShieldBadges shields={shields} size="md" />
               </div>
             </div>
           </div>
@@ -371,6 +393,16 @@ export default async function EmpireProfilePage({
                     <Icon name="shield" size={14} className="inline-block align-middle" /> {formatNumber(weaponsPower(empire.weapons, "DEFENSE"))}
                   </span>
                 </div>
+
+                {/* This card is the headline only. The mission also brought back
+                    the vaults, the bank, the arsenal, the hero and every timed
+                    spell with its expiry — all of it on the report itself. */}
+                <Link
+                  href={`/game/spy/${spyReport.id}`}
+                  className="mt-4 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
+                >
+                  <Icon name="spy" size={15} className="inline-block align-middle" /> התיק המלא ←
+                </Link>
               </>
             ) : (
               <p className="text-sm text-zinc-400">

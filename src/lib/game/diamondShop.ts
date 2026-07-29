@@ -96,6 +96,79 @@ export const HERO_POINTS_RESET_COST = 100;
  */
 export const HERO_REVIVE_COST = 500;
 
+/* ------------------------------ raid shields ------------------------------ */
+
+/**
+ * The two paid raid shields. Neither stops an attack from landing — the battle
+ * still resolves, the hero still takes the blow and the attacker still earns XP
+ * and loot rolls. What a shield protects is the *property*: the resource shield
+ * zeroes the plunder, the soldier shield blocks enslavement. That split is
+ * deliberate — a shield that made you unattackable would let a paying player
+ * farm the city from behind a wall, which is exactly what the free new-player
+ * protection (dropped the moment you attack) is careful not to allow.
+ */
+export type ShieldKey = "resources" | "soldiers";
+
+export interface ShieldDuration {
+  hours: number;
+  cost: number; // diamonds
+}
+
+export interface ShieldMeta {
+  key: ShieldKey;
+  kind: DiamondEffectKind;
+  label: string;
+  /** Short line for the shop card. */
+  desc: string;
+  /** What the badge says wherever the shield is shown to other players. */
+  badge: string;
+  durations: ShieldDuration[];
+}
+
+export const SHIELDS: ShieldMeta[] = [
+  {
+    key: "resources",
+    kind: "SHIELD_RESOURCES",
+    label: "מגן משאבים",
+    desc: "תוקף שמנצח אותך לא לוקח ולו משאב אחד — הזהב, העץ, הברזל והאבן שלך נשארים אצלך.",
+    badge: "מגן משאבים פעיל — לא ניתן לבזוז ממנו משאבים",
+    durations: [
+      { hours: 24, cost: 360 },
+      { hours: 48, cost: 600 },
+    ],
+  },
+  {
+    key: "soldiers",
+    kind: "SHIELD_SOLDIERS",
+    label: "מגן חיילים",
+    desc: "תוקף שמנצח אותך לא משעבד אף חייל — הצבא שלך יוצא מהקרב בגודלו המלא.",
+    badge: "מגן חיילים פעיל — לא ניתן לשעבד את חייליו",
+    durations: [
+      { hours: 24, cost: 500 },
+      { hours: 48, cost: 840 },
+    ],
+  },
+];
+
+export const SHIELD_KINDS: DiamondEffectKind[] = SHIELDS.map((s) => s.kind);
+
+export function shieldMeta(key: ShieldKey): ShieldMeta {
+  return SHIELDS.find((s) => s.key === key)!;
+}
+
+/**
+ * A shield must run out before it can be bought again — no renewing, and no
+ * extending, while one is up. On top of that, the shield stays unavailable for
+ * these ten minutes after it expires.
+ *
+ * That gap is the whole point: back-to-back shields would make a paying player
+ * permanently unraidable, so every shield is followed by a guaranteed window in
+ * which the city can hit back. The cooldown lives in the effect row's `readyAt`,
+ * set to `activeUntil + this` at purchase.
+ */
+export const SHIELD_RENEW_COOLDOWN_MINUTES = 10;
+export const SHIELD_RENEW_COOLDOWN_MS = SHIELD_RENEW_COOLDOWN_MINUTES * 60_000;
+
 /* ------------------------------ bank interest spell ------------------------------ */
 
 export const BANK_INTEREST_SPELL_COST = 60;

@@ -5,8 +5,8 @@ import {
   GiCheckedShield, GiCastle, GiAnvil, GiMineWagon, GiBank, GiChest,
   GiUpgrade, GiFlyingFlag, GiBowman, GiTrophy, GiRibbonMedal,
   GiScrollUnfurled, GiEnvelope, GiGears, GiExitDoor, GiCrown,
-  GiRollingDices, GiTargetPrize, GiShoppingBag, GiPresent, GiSparkles,
-  GiHeartInside, GiHealthPotion,
+  GiRollingDices, GiShoppingBag, GiPresent, GiSparkles,
+  GiHeartInside, GiHealthPotion, GiCompass,
 } from "react-icons/gi";
 
 /**
@@ -22,7 +22,27 @@ export type IconName =
   | "army" | "spy" | "attack" | "shield" | "base" | "factory" | "mine"
   | "bank" | "storage" | "upgrades" | "guild" | "hero" | "rankings"
   | "achievements" | "reports" | "messages" | "settings" | "logout"
-  | "crown" | "dice" | "wheel" | "shop" | "gift" | "spark" | "heart" | "potion";
+  | "crown" | "dice" | "wheel" | "shop" | "gift" | "spark" | "heart" | "potion"
+  | "quest";
+
+/**
+ * The one glyph game-icons.net doesn't carry: a carnival prize wheel — a
+ * segmented disc under a pointer. Hand-drawn to match the silhouette weight of
+ * the react-icons set (solid shapes, `currentColor`, 24×24 box) so it sits
+ * beside them without looking imported. Eight alternating wedges leave a gap at
+ * twelve o'clock for the pointer to bite into, which is what makes it read as a
+ * wheel rather than a pinwheel at nav sizes.
+ */
+function FortuneWheelGlyph({ children, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
+      {children}
+      <path d="M12 13.4L12.45 6.01A7.4 7.4 0 0 1 16.9 7.86ZM12 13.4L19.39 13.85A7.4 7.4 0 0 1 17.54 18.3ZM12 13.4L11.55 20.79A7.4 7.4 0 0 1 7.1 18.94ZM12 13.4L4.61 12.95A7.4 7.4 0 0 1 6.46 8.5Z" />
+      <circle cx="12" cy="13.4" r="9.2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 6.2 9.2 0.6h5.6z" />
+    </svg>
+  );
+}
 
 const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   gold: GiTwoCoins,
@@ -52,12 +72,13 @@ const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   logout: GiExitDoor,
   crown: GiCrown,
   dice: GiRollingDices,
-  wheel: GiTargetPrize,
+  wheel: FortuneWheelGlyph,
   shop: GiShoppingBag,
   gift: GiPresent,
   spark: GiSparkles,
   heart: GiHeartInside,
   potion: GiHealthPotion,
+  quest: GiCompass,
 };
 
 export function Icon({

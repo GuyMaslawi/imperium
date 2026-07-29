@@ -58,6 +58,16 @@ export interface GameTunables {
     rewardMultiplier: number;
     victoriesPerCycle: number;
   };
+  /**
+   * Hero expeditions. The durations, turn costs and loot odds live in
+   * game/heroQuests.ts; this is the global payout scalar plus the kill switch,
+   * so the board can be softened — or closed — without a deploy.
+   */
+  heroQuest: {
+    rewardMultiplier: number;
+    /** 0 closes the board entirely; 1 opens it. */
+    enabled: number;
+  };
   /** Diamond store (real-money purchase page) tunables. */
   diamondStore: {
     /** Percent off every diamond package price (0 = full price). */
@@ -100,6 +110,10 @@ export const DEFAULT_TUNABLES: GameTunables = {
     powerMultiplier: 1,
     rewardMultiplier: 1,
     victoriesPerCycle: BOSS_VICTORIES_PER_CYCLE,
+  },
+  heroQuest: {
+    rewardMultiplier: 1,
+    enabled: 1,
   },
   diamondStore: {
     purchaseDiscountPct: 0,
@@ -166,6 +180,14 @@ export const TUNABLE_META: Record<
       victoriesPerCycle: { label: "ניצחונות מותרים בין עדכון יומי לעדכון יומי" },
     },
   },
+  heroQuest: {
+    label: "מסעות הגיבור",
+    icon: "🧭",
+    fields: {
+      rewardMultiplier: { label: "מכפיל שלל המסעות (1 = ברירת מחדל)", step: 0.05 },
+      enabled: { label: "לוח המסעות פתוח (1 = כן, 0 = סגור)" },
+    },
+  },
   diamondStore: {
     label: "חנות יהלומים — רכישה",
     // 🛒 (the storefront), not 💎: a gem here would be a second, emoji drawing
@@ -229,6 +251,12 @@ const TUNABLE_BOUNDS: {
     // 0 closes the boss entirely, which is a legitimate kill switch.
     victoriesPerCycle: [0, 1e3],
   },
+  heroQuest: {
+    rewardMultiplier: [0, 1e3],
+    // Anything but 0 opens the board — the read path tests `>= 1`, so a stray
+    // 0.5 closes it rather than half-opening something that has no half state.
+    enabled: [0, 1],
+  },
   diamondStore: {
     purchaseDiscountPct: [0, 100],
   },
@@ -260,6 +288,11 @@ export function mergeTunables(overlay: unknown): GameTunables {
     battle: mergeGroup(DEFAULT_TUNABLES.battle, o.battle, TUNABLE_BOUNDS.battle),
     economy: mergeGroup(DEFAULT_TUNABLES.economy, o.economy, TUNABLE_BOUNDS.economy),
     boss: mergeGroup(DEFAULT_TUNABLES.boss, o.boss, TUNABLE_BOUNDS.boss),
+    heroQuest: mergeGroup(
+      DEFAULT_TUNABLES.heroQuest,
+      o.heroQuest,
+      TUNABLE_BOUNDS.heroQuest
+    ),
     diamondStore: mergeGroup(
       DEFAULT_TUNABLES.diamondStore,
       o.diamondStore,

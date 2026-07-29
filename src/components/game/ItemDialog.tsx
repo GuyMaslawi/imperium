@@ -20,9 +20,10 @@ import {
   SLOT_META,
   canEquipItem,
   discardWheelSpinChance,
-  itemBonusValue,
+  itemBonusLines,
+  itemPrimaryBonus,
+  slotPrimaryStat,
   itemDisplayName,
-  itemResourceBreakdown,
   itemUpgradeCost,
   nextTierLevel,
   tierForLevel,
@@ -61,11 +62,11 @@ export function ItemDialog({
   const [level, setLevel] = useState(item.level);
 
   const slotMeta = SLOT_META[item.slot];
-  const statMeta = HERO_STAT_META[slotMeta.stat];
-  const resourceLines = itemResourceBreakdown(item.slot, level);
+  const statMeta = HERO_STAT_META[slotPrimaryStat(item.slot)];
+  const bonusLines = itemBonusLines(item.slot, level);
   const rarity = tierForLevel(level);
   const rarityMeta = RARITY_META[rarity];
-  const bonus = itemBonusValue(item.slot, level);
+  const bonus = itemPrimaryBonus(item.slot, level);
   const unit = bonus.flat ? "" : "%";
 
   const upgradeToLevel = nextTierLevel(level);
@@ -78,7 +79,7 @@ export function ItemDialog({
       : forgeDiscountedCost(fullUpgradeCost, forgeDiscount);
   const nextTier = upgradeToLevel != null ? tierForLevel(upgradeToLevel) : null;
   const nextBonus =
-    upgradeToLevel != null ? itemBonusValue(item.slot, upgradeToLevel).value : null;
+    upgradeToLevel != null ? itemPrimaryBonus(item.slot, upgradeToLevel).value : null;
   const canAfford = upgradeCost != null && gold >= upgradeCost;
   // Can't upgrade an item past the hero's own level.
   const meetsUpgradeLevel = upgradeToLevel != null && heroLevel >= upgradeToLevel;
@@ -159,37 +160,44 @@ export function ItemDialog({
 
       <div className="rule-gold my-4" />
 
-      {/* stats */}
+      {/* stats — the headline first, then everything else the piece carries */}
       <div className="space-y-2 text-sm">
-        {resourceLines.length > 0 ? (
-          <div className="space-y-1">
-            {resourceLines.map((line) => (
-              <div key={line.label} className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1.5 text-zinc-400">
-                  <Icon
-                    name={RESOURCE_ICON[line.resource]}
-                    size={14}
-                    className={RESOURCE_ICON_COLOR[line.resource]}
-                  />
-                  {line.label}
-                </span>
-                <span className="nums font-black text-emerald-400" dir="ltr">
-                  +{formatBonus(line.value)}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <span className="inline-flex items-center gap-1.5 text-zinc-400">
-              <Icon name={statMeta.icon} size={14} />
-              {statMeta.label}
-            </span>
-            <span className="nums font-black text-emerald-400" dir="ltr">
-              +{formatBonus(bonus.value)}{unit}
-            </span>
-          </div>
-        )}
+        <div className="space-y-1">
+          {bonusLines.map((line, i) => (
+            <div
+              key={`${line.label}-${i}`}
+              className={`flex items-center justify-between ${
+                line.primary ? "" : "text-xs"
+              }`}
+            >
+              <span
+                className={`inline-flex items-center gap-1.5 ${
+                  line.primary ? "text-zinc-300" : "text-zinc-500"
+                }`}
+              >
+                <Icon
+                  name={
+                    line.resource
+                      ? RESOURCE_ICON[line.resource]
+                      : HERO_STAT_META[line.stat].icon
+                  }
+                  size={line.primary ? 14 : 13}
+                  className={line.resource ? RESOURCE_ICON_COLOR[line.resource] : ""}
+                />
+                {line.label}
+              </span>
+              <span
+                className={`nums font-black ${
+                  line.primary ? "text-emerald-400" : "text-emerald-500/80"
+                }`}
+                dir="ltr"
+              >
+                +{formatBonus(line.value)}
+                {line.flat ? "" : "%"}
+              </span>
+            </div>
+          ))}
+        </div>
         <p className="text-[11px] leading-relaxed text-zinc-500">
           {statMeta.description}
         </p>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { nextDailyUpdate, nextRegularUpdate, formatGameTime } from "@/lib/game/time";
+import { liveWarStart } from "@/lib/game/guildWar";
 import {
   HERO_CLASS_META,
   HERO_MAX_HEALTH,
@@ -66,8 +67,13 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   // from every screen, not only after the player happens to open the ladder.
   // It is memoised per request (see getAchievementsState), so the achievements
   // page itself does not pay for it twice.
-  const [unreadMessages, newBattleReports, newSpyReports, collectableAchievements] =
-    await Promise.all([
+  const [
+    unreadMessages,
+    newBattleReports,
+    newSpyReports,
+    collectableAchievements,
+    finishedQuest,
+  ] = await Promise.all([
       prisma.message.count({ where: { empireId: empire.id, readAt: null } }),
       prisma.battleReport.count({
         where: {
@@ -83,7 +89,31 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
         },
       }),
       getCollectableAchievements(empire.id),
+      // A hero standing at the gate with a full pack. Deliberately a `count`
+      // on the row's own end time rather than anything derived: the expedition
+      // finishes on the clock, with nobody logged in to notice, so the badge
+      // has to be a question the DB can answer on any page load.
+      prisma.heroQuest.count({
+        where: { empireId: empire.id, endsAt: { lte: new Date() } },
+      }),
     ]);
+
+  // The war arena is a guild screen: guildless players never see the link.
+  // While the nightly window is open the row also announces itself, because a
+  // fixture that lasts thirty minutes is missed if you have to go looking for
+  // it. liveWarStart is a pure clock check, so the extra count only ever runs
+  // during that half hour.
+  const guildMembership = await prisma.guildMember.findUnique({
+    where: { empireId: empire.id },
+    select: { guildId: true },
+  });
+  const warStart = liveWarStart(now);
+  const guildWarLive =
+    guildMembership !== null &&
+    warStart !== null &&
+    (await prisma.guildWar.count({
+      where: { startsAt: warStart, status: "SCHEDULED" },
+    })) > 0;
 
   const sidebarProps: SidebarProps = {
     empireName: empire.name,
@@ -101,6 +131,9 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     heroXpMax,
     recruits: empire.citizens,
     collectableAchievements,
+    heroQuestReady: finishedQuest > 0,
+    inGuild: guildMembership !== null,
+    guildWarLive,
     isAdmin: admin,
   };
 

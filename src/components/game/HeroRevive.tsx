@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { reviveHeroWithDiamonds } from "@/server/actions/diamondShop";
 import type { ActionState } from "@/server/actions/game";
@@ -19,8 +20,12 @@ function formatCountdown(ms: number): string {
 }
 
 /**
- * The fallen-hero banner: what death costs, how long it lasts, and the one way
- * to cut it short. Shown on the hero page while health is zero.
+ * The fallen-hero panel: what death costs, how long it lasts, and the one way
+ * to cut it short. Shown at the very top of the hero page while health is zero,
+ * and deliberately loud — this is the *only* place revival is sold. It used to
+ * sit as one card among a dozen in the diamond shop, where a player looking at
+ * a dead hero had no reason to go; the purchase belongs next to the thing it
+ * fixes.
  *
  * The countdown runs in SERVER time (the same trick as UpdateTimers): client
  * clocks drift, so we measure the offset once against the server's own stamp.
@@ -71,48 +76,78 @@ export function HeroRevive({
     };
   }, [expired, router]);
 
-  return (
-    <div className="rounded-2xl border border-red-500/60 bg-gradient-to-b from-red-950/60 to-transparent p-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h3 className="flex items-center gap-2 text-sm font-black text-red-300">
-          <span aria-hidden className="text-lg">💀</span> הגיבור שלך נפל בקרב
-        </h3>
-        <span className="flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-black/50 px-2.5 py-1 text-xs font-bold text-red-200">
-          קם לתחייה בעוד
-          <span className="tabular-nums text-red-100" dir="ltr">
-            {expired ? "…" : formatCountdown(remaining)}
-          </span>
-        </span>
-      </div>
-      <p className="mt-2 text-xs leading-relaxed text-zinc-300">
-        כל עוד הוא מת, <b className="text-red-300">אף אחד מהבונוסים שלו אינו פועל</b> —
-        הנקודות שהקצית, החפצים שהוא לובש ובונוס המחלקה מושבתים לחלוטין: הצבא שלך נלחם
-        בלעדיו, והמכרות מייצרים בלעדיו. הוא יקום מעצמו כעבור {HERO_REVIVE_HOURS === 1 ? "שעה" : `${HERO_REVIVE_HOURS} שעות`} —
-        או מיד, תמורת יהלומים.
-      </p>
+  const short = diamonds < HERO_REVIVE_COST;
 
-      <form className="mt-3">
-        <SubmitButton
-          className="btn btn-gold w-full px-4 py-2 text-sm sm:w-auto"
-          formAction={formAction}
-          disabled={diamonds < HERO_REVIVE_COST}
-          pendingText="מחייה..."
-        >
-          <span className="inline-flex items-center gap-1.5">
-            החייאה מיידית ל-100% חיים ·
-            <span className="nums inline-flex items-center gap-1" dir="ltr">
-              {HERO_REVIVE_COST}
-              <Icon name="diamond" size={14} className="text-cyan-300" />
+  return (
+    <div className="hero-revive overflow-hidden rounded-2xl border-2 border-red-500/70">
+      <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center md:gap-6 md:p-5">
+        {/* what happened, and what it is costing right now */}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <span aria-hidden className="hero-revive-skull text-3xl leading-none">
+              💀
             </span>
-          </span>
-        </SubmitButton>
-      </form>
-      {diamonds < HERO_REVIVE_COST && (
-        <p className="mt-1.5 text-[11px] text-zinc-500">
-          יש לך {diamonds} יהלומים — חסרים {HERO_REVIVE_COST - diamonds}.
-        </p>
-      )}
-      <FormMessage error={state.error} success={state.success} />
+            <h2 className="text-lg font-black tracking-wide text-red-300 sm:text-xl">
+              הגיבור שלך נפל בקרב
+            </h2>
+            <span className="rounded-full border border-red-500/50 bg-red-950/70 px-2.5 py-0.5 text-[11px] font-black text-red-200">
+              כל הבונוסים שלו מושבתים
+            </span>
+          </div>
+          <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-zinc-300 sm:text-[13px]">
+            כל עוד הוא מת, <b className="text-red-300">אף אחד מהבונוסים שלו אינו פועל</b> —
+            הנקודות שהקצית, החפצים שהוא לובש ובונוס המחלקה מושבתים לחלוטין: הצבא שלך
+            נלחם בלעדיו, והמכרות מייצרים בלעדיו. הוא יקום מעצמו כעבור{" "}
+            {HERO_REVIVE_HOURS === 1 ? "שעה" : `${HERO_REVIVE_HOURS} שעות`} — או מיד,
+            תמורת יהלומים.
+          </p>
+        </div>
+
+        {/* the two ways out, side by side: wait, or pay */}
+        <div className="flex shrink-0 flex-col gap-3 md:w-72">
+          <div className="rounded-xl border border-red-500/40 bg-black/50 px-3 py-2 text-center">
+            <p className="text-[11px] font-bold text-red-200/80">קם לתחייה מעצמו בעוד</p>
+            <p
+              className="nums text-3xl font-black leading-tight text-red-100"
+              dir="ltr"
+            >
+              {expired ? "…" : formatCountdown(remaining)}
+            </p>
+          </div>
+
+          <form>
+            <SubmitButton
+              className="btn btn-gold w-full px-4 py-3 text-sm"
+              formAction={formAction}
+              disabled={short}
+              pendingText="מחייה..."
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Icon name="heart" size={16} />
+                החייאה מיידית ל-100% חיים ·
+                <span className="nums inline-flex items-center gap-1" dir="ltr">
+                  {HERO_REVIVE_COST}
+                  <Icon name="diamond" size={14} className="text-cyan-300" />
+                </span>
+              </span>
+            </SubmitButton>
+          </form>
+
+          {short && (
+            <p className="text-center text-[11px] text-zinc-400">
+              יש לך <span className="nums">{diamonds}</span> יהלומים — חסרים{" "}
+              <span className="nums">{HERO_REVIVE_COST - diamonds}</span>.{" "}
+              <Link
+                href="/game/diamonds/buy"
+                className="font-bold text-cyan-300 underline decoration-dotted underline-offset-2"
+              >
+                לרכישת יהלומים
+              </Link>
+            </p>
+          )}
+          <FormMessage error={state.error} success={state.success} />
+        </div>
+      </div>
     </div>
   );
 }

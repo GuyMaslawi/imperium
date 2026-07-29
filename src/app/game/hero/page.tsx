@@ -31,6 +31,13 @@ import {
   xpToNextLevel,
 } from "@/lib/game/hero";
 import { HeroRevive } from "@/components/game/HeroRevive";
+import {
+  HeroQuestBoard,
+  type ActiveHeroQuest,
+} from "@/components/game/HeroQuestBoard";
+import { prisma } from "@/lib/prisma";
+import { getTunables } from "@/lib/game/config";
+import { heroQuestXp } from "@/lib/game/heroQuests";
 
 export const metadata = { title: "גיבור | IMPERIUM" };
 
@@ -76,6 +83,27 @@ export default async function HeroPage() {
   // The forge brew halves every upgrade price the item dialogs quote, so the
   // preview has to know about it or it would advertise the wrong number.
   const forgeDiscount = potionExpiries.FORGE_DISCOUNT !== undefined;
+
+  /* -------- the expedition board --------
+     Note what is *not* selected out of the quest row: the haul. It was rolled
+     and frozen at departure and it stays on the server until he is home — a
+     reward serialized into this page's payload would be readable in the network
+     tab, and the whole point of the board is that nobody knows yet. */
+  const [tunables, questRow] = await Promise.all([
+    getTunables(),
+    prisma.heroQuest.findUnique({
+      where: { empireId: empire.id },
+      select: { tier: true, startedAt: true, endsAt: true, rewardXp: true },
+    }),
+  ]);
+  const activeQuest: ActiveHeroQuest | null = questRow
+    ? {
+        tier: questRow.tier,
+        startedAt: questRow.startedAt.getTime(),
+        endsAt: questRow.endsAt.getTime(),
+        xp: questRow.rewardXp || heroQuestXp(questRow.tier),
+      }
+    : null;
 
   return (
     <div className="space-y-6">
@@ -275,6 +303,17 @@ export default async function HeroPage() {
           </div>
         </div>
       </div>
+
+      {/* what the hero *does* when nobody is attacking — the one recurring
+          action on this page that isn't spending a point */}
+      <HeroQuestBoard
+        cities={empire.cities}
+        turns={empire.turns}
+        heroDead={dead}
+        active={activeQuest}
+        serverNow={serverNow.getTime()}
+        open={tunables.heroQuest.enabled >= 1}
+      />
 
       {/* everything the hero is actually worth, points and gear folded together —
           a full-width footer under the whole hero section */}

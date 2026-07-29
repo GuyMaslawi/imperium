@@ -133,6 +133,18 @@ const TOTAL_DROP_WEIGHT = POTION_KINDS.reduce(
  */
 export function rollPotionDrop(random: () => number = secureRandom): PotionKind | null {
   if (random() >= POTION_DROP_CHANCE) return null;
+  return rollGuaranteedPotion(random);
+}
+
+/**
+ * Pick *which* brew, for a source that has already decided one is coming — a
+ * hero quest rolls its own, far higher, odds before it gets here. Keeping this
+ * separate is what stops such a caller from having to fake a roll through
+ * `rollPotionDrop`'s gate, which would skew the weights.
+ */
+export function rollGuaranteedPotion(
+  random: () => number = secureRandom
+): PotionKind {
   let roll = random() * TOTAL_DROP_WEIGHT;
   for (const kind of POTION_KINDS) {
     roll -= POTION_META[kind].dropWeight;

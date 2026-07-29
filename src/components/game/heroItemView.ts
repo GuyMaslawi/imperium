@@ -1,13 +1,12 @@
 import type { HeroItemSlot, HeroRarity } from "@prisma/client";
-import type { ItemTileDetails, Rarity } from "@/components/game/ItemTile";
+import { RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import type { ItemTileBonus, ItemTileDetails, Rarity } from "@/components/game/ItemTile";
 import {
   RARITY_META,
-  SLOT_META,
   HERO_STAT_META,
   canEquipItem,
-  itemBonusValue,
+  itemBonusLines,
   itemDisplayName,
-  itemResourceBreakdown,
   tierForLevel,
 } from "@/lib/game/hero";
 
@@ -37,22 +36,37 @@ export function catalogKey(slot: string, level: number): string {
   return `${slot}:${level}`;
 }
 
+/**
+ * Everything an item grants, in the shape the tile renders.
+ *
+ * Resource lines wear their own resource glyph and tint rather than the generic
+ * mine icon, so a relic reads as "gold / wood / iron / stone" the way the rest
+ * of the UI spells resources out.
+ */
+export function itemBonuses(
+  slot: HeroItemSlot,
+  level: number
+): ItemTileBonus[] {
+  return itemBonusLines(slot, level).map((line) => ({
+    icon: line.resource ? RESOURCE_ICON[line.resource] : HERO_STAT_META[line.stat].icon,
+    iconClass: line.resource ? RESOURCE_ICON_COLOR[line.resource] : undefined,
+    label: line.label,
+    value: line.value,
+    flat: line.flat,
+    primary: line.primary,
+  }));
+}
+
 /** Build the tooltip payload for an item at the given hero level. */
 export function itemDetails(
   item: Pick<HeroItemView, "slot" | "level">,
   heroLevel: number,
   extras: Partial<ItemTileDetails> = {}
 ): ItemTileDetails {
-  const statMeta = HERO_STAT_META[SLOT_META[item.slot].stat];
-  const bonus = itemBonusValue(item.slot, item.level);
   return {
     name: itemDisplayName(item.slot, item.level),
     rarityLabel: RARITY_META[tierForLevel(item.level)].label,
-    statIcon: statMeta.icon,
-    statLabel: statMeta.label,
-    bonusValue: bonus.value,
-    bonusIsFlat: bonus.flat,
-    resourceLines: itemResourceBreakdown(item.slot, item.level),
+    bonuses: itemBonuses(item.slot, item.level),
     requiredLevel: item.level,
     meetsRequirement: canEquipItem(heroLevel, item.level),
     ...extras,

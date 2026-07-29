@@ -22,6 +22,12 @@ type NavItem = {
    * command bar (see InboxNav).
    */
   badgeTone?: "muted" | "attention";
+  /**
+   * Replaces the badge's number with a word. Some badges are not a count of
+   * anything — a guild war either is on the air or it is not — and rendering
+   * that as "1" reads like an unread item.
+   */
+  badgeText?: string;
 };
 
 export type SidebarProps = {
@@ -45,6 +51,12 @@ export type SidebarProps = {
   recruits: number;
   /** Achievement rewards unlocked and waiting to be collected. */
   collectableAchievements?: number;
+  /** The hero is back from an expedition and his haul is uncollected. */
+  heroQuestReady?: boolean;
+  /** In a guild — the only players the war arena exists for, so the only ones who see it. */
+  inGuild?: boolean;
+  /** A guild war is on the air right now: the row lights up for the half hour. */
+  guildWarLive?: boolean;
   /** Show the admin control-center link (admins only). */
   isAdmin?: boolean;
 };
@@ -156,6 +168,9 @@ function SidebarContent({
   heroXpMax,
   recruits,
   collectableAchievements = 0,
+  heroQuestReady = false,
+  inGuild = false,
+  guildWarLive = false,
   isAdmin = false,
   pathname,
 }: SidebarProps & { pathname: string }) {
@@ -163,12 +178,36 @@ function SidebarContent({
   // (see InboxNav), so it deliberately has no entry here.
   const navItems: NavItem[] = [
     { href: "/game/base", label: "בסיס", icon: "base" },
-    { href: "/game/hero", label: "גיבור", icon: "hero" },
+    {
+      href: "/game/hero",
+      label: "גיבור",
+      icon: "hero",
+      // A returned hero is one thing to collect, so it wears the same gold
+      // "1" the achievements row does rather than inventing a second dialect
+      // of badge for a count that is only ever 0 or 1.
+      badge: heroQuestReady ? 1 : 0,
+      badgeTone: "attention",
+    },
     { href: "/game/rankings", label: "דירוג", icon: "rankings" },
     { href: "/game/weapons", label: "מפעל", icon: "factory" },
     { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
     { href: "/game/production", label: "מכונות", icon: "mine" },
     { href: "/game/guild", label: "ברית", icon: "guild" },
+    // Guild-only, and hidden rather than disabled: a locked door on the nav for
+    // a screen a guildless player can do nothing with is just noise. The page
+    // enforces the same rule itself — see /game/war.
+    ...(inGuild
+      ? [
+          {
+            href: "/game/war",
+            label: "מלחמת בריתות",
+            icon: "attack" as IconName,
+            badge: guildWarLive ? 1 : 0,
+            badgeText: "חי",
+            badgeTone: "attention" as const,
+          },
+        ]
+      : []),
     { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
     { href: "/game/bank", label: "בנק", icon: "bank" },
     { href: "/game/storage", label: "מחסנים", icon: "storage" },
@@ -180,6 +219,7 @@ function SidebarContent({
       badgeTone: "attention",
     },
     { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
+    { href: "/game/guide", label: "מדריך", icon: "reports" },
   ];
 
   const xpPct = heroXpMax > 0 ? Math.round((heroXp / heroXpMax) * 100) : 0;
@@ -369,7 +409,7 @@ function SidebarContent({
                             : "bg-black/40 text-zinc-400"
                         }`}
                       >
-                        {formatCompact(item.badge!)}
+                        {item.badgeText ?? formatCompact(item.badge!)}
                       </span>
                     )}
                   </span>

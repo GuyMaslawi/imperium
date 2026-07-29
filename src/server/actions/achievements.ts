@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
@@ -86,18 +86,23 @@ export async function claimAchievements(): Promise<ClaimAchievementsResult> {
         // See achievementProgress.
         if (!isAchievementReached(a, stats)) continue;
 
-        try {
-          await tx.empireAchievement.create({ data: { empireId, key: a.key } });
-        } catch (err) {
-          // Lost the race with a concurrent claim — it already paid this one out.
-          if (
-            err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === "P2002"
-          ) {
-            continue;
-          }
-          throw err;
-        }
+        // `createMany(skipDuplicates)` compiles to ON CONFLICT DO NOTHING, so a
+        // concurrent claim of the same key comes back as `count: 0` instead of
+        // raising P2002.
+        //
+        // That distinction is the whole point. In Postgres a failed statement
+        // aborts the *entire* transaction, and Prisma wraps no savepoint around
+        // individual queries — so catching P2002 in JS did not recover the
+        // connection. Every later statement returned 25P02 and the enclosing
+        // $transaction rolled back, so one raced key destroyed the payout for
+        // every other achievement in the same batch and the player saw a bare
+        // "שגיאה". (Same hazard `awardSeasonPassXp` upserts to avoid.)
+        const receipt = await tx.empireAchievement.createMany({
+          data: [{ empireId, key: a.key }],
+          skipDuplicates: true,
+        });
+        // Lost the race with a concurrent claim — it already paid this one out.
+        if (receipt.count === 0) continue;
         await grantReward(tx, empireId, a);
         granted.push(a.reward);
       }

@@ -1,22 +1,26 @@
 import "server-only";
 import type { Prisma } from "@prisma/client";
-import { CITIZENS_PER_CITY } from "./constants";
 
 /**
- * Add citizens to an empire without breaching the city population ceiling.
+ * Credit citizens to an empire.
  *
- * The daily update clamps its intake to `citizenCapacity(cities)` — but the
- * reward paths (season pass, wheel, mini-game) all did a raw
- * `citizens: { increment }`, so any of them could push a player arbitrarily far
- * past the design ceiling. That is not cosmetic: `trainUnits` converts one
- * citizen into one mine slave, and mine slaves drive uncapped production, so an
- * uncapped citizen faucet is an uncapped resource faucet one step downstream.
+ * There is **no population ceiling**: citizens accumulate like every other
+ * balance, so a player who is away keeps the whole backlog instead of forfeiting
+ * it. The city count still shapes the *flow* — it unlocks CITIZEN_GROWTH levels,
+ * which is what the daily intake is actually built from — it just no longer caps
+ * the pool those citizens land in.
  *
- * The clamp is done in SQL rather than read-then-write so two concurrent grants
- * cannot both read the same "room left" and each fill it. `GREATEST(citizens,
- * …)` makes the statement monotonic: an empire already over the ceiling (from a
- * grant that predates this helper, or a ceiling lowered by losing a city) keeps
- * what it has instead of being silently docked.
+ * This deliberately reverses the clamp that used to live here. The clamp existed
+ * because `trainUnits` turns one citizen into one soldier, spy or mine slave, and
+ * mine slaves drive production linearly — so an *unbounded* citizen faucet would
+ * be an unbounded resource faucet one step downstream. That reasoning still
+ * holds, and it is why every caller must keep coming through this helper rather
+ * than writing its own `citizens: { increment }`: what makes citizens safe is
+ * that every source of them is rate-limited (real time for the daily update,
+ * turns for hero levels, spins for the wheel), not that the pool had a lid.
+ *
+ * Kept as one SQL statement so concurrent grants compose instead of racing on a
+ * read-then-write.
  */
 export async function grantCitizens(
   tx: Prisma.TransactionClient,
@@ -27,10 +31,7 @@ export async function grantCitizens(
   if (add === 0) return;
   await tx.$executeRaw`
     UPDATE "Empire"
-    SET citizens = GREATEST(
-      citizens,
-      LEAST(citizens + ${add}, cities * ${CITIZENS_PER_CITY})
-    )
+    SET citizens = citizens + ${add}
     WHERE id = ${empireId}
   `;
 }

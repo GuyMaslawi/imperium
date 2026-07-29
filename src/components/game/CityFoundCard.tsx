@@ -7,6 +7,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
+import { CITIZEN_GROWTH_LEVELS_PER_CITY } from "@/lib/game/constants";
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -18,7 +19,6 @@ const COST_RESOURCES = [
 export interface CityFoundCardProps {
   cities: number;
   maxCities: number;
-  nextCapacity: number;
   heroLevel: number;
   heroRequired: number;
   cost: { gold: number; wood: number; iron: number; stone: number; soldiers: number };
@@ -31,7 +31,6 @@ export interface CityFoundCardProps {
 export function CityFoundCard({
   cities,
   maxCities,
-  nextCapacity,
   heroLevel,
   heroRequired,
   cost,
@@ -75,7 +74,7 @@ export function CityFoundCard({
 
       {isMax ? (
         <p className="text-sm text-zinc-400">
-          הגעת לרמת העיר המרבית. קיבולת האזרחים והתפוקה שלך במקסימום.
+          הגעת לרמת העיר המרבית. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.
         </p>
       ) : (
         <>
@@ -84,11 +83,11 @@ export function CityFoundCard({
             <span className="font-bold text-emerald-400 nums" dir="ltr">
               ×{cities + 1}
             </span>{" "}
-            ומעלה את קיבולת האזרחים ל־
+            ופותחת עוד{" "}
             <span className="font-bold text-emerald-400 nums" dir="ltr">
-              {formatNumber(nextCapacity)}
-            </span>
-            .
+              {CITIZEN_GROWTH_LEVELS_PER_CITY}
+            </span>{" "}
+            רמות לשדרוג קבלת האזרחים.
           </p>
 
           {/* Requirements — these are gates the empire must meet; none are spent. */}

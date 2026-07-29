@@ -102,10 +102,13 @@ function PremiumTile({
 
 /** Countdown to the daily update that refills the ladder with bigger rewards. */
 function CycleCountdown({ endsAt }: { endsAt: number }) {
+  // Seeded from a lazy initializer and re-seeded by the `key` at the call site,
+  // so a new cycle boundary remounts this with a fresh reading. The old code
+  // re-synced with a `setLeft` at the top of the effect, which fired on every
+  // mount and forced a second render pass before the first had painted.
   const [left, setLeft] = useState(() => endsAt - Date.now());
 
   useEffect(() => {
-    setLeft(endsAt - Date.now());
     const id = setInterval(() => setLeft(endsAt - Date.now()), 1000);
     return () => clearInterval(id);
   }, [endsAt]);
@@ -129,7 +132,14 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
 
   // The layout re-renders with fresh server state after every claim/purchase
   // (revalidatePath), so adopt it rather than drifting on stale local state.
-  useEffect(() => setState(initial), [initial]);
+  // Adopted during render, not from an effect: an effect would paint the stale
+  // ladder first and only then correct it, so a just-claimed tier flashed back
+  // to "collectable" for a frame.
+  const [syncedTo, setSyncedTo] = useState(initial);
+  if (syncedTo !== initial) {
+    setSyncedTo(initial);
+    setState(initial);
+  }
 
   const { premium: owned, tiers, collectable, seasonActive } = state;
   const pct = state.xpMax > 0 ? Math.min(100, Math.round((state.xp / state.xpMax) * 100)) : 0;
@@ -257,7 +267,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
                 </span>
               </div>
               <p className="mt-1.5 text-center text-[10px] text-zinc-500">
-                מתאפס בעדכון היומי הבא בעוד <CycleCountdown endsAt={state.cycleEndsAt} /> — והתגמולים יגדלו
+                מתאפס בעדכון היומי הבא בעוד <CycleCountdown key={state.cycleEndsAt} endsAt={state.cycleEndsAt} /> — והתגמולים יגדלו
               </p>
             </div>
 
