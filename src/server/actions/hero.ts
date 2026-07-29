@@ -142,11 +142,14 @@ export async function resetHero(): Promise<ActionState> {
         return { error: `איפוס גיבור זמין רק ברמה ${HERO_MAX_LEVEL}` };
       }
 
-      // A level-1 hero can no longer carry high-level gear — back to the bag.
-      await tx.heroItem.updateMany({
-        where: { heroId: hero.id, equipped: true, level: { gt: 1 } },
-        data: { equipped: false },
-      });
+      // The worn set is *grandfathered* through the reset: stripping a
+      // level-100 hero down to nine bare sockets is a different game, not a
+      // prestige. Whatever sits on the body stays on the body and keeps paying
+      // its bonus. The level gate only ever guards the *act* of equipping —
+      // `equipHeroItem` still refuses anything above the hero's level — so the
+      // moment the player takes a piece off it is locked in the bag until the
+      // hero climbs back to its level. Taking gear off after a reset is
+      // therefore a one-way door, which is exactly the intended cost.
 
       // Routed through grantCitizens so the city population ceiling holds. A raw
       // increment here delivered HERO_RESET_CITIZENS (2,500) in one write — 2.5×

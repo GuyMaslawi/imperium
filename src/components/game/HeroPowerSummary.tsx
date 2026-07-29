@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { HERO_STAT_META, type HeroBonuses, type HeroStat } from "@/lib/game/hero";
 import { RESOURCE_META, type StorableResource } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
+import { formatBonus } from "@/components/game/ItemTile";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
@@ -20,7 +21,9 @@ function StatRow({
   value,
   suffix,
   note,
-  format = (v) => `+${v}`,
+  // Percentages carry decimals on low-rung gear (+0.25%), so they go through
+  // formatBonus rather than being interpolated raw.
+  format = (v) => `+${formatBonus(v)}`,
 }: {
   stat: HeroStat;
   value: number;
@@ -186,19 +189,19 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
     {
       stat: "attack",
       value: totalPct.attack,
-      note: `נקודות +${points.attack}% · חפצים +${itemsPct.attack}%${classNote(classPct.attack)}`,
+      note: `נקודות +${points.attack}% · חפצים +${formatBonus(itemsPct.attack)}%${classNote(classPct.attack)}`,
     },
     {
       stat: "defense",
       value: totalPct.defense,
-      note: `נקודות +${points.defense}% · חפצים +${itemsPct.defense}%${classNote(classPct.defense)}`,
+      note: `נקודות +${points.defense}% · חפצים +${formatBonus(itemsPct.defense)}%${classNote(classPct.defense)}`,
     },
     {
       stat: "spy",
       value: totalPct.spy,
       note:
         classPct.spy > 0
-          ? `חפצים +${itemsPct.spy}%${classNote(classPct.spy)}`
+          ? `חפצים +${formatBonus(itemsPct.spy)}%${classNote(classPct.spy)}`
           : "מחפצי ריגול לבושים בלבד",
     },
   ];

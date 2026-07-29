@@ -113,6 +113,12 @@ export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
 
 export const GUILD_SPELL_TYPES = Object.keys(GUILD_SPELL_META) as GuildSpellType[];
 
+/* ------------------------------ invitations ------------------------------ */
+
+/** How long a guild invitation stays claimable before it lapses. */
+export const GUILD_INVITE_TTL_HOURS = 72;
+export const GUILD_INVITE_TTL_MS = GUILD_INVITE_TTL_HOURS * 60 * 60 * 1000;
+
 /* ------------------------------ roles ------------------------------ */
 
 export interface GuildRoleMeta {

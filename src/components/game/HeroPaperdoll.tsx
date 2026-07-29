@@ -74,17 +74,23 @@ type PickStack = {
  * worn *on* the figure instead of in a detached 3×3 grid. Clicking a worn piece
  * opens its detail dialog; clicking an empty socket opens a picker of the
  * matching items waiting in the bag, so dressing the hero never leaves the page.
+ *
+ * `readOnly` strips every action and leaves the picture: the same figure and the
+ * same nine sockets, but nothing to click and no bag behind them. That is the
+ * mode a dossier wants — a profile shows *what* the hero wears, and managing it
+ * stays on the hero page.
  */
 export function HeroPaperdoll({
   portrait,
   portraitAlt,
   portraitAccent,
   equipped,
-  bag,
+  bag = [],
   heroLevel,
-  gold,
+  gold = 0,
   wheelSpinBonus = 0,
   forgeDiscount = false,
+  readOnly = false,
 }: {
   /** Class artwork src (832×1216, so the frame keeps a 13/19 ratio). */
   portrait: string;
@@ -92,14 +98,16 @@ export function HeroPaperdoll({
   /** rgb triple — the class's own light on the embers and halo. */
   portraitAccent?: string;
   equipped: HeroItemView[];
-  /** Unequipped items — the pool the socket picker offers. */
-  bag: HeroItemView[];
+  /** Unequipped items — the pool the socket picker offers. Unused when readOnly. */
+  bag?: HeroItemView[];
   heroLevel: number;
-  gold: number;
+  gold?: number;
   /** Wheel-luck upgrade bonus (fraction) added to the discard spin chance. */
   wheelSpinBonus?: number;
   /** Whether שיקוי הנפח is running — halves every upgrade price quoted. */
   forgeDiscount?: boolean;
+  /** Show-only: no equipping, no dialogs — just the dressed figure. */
+  readOnly?: boolean;
 }) {
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
   const [pickSlot, setPickSlot] = useState<HeroItemSlot | null>(null);
@@ -142,7 +150,26 @@ export function HeroPaperdoll({
           >
             <span aria-hidden className={`absolute ${CONNECTOR[a.reach]}`} />
 
-            {item ? (
+            {readOnly ? (
+              item ? (
+                <ItemTile
+                  slug={meta.slug}
+                  icon={meta.icon}
+                  level={item.level}
+                  rarity={uiRarity(item.rarity)}
+                  details={itemDetails(item, heroLevel, { worn: true })}
+                />
+              ) : (
+                <EmptySocket
+                  label={meta.label}
+                  icon={meta.icon}
+                  statIcon={statMeta.icon}
+                  statLabel={statMeta.label}
+                  waiting={0}
+                  readOnly
+                />
+              )
+            ) : item ? (
               <button
                 type="button"
                 onClick={() => setOpenItem(item)}
@@ -156,7 +183,10 @@ export function HeroPaperdoll({
                   icon={meta.icon}
                   level={item.level}
                   rarity={uiRarity(item.rarity)}
-                  details={itemDetails(item, heroLevel, { hint: "לחץ לפרטים" })}
+                  details={itemDetails(item, heroLevel, {
+                    worn: true,
+                    hint: "לחץ לפרטים",
+                  })}
                 />
                 {/* a stronger piece of the same kind is sitting in the bag */}
                 {bag.some(
@@ -189,7 +219,13 @@ export function HeroPaperdoll({
 
       {/* worn counter */}
       <div className="absolute inset-x-0 bottom-3 flex justify-center">
-        <Tip tip="תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. לחיצה על סלוט ריק בוחרת חפץ מהתיק; לחיצה על חפץ לבוש פותחת את פרטיו. הבונוסים שלהם מרוכזים ב'סך הכל מהגיבור' שלמטה.">
+        <Tip
+          tip={
+            readOnly
+              ? "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. ריחוף מעל חפץ מציג את דרגתו והבונוסים שהוא מעניק. הלבשה והשדרוג נעשים בעמוד הגיבור."
+              : "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. לחיצה על סלוט ריק בוחרת חפץ מהתיק; לחיצה על חפץ לבוש פותחת את פרטיו. הבונוסים שלהם מרוכזים ב'סך הכל מהגיבור' שלמטה."
+          }
+        >
           <span className="cursor-help rounded-full border border-gold/40 bg-black/75 px-3 py-1 text-[11px] font-bold text-gold-dim">
             ציוד לבוש{" "}
             <span className="nums text-gold-bright" dir="ltr">
@@ -234,6 +270,7 @@ function EmptySocket({
   statLabel,
   waiting,
   onPick,
+  readOnly = false,
 }: {
   label: string;
   icon: string;
@@ -241,7 +278,9 @@ function EmptySocket({
   statLabel: string;
   /** How many matching items are waiting in the bag. */
   waiting: number;
-  onPick: () => void;
+  onPick?: () => void;
+  /** Draw the socket without offering to fill it (dossier view). */
+  readOnly?: boolean;
 }) {
   const { triggerProps, node } = useTip(
     <>
@@ -250,24 +289,33 @@ function EmptySocket({
       <span className="mt-2 block text-xs text-zinc-300">
         <Icon name={statIcon} size={12} className="inline align-[-2px]" /> {statLabel}
       </span>
-      <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
-        {waiting > 0
-          ? `${waiting} בתיק — לחץ לבחירה`
-          : "אין חפץ כזה בתיק — לכוד אחד בתקיפה"}
-      </span>
+      {!readOnly && (
+        <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
+          {waiting > 0
+            ? `${waiting} בתיק — לחץ לבחירה`
+            : "אין חפץ כזה בתיק — לכוד אחד בתקיפה"}
+        </span>
+      )}
     </>,
     { className: "w-44 p-3", bare: true },
   );
 
+  // A dossier's sockets are a fact, not an offer — no button, no hover promise.
+  const Frame = readOnly ? "div" : "button";
+
   return (
-    <button
-      type="button"
-      onClick={onPick}
+    <Frame
+      {...(readOnly
+        ? { "aria-label": `סלוט ${label} ריק` }
+        : { type: "button" as const, onClick: onPick, "aria-label": `סלוט ${label} ריק — בחר חפץ` })}
       className="group relative block w-full"
-      aria-label={`סלוט ${label} ריק — בחר חפץ`}
       {...triggerProps}
     >
-      <div className="relative flex aspect-square w-full items-center justify-center rounded-xl border-2 border-dashed border-gold/25 bg-black/55 backdrop-blur-[2px] transition group-hover:border-gold/70 group-hover:bg-black/75">
+      <div
+        className={`relative flex aspect-square w-full items-center justify-center rounded-xl border-2 border-dashed border-gold/25 bg-black/55 backdrop-blur-[2px] transition ${
+          readOnly ? "" : "group-hover:border-gold/70 group-hover:bg-black/75"
+        }`}
+      >
         <span aria-hidden className="text-3xl opacity-30 grayscale">
           {icon}
         </span>
@@ -281,7 +329,7 @@ function EmptySocket({
         )}
       </div>
       {node}
-    </button>
+    </Frame>
   );
 }
 

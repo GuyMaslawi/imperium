@@ -19,10 +19,27 @@ export type PlayerOption = { id: string; name: string };
  * "Send a message" box: pick one or more players out of the game's roster (a
  * closed list — you can only write to empires that exist, never to a free-text
  * name), then write a subject and a body.
+ *
+ * With `lockedRecipient` the roster picker is dropped and the addressee is
+ * fixed — the shape a profile page needs, where you already know who you are
+ * writing to. Mail is never gated on city or level: the recipient is whoever
+ * the page is about, attackable or not.
  */
-export function MessageCompose({ players }: { players: PlayerOption[] }) {
+export function MessageCompose({
+  players = [],
+  lockedRecipient,
+  triggerLabel = "שלח הודעה",
+  triggerClassName = "btn btn-gold px-4 py-2 text-sm",
+}: {
+  players?: PlayerOption[];
+  lockedRecipient?: PlayerOption;
+  triggerLabel?: string;
+  triggerClassName?: string;
+}) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selected, setSelected] = useState<string[]>(
+    lockedRecipient ? [lockedRecipient.id] : []
+  );
   const [query, setQuery] = useState("");
   const [state, action] = useActionState<ActionState, FormData>(
     sendPlayerMessage,
@@ -38,15 +55,23 @@ export function MessageCompose({ players }: { players: PlayerOption[] }) {
   if (state !== handledState) {
     setHandledState(state);
     if (state.success) {
-      setSelected([]);
+      // A locked addressee survives the reset — the next message from this
+      // profile still goes to the same empire.
+      setSelected(lockedRecipient ? [lockedRecipient.id] : []);
       setQuery("");
       setFormKey((k) => k + 1);
     }
   }
 
   const byId = useMemo(
-    () => new Map(players.map((p) => [p.id, p.name])),
-    [players]
+    () =>
+      new Map(
+        [...players, ...(lockedRecipient ? [lockedRecipient] : [])].map((p) => [
+          p.id,
+          p.name,
+        ])
+      ),
+    [players, lockedRecipient]
   );
 
   const matches = useMemo(() => {
@@ -75,9 +100,9 @@ export function MessageCompose({ players }: { players: PlayerOption[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="btn btn-gold px-4 py-2 text-sm"
+        className={triggerClassName}
       >
-        <Icon name="messages" size={16} /> שלח הודעה
+        <Icon name="messages" size={16} /> {triggerLabel}
       </button>
 
       <Dialog
@@ -103,7 +128,17 @@ export function MessageCompose({ players }: { players: PlayerOption[] }) {
         </div>
 
         <form key={formKey} action={action} className="mt-4 space-y-3">
-          {/* recipients — closed list of the game's players */}
+          {/* recipients — a fixed addressee when the caller supplied one,
+              otherwise the closed list of the game's players */}
+          {lockedRecipient ? (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-gold">נמען</p>
+              <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm font-bold text-gold-bright">
+                {lockedRecipient.name}
+              </p>
+              <input type="hidden" name="recipients" value={lockedRecipient.id} />
+            </div>
+          ) : (
           <div>
             <label
               htmlFor="msg-search"
@@ -184,6 +219,7 @@ export function MessageCompose({ players }: { players: PlayerOption[] }) {
               </p>
             )}
           </div>
+          )}
 
           {/* subject */}
           <div>

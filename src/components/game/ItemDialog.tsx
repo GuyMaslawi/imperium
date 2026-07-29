@@ -85,6 +85,9 @@ export function ItemDialog({
   const meetsUpgradeLevel = upgradeToLevel != null && heroLevel >= upgradeToLevel;
 
   const meetsLevel = canEquipItem(heroLevel, level);
+  // Worn despite being over the hero's level — kept through a prestige reset.
+  const grandfathered = equipped && !meetsLevel;
+  const [confirmUnequip, setConfirmUnequip] = useState(false);
 
   const run = (
     action: (prev: ActionState, fd: FormData) => Promise<ActionState>
@@ -265,15 +268,33 @@ export function ItemDialog({
         </p>
       )}
 
+      {/* Gear worn from before a prestige reset keeps working, but the level
+          gate still guards equipping — so removing it is a one-way door until
+          the hero climbs back. Say so, and make the player confirm. */}
+      {grandfathered && (
+        <p className="mt-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-2.5 text-xs leading-relaxed text-amber-200">
+          <Icon name="spark" size={13} className="inline align-[-2px]" /> החפץ
+          נשמר עליך מהאיפוס וממשיך להעניק את הבונוס המלא. אם תסיר אותו — לא תוכל
+          ללבוש אותו שוב עד שהגיבור יחזור לרמה{" "}
+          <b className="nums">{level}</b>.
+        </p>
+      )}
+
       {/* actions */}
       <div className="mt-4 grid grid-cols-2 gap-2">
         {equipped ? (
           <button
-            onClick={() => run(unequipHeroItem)}
+            onClick={() =>
+              grandfathered && !confirmUnequip
+                ? setConfirmUnequip(true)
+                : run(unequipHeroItem)
+            }
             disabled={pending}
-            className="btn btn-ghost col-span-2 py-2 text-sm"
+            className={`col-span-2 py-2 text-sm ${
+              confirmUnequip ? "btn btn-gold" : "btn btn-ghost"
+            }`}
           >
-            הסר לתיק
+            {confirmUnequip ? `אישור — הסר ונעל עד רמה ${level}` : "הסר לתיק"}
           </button>
         ) : (
           <button

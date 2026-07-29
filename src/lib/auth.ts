@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import { applyPendingUpdates } from "@/lib/game/updates";
+import { getSeasonGate } from "@/server/seasonClose";
 
 const SESSION_COOKIE = "imperium_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30; // 30 days
@@ -193,6 +194,13 @@ export const getActiveEmpireId = cache(async (): Promise<string | null> => {
   // through this function. Gating only the pages would leave the whole
   // mutation surface reachable by POST from an unverified account.
   if (!empire || empire.user.bannedAt || !empire.user.emailVerified) return null;
+  // Between seasons the world is frozen. Same reasoning as the verification
+  // check above: redirecting the pages alone would leave every server action
+  // — bank, training, attacks, the diamond shop — POSTable after the final
+  // standings were archived, which would let a player keep playing (and keep
+  // changing the numbers the next season's ladder starts from) inside a season
+  // that is already over and recorded.
+  if (!(await getSeasonGate()).open) return null;
   return empire.id;
 });
 
@@ -218,6 +226,11 @@ export const requireEmpire = cache(async () => {
   // Unverified accounts keep their session (so they can resend the link) but
   // reach no part of the game until they confirm the address.
   if (!existing.user.emailVerified) redirect("/verify-email");
+  // The season's clock has run out: every /game screen closes and the only
+  // thing left standing is the recap. Checked *before* applyPendingUpdates so
+  // a page load after the deadline cannot settle another hour of production
+  // into an empire whose final standing is already carved into the hall.
+  if (!(await getSeasonGate()).open) redirect("/season");
 
   const empire = await applyPendingUpdates(existing.id);
   return { ...empire, user: existing.user };

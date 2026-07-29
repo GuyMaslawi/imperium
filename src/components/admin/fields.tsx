@@ -12,6 +12,7 @@ export function LabeledInput({
   type = "text",
   step,
   min,
+  max,
   placeholder,
   required,
   dir,
@@ -23,6 +24,12 @@ export function LabeledInput({
   type?: "text" | "number" | "email" | "password" | "datetime-local";
   step?: number | string;
   min?: number | string;
+  /**
+   * Ceiling for a number field. Advisory only — the browser refuses to submit a
+   * larger value, but the server action clamps it again, since a form is not a
+   * validator.
+   */
+  max?: number | string;
   placeholder?: string;
   required?: boolean;
   dir?: "ltr" | "rtl";
@@ -36,6 +43,7 @@ export function LabeledInput({
         type={type}
         step={step}
         min={min}
+        max={max}
         defaultValue={defaultValue}
         placeholder={placeholder}
         required={required}

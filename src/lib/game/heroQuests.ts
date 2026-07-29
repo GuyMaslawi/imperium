@@ -473,6 +473,25 @@ export interface HeroQuestRoll {
   fortune: HeroQuestFortune;
 }
 
+/** Every kind a homecoming can pay in — the reveal panel's tile set. */
+export type HeroQuestHaulKind = keyof HeroQuestReward | "xp";
+
+/**
+ * What each kind is called when the hero walks back through the gate. Lives
+ * here rather than beside the collect action so both the server's fallback
+ * sentence and the client's reveal panel read from one list — a "use server"
+ * module can only export async functions, so it cannot hold the map itself.
+ */
+export const HERO_QUEST_HAUL_LABEL: Record<HeroQuestHaulKind, string> = {
+  gold: "זהב",
+  wood: "עץ",
+  iron: "ברזל",
+  stone: "אבן",
+  citizens: "אזרחים",
+  slaves: "עבדי מכרות",
+  xp: "ניסיון",
+};
+
 /**
  * One expedition's actual haul: the centre, times the run's fortune, times a
  * per-resource wobble.

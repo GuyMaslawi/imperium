@@ -17,14 +17,26 @@ import {
   BUILDING_TYPES,
   EMPIRE_UPGRADE_META,
   EMPIRE_UPGRADE_TYPES,
+  MINE_MAX_LEVEL,
   STORAGE_META,
   STORAGE_TYPES,
+  empireUpgradeMaxLevel,
+  isProductionBuilding,
 } from "@/lib/game/constants";
-import { WEAPONS, WEAPON_CATEGORIES, WEAPON_CATEGORY_META, weaponByKey } from "@/lib/game/weapons";
+import {
+  WEAPONS,
+  WEAPON_CATEGORIES,
+  WEAPON_CATEGORY_META,
+  TIERS_PER_CATEGORY,
+  weaponByKey,
+} from "@/lib/game/weapons";
 import {
   HERO_CLASS_META,
   HERO_CLASS_ORDER,
   HERO_MAX_HEALTH,
+  HERO_MAX_LEVEL,
+  HERO_RESET_POINTS,
+  POINTS_PER_LEVEL,
   SLOT_META,
   SLOT_ORDER,
 } from "@/lib/game/hero";
@@ -146,6 +158,14 @@ export default async function AdminUserDetail({
   });
   if (!user) notFound();
   const empire = user.empire;
+
+  // Hero stat points the player could have earned at his current standing: one
+  // per level gained plus the 25 a reset hands back (a reset wipes every
+  // allocated point, so only the most recent grant survives). `updateHero`
+  // clamps to the same figure — the form only mirrors it.
+  const heroPointPool =
+    ((empire?.hero?.level ?? 1) - 1) * POINTS_PER_LEVEL +
+    ((empire?.hero?.resets ?? 0) > 0 ? HERO_RESET_POINTS : 0);
 
   // Pickers and counters for the panels below. Guilds and seasons are small
   // tables; the history counts are indexed and only the totals are needed, so
@@ -274,6 +294,7 @@ export default async function AdminUserDetail({
                   name="cities"
                   type="number"
                   min={1}
+                  max={MAX_CITIES}
                   defaultValue={empire.cities}
                   hint={`1–${MAX_CITIES} · כרגע: ${cityName(empire.cities)}`}
                 />
@@ -332,6 +353,19 @@ export default async function AdminUserDetail({
               {BUILDING_TYPES.map((type) => {
                 const meta = BUILDING_META[type];
                 const b = empire.buildings.find((x) => x.type === type);
+                // Same ceilings the server clamps to, so the form can't even
+                // offer a value that would be silently cut down on save: mines
+                // stop at MINE_MAX_LEVEL (the barracks/spy center are never
+                // upgraded past 1), and slaves are limited to the pool the army
+                // actually owns minus what the other mines already hold.
+                const isMine = isProductionBuilding(type);
+                const slavePool = Math.max(
+                  0,
+                  (empire.army?.mineSlaves ?? 0) -
+                    empire.buildings
+                      .filter((x) => x.type !== type && isProductionBuilding(x.type))
+                      .reduce((sum, x) => sum + x.slavesAssigned, 0)
+                );
                 return (
                   <ActionForm
                     key={type}
@@ -348,9 +382,25 @@ export default async function AdminUserDetail({
                       <Icon name={meta.icon} size={14} /> {meta.label}
                     </p>
                     <div className={`grid gap-2 ${meta.supportsSlaves ? "grid-cols-2" : "grid-cols-1"}`}>
-                      <LabeledInput label="רמה" name="level" type="number" min={0} defaultValue={b?.level ?? 0} />
+                      <LabeledInput
+                        label="רמה"
+                        name="level"
+                        type="number"
+                        min={0}
+                        max={isMine ? MINE_MAX_LEVEL : 1}
+                        defaultValue={b?.level ?? 0}
+                        hint={isMine ? `מקסימום ${MINE_MAX_LEVEL}` : "0 או 1"}
+                      />
                       {meta.supportsSlaves && (
-                        <LabeledInput label="עבדים" name="slavesAssigned" type="number" min={0} defaultValue={b?.slavesAssigned ?? 0} />
+                        <LabeledInput
+                          label="עבדים"
+                          name="slavesAssigned"
+                          type="number"
+                          min={0}
+                          max={slavePool}
+                          defaultValue={b?.slavesAssigned ?? 0}
+                          hint={`פנויים ${slavePool.toLocaleString("he-IL")}`}
+                        />
                       )}
                     </div>
                   </ActionForm>
@@ -396,6 +446,9 @@ export default async function AdminUserDetail({
                 {EMPIRE_UPGRADE_TYPES.map((type) => {
                   const meta = EMPIRE_UPGRADE_META[type];
                   const u = empire.upgrades.find((x) => x.type === type);
+                  // CITIZEN_GROWTH's ceiling moves with the city count, so it is
+                  // read per empire rather than from the metadata.
+                  const maxLevel = empireUpgradeMaxLevel(type, empire.cities);
                   return (
                     <ActionForm
                       key={type}
@@ -411,7 +464,15 @@ export default async function AdminUserDetail({
                       <p className="flex items-center gap-1.5 text-xs font-bold text-gold-bright">
                         <Icon name={meta.icon} size={14} /> {meta.label}
                       </p>
-                      <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={u?.level ?? 1} />
+                      <LabeledInput
+                        label="רמה"
+                        name="level"
+                        type="number"
+                        min={1}
+                        max={maxLevel}
+                        defaultValue={u?.level ?? 1}
+                        hint={maxLevel ? `מקסימום ${maxLevel}` : undefined}
+                      />
                     </ActionForm>
                   );
                 })}
@@ -439,7 +500,15 @@ export default async function AdminUserDetail({
                     <p className="text-xs font-bold text-gold-bright">
                       {WEAPON_CATEGORY_META[category].icon} {WEAPON_CATEGORY_META[category].label}
                     </p>
-                    <LabeledInput label="טיר פתוח" name="unlockedTier" type="number" min={1} defaultValue={unlock?.unlockedTier ?? 2} />
+                    <LabeledInput
+                      label="טיר פתוח"
+                      name="unlockedTier"
+                      type="number"
+                      min={1}
+                      max={TIERS_PER_CATEGORY}
+                      defaultValue={unlock?.unlockedTier ?? 2}
+                      hint={`מקסימום ${TIERS_PER_CATEGORY}`}
+                    />
                   </ActionForm>
                 );
               })}
@@ -492,6 +561,15 @@ export default async function AdminUserDetail({
 
           {/* ---------------- hero ---------------- */}
           <EditorSection title="גיבור" icon="🛡️">
+            {/* Stat points the hero could actually have earned: one per level
+                gained, plus the 25 a reset hands back (a reset wipes every
+                allocated point, so only the last grant survives). The server
+                fills the four fields from this pool in allocation order. */}
+            <p className="mb-3 text-xs text-zinc-400">
+              נקודות זמינות לחלוקה:{" "}
+              <b className="nums text-gold-bright">{heroPointPool}</b> — סכום
+              ארבעת שדות הנקודות לא יעלה על זה.
+            </p>
             <ActionForm action={updateHero} submitLabel="שמור גיבור" className="mb-4">
               <input type="hidden" name="empireId" value={empire.id} />
               <input type="hidden" name="userId" value={user.id} />
@@ -505,15 +583,23 @@ export default async function AdminUserDetail({
                     label: HERO_CLASS_META[c].label,
                   }))}
                 />
-                <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={empire.hero?.level ?? 1} />
+                <LabeledInput
+                  label="רמה"
+                  name="level"
+                  type="number"
+                  min={1}
+                  max={HERO_MAX_LEVEL}
+                  defaultValue={empire.hero?.level ?? 1}
+                  hint={`מקסימום ${HERO_MAX_LEVEL}`}
+                />
                 <LabeledInput label="ניסיון" name="xp" type="number" min={0} defaultValue={empire.hero?.xp ?? 0} />
-                <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} defaultValue={empire.hero?.unspentPoints ?? 0} />
-                <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} defaultValue={empire.hero?.attackPoints ?? 0} />
-                <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} defaultValue={empire.hero?.defensePoints ?? 0} />
-                <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} defaultValue={empire.hero?.resourcePoints ?? 0} />
+                <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.unspentPoints ?? 0} />
+                <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.attackPoints ?? 0} />
+                <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.defensePoints ?? 0} />
+                <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.resourcePoints ?? 0} />
                 <LabeledInput label="איפוסים" name="resets" type="number" min={0} defaultValue={empire.hero?.resets ?? 0} />
                 {/* 0 = הגיבור מת (וכל הבונוסים שלו מושבתים); כל ערך גבוה יותר מחייה אותו */}
-                <LabeledInput label="חיים (0=מת)" name="health" type="number" min={0} defaultValue={empire.hero?.health ?? HERO_MAX_HEALTH} />
+                <LabeledInput label="חיים (0=מת)" name="health" type="number" min={0} max={HERO_MAX_HEALTH} defaultValue={empire.hero?.health ?? HERO_MAX_HEALTH} />
               </div>
             </ActionForm>
 
@@ -552,6 +638,7 @@ export default async function AdminUserDetail({
                           name="level"
                           type="number"
                           min={1}
+                          max={HERO_MAX_LEVEL}
                           defaultValue={item.level}
                         />
                         <LabeledBool label="חבוש" name="equipped" defaultValue={item.equipped} />
@@ -582,7 +669,15 @@ export default async function AdminUserDetail({
                   options={SLOT_ORDER.map((s) => ({ value: s, label: SLOT_META[s].label }))}
                 />
                 <LabeledSelect label="נדירות" name="rarity" options={RARITY_OPTIONS} />
-                <LabeledInput label="רמה" name="level" type="number" min={1} defaultValue={1} />
+                <LabeledInput
+                  label="רמה"
+                  name="level"
+                  type="number"
+                  min={1}
+                  max={HERO_MAX_LEVEL}
+                  defaultValue={1}
+                  hint={`מקסימום ${HERO_MAX_LEVEL}`}
+                />
               </div>
             </ActionForm>
           </EditorSection>

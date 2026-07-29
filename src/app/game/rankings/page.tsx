@@ -1,8 +1,11 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
-import { getCityLadder } from "@/server/rankingsLadder";
-import { formatCompact, formatNumber } from "@/lib/game/format";
+import { prisma } from "@/lib/prisma";
+import { getCityLadder, withViewerRow } from "@/server/rankingsLadder";
+import { getHallOfFame } from "@/server/seasonClose";
+import { GUILD_ROLE_META } from "@/lib/game/guild";
+import { formatCompact, formatDate, formatNumber } from "@/lib/game/format";
 import { cityFullName, cityName } from "@/lib/game/cities";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { CityBossBanner } from "@/components/game/CityBossBanner";
@@ -124,16 +127,27 @@ export default async function RankingsPage({
   // that everyone in the city shares, so it belongs above the ladder.
   const bossState = await getCityBossState(myEmpire);
 
-  // Ranking is by a power figure computed in JS, so the sort cannot move into
-  // SQL and the scan stays O(bucket). What keeps that off the database is the
-  // shared TTL in getCityLadder — see the header there — and what keeps it off
-  // the wire is the page slice below.
-  const ranked = await getCityLadder(myCity);
+  // Ranked and cut in SQL off the denormalised militaryPower column. What keeps
+  // it off the database is the shared TTL in getCityLadder — see the header
+  // there — and what keeps it off the wire is the page slice below.
+  //
+  // That TTL is also why the viewer's own row is spliced back in from the empire
+  // requireEmpire already loaded: train an army and walk straight here, and the
+  // cached row is the one from before you trained. See withViewerRow.
+  const ranked = withViewerRow(await getCityLadder(myCity), {
+    id: myEmpire.id,
+    name: myEmpire.name,
+    gold: myEmpire.gold,
+    army: myEmpire.army && { soldiers: myEmpire.army.soldiers },
+    hero: myEmpire.hero && {
+      level: myEmpire.hero.level,
+      resets: myEmpire.hero.resets,
+    },
+    power: myEmpire.militaryPower,
+  });
 
   // Exact, and computed against the whole ladder rather than the page.
   const myRank = ranked.findIndex((e) => e.id === myEmpire.id) + 1;
-
-  const podium = ranked.slice(0, 3);
 
   const pageCount = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
   // Land on the page holding your own row when none was asked for, so the
@@ -145,9 +159,27 @@ export default async function RankingsPage({
   const firstIndex = (page - 1) * PAGE_SIZE;
   const visible = ranked.slice(firstIndex, firstIndex + PAGE_SIZE);
 
-  // Raid shields for the rows actually rendered — one query for the whole page,
-  // and scoped to the ten visible rows rather than the bucket.
-  const shieldsByEmpire = await getShieldsForEmpires(visible.map((e) => e.id));
+  // Raid shields and guild names for the rows actually rendered — scoped to the
+  // ten visible rows rather than the whole bucket. The guild column shipped as
+  // a hard-coded dash captioned "until alliances land on the ladder"; alliances
+  // landed, and the column kept saying nobody was in one.
+  const [shieldsByEmpire, guildRows, hall] = await Promise.all([
+    getShieldsForEmpires(visible.map((e) => e.id)),
+    prisma.guildMember.findMany({
+      where: { empireId: { in: visible.map((e) => e.id) } },
+      select: {
+        empireId: true,
+        guildId: true,
+        role: true,
+        guild: { select: { name: true } },
+      },
+    }),
+    // The archive: who topped every season that has already ended. Frozen data
+    // behind a five-minute TTL, unlike everything else on this page — it moves
+    // a handful of times a year, not twice a minute.
+    getHallOfFame(),
+  ]);
+  const guildByEmpire = new Map(guildRows.map((row) => [row.empireId, row]));
 
   return (
     <div className="space-y-6">
@@ -227,6 +259,10 @@ export default async function RankingsPage({
             <tbody>
               {visible.map((empire, index) => {
                 const isMe = empire.id === myEmpire.id;
+                const guildMember = guildByEmpire.get(empire.id);
+                const guildRole = guildMember
+                  ? GUILD_ROLE_META[guildMember.role]
+                  : null;
                 // Rank is the position in the whole ladder, not on this page —
                 // page 2 starts at 11, and the medals stay with the top three
                 // wherever the reader happens to be standing.
@@ -333,6 +369,17 @@ export default async function RankingsPage({
                                 {myCityName}
                               </span>
                             </span>
+                            {/* The guild has its own column, but that column is
+                                one of the two the narrow layout drops — so on a
+                                phone it rides here instead of vanishing. */}
+                            {guildMember && guildRole && (
+                              <span className="text-gold sm:hidden">
+                                <span aria-hidden>{guildRole.icon}</span>{" "}
+                                <span className="font-bold">
+                                  {guildMember.guild.name}
+                                </span>
+                              </span>
+                            )}
                             {/* Paid raid shields — worth knowing before you
                                 spend turns on a target whose loot is locked. */}
                             <ShieldBadges shields={shieldsByEmpire.get(empire.id)} label />
@@ -340,7 +387,19 @@ export default async function RankingsPage({
                         </div>
                       </div>
                     </td>
-                    <td className="hidden px-4 py-3 text-zinc-600 sm:table-cell">—</td>
+                    <td className="hidden px-4 py-3 sm:table-cell">
+                      {guildMember && guildRole ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-gold"
+                          title={`${guildRole.label} בברית ${guildMember.guild.name}`}
+                        >
+                          <span aria-hidden>{guildRole.icon}</span>
+                          {guildMember.guild.name}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-600">—</span>
+                      )}
+                    </td>
                     <td className="px-2 py-3 sm:px-4">
                       {/* Compact on a phone, exact from sm up: the digits are
                           what you compare targets by, but four columns only fit
@@ -370,52 +429,78 @@ export default async function RankingsPage({
         <Pager page={page} pageCount={pageCount} myPage={defaultPage} />
       </div>
 
-      {/* -------- hall of fame -------- */}
+      {/* -------- hall of fame: the archive of finished seasons -------- */}
+      {/* Deliberately static. This board is written exactly once per season, at
+          the moment the season's clock runs out (see server/seasonClose.ts),
+          and every figure on it is a snapshot — the empires it names may not
+          even exist any more, because a season reset deletes them all. */}
       <div>
-        <h2 className="mb-3 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-          <Icon name="rankings" size={20} className="text-crimson-bright" />
+        <h2 className="mb-1 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+          <Icon name="crown" size={20} className="text-crimson-bright" />
           היכל התהילה
         </h2>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="panel rounded-xl p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold"><Icon name="guild" size={18} className="text-crimson-bright" /> בריתות</h3>
-            <p className="text-sm text-zinc-500">מערכת הבריתות תיפתח בהמשך.</p>
-          </div>
-          <div className="panel rounded-xl p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold"><Icon name="spy" size={18} className="text-crimson-bright" /> מודיעין</h3>
+        <p className="mb-3 text-center text-[11px] text-zinc-500">
+          אלופי כל העונות שהסתיימו. מתעדכן פעם אחת, בסיום כל עונה.
+        </p>
+
+        {hall.length === 0 ? (
+          <div className="panel rounded-xl p-6 text-center">
             <p className="text-sm text-zinc-500">
-              דירוג המודיעין ייפתח בהמשך.
+              עוד לא הסתיימה אף עונה. האלופים הראשונים ייחרתו כאן בסיום העונה
+              הנוכחית.
             </p>
           </div>
-          {/* The only panel of the three that holds real data — so it is the
-              one that gets the light sweeping over it. */}
-          <div className="panel-gold ldr-scan rounded-xl p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-              <Icon name="attack" size={18} className="text-crimson-bright" /> כוח צבאי
-            </h3>
-            <ol className="space-y-2 text-sm">
-              {podium.map((empire, index) => (
-                <li
-                  key={empire.id}
-                  style={{ "--i": index } as CSSProperties}
-                  className="ldr-podium flex items-center justify-between gap-2"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span aria-hidden>
-                      {index === 0 ? "🥇" : index === 1 ? "🥈" : "🥉"}
-                    </span>
-                    <span className="truncate font-semibold text-zinc-100">
-                      {empire.name}
-                    </span>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            {hall.map((season, si) => (
+              <div
+                key={season.id}
+                style={{ "--i": Math.min(si, 12) } as CSSProperties}
+                className="ldr-podium panel-gold rounded-xl p-4"
+              >
+                <div className="mb-3 flex items-baseline justify-between gap-2 border-b border-border-subtle pb-2">
+                  <h3 className="truncate text-sm font-bold text-gold-bright">
+                    {season.name}
+                  </h3>
+                  <span className="shrink-0 text-[10px] text-zinc-500">
+                    {formatDate(season.endsAt)}
                   </span>
-                  <span className="nums shrink-0 font-bold text-gold" dir="ltr">
-                    {formatCompact(empire.power)}
-                  </span>
-                </li>
-              ))}
-            </ol>
+                </div>
+                <ol className="space-y-2 text-sm">
+                  {season.champions.map((champ) => (
+                    <li
+                      key={champ.rank}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span aria-hidden>
+                          {champ.rank === 1 ? "🥇" : champ.rank === 2 ? "🥈" : "🥉"}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-semibold text-zinc-100">
+                            {champ.empireName}
+                          </span>
+                          {champ.playerName && (
+                            <span className="block truncate text-[10px] text-zinc-500">
+                              {champ.playerName}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span
+                        className="nums shrink-0 font-bold text-gold"
+                        dir="ltr"
+                        title={`${formatNumber(champ.power)} כוח · ${champ.cities} ערים · גיבור ${champ.heroLevel}`}
+                      >
+                        {formatCompact(champ.power)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

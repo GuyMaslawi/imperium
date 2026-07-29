@@ -421,8 +421,9 @@ body {
   animation: sp-flash 0.7s ease-out both;
 }
 
-/* --- Claim summary: the panel drops in, then each loot tile pops --- */
-@keyframes sp-haul-in {
+/* --- Any haul reveal: the panel drops in, then each loot tile pops.
+       Shared by the season-pass claim summary and the hero's homecoming. --- */
+@keyframes haul-panel-in {
   0% {
     opacity: 0;
     transform: translateY(-8px) scale(0.97);
@@ -432,11 +433,11 @@ body {
     transform: translateY(0) scale(1);
   }
 }
-.sp-haul {
-  animation: sp-haul-in 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+.haul-panel {
+  animation: haul-panel-in 0.35s cubic-bezier(0.34, 1.4, 0.64, 1) both;
 }
 
-@keyframes sp-loot-in {
+@keyframes haul-tile-in {
   0% {
     opacity: 0;
     transform: scale(0.5) translateY(10px);
@@ -449,8 +450,8 @@ body {
     transform: scale(1);
   }
 }
-.sp-loot {
-  animation: sp-loot-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+.haul-tile {
+  animation: haul-tile-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
 /* --- Cleared the whole ladder: card punches in, trophy bounces, confetti falls --- */
@@ -5669,4 +5670,146 @@ body {
   .cog-panel {
     animation: none;
   }
+}
+
+/* =========================================================================
+   שער חתום — the sealed gate (/season)
+   Prefix: ssn-. The one screen shown between seasons, so it is allowed to be
+   ceremonial: a dying glow behind a shut gate, embers drifting up through it,
+   and the podium landing under the countdown. Everything here is decoration —
+   the countdown digits themselves are live data and carry no animation, so
+   nothing moves under a reader's eye while they read a number.
+   ========================================================================= */
+
+.ssn-gate {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 0.75rem;
+}
+.ssn-body {
+  position: relative;
+  z-index: 2;
+}
+
+/* The last light of the season, banked behind the gate. */
+.ssn-glow {
+  position: absolute;
+  inset: -40% 10% auto 10%;
+  height: 130%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 100%,
+    rgba(190, 60, 30, 0.3) 0%,
+    rgba(150, 40, 20, 0.12) 38%,
+    transparent 70%
+  );
+  animation: ssn-glow-breathe 9s ease-in-out infinite;
+}
+@keyframes ssn-glow-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+/* Embers rising out of it. Positions/timings come from a fixed table in the
+   page so SSR and hydration agree — see EMBERS in app/season/page.tsx. */
+.ssn-ember {
+  position: absolute;
+  bottom: -8px;
+  left: var(--left);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 999px;
+  background: rgba(255, 190, 120, 0.85);
+  box-shadow: 0 0 8px rgba(255, 160, 80, 0.7);
+  pointer-events: none;
+  opacity: 0;
+  animation: ssn-ember-rise var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+@keyframes ssn-ember-rise {
+  0% { opacity: 0; transform: translateY(0) translateX(0); }
+  12% { opacity: 0.9; }
+  70% { opacity: 0.55; }
+  100% { opacity: 0; transform: translateY(-260px) translateX(18px); }
+}
+
+.ssn-kicker {
+  animation: ssn-fade-in 0.7s ease-out both;
+}
+.ssn-title {
+  animation: ssn-fade-in 0.7s ease-out 0.15s both;
+  text-shadow: 0 0 24px rgba(228, 195, 90, 0.35);
+}
+@keyframes ssn-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- the countdown dials --- */
+.ssn-dial {
+  min-width: 4.25rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(196, 160, 50, 0.28);
+  background: rgba(228, 195, 90, 0.05);
+  animation: ssn-fade-in 0.5s ease-out both;
+  animation-delay: calc(var(--i) * 90ms);
+}
+.ssn-dial-value {
+  display: block;
+  font-size: 1.6rem;
+  font-weight: 900;
+  line-height: 1.1;
+  color: var(--color-gold-bright, #f2dd9a);
+}
+.ssn-dial-label {
+  display: block;
+  font-size: 0.65rem;
+  color: #8a8794;
+}
+.ssn-opening {
+  animation: ssn-opening-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ssn-opening-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* --- podium + tallies land from below, in order --- */
+.ssn-champ,
+.ssn-tally {
+  animation: ssn-land 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 110ms);
+}
+@keyframes ssn-land {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+/* The winner's card keeps a slow gold breath under it. */
+.ssn-champ-first {
+  box-shadow: 0 0 0 1px rgba(228, 195, 90, 0.35), 0 12px 40px -18px rgba(228, 195, 90, 0.7);
+}
+.ssn-medal {
+  animation: ssn-medal-glint 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.7s);
+}
+@keyframes ssn-medal-glint {
+  0%, 84%, 100% { transform: rotate(0deg) scale(1); filter: none; }
+  90% { transform: rotate(-8deg) scale(1.14); filter: drop-shadow(0 0 10px rgba(255, 235, 170, 0.9)); }
+  95% { transform: rotate(6deg) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ssn-glow,
+  .ssn-kicker,
+  .ssn-title,
+  .ssn-dial,
+  .ssn-opening,
+  .ssn-champ,
+  .ssn-tally,
+  .ssn-medal {
+    animation: none;
+  }
+  .ssn-ember { display: none; }
 }

@@ -2,20 +2,26 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { useServerNow } from "@/components/game/HeroPotions";
 import { collectHeroQuest, startHeroQuest } from "@/server/actions/heroQuests";
+import type { HeroQuestHaul } from "@/server/actions/heroQuests";
 import type { ActionState } from "@/server/actions/game";
 import { formatNumber } from "@/lib/game/format";
+import { RARITY_META } from "@/lib/game/hero";
+import { POTION_META } from "@/lib/game/potions";
 import {
   HERO_QUESTS,
+  HERO_QUEST_HAUL_LABEL,
   heroQuestByTier,
   heroQuestDurationLabel,
+  heroQuestFortuneByKey,
   heroQuestTurnCost,
   heroQuestXp,
+  type HeroQuestHaulKind,
 } from "@/lib/game/heroQuests";
 
 /**
@@ -25,12 +31,18 @@ import {
  * he is currently on lifts out of the list into a banner with a live clock;
  * everything else stays a row you can read the price of at a glance.
  *
- * What the board deliberately does *not* show is the payout. The rows quote the
- * price in turns, the length of the road and the odds of loot — never the haul.
- * It isn't withheld, it genuinely isn't decided: every run rolls its own fortune
- * on the server (see lib/game/heroQuests.ts), and the number only exists once he
- * walks back through the gate. So this component never receives a reward at all,
- * which is the only way a hidden number stays hidden in a client bundle.
+ * What the board deliberately does *not* show is the payout *in advance*. The
+ * rows quote the price in turns, the length of the road and the odds of loot —
+ * never the haul. It isn't withheld, it genuinely isn't decided: every run rolls
+ * its own fortune on the server (see lib/game/heroQuests.ts), and the number
+ * only exists once he walks back through the gate. So no reward ever reaches
+ * this component before the collect, which is the only way a hidden number stays
+ * hidden in a client bundle.
+ *
+ * The collect itself is the opposite: it answers with the haul itemised, and
+ * HomecomingPanel spends it — a tile per kind, the fortune band that produced
+ * it, and whatever fell off the road. A mystery that is never resolved is just a
+ * missing number, so the reveal stays on screen until the player dismisses it.
  *
  * All timing runs in SERVER time (`useServerNow`), for the same reason the
  * potion belt does: a browser clock two minutes fast would offer a "collect"
@@ -83,6 +95,7 @@ export function HeroQuestBoard({
   const router = useRouter();
   const now = useServerNow(serverNow);
   const [msg, setMsg] = useState<ActionState>({});
+  const [haul, setHaul] = useState<HeroQuestHaul | null>(null);
   const [pending, startTransition] = useTransition();
 
   const done = active !== null && active.endsAt <= now;
@@ -98,10 +111,19 @@ export function HeroQuestBoard({
   const send = (tier: number) => {
     const fd = new FormData();
     fd.set("tier", String(tier));
+    // The previous run's spoils belong to the previous run: sending him out
+    // again clears the panel rather than leaving it above a fresh countdown.
+    setHaul(null);
     startTransition(async () => setMsg(await startHeroQuest({}, fd)));
   };
   const collect = () => {
-    startTransition(async () => setMsg(await collectHeroQuest()));
+    startTransition(async () => {
+      const res = await collectHeroQuest();
+      setHaul(res.haul ?? null);
+      // The panel *is* the confirmation, so don't also print the sentence the
+      // action returns for callers that can only render a line.
+      setMsg(res.haul ? {} : res);
+    });
   };
 
   return (
@@ -130,6 +152,16 @@ export function HeroQuestBoard({
         <p className="mt-3 rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-xs text-zinc-400">
           לוח המסעות סגור כרגע.
         </p>
+      )}
+
+      {haul && (
+        // Keyed on the run so a second collect re-plays the drop-in animation
+        // instead of swapping numbers inside a panel that is already still.
+        <HomecomingPanel
+          key={`${haul.tier}:${haul.fortune}:${haul.entries.map((e) => e.amount).join()}`}
+          haul={haul}
+          onDismiss={() => setHaul(null)}
+        />
       )}
 
       {active && (
@@ -235,6 +267,160 @@ function ActiveQuestBanner({
             ? "קבל את פני הגיבור ואסוף את השלל"
             : "הגיבור בדרכים…"}
       </button>
+    </div>
+  );
+}
+
+/* ------------------------------ the homecoming ------------------------------ */
+
+/** Icon and tint for each kind a haul can contain. */
+const HAUL_TILE: Record<HeroQuestHaulKind, { icon: IconName; tone: string }> = {
+  gold: { icon: "gold", tone: "text-gold-bright" },
+  wood: { icon: "wood", tone: "text-amber-600" },
+  iron: { icon: "iron", tone: "text-slate-300" },
+  stone: { icon: "stone", tone: "text-stone-400" },
+  citizens: { icon: "citizens", tone: "text-bone" },
+  slaves: { icon: "mine", tone: "text-orange-300" },
+  xp: { icon: "spark", tone: "text-gold-bright" },
+};
+
+/**
+ * How loud the panel is allowed to be. The fortune band is the whole story of
+ * the run, so a legendary haul gets a gold frame that carries across the room
+ * and a grim one gets a muted grey — the player should know how it went before
+ * reading a single digit. Purely presentational, which is why it lives here and
+ * not beside the band table in lib.
+ */
+const FORTUNE_TONE: Record<
+  string,
+  { frame: string; head: string; glow: string }
+> = {
+  grim: {
+    frame: "border-zinc-600/50 from-zinc-900/70",
+    head: "text-zinc-300",
+    glow: "",
+  },
+  plain: {
+    frame: "border-sky-500/40 from-sky-950/60",
+    head: "text-sky-200",
+    glow: "",
+  },
+  good: {
+    frame: "border-emerald-500/50 from-emerald-950/70",
+    head: "text-emerald-300",
+    glow: "shadow-[0_0_28px_-10px_rgba(16,185,129,0.8)]",
+  },
+  rich: {
+    frame: "border-violet-400/60 from-violet-950/70",
+    head: "text-violet-200",
+    glow: "shadow-[0_0_34px_-8px_rgba(167,139,250,0.85)]",
+  },
+  legend: {
+    frame: "border-gold/70 from-amber-950/70",
+    head: "text-gold-bright",
+    glow: "shadow-[0_0_40px_-6px_rgba(212,175,55,0.95)]",
+  },
+};
+
+/**
+ * What he brought back, spelled out. This replaces the old one-line success
+ * message, which was printed below ten quest rows — far off screen from the
+ * button that produced it, so the haul may as well not have been reported.
+ */
+function HomecomingPanel({
+  haul,
+  onDismiss,
+}: {
+  haul: HeroQuestHaul;
+  onDismiss: () => void;
+}) {
+  const quest = heroQuestByTier(haul.tier);
+  const fortune = heroQuestFortuneByKey(haul.fortune);
+  const tone = FORTUNE_TONE[fortune.key] ?? FORTUNE_TONE.plain!;
+
+  return (
+    <div
+      className={`haul-panel mt-3 overflow-hidden rounded-xl border bg-gradient-to-b via-black/60 to-black/70 p-3.5 ${tone.frame} ${tone.glow}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className={`flex items-center gap-2 text-base font-black ${tone.head}`}>
+            <span aria-hidden className="text-lg">
+              {quest?.sigil ?? "🧭"}
+            </span>
+            {fortune.label}!
+          </h3>
+          <p className="mt-0.5 text-[11px] text-zinc-400">
+            הגיבור חזר מ&rdquo;{quest?.name ?? "המסע"}&rdquo;
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="סגור את סיכום המסע"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-[11px] text-zinc-400 transition hover:bg-white/10 hover:text-bone"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4">
+        {haul.entries.map((entry, i) => {
+          const tile = HAUL_TILE[entry.kind];
+          return (
+            <div
+              key={entry.kind}
+              style={{ animationDelay: `${i * 70}ms` }}
+              className="haul-tile flex flex-col items-center justify-center gap-1 rounded-lg border border-white/10 bg-black/50 p-2 text-center"
+            >
+              <Icon name={tile.icon} size={24} className={tile.tone} />
+              <span className="nums text-sm font-black text-bone" dir="ltr">
+                +{formatNumber(entry.amount)}
+              </span>
+              <span className="text-[10px] font-bold leading-none text-zinc-400">
+                {HERO_QUEST_HAUL_LABEL[entry.kind]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      {(haul.levelsGained > 0 || haul.item || haul.potion) && (
+        <ul className="mt-2 space-y-1.5">
+          {haul.levelsGained > 0 && (
+            <li className="flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1.5 text-xs font-bold text-gold-bright">
+              <span aria-hidden>⬆️</span>
+              הגיבור עלה {haul.levelsGained > 1 ? `${haul.levelsGained} דרגות` : "דרגה"}!
+            </li>
+          )}
+          {haul.item && (
+            <li
+              className={`flex items-center gap-2 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs font-bold ${RARITY_META[haul.item.rarity].tone}`}
+            >
+              <span aria-hidden>🎁</span>
+              נמצא בדרך: {haul.item.label}
+              <span className="text-[10px] font-normal text-zinc-500">
+                — מחכה בתרמיל
+              </span>
+            </li>
+          )}
+          {haul.potion && (
+            <li
+              className={`flex items-center gap-2 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs font-bold ${POTION_META[haul.potion].tone}`}
+            >
+              <Icon name="potion" size={14} />
+              {POTION_META[haul.potion].label}
+              <span className="text-[10px] font-normal text-zinc-500">
+                — {POTION_META[haul.potion].tagline}
+              </span>
+            </li>
+          )}
+        </ul>
+      )}
+
+      <p className="mt-2.5 text-[11px] italic leading-relaxed text-zinc-400">
+        {fortune.lore}
+      </p>
     </div>
   );
 }

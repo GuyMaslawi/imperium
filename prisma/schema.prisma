@@ -197,7 +197,64 @@ model GameSeason {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Stamped the moment the season's clock runs out and its final standings
+  /// were archived. Non-null is the whole gate: a closed active season shuts
+  /// every game screen until the next season opens (see server/seasonClose.ts).
+  /// Writing it is the mutex — the close runs lazily on whichever page load
+  /// first crosses `endsAt`, and a guarded `updateMany(closedAt: null)` makes
+  /// sure only one of a hundred simultaneous loads does the archiving.
+  closedAt DateTime?
+
+  /// The end-of-season story, frozen at closing time: the categories, the
+  /// totals, and the podium as it stood. Denormalised on purpose — the admin's
+  /// season reset deletes every empire, so nothing on this page may be a join.
+  /// Shape: `SeasonRecap` in src/server/seasonClose.ts.
+  recap Json?
+
   empires Empire[]
+}
+
+/// One podium place of a finished season — the durable record behind היכל
+/// התהילה. Written once, when the season is archived, and never updated: the
+/// board is a record of who topped each season, not a live ranking.
+///
+/// **Nothing here is a relation, on purpose.** Not `empireId` (the next season
+/// reset deletes every Empire row) and not `seasonId` (an admin may delete the
+/// GameSeason itself, and the point of "save before deleting" is precisely that
+/// the record outlives it). Every column is a snapshot, including the season's
+/// own name and dates; the ids are historical breadcrumbs, never join keys.
+/// A hall that could be emptied by a cascade would not be a hall.
+model SeasonChampion {
+  /// The GameSeason this was archived from. Unconstrained — the row it names
+  /// may be long gone.
+  seasonId       String
+  seasonName     String
+  seasonStartsAt DateTime
+  seasonEndsAt   DateTime
+
+  id String @id @default(cuid())
+
+  /// 1, 2 or 3. The unique below is what makes archiving idempotent when the
+  /// same season is archived twice (admin first, clock second).
+  rank Int
+
+  empireId   String?
+  empireName String
+  /// Owner's display name at archiving time, so the hall names a player and
+  /// not only an empire.
+  playerName String?
+  guildName  String?
+
+  /// Final standing figures, exactly as the ladder ranked them.
+  power     Float
+  cities    Int
+  heroLevel Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([seasonId, rank])
+  /// The hall reads newest season first.
+  @@index([seasonEndsAt])
 }
 
 model Empire {
@@ -245,8 +302,8 @@ model Empire {
   generalPower        Float     @default(0)
   spyPower            Float     @default(0)
 
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   season        GameSeason?          @relation(fields: [seasonId], references: [id], onDelete: SetNull)
@@ -266,6 +323,8 @@ model Empire {
   messages           Message[]           @relation("MessageInbox")
   messagesSent       Message[]           @relation("MessageSender")
   guildMembership    GuildMember?
+  guildInvites       GuildInvite[]       @relation("GuildInviteTo")
+  guildInvitesSent   GuildInvite[]       @relation("GuildInviteFrom")
   guildBuffs         GuildSpellBuff[]
   diamondEffects     DiamondEffect[]
   potions            PotionStack[]
@@ -554,6 +613,32 @@ model Guild {
 
   members GuildMember[]
   spells  GuildSpell[]
+  invites GuildInvite[]
+}
+
+/// A standing invitation for one guildless empire to join one guild.
+///
+/// Joining is invitation-only: `joinGuild` consumes a live row here, so the
+/// browse list on /game/guild is a directory, not a door. The invitation used
+/// to be nothing but an inbox message, which meant the message was decoration —
+/// the join action never looked at it, and anyone holding a guild id could walk
+/// into any guild uninvited.
+model GuildInvite {
+  id          String   @id @default(cuid())
+  guildId     String
+  empireId    String
+  /// Who sent it. SetNull so a deleted recruiter does not void the invitation.
+  invitedById String?
+  createdAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  guild     Guild   @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  empire    Empire  @relation("GuildInviteTo", fields: [empireId], references: [id], onDelete: Cascade)
+  invitedBy Empire? @relation("GuildInviteFrom", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  /// One standing invitation per guild per player — re-inviting refreshes it.
+  @@unique([guildId, empireId])
+  @@index([empireId, expiresAt])
 }
 
 model GuildMember {
@@ -664,7 +749,7 @@ model GuildWarEntry {
   /// Stored rather than computed on read because the board polls every six
   /// seconds and summing it live means loading every member's army and every
   /// weapon row on each poll. advanceWar already has the figures in hand.
-  power  Int @default(0)
+  power Int @default(0)
 
   /// Final placement, written at settlement (1 = champion).
   rank        Int?
@@ -1136,8 +1221,23 @@ model BattleReport {
   // for the attacker, defense buff for the defender).
   attackerGuildBonusPct Float?
   defenderGuildBonusPct Float?
-  attackerHeroXp        Int    @default(0)
-  defenderHeroXp        Int    @default(0)
+
+  // Passive guild aid: a flat power reinforcement equal to `…AidPct` percent of
+  // the guild's combined military power, added after every own-troop
+  // multiplier. Snapshotted because the guild's roster and its aid level both
+  // move — the report has to say what this battle was actually fought with.
+  attackerGuildAidPct   Float?
+  attackerGuildAidPower Float?
+  defenderGuildAidPct   Float?
+  defenderGuildAidPower Float?
+
+  // The defender's flat multiplier (20 = +20%), snapshotted because it is a
+  // live tunable. Without it the defence column simply does not add up: it is
+  // the largest single term after the troops themselves, and the report never
+  // mentioned it.
+  defenseBonusPct Float?
+  attackerHeroXp  Int    @default(0)
+  defenderHeroXp  Int    @default(0)
 
   // Hero item captured by the attacker on a win (denormalized snapshot).
   droppedItemSlot   HeroItemSlot?
@@ -1250,18 +1350,18 @@ model ErrorLog {
   id String @id @default(cuid())
 
   /// Where it came from — a server action name, a route, or "render".
-  source  String
-  message String
+  source   String
+  message  String
   /// Truncated; a stack is for recognising the bug, not for reading in full.
-  stack   String?
+  stack    String?
   /// Request path, when one was in scope.
-  path    String?
+  path     String?
   /// Whose session hit it, when known. No FK: an error must survive the user.
   userId   String?
   empireId String?
   /// How many times this same (source, message) pair has been seen since
   /// `createdAt` — one bad deploy must not write ten thousand rows.
-  count    Int      @default(1)
+  count    Int     @default(1)
 
   createdAt DateTime @default(now())
   lastSeen  DateTime @default(now())

@@ -5,10 +5,11 @@ import {
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
   HERO_REVIVE_MS,
+  EXTRA_WEIGHTS,
   ITEM_LEVELS,
   PRIMARY_WEIGHT,
   RARITY_ORDER,
-  SECONDARY_WEIGHT,
+  SLOT_META,
   SLOT_ORDER,
   UPGRADE_COST_AT_LEVEL_10,
   UPGRADE_COST_AT_LEVEL_100,
@@ -18,6 +19,7 @@ import {
   damagedHealth,
   heroReviveAt,
   isHeroDead,
+  itemBonusLines,
   itemStatBonus,
   itemUpgradeCost,
   nextTierLevel,
@@ -202,14 +204,57 @@ describe("item stats", () => {
     }
   });
 
-  it("moves the primary on every single rung — no upgrade is ever a no-op", () => {
+  it("moves something on every single rung — no upgrade is ever a no-op", () => {
+    // The invariant is about the *item*, not any one line of it. Flat stats
+    // climb with the square of the rung, so on the small-ceilinged ones (turns,
+    // resources) the first few rungs all round to +1 and that line stands still
+    // — the price of not paying a beginner 90 citizens for a level-3 boot. What
+    // must never happen is an upgrade that costs gold and changes nothing, so
+    // every rung has to move at least one line: the percentage extras advance on
+    // each rung, and a resource item also widens its coverage with every tier.
+    for (const slot of SLOT_ORDER) {
+      for (let i = 1; i < ITEM_LEVELS.length; i++) {
+        const before = itemBonusLines(slot, ITEM_LEVELS[i - 1]);
+        const after = itemBonusLines(slot, ITEM_LEVELS[i]);
+        const moved =
+          after.length !== before.length ||
+          after.some(
+            (line, j) =>
+              line.label !== before[j].label || line.value !== before[j].value
+          );
+        expect(
+          moved,
+          `${slot} ${ITEM_LEVELS[i - 1]} → ${ITEM_LEVELS[i]} changes nothing`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("starts every flat stat small enough to make sense at level 1", () => {
+    // The bug this replaced: a level-3 boot paid +90 citizens per daily update
+    // against a base intake of 25. A first-rung item is a rounding error by
+    // design — it is the cheapest thing in the game.
+    for (const slot of SLOT_ORDER) {
+      for (const stat of ["resources", "turns", "citizens"] as const) {
+        if (!slotGrants(slot, stat)) continue;
+        expect(itemStatBonus(slot, 1, stat)).toBe(1);
+      }
+    }
+    // …and the whole first series (levels 1–10) stays inside the same order of
+    // magnitude as the economy a first-city empire actually runs on.
+    expect(itemStatBonus("BOOTS", 10, "citizens")).toBeLessThan(25);
+  });
+
+  it("grows flat stats faster than linearly, so late gear is worth its price", () => {
+    // Upgrade prices are geometric (×3.95 per series). A linear bonus curve
+    // meant every rung bought less than the one before it, all the way up.
     for (const slot of SLOT_ORDER) {
       const stat = slotPrimaryStat(slot);
-      for (let i = 1; i < ITEM_LEVELS.length; i++) {
-        expect(itemStatBonus(slot, ITEM_LEVELS[i], stat)).toBeGreaterThan(
-          itemStatBonus(slot, ITEM_LEVELS[i - 1], stat)
-        );
-      }
+      if (!["resources", "turns", "citizens"].includes(stat)) continue;
+      const quarter = itemStatBonus(slot, ITEM_LEVELS[9], stat); // rung 10
+      const full = itemStatBonus(slot, 100, stat); // rung 40
+      // Four times the rung is far more than four times the bonus.
+      expect(full).toBeGreaterThan(quarter * 8);
     }
   });
 
@@ -218,7 +263,7 @@ describe("item stats", () => {
     // (a turn is not a citizen), so a slot's own primary and extra are not
     // comparable numbers. What must hold is that the SAME stat is worth less as
     // somebody else's extra.
-    expect(SECONDARY_WEIGHT).toBeLessThan(PRIMARY_WEIGHT);
+    for (const w of EXTRA_WEIGHTS) expect(w).toBeLessThan(PRIMARY_WEIGHT);
     const STATS = ["attack", "defense", "spy", "resources", "turns", "citizens"] as const;
     for (const stat of STATS) {
       const asPrimary = SLOT_ORDER.filter((s) => slotPrimaryStat(s) === stat);
@@ -231,6 +276,37 @@ describe("item stats", () => {
         expect(itemStatBonus(slot, 100, stat)).toBeLessThan(best);
       }
     }
+  });
+
+  it("spends a comparable budget on every slot", () => {
+    // Slots differ in *shape*, not in total worth: a specialist pours its whole
+    // extra budget into one stat, a generalist splits it between two. What must
+    // not happen is a slot that is simply weaker than the rest — כפפות and שריון
+    // were exactly that (1.25 against everyone else's 1.5) for as long as an
+    // extra was worth a flat quarter.
+    const budgets = SLOT_ORDER.map((slot) =>
+      SLOT_META[slot].stats.reduce((sum, s) => sum + s.weight, 0)
+    );
+    const spread = Math.max(...budgets) - Math.min(...budgets);
+    expect(spread).toBeLessThan(0.15);
+    for (const slot of SLOT_ORDER) {
+      // The headline stat always outweighs everything riding along with it.
+      const [head, ...extras] = SLOT_META[slot].stats;
+      expect(head.weight).toBeGreaterThanOrEqual(
+        extras.reduce((sum, s) => sum + s.weight, 0)
+      );
+    }
+  });
+
+  it("gives each resource slot its own resource to lead with", () => {
+    // A פשוט piece covers one resource. Which one is the slot's identity — it is
+    // what makes an early מגן and an early פרי שטן a real choice rather than the
+    // same gold faucet in two shapes.
+    const leads = SLOT_ORDER.filter((slot) => slotGrants(slot, "resources")).map(
+      (slot) => itemBonusLines(slot, 1).find((l) => l.resource)?.resource
+    );
+    expect(leads.every(Boolean)).toBe(true);
+    expect(new Set(leads).size).toBeGreaterThanOrEqual(4);
   });
 
   it("never grants diamonds from gear", () => {

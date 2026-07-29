@@ -148,8 +148,11 @@ async function main() {
   });
   await p.guildMember.upsert({
     where: { empireId: defender.id },
-    create: { guildId: guild.id, empireId: defender.id, role: "DEPUTY" },
-    update: { guildId: guild.id, role: "DEPUTY" },
+    // LEADER, not DEPUTY: a guild always has exactly one leader (see
+    // server/guildLeadership.ts), and seeding a lone deputy produced a headless
+    // guild in the dev database that no player could govern.
+    create: { guildId: guild.id, empireId: defender.id, role: "LEADER" },
+    update: { guildId: guild.id, role: "LEADER" },
   });
 
   await p.guildSpellBuff.deleteMany({ where: { empireId: defender.id } });

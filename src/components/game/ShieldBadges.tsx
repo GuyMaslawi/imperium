@@ -33,6 +33,10 @@ const SHIELD_WORD: Record<ShieldKey, string> = {
  * the live badges below, the shop card and the ladder legend so all three stay
  * identical.
  *
+ * The frame (`rounded-md px-2 py-0.5`) is deliberately the same one every other
+ * stat pill wears — power, guild, health. A shield drawn tighter than its
+ * neighbours read as a lesser, decorative mark sitting in a row of real ones.
+ *
  * `label` spells the cover out in a word rather than a second glyph. Two icons
  * side by side is a rebus: readers saw a shield and a box and had to guess, and
  * nothing on the row told them the guess was right. Anywhere there is room for
@@ -52,7 +56,7 @@ export function ShieldGlyph({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 font-bold ${SHIELD_TONE[shieldKey]}`}
+      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold ${SHIELD_TONE[shieldKey]}`}
       title={title}
     >
       <Icon name="shield" size={size} />
@@ -64,17 +68,14 @@ export function ShieldGlyph({
 /** Which shields to draw, as expiry timestamps (null / absent = not running). */
 export type ShieldState = Partial<Record<ShieldKey, Date | string | null>>;
 
-/** "24.07 · 14:30" — the exact hour a shield drops, for the tooltip. */
-function untilLabel(value: Date | string): string {
-  const d = value instanceof Date ? value : new Date(value);
-  const date = d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
-  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-  return `${date} · ${time}`;
-}
-
 /**
  * The shield pills shown beside an empire's name. Renders nothing when the
  * empire holds no shield, so it can be dropped into any row unconditionally.
+ *
+ * The badge says *that* a shield is up and nothing more. The hour it drops is
+ * intel — a raider who knows a shield expires at 14:30 can park on the target
+ * and strike the minute it does, without paying a spy for the timing. That
+ * number belongs in the spy report (and in the shop, for your own shields).
  */
 export function ShieldBadges({
   shields,
@@ -97,9 +98,9 @@ export function ShieldBadges({
         <ShieldGlyph
           key={s.key}
           shieldKey={s.key}
-          size={size === "md" ? 15 : 12}
+          size={size === "md" ? 14 : 12}
           label={label}
-          title={`${shieldMeta(s.key).badge} · עד ${untilLabel(shields[s.key]!)}`}
+          title={shieldMeta(s.key).badge}
         />
       ))}
     </>

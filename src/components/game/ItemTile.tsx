@@ -99,6 +99,13 @@ export interface ItemTileDetails {
   requiredLevel: number;
   /** Whether the current hero meets the requirement. */
   meetsRequirement?: boolean;
+  /**
+   * The piece is on the hero's body right now. Gear worn before a prestige
+   * reset stays worn and keeps paying out even though its level requirement is
+   * no longer met, so a worn tile never renders locked — the requirement line
+   * still says ✗, with a note that taking it off locks it away.
+   */
+  worn?: boolean;
   equipped?: boolean;
   /** Catalog view: the player already owns a copy. */
   owned?: boolean;
@@ -106,9 +113,18 @@ export interface ItemTileDetails {
   hint?: string;
 }
 
-export function formatBonus(pct: number): string {
-  // Bonuses are always whole percentages.
-  return String(Math.round(pct));
+/**
+ * A bonus figure, as it is printed everywhere gear is shown.
+ *
+ * Percentages are no longer whole: an extra on a low-rung item is genuinely
+ * worth a quarter of a percent, and it says so. Only the digits that carry
+ * information are printed — "+40%", not "+40.00%" — and flat counts, which are
+ * always whole, are unaffected by the decimals branch.
+ */
+export function formatBonus(value: number): string {
+  return Number.isInteger(value)
+    ? String(value)
+    : String(Number(value.toFixed(2)));
 }
 
 /**
@@ -141,7 +157,10 @@ export function ItemTile({
   const r = RARITY[rarity];
   const iconSize =
     size === "lg" ? "text-6xl" : size === "sm" ? "text-3xl" : "text-4xl";
-  const locked = details?.meetsRequirement === false;
+  const worn = details?.worn === true || details?.equipped === true;
+  // A worn piece is never "locked": it is working right now, whatever the
+  // hero's level. Only gear waiting in the bag greys out behind the 🔒.
+  const locked = details?.meetsRequirement === false && !worn;
   // Locked items stay dim & inert; everything else shimmers. Desync each tile's
   // sweep from a stable seed so a grid twinkles unevenly rather than in a wave.
   const sparkle = !locked;
@@ -207,6 +226,14 @@ export function ItemTile({
         {details.meetsRequirement === false ? "✗" : "✓"} דרישה: גיבור רמה{" "}
         <span className="nums">{details.requiredLevel}</span>
       </p>
+
+      {/* grandfathered: worn from before a reset, below its own requirement */}
+      {worn && details.meetsRequirement === false && (
+        <p className="mt-1 text-[11px] text-amber-300">
+          ממשיך לפעול — אך הסרתו תנעל אותו עד רמה{" "}
+          <span className="nums">{details.requiredLevel}</span>
+        </p>
+      )}
 
       {details.equipped && (
         <p className="mt-1 text-[11px] font-bold text-emerald-300">✔ לבוש כעת</p>

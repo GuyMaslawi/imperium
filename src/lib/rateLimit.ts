@@ -60,19 +60,26 @@ function sweep(now: number): void {
   }
 }
 
-/** Consume one hit against this instance's own copy of the window. */
-function localAllows(key: string, limit: number, windowMs: number): boolean {
+/** Consume `cost` hits against this instance's own copy of the window. */
+function localAllows(
+  key: string,
+  limit: number,
+  windowMs: number,
+  cost: number
+): boolean {
   const now = Date.now();
   const existing = buckets.get(key);
 
   if (!existing || existing.resetAt <= now) {
     if (buckets.size >= MAX_BUCKETS) sweep(now);
-    buckets.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
+    buckets.set(key, { count: cost, resetAt: now + windowMs });
+    // A single action worth more than the whole window is refused outright
+    // rather than let through on a fresh bucket.
+    return cost <= limit;
   }
 
-  if (existing.count >= limit) return false;
-  existing.count += 1;
+  if (existing.count + cost > limit) return false;
+  existing.count += cost;
   return true;
 }
 
@@ -96,9 +103,14 @@ async function sweepShared(): Promise<void> {
 }
 
 /**
- * Consume one hit against `key`. Allows up to `limit` hits per `windowMs`;
- * resolves `true` while under the limit and `false` once the window is
- * exhausted, until it rolls over.
+ * Consume `cost` hits against `key` (default 1). Allows up to `limit` hits per
+ * `windowMs`; resolves `true` while under the limit and `false` once the window
+ * is exhausted, until it rolls over.
+ *
+ * `cost` is what lets a budget be counted in something other than calls. Player
+ * mail is the case that needs it: throttling *sends* leaves the recipient count
+ * unbounded, since one send may address many players, so the mail budget is
+ * charged per addressee instead.
  *
  * The counter moves in a single statement. `ON CONFLICT DO UPDATE` with the
  * window rollover expressed as a `CASE` is what makes it safe: read-then-write
@@ -111,20 +123,26 @@ async function sweepShared(): Promise<void> {
 export async function rateLimit(
   key: string,
   limit: number,
-  windowMs: number
+  windowMs: number,
+  cost = 1
 ): Promise<boolean> {
+  // A caller-supplied cost reaches the counter, so it is clamped to a positive
+  // integer here: a zero or negative charge would decrement a shared window,
+  // handing an attacker a way to refund every other bucket they share.
+  const hits = Math.max(1, Math.floor(cost));
+
   // Cheap per-instance pre-filter — see the header.
-  if (!localAllows(key, limit, windowMs)) return false;
+  if (!localAllows(key, limit, windowMs, hits)) return false;
 
   const resetAt = new Date(Date.now() + windowMs);
   try {
     const rows = await prisma.$queryRaw<{ count: number }[]>`
       INSERT INTO "RateLimitBucket" ("key", "count", "resetAt")
-      VALUES (${key}, 1, ${resetAt})
+      VALUES (${key}, ${hits}::int, ${resetAt})
       ON CONFLICT ("key") DO UPDATE SET
         "count" = CASE
-          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN 1
-          ELSE "RateLimitBucket"."count" + 1
+          WHEN "RateLimitBucket"."resetAt" <= NOW() THEN ${hits}::int
+          ELSE "RateLimitBucket"."count" + ${hits}::int
         END,
         "resetAt" = CASE
           WHEN "RateLimitBucket"."resetAt" <= NOW() THEN ${resetAt}

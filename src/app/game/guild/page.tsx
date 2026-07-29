@@ -8,6 +8,7 @@ import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
+  GUILD_INVITE_TTL_HOURS,
   GUILD_ROLE_META,
   GUILD_SPELL_MAX_LEVEL,
   GUILD_SPELL_TYPES,
@@ -20,7 +21,7 @@ import {
   spellUpgradeCostDiamonds,
 } from "@/lib/game/guild";
 import { GuildCreateForm } from "@/components/game/GuildCreateForm";
-import { GuildJoinButton } from "@/components/game/GuildJoinButton";
+import { GuildInviteActions } from "@/components/game/GuildInviteActions";
 import { GuildAddMemberForm } from "@/components/game/GuildAddMemberForm";
 import { GuildShopCard } from "@/components/game/GuildShopCard";
 import { GuildCapacityCard } from "@/components/game/GuildCapacityCard";
@@ -81,21 +82,49 @@ function GuildHall({
 
 /* -------- no guild yet: create + browse open guilds -------- */
 
-async function NoGuildView({ diamonds }: { diamonds: number }) {
+async function NoGuildView({
+  empireId,
+  diamonds,
+}: {
+  empireId: string;
+  diamonds: number;
+}) {
   // Bounded: this is a recruitment browser, not a directory. Unbounded it grew
   // with the player count and carried a nested per-guild join, reachable by any
   // guildless player on every page load.
-  const guilds = await prisma.guild.findMany({
-    orderBy: { createdAt: "asc" },
-    take: GUILD_BROWSE_LIMIT,
-    include: {
-      _count: { select: { members: true } },
-      members: {
-        where: { role: "LEADER" },
-        include: { empire: { select: { name: true } } },
+  const [guilds, invites] = await Promise.all([
+    prisma.guild.findMany({
+      orderBy: { createdAt: "asc" },
+      take: GUILD_BROWSE_LIMIT,
+      include: {
+        _count: { select: { members: true } },
+        members: {
+          where: { role: "LEADER" },
+          include: { empire: { select: { name: true } } },
+        },
       },
-    },
-  });
+    }),
+    // Live invitations only — a lapsed row is not a door, and joinGuild would
+    // refuse it anyway.
+    prisma.guildInvite.findMany({
+      where: { empireId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: "desc" },
+      include: {
+        guild: {
+          include: {
+            _count: { select: { members: true } },
+            members: {
+              where: { role: "LEADER" },
+              include: { empire: { select: { name: true } } },
+            },
+          },
+        },
+        invitedBy: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const invitedGuildIds = new Set(invites.map((i) => i.guildId));
 
   return (
     <>
@@ -106,17 +135,75 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
           אין לך ברית
         </p>
         <p className="mt-1 text-xs text-zinc-400">
-          האולם ריק — הצטרף לברית קיימת או הקם אחת משלך.
+          האולם ריק — המתן להזמנה לברית קיימת או הקם אחת משלך.
         </p>
       </GuildHall>
+
+      {/* -------- standing invitations: the only way in -------- */}
+      {invites.length > 0 && (
+        <div className="panel-gold rounded-xl p-4">
+          <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+            <Icon name="messages" size={18} className="text-crimson" />
+            הזמנות שממתינות לך
+            <span className="nums mr-auto rounded-full border border-gold/50 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold-bright" dir="ltr">
+              {invites.length}
+            </span>
+          </h2>
+          <p className="mb-4 text-xs text-zinc-500">
+            הזמנה תקפה ל־{GUILD_INVITE_TTL_HOURS} שעות מרגע שנשלחה. אישור מכניס
+            אותך לברית מיד — ושאר ההזמנות שלך נמחקות.
+          </p>
+
+          <ul className="space-y-2">
+            {invites.map((invite) => {
+              const capacity = guildCapacity(invite.guild.capacityLevel);
+              const memberCount = invite.guild._count.members;
+              return (
+                <li
+                  key={invite.id}
+                  className="panel-inset flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-3 py-2.5"
+                >
+                  <span className="text-sm font-bold text-gold-bright">
+                    {invite.guild.name}
+                  </span>
+                  <span className="text-[11px] text-zinc-500">
+                    מנהיג: {invite.guild.members[0]?.empire.name ?? "—"}
+                  </span>
+                  <span className="nums text-[11px] text-zinc-500" dir="ltr">
+                    {memberCount}/{capacity}
+                  </span>
+                  {invite.invitedBy && (
+                    <span className="text-[11px] text-zinc-500">
+                      הוזמנת ע״י {invite.invitedBy.name}
+                    </span>
+                  )}
+                  <div className="mr-auto">
+                    <GuildInviteActions
+                      guildId={invite.guildId}
+                      guildName={invite.guild.name}
+                      full={memberCount >= capacity}
+                    />
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
         {/* -------- active recruitment (right in RTL) -------- */}
         <div className="panel rounded-xl p-4">
-          <h2 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+          <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="citizens" size={18} className="text-crimson" />
-            גיוס בריתות פעיל
+            בריתות הממלכה
           </h2>
+          {/* This list used to carry a "הצטרף" button on every row, which was
+              the whole bug: joining asked for nothing but a guild id, so the
+              directory was an open door into any guild in the game. */}
+          <p className="mb-4 text-xs text-zinc-500">
+            הכניסה לברית היא בהזמנה בלבד — פנה למנהיג או לסגן כדי שיזמינו אותך.
+          </p>
 
           {guilds.length === 0 ? (
             <p className="py-6 text-center text-sm text-zinc-500">
@@ -156,10 +243,19 @@ async function NoGuildView({ diamonds }: { diamonds: number }) {
                           </span>
                         </td>
                         <td className="py-3 pl-2">
-                          <GuildJoinButton
-                            guildId={guild.id}
-                            full={memberCount >= capacity}
-                          />
+                          {invitedGuildIds.has(guild.id) ? (
+                            <span className="inline-block rounded-full border border-gold/50 bg-gold/10 px-2.5 py-1 text-[11px] font-semibold text-gold-bright">
+                              הוזמנת ✉︎
+                            </span>
+                          ) : memberCount >= capacity ? (
+                            <span className="inline-block rounded-full border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-[11px] font-semibold text-red-400">
+                              מלאה 🚫
+                            </span>
+                          ) : (
+                            <span className="inline-block rounded-full border border-border-subtle bg-panel-inset px-2.5 py-1 text-[11px] font-semibold text-zinc-500">
+                              בהזמנה בלבד
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -227,7 +323,7 @@ export default async function GuildPage() {
           title="הברית שלי"
           ornament={<Icon name="base" size={22} className="text-crimson" />}
         />
-        <NoGuildView diamonds={diamonds} />
+        <NoGuildView empireId={empire.id} diamonds={diamonds} />
       </div>
     );
   }

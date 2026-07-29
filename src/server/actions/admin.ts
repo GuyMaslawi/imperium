@@ -21,11 +21,24 @@ import type {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin, logAdmin } from "@/lib/admin";
-import { weaponByKey } from "@/lib/game/weapons";
+import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
-import { HERO_MAX_HEALTH } from "@/lib/game/hero";
-import { MAX_CITIES } from "@/lib/game/constants";
+import {
+  HERO_MAX_HEALTH,
+  HERO_MAX_LEVEL,
+  HERO_RESET_POINTS,
+  POINTS_PER_LEVEL,
+  xpToNextLevel,
+} from "@/lib/game/hero";
+import {
+  EMPIRE_UPGRADE_META,
+  MAX_CITIES,
+  MINE_MAX_LEVEL,
+  empireUpgradeMaxLevel,
+  isProductionBuilding,
+  type ActiveEmpireUpgradeType,
+} from "@/lib/game/constants";
 import { POTION_STACK_CAP } from "@/lib/game/potions";
 import { SEASON_PASS_XP_MAX } from "@/lib/game/seasonPass";
 import { ACHIEVEMENT_BY_KEY, GLORY_KEYS } from "@/lib/game/achievements";
@@ -39,6 +52,8 @@ import {
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
+import { repairGuildLeadership } from "@/server/guildLeadership";
+import { archiveSeasonStandings } from "@/server/seasonClose";
 
 export interface AdminActionState {
   error?: string;
@@ -97,6 +112,23 @@ function num(formData: FormData, key: string): number {
     throw new AdminError(`ערך לא תקין בשדה ${key}`);
   }
   return clampNum(n);
+}
+
+/**
+ * Clamp an admin-entered level/tier to the ceiling the game itself enforces.
+ *
+ * The editor is a shortcut around the *cost* of progression, never around its
+ * ceilings: anything a player cannot reach by playing, an admin cannot hand out
+ * here either. Skipping this is not a cosmetic "big number" — every ladder in
+ * the game is a multiplier on something unbounded downstream. A mine at level
+ * 555,555,555 yields `level × 2` per assigned slave *per tick* (an infinite
+ * resource faucet that also poisons the rankings and the world records), a hero
+ * stat point is +1% attack, and TURNS_PER_REGULAR_UPDATE past its cap of 5
+ * uncaps attacking itself. The upgrade paths in `game.ts` all guard these caps;
+ * the admin path is the only way around them, so it clamps identically.
+ */
+function clampLevel(n: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.round(n)));
 }
 
 /** Read an optional numeric field (bounded); returns `fallback` when blank. */
@@ -569,8 +601,31 @@ export async function updateBuilding(
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const type = str(formData, "type") as BuildingType;
-    const level = Math.max(0, Math.round(num(formData, "level")));
-    const slavesAssigned = Math.max(0, Math.round(optNum(formData, "slavesAssigned")));
+    const isMine = isProductionBuilding(type);
+    // Mines share the player's ceiling; the barracks and the spy center are
+    // built once at level 1 and have no upgrade path at all.
+    const level = clampLevel(num(formData, "level"), 0, isMine ? MINE_MAX_LEVEL : 1);
+
+    // Mine slaves are a *shared* pool: the assignment screen refuses any split
+    // whose total exceeds the army's `mineSlaves`. This form edits one mine at a
+    // time, so the ceiling is the pool minus what the other mines already hold —
+    // without it a mine could be staffed with slaves the empire never trained,
+    // which is production conjured out of nothing.
+    const [army, others] = await Promise.all([
+      prisma.army.findUnique({ where: { empireId }, select: { mineSlaves: true } }),
+      prisma.building.findMany({
+        where: { empireId, NOT: { type } },
+        select: { type: true, slavesAssigned: true },
+      }),
+    ]);
+    const assignedElsewhere = others
+      .filter((b) => isProductionBuilding(b.type))
+      .reduce((sum, b) => sum + b.slavesAssigned, 0);
+    const slaveCeiling = Math.max(0, (army?.mineSlaves ?? 0) - assignedElsewhere);
+    const slavesAssigned = isMine
+      ? clampLevel(optNum(formData, "slavesAssigned"), 0, slaveCeiling)
+      : 0;
+
     await prisma.building.upsert({
       where: { empireId_type: { empireId, type } },
       create: { empireId, type, level, slavesAssigned },
@@ -580,10 +635,14 @@ export async function updateBuilding(
       action: "empire.building",
       targetType: "empire",
       targetId: empireId,
-      summary: `מבנה ${type} → רמה ${level}`,
+      summary: `מבנה ${type} → רמה ${level}${isMine ? ` · ${slavesAssigned} עבדים` : ""}`,
     });
     revalidateEmpire(userId);
-    return { success: "המבנה עודכן" };
+    // The applied numbers ride back on the message: a clamped value must not
+    // look like it was saved as typed.
+    return {
+      success: `המבנה עודכן — רמה ${level}${isMine ? `, ${slavesAssigned} עבדים` : ""}`,
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -631,7 +690,21 @@ export async function updateUpgrade(
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const type = str(formData, "type") as EmpireUpgradeType;
-    const level = Math.max(1, Math.round(num(formData, "level")));
+    // Ceilings are per-type and, for CITIZEN_GROWTH, per city count — the exact
+    // rule `empireUpgradeMaxLevel` enforces on the upgrades page. DIAMOND_YIELD
+    // is retired and carries no metadata, so it keeps the lower bound only.
+    const cities =
+      (
+        await prisma.empire.findUnique({
+          where: { id: empireId },
+          select: { cities: true },
+        })
+      )?.cities ?? 1;
+    const maxLevel =
+      type in EMPIRE_UPGRADE_META
+        ? empireUpgradeMaxLevel(type as ActiveEmpireUpgradeType, cities)
+        : undefined;
+    const level = clampLevel(num(formData, "level"), 1, maxLevel ?? ADMIN_NUM_MAX);
     await prisma.empireUpgrade.upsert({
       where: { empireId_type: { empireId, type } },
       create: { empireId, type, level },
@@ -644,7 +717,7 @@ export async function updateUpgrade(
       summary: `שדרוג ${type} → רמה ${level}`,
     });
     revalidateEmpire(userId);
-    return { success: "השדרוג עודכן" };
+    return { success: `השדרוג עודכן — רמה ${level}` };
   } catch (e) {
     return toErr(e);
   }
@@ -661,7 +734,14 @@ export async function updateWeaponUnlock(
     const userId = str(formData, "userId");
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const category = str(formData, "category") as WeaponCategory;
-    const unlockedTier = Math.max(1, Math.round(num(formData, "unlockedTier")));
+    // 30 tiers per category is the whole catalog — a higher "unlocked tier" is
+    // not just meaningless, it silently widens the wheel's weapon prize pool
+    // (`wheel.ts` gates drops on `weapon.tier <= unlockedTier`).
+    const unlockedTier = clampLevel(
+      num(formData, "unlockedTier"),
+      1,
+      TIERS_PER_CATEGORY
+    );
     await prisma.empireWeaponUnlock.upsert({
       where: { empireId_category: { empireId, category } },
       create: { empireId, category, unlockedTier },
@@ -674,7 +754,7 @@ export async function updateWeaponUnlock(
       summary: `פתיחת נשק ${category} → טיר ${unlockedTier}`,
     });
     revalidateEmpire(userId);
-    return { success: "פתיחת הנשק עודכנה" };
+    return { success: `פתיחת הנשק עודכנה — טיר ${unlockedTier}` };
   } catch (e) {
     return toErr(e);
   }
@@ -738,17 +818,43 @@ export async function updateHero(
       0,
       Math.min(HERO_MAX_HEALTH, Math.round(num(formData, "health")))
     );
+    const level = clampLevel(num(formData, "level"), 1, HERO_MAX_LEVEL);
+    const resets = Math.max(0, Math.round(num(formData, "resets")));
+    // XP is consumed as it is earned — `applyHeroXp` subtracts each level's cost
+    // as it cascades — so a live hero never holds more than the next level's
+    // requirement, and a hero standing at the cap always sits at exactly 0.
+    const xp =
+      level >= HERO_MAX_LEVEL
+        ? 0
+        : clampLevel(num(formData, "xp"), 0, xpToNextLevel(level));
+
+    // Stat points have exactly two sources: one per level gained, plus the 25
+    // handed back at a reset (which wipes every allocated point, so only the
+    // most recent reset's grant survives). Each point is a permanent +1% on a
+    // core combat stat, so an unbounded field here is a bigger cheat than any
+    // resource number. The pool is filled in allocation order and whatever
+    // exceeds it is dropped.
+    const pointPool =
+      (level - 1) * POINTS_PER_LEVEL + (resets > 0 ? HERO_RESET_POINTS : 0);
+    let unallocated = pointPool;
+    const takePoints = (key: string) => {
+      const want = Math.max(0, Math.round(num(formData, key)));
+      const got = Math.min(unallocated, want);
+      unallocated -= got;
+      return got;
+    };
+
     const data = {
       heroClass,
       health,
       diedAt: health <= 0 ? new Date() : null,
-      level: Math.max(1, Math.round(num(formData, "level"))),
-      xp: Math.max(0, Math.round(num(formData, "xp"))),
-      unspentPoints: Math.max(0, Math.round(num(formData, "unspentPoints"))),
-      attackPoints: Math.max(0, Math.round(num(formData, "attackPoints"))),
-      defensePoints: Math.max(0, Math.round(num(formData, "defensePoints"))),
-      resourcePoints: Math.max(0, Math.round(num(formData, "resourcePoints"))),
-      resets: Math.max(0, Math.round(num(formData, "resets"))),
+      level,
+      xp,
+      attackPoints: takePoints("attackPoints"),
+      defensePoints: takePoints("defensePoints"),
+      resourcePoints: takePoints("resourcePoints"),
+      unspentPoints: takePoints("unspentPoints"),
+      resets,
     };
     await prisma.hero.upsert({
       where: { empireId },
@@ -762,7 +868,9 @@ export async function updateHero(
       summary: `גיבור → רמה ${data.level}`,
     });
     revalidateEmpire(userId);
-    return { success: "הגיבור עודכן" };
+    return {
+      success: `הגיבור עודכן — רמה ${data.level}, ${pointPool} נק' זמינות`,
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -793,7 +901,9 @@ export async function grantHeroItem(
     await assertTargetEditable(admin, { userId, empireId: str(formData, "empireId") });
     const slot = slotSchema.parse(formData.get("slot")) as HeroItemSlot;
     const rarity = raritySchema.parse(formData.get("rarity")) as HeroRarity;
-    const level = Math.max(1, Math.round(num(formData, "level")));
+    // Gear levels ride the hero ladder: drops roll at most HERO_MAX_LEVEL and
+    // `nextTierLevel` refuses to upgrade past it.
+    const level = clampLevel(num(formData, "level"), 1, HERO_MAX_LEVEL);
 
     const hero = await prisma.hero.upsert({
       where: { empireId },
@@ -811,7 +921,7 @@ export async function grantHeroItem(
       summary: `פריט גיבור הוענק: ${slot} ${rarity} רמה ${level}`,
     });
     revalidateEmpire(userId);
-    return { success: "הפריט הוענק לגיבור" };
+    return { success: `הפריט הוענק לגיבור — רמה ${level}` };
   } catch (e) {
     return toErr(e);
   }
@@ -1249,7 +1359,7 @@ export async function updateHeroItem(
 
     const slot = slotSchema.parse(formData.get("slot")) as HeroItemSlot;
     const rarity = raritySchema.parse(formData.get("rarity")) as HeroRarity;
-    const level = Math.max(1, Math.round(num(formData, "level")));
+    const level = clampLevel(num(formData, "level"), 1, HERO_MAX_LEVEL);
     const equipped = flag(formData, "equipped");
 
     await prisma.$transaction(async (tx) => {
@@ -1272,7 +1382,7 @@ export async function updateHeroItem(
       summary: `פריט גיבור עודכן: ${slot} ${rarity} רמה ${level}${equipped ? " (חבוש)" : ""}`,
     });
     revalidateEmpire(userId);
-    return { success: "הפריט עודכן" };
+    return { success: `הפריט עודכן — רמה ${level}` };
   } catch (e) {
     return toErr(e);
   }
@@ -1546,8 +1656,18 @@ export async function setGuildMembership(
     const guildId = str(formData, "guildId");
     const role = guildRoleSchema.parse(formData.get("role")) as GuildRole;
 
+    // Which guild this empire is leaving, read before the write so the guild it
+    // vacates can be re-seated: pulling a leader out here is the main way a
+    // guild ends up headless, and a headless guild cannot appoint its own
+    // leader — see server/guildLeadership.ts.
+    const previous = await prisma.guildMember.findUnique({
+      where: { empireId },
+      select: { guildId: true },
+    });
+
     if (!guildId) {
       await prisma.guildMember.deleteMany({ where: { empireId } });
+      await repairGuildLeadership(previous?.guildId);
       await logAdmin(admin, {
         action: "empire.guild_remove",
         targetType: "empire",
@@ -1569,6 +1689,14 @@ export async function setGuildMembership(
       create: { empireId, guildId, role },
       update: { guildId, role },
     });
+    // Both ends: the guild moved away from may have lost its leader, and the
+    // one moved into may have been given a second one (role is unchecked here
+    // by design — this is the override). ensureGuildLeader is a no-op whenever
+    // a leader is already seated.
+    if (previous?.guildId && previous.guildId !== guildId) {
+      await repairGuildLeadership(previous.guildId);
+    }
+    await repairGuildLeadership(guildId);
     await logAdmin(admin, {
       action: "empire.guild_set",
       targetType: "empire",
@@ -2083,15 +2211,26 @@ export async function deleteSeason(
   try {
     const admin = await requireAdmin();
     const id = str(formData, "id");
+    // Offered before every destructive season action: the standings are derived
+    // from live empires, and once the season is gone there is nothing left to
+    // derive them from. Defaults to "no" — an admin deleting a mis-typed season
+    // they created a minute ago should not have it enshrined in the hall.
+    const archive = str(formData, "archive") === "1";
+    const archived = archive ? await archiveSeasonStandings(id) : 0;
+
     await prisma.gameSeason.delete({ where: { id } });
     await logAdmin(admin, {
       action: "season.delete",
       targetType: "season",
       targetId: id,
-      summary: "עונה נמחקה",
+      summary: archived > 0 ? "עונה נמחקה (הדירוג נשמר)" : "עונה נמחקה",
+      details: { archivedChampions: archived },
     });
     revalidatePath("/admin/seasons");
-    return { success: "העונה נמחקה" };
+    revalidatePath("/game/rankings");
+    return {
+      success: archived > 0 ? "העונה נמחקה והדירוג נשמר בהיכל התהילה" : "העונה נמחקה",
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -2131,6 +2270,17 @@ export async function resetSeason(
       where: { isActive: true },
       select: { id: true },
     });
+
+    // The final standings are a pure function of the empires this transaction
+    // is about to delete, so if they are to be kept they must be read *first*.
+    // Deliberately does not close the season: the world restarts inside the
+    // same season and play continues — sealing it would lock every player out
+    // of the game as a side effect of a reset button.
+    const archived =
+      str(formData, "archive") === "1" && activeSeason
+        ? await archiveSeasonStandings(activeSeason.id)
+        : 0;
+
     // Carry over only the identity + diamond balance of each empire.
     const empires = await prisma.empire.findMany({
       select: { userId: true, name: true, diamonds: true },
@@ -2166,13 +2316,19 @@ export async function resetSeason(
     await logAdmin(admin, {
       action: "season.reset",
       targetType: "season",
-      summary: `אופסה העונה — ${empires.length} אימפריות אותחלו, כל הגילדות נמחקו`,
-      details: { empiresReset: empires.length },
+      summary: `אופסה העונה — ${empires.length} אימפריות אותחלו, כל הגילדות נמחקו${
+        archived > 0 ? " (הדירוג נשמר)" : ""
+      }`,
+      details: { empiresReset: empires.length, archivedChampions: archived },
     });
 
     revalidatePath("/admin/seasons");
     revalidatePath("/game", "layout");
-    return { success: `העונה אופסה — ${empires.length} שחקנים התחילו מחדש` };
+    return {
+      success: `העונה אופסה — ${empires.length} שחקנים התחילו מחדש${
+        archived > 0 ? ", והדירוג הסופי נשמר בהיכל התהילה" : ""
+      }`,
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -2234,7 +2390,13 @@ export async function setGuildMemberRole(
     const admin = await requireAdmin();
     const memberId = str(formData, "memberId");
     const role = guildRoleSchema.parse(formData.get("role")) as GuildRole;
-    await prisma.guildMember.update({ where: { id: memberId }, data: { role } });
+    const member = await prisma.guildMember.update({
+      where: { id: memberId },
+      data: { role },
+    });
+    // Demoting the leader leaves the crown vacant, and no member of a headless
+    // guild can fill it from the game screen.
+    await repairGuildLeadership(member.guildId);
     await logAdmin(admin, {
       action: "guild.member_role",
       targetType: "guildMember",

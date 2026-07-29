@@ -950,7 +950,7 @@ function FullDossier({
                   level={item.level}
                   name={meta.label}
                   rarity={uiRarityForLevel(item.level)}
-                  details={itemDetails(item, intel.hero!.level)}
+                  details={itemDetails(item, intel.hero!.level, { worn: true })}
                 />
               );
             })}

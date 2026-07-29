@@ -49,6 +49,25 @@ const cache = new Map<number, Entry>();
  */
 const MAX_TIERS = 64;
 
+/**
+ * The ladder's ordering. Ties on raw military power break on the hero — his
+ * level, then how many times he has run the curve to 100. Applied in JS because
+ * it only ever reorders empires the `[cities, militaryPower]` index already
+ * placed together, and `empire.level` (the old tiebreak) is a column gameplay
+ * never writes: it was 1 for everyone, so ties fell through to whatever order
+ * Postgres returned.
+ *
+ * Shared by `build` and `withViewerRow` so a re-inserted row lands exactly
+ * where the query would have put it.
+ */
+function compareRows(a: LadderRow, b: LadderRow): number {
+  return (
+    b.power - a.power ||
+    (b.hero?.level ?? 1) - (a.hero?.level ?? 1) ||
+    (b.hero?.resets ?? 0) - (a.hero?.resets ?? 0)
+  );
+}
+
 async function build(cities: number): Promise<LadderRow[]> {
   // Ordered by the stored column, so Postgres walks the [cities, militaryPower]
   // index instead of the app loading and sorting the bucket. The arsenal is not
@@ -68,17 +87,38 @@ async function build(cities: number): Promise<LadderRow[]> {
 
   return empires
     .map(({ militaryPower, ...e }) => ({ ...e, power: militaryPower }))
-    // Ties on raw military power break on the hero — his level, then how many
-    // times he has run the curve to 100. Done in JS because it only ever
-    // reorders empires the index already placed together, and `empire.level`
-    // (the old tiebreak) is a column gameplay never writes: it was 1 for
-    // everyone, so ties fell through to whatever order Postgres returned.
-    .sort(
-      (a, b) =>
-        b.power - a.power ||
-        (b.hero?.level ?? 1) - (a.hero?.level ?? 1) ||
-        (b.hero?.resets ?? 0) - (a.hero?.resets ?? 0)
-    );
+    .sort(compareRows);
+}
+
+/**
+ * The cached ladder with the viewer's own row replaced by the figures the page
+ * already holds fresh, re-placed at the rank that row now sorts to.
+ *
+ * The TTL above is what keeps the ladder off the database, but it also means a
+ * player who trains an army and walks straight to the ladder reads their own row
+ * as it was up to twenty seconds ago — and `revalidatePath` cannot help, because
+ * a module-level Map is not Next's cache. Everyone *else* being a few seconds
+ * stale is the deal the TTL buys and nobody can tell; your own numbers being
+ * stale right after you changed them reads as a lost action.
+ *
+ * `requireEmpire` has already loaded the viewer's empire, settled, on every
+ * /game page load, so the fresh row costs no query.
+ *
+ * Never mutates the cached array — it filters into a new one.
+ */
+export function withViewerRow(
+  rows: readonly LadderRow[],
+  viewer: LadderRow
+): LadderRow[] {
+  const merged = rows.filter((r) => r.id !== viewer.id);
+  // Linear rather than a re-sort: the rest is already ordered, so this only
+  // finds the one seam the viewer's row belongs in. Also inserts an empire the
+  // cached build has never seen — one that just took its first city, and used to
+  // be missing from its new tier's ladder for a TTL.
+  let at = merged.findIndex((r) => compareRows(viewer, r) < 0);
+  if (at < 0) at = merged.length;
+  merged.splice(at, 0, viewer);
+  return merged;
 }
 
 /**

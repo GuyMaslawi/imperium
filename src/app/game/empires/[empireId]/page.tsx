@@ -15,17 +15,24 @@ import {
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { cityName } from "@/lib/game/cities";
 import { RankActions } from "@/components/game/RankActions";
+import { MessageCompose } from "@/components/game/MessageCompose";
 import { ShieldBadges } from "@/components/game/ShieldBadges";
 import { getActiveShields } from "@/lib/game/diamondEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
-import { ItemTile } from "@/components/game/ItemTile";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
-import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
+import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
+import type { HeroItemView } from "@/components/game/heroItemView";
 import {
   HERO_CLASS_META,
+  HERO_STAT_META,
+  RARITY_META,
   SLOT_META,
   SLOT_ORDER,
   heroClassImage,
+  itemDisplayName,
+  itemPrimaryBonus,
+  slotPrimaryStat,
+  tierForLevel,
 } from "@/lib/game/hero";
 
 export const metadata = { title: "פרופיל אימפריה | אימפריום" };
@@ -56,6 +63,14 @@ export default async function EmpireProfilePage({
   const heroResets = hero?.resets ?? 0;
   const heroClassKey = hero?.heroClass ?? "WARLORD";
   const equippedBySlot = new Map((hero?.items ?? []).map((item) => [item.slot, item]));
+  // The paperdoll is a client component, so the rows have to cross as plain
+  // data. Tier is always derived from level — never read off the row.
+  const equippedView: HeroItemView[] = (hero?.items ?? []).map(({ id, slot, level }) => ({
+    id,
+    slot,
+    level,
+    rarity: tierForLevel(level),
+  }));
 
   const isMe = empire.id === myEmpire.id;
   // Espionage and combat are confined to your own city — an empire is "in your
@@ -171,12 +186,15 @@ export default async function EmpireProfilePage({
         </div>
       )}
 
-      {/* -------- command bar: attack actions live on top, ready to fire -------- */}
-      {canEngage && (
+      {/* -------- command bar: attack actions live on top, ready to fire --------
+          Shown on every dossier but your own, not only on attackable ones: mail
+          crosses cities and levels even where turns cannot, so the message
+          button must survive the `canEngage` gate that guards the war actions. */}
+      {!isMe && (
         <div className="panel-gold rounded-xl p-4">
           {/* Spelled out above the buttons, not just as a pill: turns spent on a
               shielded target buy XP and loot rolls, but never spoils. */}
-          {activeShields.length > 0 && (
+          {canEngage && activeShields.length > 0 && (
             <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
               <ShieldBadges shields={shields} />
               <span>
@@ -188,20 +206,24 @@ export default async function EmpireProfilePage({
             </div>
           )}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <RankActions
-              targetEmpireId={empire.id}
-              currentTurns={myEmpire.turns}
-            />
+            {canEngage ? (
+              <RankActions
+                targetEmpireId={empire.id}
+                currentTurns={myEmpire.turns}
+              />
+            ) : (
+              <p className="max-w-md text-sm text-zinc-400">
+                אין כאן פעולות מלחמה — האימפריה הזו יושבת בעיר אחרת. דואר, לעומת
+                זאת, עובר בכל מצב: אפשר לכתוב לכל שחקן במשחק, בכל עיר ובכל רמה.
+              </p>
+            )}
             <div className="flex flex-col items-stretch gap-2">
-              <button
-                type="button"
-                disabled
-                title="מערכת הודעות בין שחקנים תתווסף בהמשך."
-                className="btn btn-ghost px-4 py-2 text-sm"
-              >
-                <Icon name="messages" size={16} className="inline-block align-middle" /> הודעה · בקרוב
-              </button>
+              <MessageCompose
+                lockedRecipient={{ id: empire.id, name: empire.name }}
+                triggerLabel="שלח הודעה"
+              />
               {/* decorative auto-attack control (not yet available) */}
+              {canEngage && (
               <div className="flex items-center justify-end gap-2 text-xs text-zinc-500">
                 <span>תקיפה אוטומטית</span>
                 <span className="nums rounded-md border border-border-subtle bg-panel-inset px-2 py-1 font-bold text-zinc-300" dir="ltr">
@@ -216,6 +238,7 @@ export default async function EmpireProfilePage({
                   הפעל · בקרוב
                 </button>
               </div>
+              )}
             </div>
           </div>
         </div>
@@ -467,34 +490,71 @@ export default async function EmpireProfilePage({
             )}
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-9">
-          {SLOT_ORDER.map((slot) => {
-            const meta = SLOT_META[slot];
-            const item = equippedBySlot.get(slot);
-            if (!item) {
-              return (
-                <div key={slot} className="flex flex-col items-center gap-1">
-                  <div className="panel-inset flex aspect-square w-full items-center justify-center rounded-xl">
-                    <span aria-hidden className="text-3xl opacity-25 grayscale">
-                      {meta.icon}
+        {/* The same figure the hero page draws, only smaller: nine pieces worn
+            on the body rather than a detached row of tiles. A dossier is a
+            picture of an empire, and the hero is the one part of it that has a
+            face — a flat 9-wide strip said what he owns without ever showing
+            him. Read-only: dressing him stays on the hero page. */}
+        {/* The sockets carry a 54px floor, so a frame much under 240px is all
+            medallion and no hero. */}
+        <div className="grid gap-4 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:items-start">
+          <div className="mx-auto w-full max-w-[240px]">
+            <HeroPaperdoll
+              readOnly
+              portrait={heroClassImage(heroClassKey)}
+              portraitAlt={HERO_CLASS_META[heroClassKey].label}
+              portraitAccent={HERO_CLASS_META[heroClassKey].accent}
+              equipped={equippedView}
+              heroLevel={heroLevel}
+            />
+          </div>
+
+          {/* The roster beside him — what each socket actually holds, in words.
+              The figure answers "how is he kitted out?" at a glance; this
+              answers "with what, exactly?" without a hover on every medallion. */}
+          <ul className="grid gap-x-4 gap-y-1.5 self-center text-sm sm:grid-cols-2">
+            {SLOT_ORDER.map((slot) => {
+              const meta = SLOT_META[slot];
+              const item = equippedBySlot.get(slot);
+              const stat = HERO_STAT_META[slotPrimaryStat(slot)];
+              if (!item) {
+                return (
+                  <li
+                    key={slot}
+                    className="flex items-center justify-between gap-2 border-b border-border-subtle pb-1.5 text-zinc-600"
+                  >
+                    <span className="truncate">
+                      <span aria-hidden className="opacity-40">{meta.icon}</span> {meta.label}
                     </span>
-                  </div>
-                  <span className="text-[11px] text-zinc-600">{meta.label}</span>
-                </div>
+                    <span className="shrink-0 text-xs">ריק</span>
+                  </li>
+                );
+              }
+              const bonus = itemPrimaryBonus(slot, item.level);
+              const tier = RARITY_META[tierForLevel(item.level)];
+              return (
+                <li
+                  key={slot}
+                  className="flex items-center justify-between gap-2 border-b border-border-subtle pb-1.5"
+                >
+                  <span className="min-w-0 truncate">
+                    <span aria-hidden>{meta.icon}</span>{" "}
+                    <span className={`font-semibold ${tier.tone}`}>
+                      {itemDisplayName(slot, item.level)}
+                    </span>{" "}
+                    <span className="nums text-xs text-zinc-500" dir="ltr">
+                      Lv {item.level}
+                    </span>
+                  </span>
+                  <span className="nums shrink-0 text-xs font-bold text-emerald-400" dir="ltr">
+                    +{Math.round(bonus.value)}
+                    {bonus.flat ? "" : "%"}{" "}
+                    <Icon name={stat.icon} size={12} className="inline align-[-2px]" />
+                  </span>
+                </li>
               );
-            }
-            return (
-              <ItemTile
-                key={slot}
-                slug={meta.slug}
-                icon={meta.icon}
-                level={item.level}
-                name={meta.label}
-                rarity={uiRarityForLevel(item.level)}
-                details={itemDetails(item, heroLevel)}
-              />
-            );
-          })}
+            })}
+          </ul>
         </div>
         {equippedBySlot.size === 0 && (
           <p className="mt-3 text-xs text-zinc-600">

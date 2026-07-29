@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { HeroItemSlot, HeroRarity } from "@prisma/client";
+import type { HeroItemSlot, HeroRarity, PotionKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
@@ -25,6 +25,7 @@ import {
   rollGuaranteedItem,
 } from "@/lib/game/hero";
 import {
+  HERO_QUEST_HAUL_LABEL,
   heroQuestByTier,
   heroQuestDurationMs,
   heroQuestDurationLabel,
@@ -33,6 +34,7 @@ import {
   heroQuestUnlocked,
   heroQuestXp,
   rollHeroQuestReward,
+  type HeroQuestHaulKind,
 } from "@/lib/game/heroQuests";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
@@ -194,6 +196,37 @@ export async function startHeroQuest(
 
 /* ------------------------------ collect ------------------------------ */
 
+/** One line of the homecoming table — a kind the board knows how to draw. */
+export interface HeroQuestHaulEntry {
+  kind: HeroQuestHaulKind;
+  amount: number;
+}
+
+/**
+ * Everything the run turned out to be worth, itemised.
+ *
+ * This is the *only* moment the haul is ever named, so it goes back as data
+ * rather than a sentence: the board draws a tile per kind, and a player who
+ * looked away for a second can still read what arrived. Quest name, sigil,
+ * colour and the fortune's flavour are all derivable from `tier` and `fortune`
+ * through pure lookups the client already imports — no need to ship them twice.
+ */
+export interface HeroQuestHaul {
+  tier: number;
+  /** Fortune band key; the board resolves label + lore via heroQuestFortuneByKey. */
+  fortune: string;
+  entries: HeroQuestHaulEntry[];
+  /** Hero levels the trip bought, for the line under the XP tile. */
+  levelsGained: number;
+  item: { label: string; rarity: HeroRarity } | null;
+  potion: PotionKind | null;
+}
+
+export interface HeroQuestCollectState extends ActionState {
+  /** Present only on a successful claim — the reveal panel's whole content. */
+  haul?: HeroQuestHaul;
+}
+
 /**
  * Bring the hero home and pay out the quest he finished.
  *
@@ -202,7 +235,7 @@ export async function startHeroQuest(
  * each other — use the hero's level *now*, which is the level the board's odds
  * were always going to be read against.
  */
-export async function collectHeroQuest(): Promise<ActionState> {
+export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -260,16 +293,18 @@ export async function collectHeroQuest(): Promise<ActionState> {
       const hero = empire.hero;
       let droppedItem: { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null =
         null;
-      let droppedPotion: string | null = null;
+      let droppedPotion: PotionKind | null = null;
+      let xpGained = 0;
+      let levelsGained = 0;
 
       if (hero) {
         // XP is paid even to a hero who fell while he was away: he earned it on
         // the road, and his corpse still knows what it learned. (A dead hero
         // simply grants no bonuses until he rises — see heroBonuses.)
-        const next = applyHeroXp(
-          hero,
-          Math.round(quest.rewardXp * classXpMultiplier(hero))
-        );
+        // The class multiplier is part of what he brought home, so the reveal
+        // quotes the XP actually banked rather than the rung's base figure.
+        xpGained = Math.round(quest.rewardXp * classXpMultiplier(hero));
+        const next = applyHeroXp(hero, xpGained);
         await tx.hero.update({
           where: { id: hero.id },
           data: {
@@ -278,7 +313,7 @@ export async function collectHeroQuest(): Promise<ActionState> {
             unspentPoints: { increment: next.pointsGained },
           },
         });
-        const levelsGained = next.level - hero.level;
+        levelsGained = next.level - hero.level;
         if (levelsGained > 0) {
           await grantCitizens(tx, empireId, levelsGained * CITIZENS_PER_LEVEL);
         }
@@ -302,29 +337,53 @@ export async function collectHeroQuest(): Promise<ActionState> {
         // the weighted pick of which one is left — see rollGuaranteedPotion.
         const kind = rollGuaranteedPotion();
         if (await grantPotion(tx, empireId, kind)) {
-          droppedPotion = POTION_META[kind].label;
+          droppedPotion = kind;
         }
       }
 
-      /* ---- the homecoming line ---- */
-      const spoils = [
-        quest.rewardGold > 0 ? `${formatNumber(quest.rewardGold)} זהב` : null,
-        quest.rewardWood > 0 ? `${formatNumber(quest.rewardWood)} עץ` : null,
-        quest.rewardIron > 0 ? `${formatNumber(quest.rewardIron)} ברזל` : null,
-        quest.rewardStone > 0 ? `${formatNumber(quest.rewardStone)} אבן` : null,
-        quest.rewardCitizens > 0 ? `${formatNumber(quest.rewardCitizens)} אזרחים` : null,
-        quest.rewardSlaves > 0 ? `${formatNumber(quest.rewardSlaves)} עבדי מכרות` : null,
-        quest.rewardXp > 0 ? `${formatNumber(quest.rewardXp)} ניסיון` : null,
-        droppedItem ? itemDisplayName(droppedItem.slot, droppedItem.level) : null,
-        droppedPotion,
-      ].filter(Boolean);
-
+      /* ---- the homecoming ---- */
       // The one moment the haul is ever named — and the only place the run's
-      // luck is revealed, which is what makes the wait worth anything.
+      // luck is revealed, which is what makes the wait worth anything. It goes
+      // back itemised (see HeroQuestHaul); the sentence below is the fallback
+      // for anywhere that can only render a line.
+      const entries: HeroQuestHaulEntry[] = (
+        [
+          { kind: "gold", amount: quest.rewardGold },
+          { kind: "wood", amount: quest.rewardWood },
+          { kind: "iron", amount: quest.rewardIron },
+          { kind: "stone", amount: quest.rewardStone },
+          { kind: "citizens", amount: quest.rewardCitizens },
+          { kind: "slaves", amount: quest.rewardSlaves },
+          { kind: "xp", amount: xpGained },
+        ] as const
+      )
+        .filter((e) => e.amount > 0)
+        .map((e) => ({ kind: e.kind, amount: e.amount }));
+
       const fortune = heroQuestFortuneByKey(quest.fortune);
+      const spoils = [
+        ...entries.map(
+          (e) => `${formatNumber(e.amount)} ${HERO_QUEST_HAUL_LABEL[e.kind]}`
+        ),
+        droppedItem ? itemDisplayName(droppedItem.slot, droppedItem.level) : null,
+        droppedPotion ? POTION_META[droppedPotion].label : null,
+      ].filter(Boolean);
 
       return {
         success: `${fortune.label}! הגיבור חזר מ"${meta?.name ?? "המסע"}" עם ${spoils.join(", ")}. ${fortune.lore}`,
+        haul: {
+          tier: quest.tier,
+          fortune: quest.fortune,
+          entries,
+          levelsGained,
+          item: droppedItem
+            ? {
+                label: itemDisplayName(droppedItem.slot, droppedItem.level),
+                rarity: droppedItem.rarity,
+              }
+            : null,
+          potion: droppedPotion,
+        },
       };
     });
 

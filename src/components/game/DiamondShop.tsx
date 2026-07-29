@@ -179,7 +179,9 @@ function ResourceBoostCard({
           </SubmitButton>
         )}
       </form>
-      <FormMessage error={state.error} success={state.success} />
+      {/* Once the boost is running the card says so itself ("✨ פעיל עד …" plus
+          the +% badge), so the action's success line would only repeat it. */}
+      <FormMessage error={state.error} success={activeUntil ? undefined : state.success} />
     </ShopCard>
   );
 }
@@ -214,7 +216,7 @@ function DiscountCard({
           </SubmitButton>
         )}
       </form>
-      <FormMessage error={state.error} success={state.success} />
+      <FormMessage error={state.error} success={activeUntil ? undefined : state.success} />
     </ShopCard>
   );
 }
@@ -356,7 +358,7 @@ function ShieldCard({
           ))}
         </div>
       )}
-      <FormMessage error={state.error} success={state.success} />
+      <FormMessage error={state.error} success={activeUntil ? undefined : state.success} />
     </ShopCard>
   );
 }

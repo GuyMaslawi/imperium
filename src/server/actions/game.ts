@@ -1211,6 +1211,15 @@ export async function attackEmpire(
           defenderHeroBonusPct,
           attackerGuildBonusPct,
           defenderGuildBonusPct,
+          // Every remaining term of the two power formulas above, so the battle
+          // report can itemise a total instead of asserting one.
+          attackerGuildAidPct: attackerGuildAid.pct,
+          attackerGuildAidPower: attackerGuildAid.power,
+          defenderGuildAidPct: defenderGuildAid.pct,
+          defenderGuildAidPower: defenderGuildAid.power,
+          // Unrounded, so the report's ledger reproduces the battle exactly
+          // even on a fractional tunable; the display rounds it.
+          defenseBonusPct: (DEFENSE_BONUS - 1) * 100,
           attackerHeroXp,
           defenderHeroXp,
           wonWheelSpin,

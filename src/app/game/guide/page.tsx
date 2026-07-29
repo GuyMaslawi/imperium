@@ -1398,6 +1398,10 @@ export default async function GuidePage() {
                       • חוזר לרמה 1 עם <b className="nums">+{nf(HERO_RESET_CITIZENS)}</b> אזרחים
                       ו־<b className="nums">+{HERO_RESET_POINTS}</b> נקודות
                     </li>
+                    <li>
+                      • הציוד הלבוש נשאר עליך וממשיך לפעול — אך חפץ שתסיר יינעל
+                      בתיק עד שתחזור לרמתו
+                    </li>
                     <li>• תג ↻ קבוע — ותוקפים שמנצחים אותך מקבלים יותר ניסיון</li>
                   </ul>
                 </div>
@@ -1515,38 +1519,44 @@ export default async function GuidePage() {
                 </div>
 
                 <Formula
-                  label="הבונוס של חפץ"
+                  label="הבונוס של חפץ — אחוזים בקו ישר, כמויות בריבוע"
                   expr={
                     <>
-                      <V>דרגת שדרוג</V>
-                      <O>(1–40)</O>
-                      <O>×</O>
-                      <V>קצב הסטטיסטיקה</V>
+                      <V>תקרת הסטטיסטיקה</V>
                       <O>×</O>
                       <V>משקל (ראשי / משני)</V>
+                      <O>×</O>
+                      <O>(</O>
+                      <V>דרגת שדרוג</V>
+                      <O>÷ 40)</O>
+                      <sup className="text-gold-dim">2</sup>
                     </>
                   }
                   legend={[
                     { term: "ראשי", desc: "הסטט שהמשבצת קיימת בשבילו — משקל מלא." },
-                    { term: "משני", desc: "רבע מהמשקל. עולה כל כמה שדרוגים, לא בכל אחד." },
+                    {
+                      term: "משני",
+                      desc: "חצי מהמשקל במשבצת מתמחה (כפפות, שריון), או 0.35 ו־0.25 במשבצת שמפצלת בין שניים.",
+                    },
                     {
                       term: "אחוזים",
-                      desc: `1% לכל דרגה → +${itemPrimaryBonus("SWORD", HERO_MAX_LEVEL).value}% ברמה 100 כראשי, +${itemStatBonus("GAUNTLETS", HERO_MAX_LEVEL, "defense")}% כמשני.`,
+                      desc: `לא בריבוע — 1% לכל דרגה, ישר: +${itemPrimaryBonus("SWORD", HERO_MAX_LEVEL).value}% ברמה 100 כראשי, +${itemStatBonus("GAUNTLETS", HERO_MAX_LEVEL, "defense")}% כמשני. אחוז שווה חלק יחסי מהצבא שלך, ולכן הוא הגיוני באותה מידה בכל רמה.`,
+                    },
+                    {
+                      term: "כמויות",
+                      desc: `אזרחים, משאבים ותורות עולים בריבוע הדרגה — חפץ רמה 1 נותן ${itemStatBonus("BOOTS", 1, "citizens")}, רמה 10 נותן ${itemStatBonus("BOOTS", 10, "citizens")}, ורמה 100 נותן ${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value}. כמות קבועה נבלעת בכלכלה שגדלה, ולכן היא חייבת לגדול מהר ממנה.`,
                     },
                     {
                       term: "פרי־שטן",
-                      desc: `עד +${itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value} משאבים לעדכון רגיל — וככל שהדרגה גבוהה, יותר סוגי משאבים.`,
-                    },
-                    {
-                      term: "נעליים",
-                      desc: `עד +${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value} אזרחים בכל עדכון יומי.`,
+                      desc: `עד +${itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value} משאבים לעדכון רגיל — וככל שהדרגה גבוהה, יותר סוגי משאבים. לכל משבצת סדר משאבים משלה: פרי שטן פותח בזהב, מגן בעץ, מכנסיים בברזל, נעליים באבן.`,
                     },
                   ]}
                   example={
                     <>
-                      חרב ברמה <N>50</N> = דרגה <N>20</N> ×{" "}
-                      <N>1%</N> = <R>+{itemPrimaryBonus("SWORD", 50).value}%</R> התקפה,
-                      ועוד <R>+{itemStatBonus("SWORD", 50, "resources")}</R> משאבים ו־
+                      חרב ברמה <N>50</N> = דרגה <N>20</N> מתוך <N>40</N>, כלומר{" "}
+                      <N>רבע</N> מהתקרה בכמויות אבל <N>חצי</N> באחוזים:{" "}
+                      <R>+{itemPrimaryBonus("SWORD", 50).value}%</R> התקפה, ועוד{" "}
+                      <R>+{itemStatBonus("SWORD", 50, "resources")}</R> משאבים ו־
                       <R>+{itemStatBonus("SWORD", 50, "citizens")}</R> אזרחים כמשניים;
                       אותה רמה בכנפיים = <R>+{itemPrimaryBonus("WINGS", 50).value}</R> תורות
                       בכל עדכון יומי.

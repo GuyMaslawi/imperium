@@ -20,7 +20,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:db": "vitest run --config vitest.db.config.ts",
-    "db:power": "tsx scripts/backfill-power.ts"
+    "db:power": "tsx scripts/backfill-power.ts",
+    "db:guild-leaders": "tsx scripts/repair-guild-leadership.ts",
+    "db:clamp": "tsx scripts/repair-out-of-range.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

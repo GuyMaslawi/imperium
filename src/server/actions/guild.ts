@@ -10,6 +10,8 @@ import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
+  GUILD_INVITE_TTL_HOURS,
+  GUILD_INVITE_TTL_MS,
   GUILD_NAME_MAX_LENGTH,
   GUILD_NAME_MIN_LENGTH,
   GUILD_SPELL_BUFF_MS,
@@ -25,6 +27,10 @@ import {
 } from "@/lib/game/guild";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import {
+  announceSuccession,
+  ensureGuildLeader,
+} from "@/server/guildLeadership";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -98,6 +104,16 @@ async function runMemberAction(
         include: { guild: true },
       });
       if (!membership) return { error: "אינך חבר בברית." };
+
+      // Seat a leader before the action runs, so a guild left headless can
+      // still be governed — every role gate below reads the repaired roster.
+      const heir = await ensureGuildLeader(tx, membership.guildId);
+      if (heir) {
+        await announceSuccession(tx, heir.empireId, membership.guild.name);
+        // The caller may be the heir; act on the role they now hold.
+        if (heir.id === membership.id) membership.role = "LEADER";
+      }
+
       return perform(membership, tx, empireId);
     });
 
@@ -180,6 +196,16 @@ export async function createGuild(
 
 const guildIdSchema = z.object({ guildId: z.string().min(1) });
 
+/**
+ * Accept a standing invitation and take a seat.
+ *
+ * Invitation-only, and the invitation is the *authorisation*, not a hint: the
+ * row in GuildInvite is looked up here and consumed on the way in. Before that,
+ * this action asked only for a guild id — which every guildless player was
+ * handed for every guild in the game by the browse table on /game/guild — so
+ * "joining" was open enrolment and `addGuildMember`'s invitation was a courtesy
+ * message with no bearing on anything. A guild could not keep anyone out.
+ */
 export async function joinGuild(
   _prev: ActionState,
   formData: FormData
@@ -210,6 +236,18 @@ export async function joinGuild(
       const guild = await tx.guild.findUnique({ where: { id: guildId } });
       if (!guild) return { error: "הברית לא נמצאה." };
 
+      // Consume the invitation. deleteMany with the expiry in the WHERE makes
+      // the check and the burn one statement, so a doubled click cannot spend
+      // one invitation twice; count === 0 means never invited, or lapsed.
+      const claimed = await tx.guildInvite.deleteMany({
+        where: { guildId, empireId, expiresAt: { gt: new Date() } },
+      });
+      if (claimed.count === 0) {
+        return {
+          error: `הצטרפות ל"${guild.name}" אפשרית רק בהזמנה — בקש ממנהיג הברית או מסגן להזמין אותך.`,
+        };
+      }
+
       await tx.guildMember.create({ data: { guildId, empireId } });
 
       // Re-count after inserting — throwing rolls the join back if a
@@ -218,6 +256,10 @@ export async function joinGuild(
       if (memberCount > guildCapacity(guild.capacityLevel)) {
         throw new Error("guild full");
       }
+
+      // Every other guild's invitation is moot now that they have a guild;
+      // they would only misfire on the day this player leaves.
+      await tx.guildInvite.deleteMany({ where: { empireId } });
 
       return { success: `הצטרפת לברית "${guild.name}"!` };
     });
@@ -229,29 +271,59 @@ export async function joinGuild(
   }
 }
 
+/** Turn an invitation down — removes it from the join list for good. */
+export async function declineGuildInvite(
+  _prev: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  const parsed = guildIdSchema.safeParse({ guildId: formData.get("guildId") });
+  if (!parsed.success) return { error: "ברית לא תקינה" };
+  const { guildId } = parsed.data;
+
+  try {
+    const empireId = await requireOwnEmpireId();
+    await prisma.guildInvite.deleteMany({ where: { guildId, empireId } });
+    revalidateGuild();
+    return { success: "ההזמנה נדחתה." };
+  } catch (err) {
+    await logError("guild.declineGuildInvite", err);
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
 export async function leaveGuild(): Promise<ActionState> {
   return runMemberAction(async (membership, tx, empireId) => {
     const { guild } = membership;
 
-    if (membership.role === "LEADER") {
-      // Lock the guild row before counting. GuildMember cascades on guild
-      // delete, so a join that commits between an unlocked count and the delete
-      // is silently destroyed — the newcomer pays nothing but loses the guild
-      // they just joined, with no message. joinGuild/addGuildMember already take
-      // this lock, so taking it here is what actually makes them serialize.
-      await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${guild.id} FOR UPDATE`;
-      const memberCount = await tx.guildMember.count({
-        where: { guildId: guild.id },
-      });
-      if (memberCount > 1) {
-        return { error: "מנהיג לא יכול לעזוב — העבר קודם את ההנהגה." };
-      }
-      // Last member out disbands the guild.
+    // Lock the guild row before counting. GuildMember cascades on guild
+    // delete, so a join that commits between an unlocked count and the delete
+    // is silently destroyed — the newcomer pays nothing but loses the guild
+    // they just joined, with no message. joinGuild/addGuildMember already take
+    // this lock, so taking it here is what actually makes them serialize.
+    await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${guild.id} FOR UPDATE`;
+    const memberCount = await tx.guildMember.count({
+      where: { guildId: guild.id },
+    });
+
+    // The last member out disbands the guild, whatever rank they hold. This
+    // used to be the leader's privilege alone, so a guild whose crown had been
+    // vacated from outside outlived its last member: an empty row nobody could
+    // reach, still listed in the recruitment browser and still holding its name
+    // against every future founder.
+    if (memberCount <= 1) {
       await tx.guild.delete({ where: { id: guild.id } });
       return { success: `הברית "${guild.name}" פורקה.` };
     }
 
     await tx.guildMember.delete({ where: { empireId } });
+
+    // A leader walking out crowns their successor on the way rather than being
+    // told to transfer first — the guild is never left headless.
+    if (membership.role === "LEADER") {
+      const heir = await ensureGuildLeader(tx, guild.id);
+      if (heir) await announceSuccession(tx, heir.empireId, guild.name);
+    }
+
     return { success: `עזבת את הברית "${guild.name}".` };
   });
 }
@@ -274,10 +346,10 @@ const addMemberSchema = z.object({
  * the game. They could leave, but only after noticing, and the aid was live from
  * the moment the row existed.
  *
- * Nothing is lost by asking: `joinGuild` is open to anyone who has the guild id,
- * so an invitee can act on the message immediately. The recruiter simply no
- * longer decides for them. Capacity is therefore checked at join time (where it
- * always was), not here — an invitation is not a reservation.
+ * The invitation is now a GuildInvite row, not just the message: `joinGuild`
+ * consumes it, so this is the only door into the guild. Capacity is checked at
+ * join time (under the guild lock) rather than reserved here — an invitation is
+ * permission to try for a seat, not a seat held open.
  */
 export async function addGuildMember(
   _prev: ActionState,
@@ -320,17 +392,32 @@ export async function addGuildMember(
       return { error: "הברית מלאה — הרחב את הקיבולת קודם." };
     }
 
+    // Upsert so re-inviting refreshes the clock instead of failing on the
+    // [guildId, empireId] unique — a recruiter chasing a quiet player should
+    // not have to wait out the old invitation.
+    const expiresAt = new Date(Date.now() + GUILD_INVITE_TTL_MS);
+    await tx.guildInvite.upsert({
+      where: { guildId_empireId: { guildId: membership.guildId, empireId: target.id } },
+      create: {
+        guildId: membership.guildId,
+        empireId: target.id,
+        invitedById: empireId,
+        expiresAt,
+      },
+      update: { invitedById: empireId, expiresAt },
+    });
+
     await tx.message.create({
       data: {
         empireId: target.id,
         kind: "SYSTEM",
         title: "🏰 הוזמנת לברית",
-        body: `${membership.guild.name} מזמינה אותך להצטרף. פתח את מסך הברית כדי להצטרף — ההחלטה שלך.`,
+        body: `${membership.guild.name} מזמינה אותך להצטרף. פתח את מסך הברית כדי לאשר — ההזמנה תקפה ל־${GUILD_INVITE_TTL_HOURS} שעות.`,
         href: "/game/guild",
       },
     });
 
-    return { success: `נשלחה הזמנה ל${target.name}.` };
+    return { success: `נשלחה הזמנה ל${target.name} (תקפה ${GUILD_INVITE_TTL_HOURS} שעות).` };
   });
 }
 

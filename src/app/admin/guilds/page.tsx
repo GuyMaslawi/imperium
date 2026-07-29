@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledInput, LabeledSelect } from "@/components/admin/fields";
 import { updateGuild, deleteGuild, setGuildMemberRole } from "@/server/actions/admin";
+import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +57,22 @@ export default async function AdminGuildsPage() {
               <input type="hidden" name="id" value={g.id} />
               <div className="grid gap-3 sm:grid-cols-3">
                 <LabeledInput label="שם" name="name" defaultValue={g.name} required />
-                <LabeledInput label="רמת קיבולת (עד 9)" name="capacityLevel" type="number" min={1} defaultValue={g.capacityLevel} />
-                <LabeledInput label="עזרת ברית % (עד 10)" name="aidLevel" type="number" min={0} defaultValue={g.aidLevel} />
+                <LabeledInput
+                  label={`רמת קיבולת (עד ${GUILD_CAPACITY_MAX_LEVEL})`}
+                  name="capacityLevel"
+                  type="number"
+                  min={1}
+                  max={GUILD_CAPACITY_MAX_LEVEL}
+                  defaultValue={g.capacityLevel}
+                />
+                <LabeledInput
+                  label={`עזרת ברית % (עד ${GUILD_AID_MAX_LEVEL})`}
+                  name="aidLevel"
+                  type="number"
+                  min={0}
+                  max={GUILD_AID_MAX_LEVEL}
+                  defaultValue={g.aidLevel}
+                />
               </div>
             </ActionForm>
 

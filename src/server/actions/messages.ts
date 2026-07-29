@@ -8,6 +8,12 @@ import { rateLimit } from "@/lib/rateLimit";
 import {
   MESSAGE_BODY_MAX,
   MESSAGE_MAX_RECIPIENTS,
+  MESSAGE_PAIR_LIMIT,
+  MESSAGE_PAIR_WINDOW_MS,
+  MESSAGE_RECIPIENT_LIMIT,
+  MESSAGE_RECIPIENT_WINDOW_MS,
+  MESSAGE_SEND_LIMIT,
+  MESSAGE_SEND_WINDOW_MS,
   MESSAGE_TITLE_MAX,
 } from "@/lib/game/messages";
 import type { ActionState } from "./game";
@@ -103,8 +109,10 @@ export async function sendPlayerMessage(
     return { error: "לא מחובר" };
   }
 
-  // Blunt the obvious abuse: mass-mailing every player on a loop.
-  if (!(await rateLimit(`msg-send:${empireId}`, 10, 5 * 60 * 1000))) {
+  // How often the composer may fire. The budget that bounds actual delivery
+  // volume is charged per addressee further down, once the recipients are
+  // known — see MESSAGE_RECIPIENT_LIMIT.
+  if (!(await rateLimit(`msg-send:${empireId}`, MESSAGE_SEND_LIMIT, MESSAGE_SEND_WINDOW_MS))) {
     return { error: "שלחת יותר מדי הודעות — נסה שוב בעוד כמה דקות" };
   }
 
@@ -139,8 +147,48 @@ export async function sendPlayerMessage(
       return { error: "לא נבחרו נמענים תקינים" };
     }
 
+    // Volume budget, charged per addressee — one send to ten players costs ten.
+    // Checked against the resolved targets rather than the submitted ids, so a
+    // list padded with dead ones does not bill for deliveries never made.
+    if (
+      !(await rateLimit(
+        `msg-recipients:${empireId}`,
+        MESSAGE_RECIPIENT_LIMIT,
+        MESSAGE_RECIPIENT_WINDOW_MS,
+        targets.length
+      ))
+    ) {
+      return {
+        error: "שלחת הודעות ליותר מדי שחקנים בזמן קצר — נסה שוב בעוד כמה דקות",
+      };
+    }
+
+    // Per sender→recipient budget: the volume cap above still allows a whole
+    // window to be aimed at one player, which is the harassment case. Throttled
+    // addressees are dropped from this send rather than failing it, so one
+    // over-mailed target does not block the rest of the list.
+    const verdicts = await Promise.all(
+      targets.map((t) =>
+        rateLimit(
+          `msg-pair:${empireId}:${t.id}`,
+          MESSAGE_PAIR_LIMIT,
+          MESSAGE_PAIR_WINDOW_MS
+        )
+      )
+    );
+    const allowed = targets.filter((_, i) => verdicts[i]);
+    const throttled = targets.filter((_, i) => !verdicts[i]);
+    if (allowed.length === 0) {
+      return {
+        error:
+          targets.length === 1
+            ? `שלחת לאחרונה כמה הודעות אל ${targets[0]!.name} — המתן לפני שתשלח שוב`
+            : "שלחת לאחרונה כמה הודעות אל השחקנים האלה — המתן לפני שתשלח שוב",
+      };
+    }
+
     await prisma.message.createMany({
-      data: targets.map((t) => ({
+      data: allowed.map((t) => ({
         empireId: t.id,
         senderEmpireId: empireId,
         kind: "PLAYER" as const,
@@ -150,11 +198,17 @@ export async function sendPlayerMessage(
     });
 
     revalidatePath("/game", "layout");
+    // A silent partial send would read as a full one, so the skipped names are
+    // named.
+    const skipped =
+      throttled.length > 0
+        ? ` (לא נשלחה אל ${throttled.map((t) => t.name).join(", ")} — יותר מדי הודעות אליהם לאחרונה)`
+        : "";
     return {
       success:
-        targets.length === 1
-          ? `ההודעה נשלחה אל ${targets[0]!.name}`
-          : `ההודעה נשלחה אל ${targets.length} שחקנים`,
+        (allowed.length === 1
+          ? `ההודעה נשלחה אל ${allowed[0]!.name}`
+          : `ההודעה נשלחה אל ${allowed.length} שחקנים`) + skipped,
     };
   } catch (err) {
     await logError("messages.sendPlayerMessage", err);

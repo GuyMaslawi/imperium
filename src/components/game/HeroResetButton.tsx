@@ -31,7 +31,15 @@ export function HeroResetButton() {
           {formatNumber(HERO_RESET_CITIZENS)} אזרחים
         </b>{" "}
         ו-<b className="text-gold-bright">{HERO_RESET_POINTS} נקודות גיבור</b>.
-        כל הנקודות שהוקצו יימחקו, וחפצים מעל רמה 1 יוסרו לתיק.
+        כל הנקודות שהוקצו יימחקו.
+      </p>
+      <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
+        <b className="text-emerald-400">הציוד הלבוש נשאר עליך</b> וממשיך להעניק
+        את מלוא הבונוס — אבל שים לב:{" "}
+        <b className="text-amber-300">
+          חפץ שתסיר יינעל בתיק עד שתחזור לרמתו
+        </b>
+        .
       </p>
 
       {!confirming ? (

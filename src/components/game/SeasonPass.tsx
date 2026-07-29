@@ -63,7 +63,7 @@ function HaulPanel({
   onDismiss: () => void;
 }) {
   return (
-    <div className="sp-haul mt-4 overflow-hidden rounded-xl border border-emerald-500/50 bg-gradient-to-b from-emerald-950/70 via-black/60 to-black/70 p-3 shadow-[0_0_28px_-10px_rgba(16,185,129,0.8)]">
+    <div className="haul-panel mt-4 overflow-hidden rounded-xl border border-emerald-500/50 bg-gradient-to-b from-emerald-950/70 via-black/60 to-black/70 p-3 shadow-[0_0_28px_-10px_rgba(16,185,129,0.8)]">
       <div className="flex items-center justify-between gap-2">
         <button
           onClick={onDismiss}
@@ -86,7 +86,7 @@ function HaulPanel({
           <div
             key={entry.kind}
             style={{ animationDelay: `${i * 70}ms` }}
-            className="sp-loot flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2 text-center"
+            className="haul-tile flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2 text-center"
           >
             <Icon
               name={RESOURCE_ICON[entry.kind]}
@@ -306,7 +306,7 @@ function CycleClearedOverlay({
                 <div
                   key={entry.kind}
                   style={{ animationDelay: `${i * 70}ms` }}
-                  className="sp-loot flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2"
+                  className="haul-tile flex flex-col items-center justify-center gap-1 rounded-lg border border-emerald-500/25 bg-black/50 p-2"
                 >
                   <Icon
                     name={RESOURCE_ICON[entry.kind]}
@@ -393,6 +393,18 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
   const pct = state.xpMax > 0 ? Math.min(100, Math.round((state.xp / state.xpMax) * 100)) : 0;
   const canAfford = state.diamonds >= state.price;
   const canBuy = seasonActive && canAfford;
+
+  /**
+   * Closing the pass throws away the post-claim panels with it. They report
+   * what *just* happened, so leaving them in state meant reopening the ladder
+   * an hour later still greeted you with "השלל נאסף" from the last claim — a
+   * message that looked stuck, because only its own ✕ ever cleared it.
+   */
+  function closePass() {
+    setOpen(false);
+    setHaul(null);
+    setNotice(null);
+  }
 
   function reject(message?: string) {
     setShake(true);
@@ -491,7 +503,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
           // ladder crawled. The shell is height-capped instead, and the ladder
           // below is the single scroll region.
           className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
-          onClick={() => setOpen(false)}
+          onClick={closePass}
         >
           <div
             dir="rtl"
@@ -520,7 +532,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
             <div className="shrink-0 overflow-y-auto p-5 pb-4 [@media(max-height:560px)]:min-h-0 [@media(max-height:560px)]:shrink">
             <div className="flex items-center justify-between">
               <button
-                onClick={() => setOpen(false)}
+                onClick={closePass}
                 className="flex h-8 w-8 items-center justify-center rounded-full border border-border-subtle text-zinc-400 hover:text-white"
               >
                 ✕
