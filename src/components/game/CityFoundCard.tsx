@@ -5,7 +5,7 @@ import { foundCity, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { CITIZEN_GROWTH_LEVELS_PER_CITY } from "@/lib/game/constants";
 import { cityAt } from "@/lib/game/cities";
@@ -137,7 +137,11 @@ export function CityFoundCard({
                     className={missing ? "font-semibold text-red-400" : undefined}
                     title={missing ? "אין מספיק מהמשאב הזה" : undefined}
                   >
-                    <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
+                    <Icon
+                      name={icon}
+                      size={14}
+                      className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[key]}`}
+                    />{" "}
                     <span className="nums" dir="ltr">
                       {formatNumber(cost[key])}
                     </span>

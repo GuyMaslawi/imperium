@@ -286,6 +286,15 @@ model Empire {
   lastDailyUpdateAt   DateTime  @default(now())
   /// Last time the player opened the reports page — drives the "new reports" badge.
   reportsSeenAt       DateTime  @default(now())
+  /// Heartbeat behind the chat's online dot. Stamped by the chat poll every
+  /// PRESENCE_TOUCH_MS at most (a guarded updateMany that usually matches no
+  /// row), so "online" means a browser actually had the game open in the last
+  /// few minutes.
+  ///
+  /// It has to be its own column: `updatedAt` moves whenever anything writes to
+  /// the empire — a plunder, an admin gift, a settle — so presence read from it
+  /// would light up players who are asleep and being raided.
+  lastSeenAt          DateTime?
   /// New-player shield: while this is in the future the empire cannot be
   /// attacked or spied. Set at registration; cleared early the moment the
   /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).
@@ -328,6 +337,9 @@ model Empire {
   battlesDefended    BattleReport[]      @relation("BattleDefender")
   messages           Message[]           @relation("MessageInbox")
   messagesSent       Message[]           @relation("MessageSender")
+  chatSent           ChatMessage[]       @relation("ChatSender")
+  chatReceived       ChatMessage[]       @relation("ChatRecipient")
+  chatTyping         ChatTyping?
   guildMembership    GuildMember?
   guildInvites       GuildInvite[]       @relation("GuildInviteTo")
   guildInvitesSent   GuildInvite[]       @relation("GuildInviteFrom")
@@ -338,6 +350,8 @@ model Empire {
   diamondPurchases   DiamondPurchase[]
   seasonPass         SeasonPassProgress?
   bossFights         BossFight[]
+  bossSieges         BossSiege[]
+  bossBattles        BossBattle[]
   achievements       EmpireAchievement[]
   gloryAwards        EmpireGloryAward[]
   heroQuest          HeroQuest?
@@ -352,6 +366,8 @@ model Empire {
   /// The cross-game boards.
   @@index([generalPower])
   @@index([spyPower])
+  /// The chat roster: who is online, then who was here most recently.
+  @@index([lastSeenAt])
 }
 
 /// A single collected achievement. The row IS the receipt: nothing is written
@@ -1272,9 +1288,183 @@ model BattleReport {
   @@index([createdAt])
 }
 
-/// One run at the city boss — the PvE tyrant guarding each city tier.
-/// See src/lib/game/bosses.ts for the catalog and every balance formula, and
-/// src/server/actions/boss.ts for resolution.
+/// One of the three things the boss does in a round. Rolled into the assault plan
+/// at launch and shown in the log as the army meets it, so the reveal is a replay
+/// of something already decided rather than a live draw.
+enum BossMove {
+  /// A heavy overhead blow. Answered by a shield wall.
+  SMASH
+  /// A sweep across the massed lines. Answered by spreading and flanking.
+  SWEEP
+  /// The tyrant overextends and bares its guard. The window for a frontal charge.
+  EXPOSED
+}
+
+/// The answer the army's officers chose. Picked by `autoTactic` — the counter on a
+/// successful read, one of the two wrong answers otherwise. FURY is the hero's
+/// charged strike, released the moment the meter fills.
+enum BossTactic {
+  ASSAULT
+  SHIELD
+  FLANK
+  FURY
+}
+
+/// How a sortie ended. Only KILLED writes `BossFight.victory = true`.
+enum BossBattleStatus {
+  /// The assault is under way — its clock has not run out yet.
+  ACTIVE
+  /// The tyrant fell to this assault.
+  KILLED
+  /// The army broke (losses past the rout line) and pulled back early.
+  ROUTED
+  /// The rounds ran out with the boss still standing.
+  SPENT
+  /// Unused since the fight stopped taking player input; kept so reports written
+  /// while retreating was a button still render.
+  RETREATED
+  /// The boss died or revived out from under the assault before it settled.
+  EXPIRED
+}
+
+/// A siege of one city boss, for one empire, for one daily-update cycle.
+///
+/// This is the row that made the boss worth coming back to. It used to be one
+/// all-or-nothing swing capped at a single victory per cycle: a player below the
+/// boss's power got nothing but a mauled army, and a player above it got one
+/// win and then had nothing to do with the boss until the next update. Now the
+/// boss carries a health pool that *persists between sorties* — every attack
+/// that lands leaves it wounded, damage pays loot pro-rata as it is dealt, and
+/// felling it pays the hoard on top.
+///
+/// The cycle boundary is the identity, not a timestamp to compare: `cycleAt` is
+/// `lastDailyUpdate()` at creation, so a new cycle simply misses the unique key
+/// and a fresh, full-health siege is created. Nothing needs to sweep old rows.
+///
+/// The loot pool is also what replaced the victory cap. Total chip loot is
+/// bounded by `maxHp` (you cannot deal more damage than the boss has health) and
+/// the kill bonus is paid once per siege, so a player who banked turns for a
+/// fortnight can spend them on extra sorties without minting extra loot — the
+/// turns buy attempts, not payouts. See src/lib/game/bossBattle.ts.
+model BossSiege {
+  id       String @id @default(cuid())
+  empireId String
+
+  /// City tier under siege and its boss — snapshots, as on BossFight.
+  cityTier Int
+  bossKey  String
+
+  /// Health pool for this life, and what is left of it.
+  maxHp       Float
+  hp          Float
+  /// Running total of damage this life has taken (`maxHp - hp`, kept explicitly
+  /// so a report can show progress without recomputing from the battle logs).
+  damageDealt Float @default(0)
+  /// Assaults launched against this life.
+  sorties     Int   @default(0)
+
+  /// When the tyrant fell, and when it returns. Both null while it lives; both
+  /// set together on the killing blow. A row with `revivesAt` in the past is a
+  /// spent life — the next assault opens a fresh one rather than reusing it.
+  killedAt  DateTime?
+  revivesAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  empire  Empire       @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  battles BossBattle[]
+
+  /// The one lookup: this empire's newest life of a given tier's boss. There is
+  /// no unique key to collide on any more — lives accumulate — so concurrent
+  /// marches are serialised by the empire row lock in `startBossAssault`.
+  @@index([empireId, cityTier, createdAt])
+}
+
+/// One assault on a besieged boss: a battle the army fights on its own, rolled in
+/// full at launch and revealed over `BOSS_ASSAULT_DURATION_MS` of real time.
+///
+/// The row is a **plan plus a deadline**, not a live game state. Every round —
+/// the boss's move, the tactic the officers chose, the damage, the casualties — is
+/// decided and stored the moment the player presses attack; `endsAt` is when it
+/// finishes; and the totals are applied to the world in a single write at the
+/// settle (see `settleDueAssault`).
+///
+/// That shape is what lets the player walk away. There is no per-round request to
+/// miss, nothing to resume, and no way for the outcome to depend on whether anyone
+/// was watching: an assault interrupted by a closed laptop pays exactly what it
+/// would have paid. The un-elapsed rounds are filtered out server-side, so the
+/// client is never handed the ending early.
+///
+/// `attackPower` and `soldiersAtStart` are snapshotted at launch: the army that
+/// marched is the army that fought, so reinforcements trained during the minute
+/// cannot retroactively join a battle that is already decided.
+model BossBattle {
+  id       String @id @default(cuid())
+  siegeId  String
+  empireId String
+
+  status BossBattleStatus @default(ACTIVE)
+
+  /// Rounds the plan actually contains (a kill or a rout ends it early), and the
+  /// limit it was rolled against.
+  round     Int
+  maxRounds Int
+
+  /// How the rolled battle ends. Stored rather than re-derived at the settle: the
+  /// distinction between "ran out of rounds" and "broke and pulled back early" is
+  /// the simulation's to make, and inferring it from the log is the kind of guess
+  /// that quietly pays the wrong loot.
+  outcome BossBattleStatus
+
+  /// Battle power that marched, and the bonuses it was built from (mirrored onto
+  /// the BossFight report exactly as a player battle mirrors them).
+  attackPower   Float
+  heroBonusPct  Float?
+  guildBonusPct Float?
+
+  soldiersAtStart Int
+  /// Totals from the plan. Decided at launch; applied at the settle.
+  soldiersLost    Int
+  damageDealt     Float
+  /// The boss's remaining health when this assault began, for the report's bar.
+  hpAtStart       Float
+
+  /// Rounds the officers read correctly, out of rounds fought. The grade is built
+  /// from these two — see `bossReadChance`, which is what the hero contributes.
+  correctCounters Int
+  decisions       Int
+
+  turnsSpent Int
+
+  /// The plan: `{ round, move, tactic, correct, furyUsed, damage, soldiersLost,
+  /// bossHpAfter, fury, at }` per round, where `at` is the reveal offset in ms.
+  log Json @default("[]")
+
+  startedAt DateTime  @default(now())
+  /// When the assault completes and becomes payable. The settle is lazy — any read
+  /// past this instant performs it, including the inbox poll, so the player is
+  /// notified within one poll interval wherever they happen to be.
+  endsAt    DateTime
+  endedAt   DateTime?
+
+  siege  BossSiege  @relation(fields: [siegeId], references: [id], onDelete: Cascade)
+  empire Empire     @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  fight  BossFight?
+
+  /// The hot lookups: this empire's running assault, and the sweep for assaults
+  /// whose clock has run out.
+  @@index([empireId, status])
+  @@index([status, endsAt])
+  @@index([siegeId])
+}
+
+/// One settled sortie at the city boss — the PvE tyrant guarding each city tier.
+/// See src/lib/game/bosses.ts for the catalog, src/lib/game/bossBattle.ts for
+/// the round-by-round combat, and src/server/bossSiege.ts for resolution.
+///
+/// Written when a sortie *ends*, whatever ended it. `victory` is true only for a
+/// kill, which is what keeps the honour roll, the achievement counters and the
+/// admin monitor reading the same thing they always did.
 model BossFight {
   id       String @id @default(cuid())
   empireId String
@@ -1309,9 +1499,25 @@ model BossFight {
   droppedItemLevel  Int?
   droppedItemRarity HeroRarity?
 
+  /// The sortie that produced this report, and how it ended. `battleId` is null
+  /// only on reports written before the siege rework.
+  battleId String?           @unique
+  endedBy  BossBattleStatus?
+
+  /// Siege progress the sortie made: damage dealt, and the pool it came out of.
+  /// The chip loot above is `damageDealt / bossMaxHp` of the cycle's haul.
+  damageDealt Float   @default(0)
+  bossMaxHp   Float   @default(0)
+  bossHpAfter Float   @default(0)
+  /// Rounds fought, and the grade the play earned ("S" | "A" | "B" | "C").
+  /// Only a kill is graded — the grade multiplies the kill bonus.
+  rounds      Int     @default(0)
+  grade       String?
+
   createdAt DateTime @default(now())
 
-  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  empire Empire      @relation(fields: [empireId], references: [id], onDelete: Cascade)
+  battle BossBattle? @relation(fields: [battleId], references: [id], onDelete: SetNull)
 
   // The per-cycle victory allowance counts this empire's recent wins on every
   // run; the rankings banner lists the conquerors of one city tier newest-first.
@@ -1340,6 +1546,90 @@ model RateLimitBucket {
 
   /// Drives the opportunistic sweep of expired windows.
   @@index([resetAt])
+}
+
+enum ChatChannel {
+  /// The town square: one room every player reads and writes.
+  GLOBAL
+  /// A two-person conversation, addressed by `recipientEmpireId`.
+  DIRECT
+}
+
+/// One line of live chat — a global room message or half of a private
+/// conversation.
+///
+/// Deliberately NOT a `Message`. The inbox is a mailbox: rows are titled,
+/// linkable, individually read-marked and kept forever, because a battle alert
+/// is a record. Chat is a stream — no title, no href, read in bulk, and only the
+/// tail is ever shown — so a shared table would have meant a nullable title, a
+/// kind that behaves unlike every other kind, and every inbox query growing a
+/// `kind NOT IN (…)` filter. See src/lib/game/chat.ts.
+///
+/// `senderName` is denormalised on purpose. A chat pane renders a hundred lines
+/// at a time and each one needs an author, so the alternative is a join (or an
+/// N+1) on the hottest polled query in the game; and when an empire is deleted
+/// the FK goes null while the conversation stays readable — the name it was said
+/// under is part of the line, not a lookup.
+model ChatMessage {
+  id      String      @id @default(cuid())
+  channel ChatChannel @default(GLOBAL)
+
+  /// Author. SetNull (not Cascade) so a deleted player does not tear holes in
+  /// everyone else's transcript.
+  senderEmpireId    String?
+  /// The author's empire name as it stood when the line was written.
+  senderName        String
+  /// The other side of a DIRECT line. Always null for GLOBAL.
+  recipientEmpireId String?
+
+  body String
+
+  /// Set when an admin removes the line. Hidden rows are filtered out of every
+  /// read path rather than deleted, so moderation is auditable and reversible.
+  hiddenAt   DateTime?
+  hiddenById String?
+
+  /// When the recipient of a DIRECT line saw it — drives the unread badge.
+  /// Always null for GLOBAL, where "unread" is a client-side high-water mark.
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  sender    Empire? @relation("ChatSender", fields: [senderEmpireId], references: [id], onDelete: SetNull)
+  recipient Empire? @relation("ChatRecipient", fields: [recipientEmpireId], references: [id], onDelete: Cascade)
+
+  /// The global room's tail: `WHERE channel = 'GLOBAL' ORDER BY createdAt DESC`.
+  @@index([channel, createdAt])
+  /// The unread badge, and the inbound half of a thread.
+  @@index([recipientEmpireId, createdAt])
+  /// The outbound half of a thread, and the "did I just say this?" repeat check.
+  @@index([senderEmpireId, createdAt])
+}
+
+/// "X is typing…", as one self-expiring row per player.
+///
+/// A typing marker is the most write-heavy, least valuable thing in the chat: it
+/// is true for two seconds and nobody may ever see it. So it is deliberately not
+/// a message row and not a column on Empire — one row per *player* (the empire
+/// is the primary key), overwritten in place, read by comparing `updatedAt`
+/// against a TTL. Nothing sweeps it: a stale row is already inert, and the next
+/// keystroke overwrites it.
+model ChatTyping {
+  /// Who is typing. Primary key, so a player has exactly one marker no matter
+  /// how many conversations they switch between.
+  empireId String @id
+  /// Denormalised for the same reason as on ChatMessage: the indicator names
+  /// the typist, and a join for a value this ephemeral is not worth it.
+  name     String
+  /// Null = the public room; otherwise the conversation being typed into. Only
+  /// that partner is ever shown the marker.
+  toEmpireId String?
+  updatedAt  DateTime
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
+
+  /// The read: everyone typing into this room/conversation, recently enough.
+  @@index([toEmpireId, updatedAt])
 }
 
 /// A captured application error.

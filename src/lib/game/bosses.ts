@@ -6,24 +6,31 @@ import { MAX_CITIES, type StorableResource } from "./constants";
  *
  * Each of the ten city tiers (`Empire.cities`, 1..MAX_CITIES) is held by one
  * named boss. Unlike a player target, a boss is a *fixed, public* wall: its
- * power is printed on the rankings page, so a player can see exactly how much
- * army they still have to raise before the fight is winnable. There is no dice
- * roll — attack power strictly greater than the boss's power wins.
+ * power is printed on the rankings page, so a player can see exactly what they
+ * are up against before marching.
  *
- * Three numbers define the whole feature:
+ * This file holds the catalog and the three curves the encounter is built from.
+ * The encounter itself — a multi-round sortie against a health pool that
+ * persists across the daily cycle — lives in `bossBattle.ts`, and the resolution
+ * in `server/bossSiege.ts`.
  *
  * 1. **Turn cost** — 300 turns in the first city, +200 for every city after
  *    (see `bossTurnCost`). At the base turn income (1 turn / 5 min) 300 turns is
- *    roughly one full daily-update cycle of banked turns, so a boss run is a
- *    deliberate, expensive commitment rather than something you spam.
+ *    roughly one full daily-update cycle of banked turns, so a sortie is a
+ *    deliberate, expensive commitment rather than something you spam. It is also
+ *    now the *only* limit on how often the boss can be attacked: the loot is
+ *    bounded by the cycle's pool rather than by a victory counter, so extra
+ *    turns buy extra attempts, never extra payouts.
  * 2. **Power** — static per tier, growing on the same ×2.5-per-tier curve the
- *    game already uses for `cityCost`. Because it never moves, "I need a bigger
- *    army" is always the answer, and the answer is quantified.
+ *    game already uses for `cityCost`. It no longer decides the fight on its own
+ *    (see `bossBattle.ts`); it sets the boss's health pool and scales the damage
+ *    a round deals, so a bigger army fells the tyrant faster and bleeds less.
  * 3. **Reward** — scales with the tier *and* with the current season day, on the
  *    same daily-growth idea as the season pass (see `seasonPassRewardAmount`),
- *    so the haul is always meaningful for where the season actually is. It is
- *    tuned to pay noticeably more than the turns would have earned as ordinary
- *    attacks, which is what makes the boss worth attacking at all.
+ *    so the haul is always meaningful for where the season actually is. What
+ *    `bossReward` returns is the haul for a *whole cycle*, which a sortie earns
+ *    a share of: pro-rata as it wears the boss down, plus the hoard on the kill
+ *    (see `BOSS_CHIP_SHARE` / `BOSS_KILL_SHARE`).
  *
  * Deliberately absent: diamonds. Same reasoning as the season pass — a
  * repeatable source of diamonds undercuts the real-money store (see
@@ -155,9 +162,9 @@ export const BOSS_TURN_COST_BASE = 300;
 export const BOSS_TURN_COST_PER_CITY = 200;
 
 /**
- * Turns spent on one run at the boss of `cities`: 300 in the first city, 500 in
- * the second, and so on up to 2,100 in the tenth. Spent whether the run wins or
- * loses — marching on a boss you cannot beat is its own punishment.
+ * Turns spent on one sortie at the boss of `cities`: 300 in the first city, 500
+ * in the second, and so on up to 2,100 in the tenth. Paid at launch and never
+ * refunded — a sortie that routs still cost the march.
  */
 export function bossTurnCost(cities: number): number {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));
@@ -180,44 +187,20 @@ export const BOSS_BASE_POWER = 12_000;
 export const BOSS_POWER_TIER_MULTIPLIER = 2.5;
 
 /**
- * The boss's fixed battle power. Static by design: it is printed on the boss
- * banner, so a player always knows exactly how far off they are. An attack wins
- * when the attacker's real attack power (soldiers + attack weapons, times hero
- * and guild bonuses, plus guild aid) is strictly greater.
+ * The boss's reference battle power. Static by design and printed on the boss
+ * banner, so a player always knows what the wall is worth.
+ *
+ * It is the yardstick, not the verdict: the boss's health pool is a multiple of
+ * it (`bossSiegeMaxHp`) and each round's damage is a fraction of the attacker's
+ * power, so an army at parity fells the tyrant in one well-played sortie, an army
+ * at half parity needs two or three, and an army at triple ends it in a couple
+ * of rounds. Casualties are dealt per round by the tactic matrix.
  */
 export function bossPower(cities: number, powerMultiplier = 1): number {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));
   return Math.round(
     BOSS_BASE_POWER * Math.pow(BOSS_POWER_TIER_MULTIPLIER, tier - 1) * powerMultiplier
   );
-}
-
-/* ------------------------------ casualties ------------------------------ */
-
-/**
- * Soldiers lost. A repelled assault is mauled — the boss is not a player who
- * merely holds the wall. A win still costs, scaled by how close the fight was,
- * so overwhelming force is the safe way to farm and a squeaker is expensive.
- */
-export const BOSS_LOSS_RATE_DEFEAT = 0.35;
-export const BOSS_LOSS_RATE_VICTORY_MAX = 0.15;
-
-/**
- * Fraction of the attacker's soldiers killed in the run. On a victory the rate
- * runs from ~0 (a crushing overmatch) up to BOSS_LOSS_RATE_VICTORY_MAX (a fight
- * decided by a hair); on a defeat it is the flat rout rate.
- */
-export function bossSoldierLossRate(
-  victory: boolean,
-  attackerPower: number,
-  bossPowerValue: number
-): number {
-  if (!victory) return BOSS_LOSS_RATE_DEFEAT;
-  const total = attackerPower + bossPowerValue;
-  const closeness =
-    total > 0 ? Math.min(attackerPower, bossPowerValue) / total : 0;
-  // closeness runs 0..0.5, so ×2 maps a dead-even fight to the full rate.
-  return BOSS_LOSS_RATE_VICTORY_MAX * closeness * 2;
 }
 
 /* ------------------------------ rewards ------------------------------ */
@@ -239,6 +222,28 @@ export const BOSS_REWARD_BASE: BossReward = {
   stone: 25_000,
   slaves: 40,
 };
+
+/**
+ * Scale-up applied to the whole haul when the boss became a siege.
+ *
+ * The old payout was sized against a single click, and it showed: players read
+ * the boss as not worth the wait, which it wasn't — one win per cycle for a bit
+ * more than the turns would have earned as ordinary attacks. The cycle haul is
+ * now ×2.5, and a sortie that also lands the kill with an S grade takes home
+ * `0.55 + 0.45 × 1.5` of it — about three times what the old single victory paid.
+ */
+export const BOSS_REWARD_SCALE = 2.5;
+
+/**
+ * The one term the scale-up is held back on.
+ *
+ * Mine slaves feed uncapped production, and a slave payout compounds twice over
+ * (more slaves × a higher city production multiplier) — the same reason their
+ * tier curve is gentler than the resource curve. ×1.75 keeps the pens a visibly
+ * bigger prize without turning one cycle's boss into a permanent economy tier.
+ * If it still inflates, `boss.rewardMultiplier` is the live knob.
+ */
+export const BOSS_REWARD_SCALE_SLAVES = 1.75;
 
 /** Resource reward multiplier per city tier — the same curve as the power. */
 export const BOSS_REWARD_TIER_MULTIPLIER = 2.4;
@@ -264,13 +269,18 @@ function grow(base: number, tierMultiplier: number, tier: number, day: number): 
 }
 
 /**
- * The haul for beating the boss of `cities` on season day `day`.
+ * The haul a whole cycle of the boss of `cities` is worth on season day `day`.
+ *
+ * This is the *pool*, not a payout: a sortie earns `bossChipFraction` of it for
+ * the damage it deals and `bossKillFraction` for the kill (see `bossBattle.ts`).
  * `multiplier` is the admin-tunable global scalar.
  */
 export function bossReward(cities: number, day: number, multiplier = 1): BossReward {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));
   const res = (base: number) =>
-    Math.round((grow(base, BOSS_REWARD_TIER_MULTIPLIER, tier, day) * multiplier) / 100) * 100;
+    Math.round(
+      (grow(base, BOSS_REWARD_TIER_MULTIPLIER, tier, day) * BOSS_REWARD_SCALE * multiplier) / 100
+    ) * 100;
   return {
     gold: res(BOSS_REWARD_BASE.gold),
     wood: res(BOSS_REWARD_BASE.wood),
@@ -279,7 +289,9 @@ export function bossReward(cities: number, day: number, multiplier = 1): BossRew
     slaves: Math.max(
       1,
       Math.round(
-        grow(BOSS_REWARD_BASE.slaves, BOSS_SLAVE_TIER_MULTIPLIER, tier, day) * multiplier
+        grow(BOSS_REWARD_BASE.slaves, BOSS_SLAVE_TIER_MULTIPLIER, tier, day) *
+          BOSS_REWARD_SCALE_SLAVES *
+          multiplier
       )
     ),
   };
@@ -322,11 +334,36 @@ export const BOSS_ITEM_RARITY_FLOOR: HeroRarity = "RARE";
 /* ------------------------------ cadence ------------------------------ */
 
 /**
- * Victories allowed between one daily update and the next. The boss "licks its
- * wounds" until the next update, which is what stops a player who banked turns
- * for a fortnight (turn gain is uncapped — see applyPendingUpdates) from
- * cashing the whole stockpile into one afternoon of boss farming. Defeats do
- * not consume the allowance: losing already cost the turns and a third of the
- * army.
+ * How long a felled tyrant stays dead before it returns at full health.
+ *
+ * The clock starts **when it dies**, not on a shared schedule, and that asymmetry
+ * is the whole design:
+ *
+ *  - A boss that is alive never resets. Its wounds persist indefinitely, so a
+ *    player who cannot fell it in one assault is under no time pressure at all —
+ *    they chip at it across as many assaults as they like and are paid for each.
+ *  - A boss that is dead is gone for an hour, with a countdown to prove it.
+ *
+ * This replaced a per-daily-update reset, which had both failure modes at once:
+ * it punished the weak player (progress wiped at 19:30 whether or not they were
+ * done) and bored the strong one (killed it at 19:31, nothing to do for 24h).
+ *
+ * Nothing else caps the boss, and nothing else needs to. The turn cost is the
+ * real limiter: 300 turns for the first city is roughly a full day of turn income
+ * (1 turn / 5 min), so an hourly respawn does not mean hourly loot — it means a
+ * player who has banked turns may spend them here instead of on attacks, which is
+ * a trade rather than a windfall.
  */
-export const BOSS_VICTORIES_PER_CYCLE = 1;
+export const BOSS_REVIVE_MS = 60 * 60 * 1000;
+
+/**
+ * There is no victory allowance, and the absence is deliberate.
+ *
+ * The old rule was one win per daily update, because turn gain is uncapped (see
+ * `applyPendingUpdates`). What replaced it is an economic bound rather than a
+ * counter: each boss *life* is worth one haul, chip loot is paid pro-rata against
+ * that life's health pool, and the kill bonus is paid once because a life can only
+ * be ended once. Extra assaults against the same life therefore buy progress, not
+ * duplicate payouts. See `bossBattle.ts` (`BOSS_CHIP_SHARE`) and
+ * `server/bossSiege.ts`.
+ */

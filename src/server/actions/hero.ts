@@ -309,7 +309,7 @@ export async function discardHeroItem(
       if (deleted === 0) return { error: "הפריט לא נמצא בתיק שלך" };
 
       // The fates may reward parting with gear — rarer items pay far more often
-      // (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to +10% on top.
+      // (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to +15% on top.
       // The server owns the roll.
       const luckBonus = wheelLuckBonus(
         empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
@@ -379,7 +379,7 @@ export async function discardHeroItems(
 
       // Roll each thrown item independently — rarer gear pays a wheel spin far
       // more often (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to
-      // +10% on top of every roll. The server owns every roll.
+      // +15% on top of every roll. The server owns every roll.
       const luckBonus = wheelLuckBonus(
         empire.upgrades.find((u) => u.type === "WHEEL_LUCK")?.level ?? 1
       );

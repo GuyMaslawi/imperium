@@ -1,10 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  BANK_DAILY_INTEREST_MAX_LEVEL,
+  BANK_INTEREST_MAX_RATE,
+  MAX_CITIES,
   MINE_MAX_LEVEL,
+  TICKS_PER_DAY,
+  TURNS_UPGRADE_MAX_LEVEL,
+  WHEEL_LUCK_MAX_LEVEL,
   bankInterestRate,
+  bankInterestUpgradeCost,
+  cityCost,
+  empireUpgradeCostFor,
   mineProductionPerTick,
   mineProductionValue,
   storageCapacityForLevel,
+  turnsPerRegularUpdate,
+  turnsUpgradeCost,
+  wheelLuckBonus,
+  wheelLuckUpgradeCost,
 } from "@/lib/game/constants";
 import {
   SEASON_PASS_PREMIUM_PRICE,
@@ -42,7 +55,16 @@ import {
   rollGuaranteedPotion,
   rollPotionDrop,
 } from "@/lib/game/potions";
-import { pickWheelPrizeIndex, wheelPrizeAmount, WHEEL_PRIZES } from "@/lib/game/wheel";
+import {
+  pickWheelPrizeIndex,
+  wheelPrizeAmount,
+  WHEEL_DOUBLE_EVERY_CYCLES,
+  WHEEL_MAX_DOUBLINGS,
+  WHEEL_PREMIUM_BASE,
+  WHEEL_PREMIUM_STEP,
+  WHEEL_PRIZES,
+  WHEEL_RESOURCE_BASE,
+} from "@/lib/game/wheel";
 import { armyPower, getEmpireMilitaryPower } from "@/lib/game/power";
 import { MAX_WEAPON_TIER, weaponByKey, weaponsPower } from "@/lib/game/weapons";
 
@@ -67,11 +89,21 @@ describe("mines", () => {
 
 describe("the bank", () => {
   it("caps the interest rate however high the upgrade goes", () => {
-    // 15% per daily update compounded twice a day was ~4,384× a month on
-    // plunder-immune gold. The cap is the fix; this is the guard on the cap.
+    // Legacy rows sit above the level cap (the ladder used to run to 15), so the
+    // clamp is what stops them from paying more than the advertised ceiling.
     const capped = bankInterestRate(1e6);
-    expect(capped).toBeLessThanOrEqual(0.03);
+    expect(capped).toBeLessThanOrEqual(BANK_INTEREST_MAX_RATE);
     expect(capped).toBeGreaterThan(0);
+    expect(bankInterestRate(BANK_DAILY_INTEREST_MAX_LEVEL)).toBe(BANK_INTEREST_MAX_RATE);
+  });
+
+  it("adds exactly one percent per rung, and prices each rung steeply", () => {
+    expect(bankInterestRate(4) - bankInterestRate(3)).toBeCloseTo(0.01, 10);
+    // The ladder is a real sink: the last rung alone costs more than the tenth
+    // city, so 10% cannot be reached early.
+    const last = bankInterestUpgradeCost(BANK_DAILY_INTEREST_MAX_LEVEL - 1);
+    expect(last.gold).toBeGreaterThan(cityCost(MAX_CITIES - 1).gold);
+    expect(empireUpgradeCostFor("BANK_DAILY_INTEREST", 3)).toEqual(bankInterestUpgradeCost(3));
   });
 
   it("never pays negative interest", () => {
@@ -259,6 +291,96 @@ describe("the wheel", () => {
   it("pays more in a later cycle", () => {
     const prize = WHEEL_PRIZES[0];
     expect(wheelPrizeAmount(prize, 5)).toBeGreaterThanOrEqual(wheelPrizeAmount(prize, 1));
+  });
+
+  it("never hands out army weapons — those are earned in the factory", () => {
+    expect(WHEEL_PRIZES.map((p) => p.key)).not.toContain("allWeapons");
+  });
+
+  it("pays the diamond and citizen wedges the identical number, every cycle", () => {
+    const diamonds = WHEEL_PRIZES.find((p) => p.key === "diamonds")!;
+    const citizens = WHEEL_PRIZES.find((p) => p.key === "citizens")!;
+    for (const cycle of [1, 2, 3, 17, 60]) {
+      expect(wheelPrizeAmount(diamonds, cycle)).toBe(wheelPrizeAmount(citizens, cycle));
+    }
+    // Day 1 morning, day 1 evening, day 2 morning — the published ladder.
+    expect(wheelPrizeAmount(diamonds, 1)).toBe(WHEEL_PREMIUM_BASE);
+    expect(wheelPrizeAmount(diamonds, 3)).toBe(WHEEL_PREMIUM_BASE + 2 * WHEEL_PREMIUM_STEP);
+  });
+
+  it("doubles every resource wedge once a day, then plateaus at the cap", () => {
+    for (const key of ["gold", "iron", "stone", "wood"]) {
+      const prize = WHEEL_PRIZES.find((p) => p.key === key)!;
+      expect(wheelPrizeAmount(prize, 1)).toBe(WHEEL_RESOURCE_BASE);
+      // Both of day 1's updates pay the base; the doubling lands on day 2.
+      expect(wheelPrizeAmount(prize, 2)).toBe(WHEEL_RESOURCE_BASE);
+      expect(wheelPrizeAmount(prize, 3)).toBe(WHEEL_RESOURCE_BASE * 2);
+      expect(wheelPrizeAmount(prize, 5)).toBe(WHEEL_RESOURCE_BASE * 4);
+
+      // A long season must not print 2^89 — the cap is what makes that safe.
+      const capped = WHEEL_RESOURCE_BASE * 2 ** WHEEL_MAX_DOUBLINGS;
+      const firstCappedCycle = WHEEL_MAX_DOUBLINGS * WHEEL_DOUBLE_EVERY_CYCLES + 1;
+      expect(wheelPrizeAmount(prize, firstCappedCycle)).toBe(capped);
+      expect(wheelPrizeAmount(prize, firstCappedCycle + 400)).toBe(capped);
+    }
+  });
+});
+
+describe("wheel luck", () => {
+  it("tops out at +15% and never climbs past it", () => {
+    expect(wheelLuckBonus(WHEEL_LUCK_MAX_LEVEL)).toBeCloseTo(0.15);
+    expect(wheelLuckBonus(WHEEL_LUCK_MAX_LEVEL + 40)).toBeCloseTo(0.15);
+  });
+
+  it("costs a fortune from the very first purchase", () => {
+    // The premise of the upgrade: level 1 → 2 already outprices a second city.
+    expect(wheelLuckUpgradeCost(1).gold).toBeGreaterThanOrEqual(3_000_000);
+  });
+
+  it("compounds — every level costs strictly more than the one below", () => {
+    for (let level = 1; level < WHEEL_LUCK_MAX_LEVEL - 1; level++) {
+      expect(wheelLuckUpgradeCost(level + 1).gold).toBeGreaterThan(
+        wheelLuckUpgradeCost(level).gold
+      );
+    }
+  });
+
+  it("is the curve the purchase action actually charges", () => {
+    // empireUpgradeCostFor is what both the page and the server action price
+    // against; a missed branch there would silently sell 15% at generic prices.
+    expect(empireUpgradeCostFor("WHEEL_LUCK", 9)).toEqual(wheelLuckUpgradeCost(9));
+  });
+});
+
+describe("the turns upgrade", () => {
+  it("prices a level against what a level is worth per day", () => {
+    // Each level is +1 turn on every tick — 288 turns a day, permanently. The
+    // ladder was linear off a 1,500-gold base once, which sold all five levels
+    // for ~27K gold; the first rung alone must now cost a city.
+    expect(turnsPerRegularUpdate(1) * TICKS_PER_DAY).toBe(288);
+    expect(turnsUpgradeCost(1).gold).toBeGreaterThanOrEqual(cityCost(1).gold / 4);
+  });
+
+  it("compounds — every level costs strictly more than the one below", () => {
+    for (let level = 1; level < TURNS_UPGRADE_MAX_LEVEL - 1; level++) {
+      expect(turnsUpgradeCost(level + 1).gold).toBeGreaterThan(
+        turnsUpgradeCost(level).gold
+      );
+    }
+  });
+
+  it("charges millions, not thousands, for the whole ladder", () => {
+    let gold = 0;
+    for (let level = 1; level < TURNS_UPGRADE_MAX_LEVEL; level++) {
+      gold += turnsUpgradeCost(level).gold;
+    }
+    expect(gold).toBeGreaterThan(5_000_000);
+  });
+
+  it("is the curve the purchase action actually charges", () => {
+    expect(empireUpgradeCostFor("TURNS_PER_REGULAR_UPDATE", 3)).toEqual(
+      turnsUpgradeCost(3)
+    );
   });
 });
 

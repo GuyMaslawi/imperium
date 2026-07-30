@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import {
   BUILDING_META,
   bankInterestRate,
+  citizensPerDailyUpdate,
   cityProductionMultiplier,
   mineProductionPerTick,
   type StorableResource,
@@ -11,7 +12,13 @@ import {
 import { getTunables } from "./config";
 import { dailyUpdatesBetween, elapsedRegularTicks, lastTickBoundary } from "./time";
 import { turnsGainFromUpgrades } from "./turns";
-import { HERO_MAX_HEALTH, bonusMultiplier, heroBonuses, heroShouldRevive } from "./hero";
+import {
+  HERO_MAX_HEALTH,
+  bonusMultiplier,
+  heroBonuses,
+  heroShouldRevive,
+  resourceProductionPct,
+} from "./hero";
 import { getActiveGuildBuffPct } from "./guildBuffs";
 import { getActiveResourceBoosts } from "./diamondEffects";
 import { getActivePotionKinds } from "./potionEffects";
@@ -107,7 +114,7 @@ export async function applyPendingUpdates(
     // Cities multiply raw mine output: ×1 at one city, ×10 at ten. Derived from
     // the live count, so a city lost to siege drops production on the next tick.
     const baseMultiplier =
-      bonusMultiplier(heroBonus.points.resources + heroBonus.classPct.resources) *
+      bonusMultiplier(resourceProductionPct(heroBonus)) *
       bonusMultiplier(guildResourcesPct) *
       potionResources *
       tunables.economy.mineProductionMultiplier *
@@ -137,8 +144,7 @@ export async function applyPendingUpdates(
   if (missedDailies.length > 0) {
     const growthLevel =
       empire.upgrades.find((u) => u.type === "CITIZEN_GROWTH")?.level ?? 1;
-    const citizensPerDaily =
-      tunables.daily.citizensBase + growthLevel * tunables.daily.citizensPerLevel;
+    const citizensPerDaily = citizensPerDailyUpdate(growthLevel, tunables.daily);
     // Citizen items add a flat count per daily update (not a %).
     //
     // No ceiling: the whole backlog lands, so a week away is a week's citizens

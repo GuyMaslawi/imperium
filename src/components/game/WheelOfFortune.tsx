@@ -313,16 +313,29 @@ export function WheelOfFortune({
                       className={RESOURCE_ICON_COLOR[h.prize.key] ?? "text-emerald-100"}
                     />
                     {h.prize.label}
-                    {h.count >= 2 && (
+                    {/* Unit prizes grant exactly one thing per win, so ×count and
+                        the total are the same number — showing both read as two
+                        different multipliers. One badge with the total only. */}
+                    {h.prize.kind !== "unit" && h.count >= 2 && (
                       <span className="nums rounded bg-gold/25 px-1 text-[10px] font-black text-gold-bright" dir="ltr">
                         ×{h.count}
                       </span>
                     )}
                     <span className="nums rounded bg-emerald-400/25 px-1 text-[10px] text-gold-bright" dir="ltr">
-                      {h.prize.kind === "unit" ? `x${h.total}` : `+${formatNumber(h.total)}`}
+                      {h.prize.kind === "unit" ? `×${h.total}` : `+${formatNumber(h.total)}`}
                     </span>
                   </span>
                 ))}
+                {/* Unit prizes need their note here too — in a batch reveal the
+                    single-spin note below is never shown, so "כל הנשק" arrived
+                    with no explanation of what those 24 pieces were. */}
+                {result.haul
+                  .filter((h) => h.prize.kind === "unit" && h.prize.note)
+                  .map((h) => (
+                    <p key={`note-${h.prize.key}`} className="w-full text-[11px] text-emerald-200/70">
+                      {h.prize.label}: {h.prize.note}
+                    </p>
+                  ))}
               </div>
             ) : (
               result.prize.note && (

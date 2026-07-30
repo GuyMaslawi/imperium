@@ -1,4 +1,5 @@
 import { requireEmpire } from "@/lib/auth";
+import { getTunables } from "@/lib/game/config";
 import {
   EMPIRE_UPGRADE_META,
   EMPIRE_UPGRADE_TYPES,
@@ -20,6 +21,9 @@ export const metadata = { title: "שדרוגים | אימפריום" };
 
 export default async function UpgradesPage() {
   const empire = await requireEmpire();
+  // The citizen-intake effect is admin-tunable, so the card must print the live
+  // rate rather than the shipped default.
+  const tunables = await getTunables();
 
   const available = {
     gold: Math.floor(empire.gold),
@@ -112,8 +116,8 @@ export default async function UpgradesPage() {
               icon={meta.icon}
               description={meta.description}
               level={level}
-              currentEffect={meta.effectLabel(level)}
-              nextEffect={meta.effectLabel(level + 1)}
+              currentEffect={meta.effectLabel(level, tunables.daily)}
+              nextEffect={meta.effectLabel(level + 1, tunables.daily)}
               upgradeCost={empireUpgradeCostFor(type, level)}
               available={available}
               isMaxLevel={isMaxLevel}

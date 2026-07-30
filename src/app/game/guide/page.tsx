@@ -4,6 +4,7 @@ import { requireEmpire } from "@/lib/auth";
 import { getTunables } from "@/lib/game/config";
 import {
   BANK_DAILY_INTEREST_MAX_LEVEL,
+  BANK_INTEREST_COST_GROWTH,
   BANK_INTEREST_MAX_RATE,
   BANK_INTEREST_PER_LEVEL,
   BANK_DEPOSIT_MAX,
@@ -20,8 +21,13 @@ import {
   SOLDIER_POWER,
   SPY_POWER,
   STORAGE_CAPACITY_PER_LEVEL,
+  TICKS_PER_DAY,
+  TURNS_UPGRADE_COST_GROWTH,
+  TURNS_UPGRADE_MAX_LEVEL,
   UNIT_META,
+  WHEEL_LUCK_COST_GROWTH,
   WHEEL_LUCK_MAX_LEVEL,
+  bankInterestUpgradeCost,
   cityCost,
   cityHeroLevelRequired,
   citizensPerDailyUpdate,
@@ -29,7 +35,10 @@ import {
   empireUpgradeMaxLevel,
   mineUpgradeCost,
   storageUpgradeCost,
+  turnsUpgradeCost,
   wheelLuckBonus,
+  wheelLuckUpgradeCost,
+  type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { cityAt } from "@/lib/game/cities";
 import {
@@ -42,6 +51,7 @@ import {
   weaponsOfCategory,
 } from "@/lib/game/weapons";
 import {
+  FLAT_CURVE_EXPONENT,
   HERO_BAG_CAPACITY,
   HERO_CLASS_META,
   HERO_CLASS_ORDER,
@@ -90,12 +100,28 @@ import {
   BOSS_BASE_POWER,
   BOSS_HERO_XP_BASE,
   BOSS_ITEM_RARITY_FLOOR,
-  BOSS_LOSS_RATE_DEFEAT,
-  BOSS_LOSS_RATE_VICTORY_MAX,
   BOSS_POWER_TIER_MULTIPLIER,
+  BOSS_REVIVE_MS,
   BOSS_TURN_COST_BASE,
   CITY_BOSSES,
 } from "@/lib/game/bosses";
+import {
+  BOSS_ASSAULT_DURATION_MS,
+  BOSS_CHIP_SHARE,
+  BOSS_GRADE_BONUS,
+  BOSS_GRADE_MIN_DECISIONS,
+  BOSS_HP_PER_POWER,
+  BOSS_KILL_SHARE,
+  BOSS_MOVE_META,
+  BOSS_MOVE_COUNTER,
+  BOSS_READ_CHANCE_BASE,
+  BOSS_READ_CHANCE_MAX,
+  BOSS_READ_CHANCE_NO_HERO,
+  BOSS_ROUT_LOOT_PENALTY,
+  BOSS_ROUT_LOSS_FRACTION,
+  BOSS_SORTIE_ROUNDS,
+  BOSS_TACTIC_META,
+} from "@/lib/game/bossBattle";
 import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
@@ -116,7 +142,23 @@ import {
   SEASON_PASS_XP_PER_TIER,
   SEASON_PASS_DAILY_GROWTH,
 } from "@/lib/game/seasonPass";
-import { WHEEL_CYCLE_GROWTH, WHEEL_PRIZES } from "@/lib/game/wheel";
+import {
+  WHEEL_MAX_DOUBLINGS,
+  WHEEL_PREMIUM_BASE,
+  WHEEL_PREMIUM_STEP,
+  WHEEL_PRIZES,
+  WHEEL_RESOURCE_BASE,
+} from "@/lib/game/wheel";
+import {
+  CHAT_BODY_MAX,
+  CHAT_BURST_LIMIT,
+  CHAT_BURST_WINDOW_MS,
+  CHAT_DIRECT_LIMIT,
+  CHAT_GLOBAL_LIMIT,
+  CHAT_PAIR_LIMIT,
+  CHAT_REPEAT_WINDOW_MS,
+  PRESENCE_ONLINE_MS,
+} from "@/lib/game/chat";
 import {
   BOOST_MAX_PCT,
   BOOST_STEP_COST,
@@ -181,6 +223,7 @@ const SECTIONS = {
   quests: { id: "quests", title: "מסעות הגיבור", sub: "expeditions", icon: "quest" },
   bosses: { id: "bosses", title: "שליטי הערים", sub: "city bosses", icon: "shield" },
   guild: { id: "guild", title: "ברית", sub: "guilds", icon: "guild" },
+  chat: { id: "chat", title: "צ׳אט", sub: "live chat", icon: "chat" },
   rewards: { id: "rewards", title: "גלגל, פס עונה ואירועים", sub: "rewards", icon: "wheel" },
   diamonds: { id: "diamonds", title: "יהלומים", sub: "diamonds", icon: "diamond" },
   roadmap: { id: "roadmap", title: "מסלול התקדמות", sub: "roadmap", icon: "rankings" },
@@ -224,6 +267,28 @@ const LOOP_NODES: { icon: IconName; title: string; text: string }[] = [
 ];
 
 const nf = (v: number) => Math.round(v).toLocaleString("he-IL");
+
+/**
+ * Everything an empire pays to take an upgrade from its starting level 1 up to
+ * `maxLevel`. The table used to quote a single rung (5 → 6), which said nothing
+ * about a geometric ladder — and named a purchase that does not exist for the
+ * five-level turns upgrade. Uncapped upgrades have no total, so they print "—".
+ */
+function upgradeLadderTotal(
+  type: ActiveEmpireUpgradeType,
+  maxLevel: number | undefined
+) {
+  const total = { gold: 0, wood: 0, iron: 0, stone: 0 };
+  if (maxLevel === undefined) return undefined;
+  for (let level = 1; level < maxLevel; level++) {
+    const rung = empireUpgradeCostFor(type, level);
+    total.gold += rung.gold;
+    total.wood += rung.wood;
+    total.iron += rung.iron;
+    total.stone += rung.stone;
+  }
+  return total;
+}
 
 export default async function GuidePage() {
   // The guide quotes live balance, not the historical defaults: an admin who
@@ -402,8 +467,8 @@ export default async function GuidePage() {
                 example={
                   <>
                     ברמת שדרוג <N>10</N> תקבל{" "}
-                    <N>{citizensPerDailyUpdate(10)}</N> אזרחים בכל עדכון —{" "}
-                    <N>{citizensPerDailyUpdate(10) * 2}</N> ביממה. אם לא נכנסת שבוע,
+                    <N>{citizensPerDailyUpdate(10, tunables.daily)}</N> אזרחים בכל עדכון —{" "}
+                    <N>{citizensPerDailyUpdate(10, tunables.daily) * 2}</N> ביממה. אם לא נכנסת שבוע,
                     כל העדכונים שהוחמצו נצברים ומשולמים בכניסה הבאה.
                   </>
                 }
@@ -495,8 +560,14 @@ export default async function GuidePage() {
                 legend={[
                   { term: "רמה × 2", desc: `כמה מפיק כל עבד. רמה ${MINE_MAX_LEVEL} = ${MINE_MAX_LEVEL * 2} ליחידה — התקרה.` },
                   { term: "ערים", desc: `מכפיל ליניארי: ×1 בעיר אחת, ×${MAX_CITIES} בעשר.` },
-                  { term: "בונוס גיבור", desc: "נקודות משאבים + בונוס מקצוע הסוחר." },
-                  { term: "חפץ", desc: "פרי־שטן מוסיף כמות קבועה, לא אחוז." },
+                  {
+                    term: "בונוס גיבור",
+                    desc: "נקודות משאבים + בונוס מקצוע הסוחר + חרב ומגן, שמוסיפים אחוזים לתפוקה.",
+                  },
+                  {
+                    term: "חפץ",
+                    desc: "פרי שטן, מכנסיים ונעליים מוסיפים כמות קבועה מעל המכפיל — לא אחוז.",
+                  },
                 ]}
                 example={
                   <>
@@ -598,7 +669,12 @@ export default async function GuidePage() {
                             ×{city}
                           </td>
                           <td className="nums text-bone" dir="ltr">
-                            {nf(citizensPerDailyUpdate(city * CITIZEN_GROWTH_LEVELS_PER_CITY))}
+                            {nf(
+                              citizensPerDailyUpdate(
+                                city * CITIZEN_GROWTH_LEVELS_PER_CITY,
+                                tunables.daily
+                              )
+                            )}
                           </td>
                           <td className="nums text-purple-300" dir="ltr">
                             {city === 1 ? "—" : cityHeroLevelRequired(city - 1)}
@@ -736,8 +812,8 @@ export default async function GuidePage() {
                 <Fact
                   icon="gold"
                   label="ריבית מקסימלית"
-                  value={`${(BANK_INTEREST_MAX_RATE * 100).toFixed(1)}%`}
-                  hint={`${(BANK_INTEREST_PER_LEVEL * 100).toFixed(1)}% לכל רמת שדרוג · עד רמה ${BANK_DAILY_INTEREST_MAX_LEVEL}`}
+                  value={`${Math.round(BANK_INTEREST_MAX_RATE * 100)}%`}
+                  hint={`${Math.round(BANK_INTEREST_PER_LEVEL * 100)}% לכל רמת שדרוג · עד רמה ${BANK_DAILY_INTEREST_MAX_LEVEL}`}
                 />
                 <Fact
                   icon="bank"
@@ -762,11 +838,11 @@ export default async function GuidePage() {
                     <V>יתרה</V>
                     <O>×</O>
                     <O>min(</O>
-                    <N>15%</N>
+                    <N>{`${Math.round(BANK_INTEREST_MAX_RATE * 100)}%`}</N>
                     <O>,</O>
                     <V>רמת שדרוג</V>
                     <O>×</O>
-                    <N>1%</N>
+                    <N>{`${Math.round(BANK_INTEREST_PER_LEVEL * 100)}%`}</N>
                     <O>)</O>
                     <O>=</O>
                     <R>ריבית</R>
@@ -986,14 +1062,14 @@ export default async function GuidePage() {
                       <th className="text-right">שדרוג</th>
                       <th className="text-right">מה הוא עושה</th>
                       <th className="text-right">תקרה</th>
-                      <th className="text-right">עלות רמה 5 → 6</th>
+                      <th className="text-right">עלות כל הסולם עד התקרה</th>
                     </tr>
                   </thead>
                   <tbody>
                     {EMPIRE_UPGRADE_TYPES.map((type) => {
                       const meta = EMPIRE_UPGRADE_META[type];
                       const max = empireUpgradeMaxLevel(type, MAX_CITIES);
-                      const cost = empireUpgradeCostFor(type, 5);
+                      const cost = upgradeLadderTotal(type, max);
                       return (
                         <tr key={type}>
                           <td className="whitespace-nowrap">
@@ -1009,14 +1085,18 @@ export default async function GuidePage() {
                             {max ?? "∞"}
                           </td>
                           <td>
-                            <Cost
-                              amounts={[
-                                { key: "gold", value: cost.gold },
-                                { key: "wood", value: cost.wood },
-                                { key: "iron", value: cost.iron },
-                                { key: "stone", value: cost.stone },
-                              ]}
-                            />
+                            {cost ? (
+                              <Cost
+                                amounts={[
+                                  { key: "gold", value: cost.gold },
+                                  { key: "wood", value: cost.wood },
+                                  { key: "iron", value: cost.iron },
+                                  { key: "stone", value: cost.stone },
+                                ]}
+                              />
+                            ) : (
+                              <span className="text-zinc-500">—</span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1070,7 +1150,22 @@ export default async function GuidePage() {
                   </>
                 }
                 legend={[
-                  { term: "קבלת תורות", desc: "מתומחר גבוה יותר: 2,700 × רמה זהב." },
+                  {
+                    term: "שלושה יוצאים מהכלל",
+                    desc: "הנוסחה הזו היא של השדרוגים הרגילים. שלושה שדרוגים מתומחרים גיאומטרית — כל רמה עולה פי כמה מקודמתה — כי מה שהם נותנים לא נגמר לעולם.",
+                  },
+                  {
+                    term: "קבלת תורות",
+                    desc: `תור אחד לעדכון רגיל הוא ${nf(TICKS_PER_DAY)} תורות ביום, לתמיד. לכן: ${nf(turnsUpgradeCost(1).gold)} זהב לרמה הראשונה, וכל רמה אחריה פי ${TURNS_UPGRADE_COST_GROWTH} — עד רמה ${TURNS_UPGRADE_MAX_LEVEL}.`,
+                  },
+                  {
+                    term: "ריבית בנק",
+                    desc: `${nf(bankInterestUpgradeCost(1).gold)} זהב לרמה הראשונה וכל רמה אחריה פי ${BANK_INTEREST_COST_GROWTH}, כי ריבית עובדת על זהב שאי אפשר לבזוז ומצטברת פעמיים ביום. ${Math.round(BANK_INTEREST_MAX_RATE * 100)}% הוא פרס של סוף עונה.`,
+                  },
+                  {
+                    term: "מזל הגלגל",
+                    desc: `היקר במשחק: ${nf(wheelLuckUpgradeCost(1).gold)} זהב לרמה הראשונה, וכל רמה אחריה פי ${WHEEL_LUCK_COST_GROWTH} — ${nf(wheelLuckUpgradeCost(WHEEL_LUCK_MAX_LEVEL - 1).gold)} לרמה ${WHEEL_LUCK_MAX_LEVEL}. סיבובי גלגל הם המטבע הנדיר במשחק, ולכן כל אחוז כואב.`,
+                  },
                 ]}
               />
             </GuideSection>
@@ -1519,7 +1614,7 @@ export default async function GuidePage() {
                 </div>
 
                 <Formula
-                  label="הבונוס של חפץ — אחוזים בקו ישר, כמויות בריבוע"
+                  label="הבונוס של חפץ — אחוזים בקו ישר, כמויות בחזקה"
                   expr={
                     <>
                       <V>תקרת הסטטיסטיקה</V>
@@ -1529,7 +1624,9 @@ export default async function GuidePage() {
                       <O>(</O>
                       <V>דרגת שדרוג</V>
                       <O>÷ 40)</O>
-                      <sup className="text-gold-dim">2</sup>
+                      <sup className="text-gold-dim">
+                        {`${FLAT_CURVE_EXPONENT.resources}–${FLAT_CURVE_EXPONENT.citizens}`}
+                      </sup>
                     </>
                   }
                   legend={[
@@ -1544,11 +1641,11 @@ export default async function GuidePage() {
                     },
                     {
                       term: "כמויות",
-                      desc: `אזרחים, משאבים ותורות עולים בריבוע הדרגה — חפץ רמה 1 נותן ${itemStatBonus("BOOTS", 1, "citizens")}, רמה 10 נותן ${itemStatBonus("BOOTS", 10, "citizens")}, ורמה 100 נותן ${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value}. כמות קבועה נבלעת בכלכלה שגדלה, ולכן היא חייבת לגדול מהר ממנה.`,
+                      desc: `משאבים ותורות עולים בריבוע הדרגה, ואזרחים מהר עוד יותר (חזקת ${FLAT_CURVE_EXPONENT.citizens}) — נעליים רמה 1 נותנות ${itemStatBonus("BOOTS", 1, "citizens")} אזרחים, רמה 13 נותנות ${itemStatBonus("BOOTS", 13, "citizens")}, ורמה 100 נותנות ${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value}. כמות קבועה נבלעת בכלכלה שגדלה, ולכן היא חייבת לגדול מהר ממנה.`,
                     },
                     {
-                      term: "פרי־שטן",
-                      desc: `עד +${itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value} משאבים לעדכון רגיל — וככל שהדרגה גבוהה, יותר סוגי משאבים. לכל משבצת סדר משאבים משלה: פרי שטן פותח בזהב, מגן בעץ, מכנסיים בברזל, נעליים באבן.`,
+                      term: "משאבים — שני כלים",
+                      desc: `פרי שטן, מכנסיים ונעליים נותנים כמות קבועה בכל עדכון רגיל (עד +${itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value}), וככל שהדרגה גבוהה יותר סוגי משאבים. לכל משבצת סדר משלה: פרי שטן פותח בזהב, מכנסיים בברזל, נעליים באבן. חרב ומגן פועלים הפוך — הם מכפילים את תפוקת כל המכרות באחוזים (עד +${itemStatBonus("SWORD", HERO_MAX_LEVEL, "resources")}%), קטן בהתחלה ומשמעותי בסוף.`,
                     },
                   ]}
                   example={
@@ -1556,7 +1653,7 @@ export default async function GuidePage() {
                       חרב ברמה <N>50</N> = דרגה <N>20</N> מתוך <N>40</N>, כלומר{" "}
                       <N>רבע</N> מהתקרה בכמויות אבל <N>חצי</N> באחוזים:{" "}
                       <R>+{itemPrimaryBonus("SWORD", 50).value}%</R> התקפה, ועוד{" "}
-                      <R>+{itemStatBonus("SWORD", 50, "resources")}</R> משאבים ו־
+                      <R>+{itemStatBonus("SWORD", 50, "resources")}%</R> תפוקת מכרות ו־
                       <R>+{itemStatBonus("SWORD", 50, "citizens")}</R> אזרחים כמשניים;
                       אותה רמה בכנפיים = <R>+{itemPrimaryBonus("WINGS", 50).value}</R> תורות
                       בכל עדכון יומי.
@@ -1834,8 +1931,13 @@ export default async function GuidePage() {
             <GuideSection meta={SECTIONS.bosses} index={INDEX.bosses}>
               <Lead>
                 לכל אחת מעשר דרגות הערים יש שליט אחד — קיר PvE שכוחו{" "}
-                <b>פומבי וקבוע</b>. אין הגרלה: כוח ההתקפה שלך גדול משלו? ניצחת. זו הדרך
-                לדעת בדיוק כמה צבא עוד חסר לך.
+                <b>פומבי וקבוע</b>. לוחצים <b>תקיפה</b> פעם אחת, והצבא יוצא לקרב של{" "}
+                <b className="nums">{BOSS_SORTIE_ROUNDS}</b> סבבים שרץ כ־
+                <b className="nums">{Math.round(BOSS_ASSAULT_DURATION_MS / 1000)}</b> שניות
+                בזמן אמת. אפשר לצפות, ואפשר לעבור לדף אחר ולהמשיך לשחק — כשהקרב נגמר מגיעה
+                הודעה עם כל השלל. לבוס יש <b>מאגר חיים שנשמר בין תקיפות</b>, וכשהוא נופל הוא
+                קם לתחייה אחרי{" "}
+                <b className="nums">{Math.round(BOSS_REVIVE_MS / 60000)}</b> דקות.
               </Lead>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1847,53 +1949,101 @@ export default async function GuidePage() {
                   tone="text-red-300"
                 />
                 <Fact
-                  icon="turns"
-                  label="תורות לקרב"
-                  value={`${BOSS_TURN_COST_BASE}+`}
-                  hint="+200 לכל דרגת עיר"
-                  tone="text-emerald-300"
-                />
-                <Fact
-                  icon="army"
-                  label="אבדות בהפסד"
-                  value={`${Math.round(BOSS_LOSS_RATE_DEFEAT * 100)}%`}
-                  hint={`בניצחון: עד ${Math.round(BOSS_LOSS_RATE_VICTORY_MAX * 100)}%`}
+                  icon="heart"
+                  label="מאגר חיים"
+                  value={`×${BOSS_HP_PER_POWER}`}
+                  hint="מהכוח שלו — נשמר בין תקיפות"
                   tone="text-bone-bright"
                 />
                 <Fact
-                  icon="crown"
-                  label="ניצחונות בין עדכונים"
-                  value={tunables.boss.victoriesPerCycle}
-                  hint="הפסד לא מנצל מכסה"
+                  icon="turns"
+                  label="תורות לתקיפה"
+                  value={`${BOSS_TURN_COST_BASE}+`}
+                  hint="+200 לכל דרגת עיר · אין מכסת תקיפות"
+                  tone="text-emerald-300"
+                />
+                <Fact
+                  icon="hero"
+                  label="סיכוי קריאה נכונה"
+                  value={`${Math.round(BOSS_READ_CHANCE_BASE * 100)}–${Math.round(BOSS_READ_CHANCE_MAX * 100)}%`}
+                  hint="לפי רמת הגיבור — זה מה שהוא תורם לקרב"
                   tone="text-purple-300"
                 />
               </div>
 
+              {/* The whole skill of the fight is these three lines. */}
+              <div className="grid gap-2 sm:grid-cols-3">
+                {(["SMASH", "SWEEP", "EXPOSED"] as const).map((move) => {
+                  const meta = BOSS_MOVE_META[move];
+                  const counter = BOSS_TACTIC_META[BOSS_MOVE_COUNTER[move]];
+                  return (
+                    <div key={move} className="panel-gold rounded-xl p-4">
+                      <p className={`flex items-center gap-2 font-black ${meta.tone}`}>
+                        <span aria-hidden className="text-lg">
+                          {meta.icon}
+                        </span>
+                        {meta.label}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
+                        {meta.telegraph}
+                      </p>
+                      <p className="mt-2 flex items-center gap-1.5 text-xs font-bold text-emerald-300">
+                        <span aria-hidden>{counter.icon}</span> התשובה הנכונה: {counter.label}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
               <Formula
-                label="אבדות חיילים בניצחון"
+                label="חלוקת השלל של המחזור"
                 expr={
                   <>
-                    <N>{Math.round(BOSS_LOSS_RATE_VICTORY_MAX * 100)}%</N>
+                    <N>{Math.round(BOSS_CHIP_SHARE * 100)}%</N>
                     <O>×</O>
                     <O>(</O>
-                    <V>הצד החלש מבין השניים</V>
+                    <V>הנזק שגרמת</V>
                     <O>÷</O>
-                    <V>סכום הכוחות</V>
+                    <V>מאגר החיים</V>
                     <O>)</O>
+                    <O>+</O>
+                    <N>{Math.round(BOSS_KILL_SHARE * 100)}%</N>
                     <O>×</O>
-                    <N>2</N>
+                    <V>דירוג ההפלה</V>
                   </>
                 }
                 legend={[
-                  { term: "עוצמה עדיפה", desc: "ניצחון מוחץ כמעט לא עולה חיילים; ניצחון בשערה עולה ביוקר." },
-                  { term: "שלל מובטח", desc: `שליט שנופל מפיל תמיד חפץ — ברצפת דרגה ${RARITY_META[BOSS_ITEM_RARITY_FLOOR].label} ומעלה.` },
-                  { term: "ניסיון", desc: `${BOSS_HERO_XP_BASE} + 250 לכל דרגת עיר — הרבה מעל תקיפה רגילה.` },
+                  {
+                    term: "שלל בדרך",
+                    desc: `${Math.round(BOSS_CHIP_SHARE * 100)}% מהשלל משולם לפי הנזק שהספקת לגרום — גם בתקיפה שלא הפילה אותו. תקיפה שלא סיימה את העבודה עדיין משתלמת.`,
+                  },
+                  {
+                    term: "אוצר ההפלה",
+                    desc: `${Math.round(BOSS_KILL_SHARE * 100)}% נשמרים למכה שמפילה אותו, וגדלים עד ×${BOSS_GRADE_BONUS.S} בדירוג S — שנקבע לפי הקריאות הנכונות והצבא ששרד, ודורש לפחות ${BOSS_GRADE_MIN_DECISIONS} סבבים: הפלה במכה אחת לא מגיעה ל־S.`,
+                  },
+                  {
+                    term: "שבירת הצבא",
+                    desc: `אם הצבא מאבד ${Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}% מכוחו הוא נסוג באמצע הקרב, ו-${Math.round((1 - BOSS_ROUT_LOOT_PENALTY) * 100)}% מהשלל שנצבר אובד.`,
+                  },
+                  {
+                    term: "אין מכסה",
+                    desc: `אפשר לתקוף שוב ושוב — התורות הן הגבול היחיד. השלל חסום ע\"י מאגר החיים, כך שתקיפות נוספות קונות התקדמות, לא כפל שלל. בוס שנופל חוזר אחרי ${Math.round(BOSS_REVIVE_MS / 60000)} דקות עם מאגר חדש.`,
+                  },
+                  {
+                    term: "ציוד מובטח",
+                    desc: `שליט שנופל מפיל תמיד חפץ — ברצפת דרגה ${RARITY_META[BOSS_ITEM_RARITY_FLOOR].label} ומעלה, ובדירוג S דרגה אחת מעל זה.`,
+                  },
+                  {
+                    term: "ניסיון",
+                    desc: `${BOSS_HERO_XP_BASE} + 250 לכל דרגת עיר, על אותה חלוקה כמו השלל.`,
+                  },
                 ]}
               />
 
               <BossLadder
                 powerMultiplier={tunables.boss.powerMultiplier}
                 rewardMultiplier={tunables.boss.rewardMultiplier}
+                hpMultiplier={tunables.boss.hpMultiplier}
               />
 
               <Note tone="gold" icon="rankings">
@@ -1901,7 +2051,17 @@ export default async function GuidePage() {
                 <Link href="/game/rankings" className="text-gold underline">
                   הדירוג
                 </Link>{" "}
-                עם הכוח המדויק שלהם — אפשר לתכנן מולם מראש.
+                עם הכוח המדויק שלהם — אפשר לתכנן מולם מראש. מד הזעם של הגיבור נטען בכל סבב,
+                וברגע שהוא מתמלא הגיבור משתחרר מעצמו במכה אחת גדולה.
+              </Note>
+
+              <Note tone="red" icon="heart" title="אל תשלח צבא בלי גיבור">
+                גיבור מת לא קורא את השליט ולא משחרר זעם: הקריאה יורדת מ־
+                {Math.round(BOSS_READ_CHANCE_BASE * 100)}–{Math.round(BOSS_READ_CHANCE_MAX * 100)}%
+                לניחוש עיוור של{" "}
+                <b className="nums">{Math.round(BOSS_READ_CHANCE_NO_HERO * 100)}%</b> — אחד
+                משלושה — וכל סבב שנקרא לא נכון גם מכפיל את האבדות. תחייה לפני התקיפה, לא
+                אחריה.
               </Note>
             </GuideSection>
 
@@ -2011,7 +2171,98 @@ export default async function GuidePage() {
               </Note>
             </GuideSection>
 
-            {/* ============================ 19 rewards ============================ */}
+            {/* ============================ 19 chat ============================ */}
+            <GuideSection meta={SECTIONS.chat} index={INDEX.chat}>
+              <Lead>
+                בפינה השמאלית התחתונה של כל מסך יושב <b>הצ׳אט</b>. הוא לא דף אלא חלונית
+                צפה: אפשר לדבר תוך כדי בנייה, תקיפה או קריאת דוח, והיא נשארת פתוחה גם
+                כשעוברים מסך. שתי לשוניות — <b>החדר הפומבי</b> שכל השרת רואה, ו
+                <b>שיחות פרטיות</b> אחד על אחד.
+              </Lead>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Fact
+                  icon="chat"
+                  label="אורך הודעה"
+                  value={CHAT_BODY_MAX}
+                  hint="תווים — צעקה, לא מכתב"
+                />
+                <Fact
+                  icon="messages"
+                  label="נמען פרטי"
+                  value="כל שחקן"
+                  hint="חיפוש לפי שם, בלי צורך לתפוס אותו מרגל"
+                  tone="text-purple-300"
+                />
+                <Fact
+                  icon="turns"
+                  label="נקודה ירוקה"
+                  value={`${Math.round(PRESENCE_ONLINE_MS / 60000)} דק׳`}
+                  hint="מאז שהמשחק היה פתוח אצלו"
+                  tone="text-emerald-300"
+                />
+                <Fact
+                  icon="spark"
+                  label="קצב"
+                  value={`${CHAT_BURST_LIMIT}/${Math.round(CHAT_BURST_WINDOW_MS / 1000)}ש׳`}
+                  hint="בלם הצפה — ראה למטה"
+                  tone="text-bone-bright"
+                />
+              </div>
+
+              <Formula
+                label="מה מותר לשלוח"
+                expr={
+                  <>
+                    <N>{CHAT_BURST_LIMIT}</N>
+                    <O> הודעות ב־</O>
+                    <N>{Math.round(CHAT_BURST_WINDOW_MS / 1000)}</N>
+                    <O> שניות</O>
+                    <O>·</O>
+                    <N>{CHAT_GLOBAL_LIMIT}</N>
+                    <V> בחדר לדקה</V>
+                    <O>·</O>
+                    <N>{CHAT_DIRECT_LIMIT}</N>
+                    <V> בפרטי לדקה</V>
+                    <O>·</O>
+                    <N>{CHAT_PAIR_LIMIT}</N>
+                    <V> לאותו שחקן</V>
+                  </>
+                }
+                legend={[
+                  {
+                    term: "שתי מכסות",
+                    desc: `הבלם המהיר עוצר הדבקה בלולאה, ומכסת הדקה עוצרת הצפה מתמשכת. לחדר ולשיחות פרטיות מכסות נפרדות — שיחה ארוכה לא גוזלת את הזכות שלך לדבר בחדר.`,
+                  },
+                  {
+                    term: "מכסה לכל שיחה",
+                    desc: `${CHAT_PAIR_LIMIT} הודעות בדקה לכל בן שיח, כדי שלא יהיה אפשר להפנות דקה שלמה לשחקן אחד. המכסה נספרת על הצמד, אז החלפת תפקידים לא מאפסת אותה.`,
+                  },
+                  {
+                    term: "כפילות",
+                    desc: `אותה הודעה בדיוק לאותו יעד חסומה ל־${Math.round(CHAT_REPEAT_WINDOW_MS / 1000)} שניות. אותן מילים בחדר ובשיחה פרטית נחשבות לשתי אמירות שונות.`,
+                  },
+                  {
+                    term: "מי מקליד",
+                    desc: "מתחת לחלונית רואים בזמן אמת מי כותב עכשיו — בחדר ובשיחה — והנקודה ליד השם מראה מי מחובר.",
+                  },
+                ]}
+              />
+
+              <Note tone="purple" icon="messages" title="צ׳אט מול תיבת הדואר">
+                שני ערוצים שונים בכוונה. הצ׳אט הוא שיחה חיה וקצרה שנקראת עכשיו; תיבת
+                ההודעות בסרגל העליון היא הארכיון — דוחות קרב, ריגול, שלל של שליטי ערים
+                והודעות ארוכות, שממתינות שם עד שתקרא אותן. הודעה פרטית בצ׳אט מדליקה מונה
+                על הלשונית, לא בתיבה.
+              </Note>
+
+              <Note tone="red" icon="shield" title="מנהל יכול להסתיר שורה">
+                הסתרה, לא מחיקה: השורה נעלמת מהחדר של כולם ונרשמת ביומן הניהול עם השם של
+                מי שהסתיר אותה. שחקן חסום לא מופיע ברשימה ואי אפשר לכתוב אליו.
+              </Note>
+            </GuideSection>
+
+            {/* ============================ 20 rewards ============================ */}
             <GuideSection meta={SECTIONS.rewards} index={INDEX.rewards}>
               <Lead>
                 שלושה מקורות פרסים שמתחדשים מעצמם — כולם על אותו שעון של העדכון היומי,
@@ -2026,9 +2277,13 @@ export default async function GuidePage() {
                   <p className="text-[11px] leading-relaxed text-zinc-400">
                     <b className="nums">{tunables.daily.wheelSpins}</b> סיבובים בכל עדכון
                     יומי, נצברים בלי הגבלה — שבוע היעדרות לא מבזבז כלום.{" "}
-                    {WHEEL_PRIZES.length} פרסים, וכל פרס כמותי גדל ב־
-                    <b className="nums">{Math.round(WHEEL_CYCLE_GROWTH * 100)}%</b> מהבסיס בכל
-                    עדכון יומי. היהלומים הם היחידים שלא גדלים.
+                    {WHEEL_PRIZES.length} פרסים בשני מסלולי גדילה: ארבעת המשאבים פותחים ב־
+                    <b className="nums">{nf(WHEEL_RESOURCE_BASE)}</b> כל אחד{" "}
+                    <b>ומכפילים את עצמם כל יום</b> (עד <b className="nums">{WHEEL_MAX_DOUBLINGS}</b>{" "}
+                    הכפלות), והיהלומים והאזרחים פותחים ב־
+                    <b className="nums">{WHEEL_PREMIUM_BASE}</b> ועולים ב־
+                    <b className="nums">{WHEEL_PREMIUM_STEP}</b> בכל עדכון יומי — שני הווג׳ים
+                    האלה משלמים תמיד את אותו מספר בדיוק.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {WHEEL_PRIZES.map((p) => (
@@ -2096,11 +2351,11 @@ export default async function GuidePage() {
               </div>
             </GuideSection>
 
-            {/* ============================ 20 diamonds ============================ */}
+            {/* ============================ 21 diamonds ============================ */}
             <GuideSection meta={SECTIONS.diamonds} index={INDEX.diamonds}>
               <Lead>
                 יהלומים הם המטבע הנדיר. הם לא נופלים ממכרות, לא מהעונה ולא מחפצי
-                הגיבור — רק מגלגל המזל (ווג׳ קבוע) ומרכישה אמיתית. לכן כל הוצאה
+                הגיבור — רק מווג׳ אחד בגלגל המזל ומרכישה אמיתית. לכן כל הוצאה
                 שלהם היא החלטה.
               </Lead>
 
@@ -2161,10 +2416,13 @@ export default async function GuidePage() {
                 כי בדיוק אז תוקפים ממתינים.
               </Note>
 
-              <Note tone="green" icon="diamond" title="למה אין יהלומים בפרסים החוזרים">
-                דרך התהילה, שליטי הערים והגלגל (מלבד ווג׳ קבוע של 3) לא מחלקים יהלומים
-                בכוונה: מקור חוזר של מטבע פרימיום היה מציף את המשחק ומרוקן מתוכן את כל
-                מה שנקנה בו.
+              <Note tone="green" icon="diamond" title="למה יש רק ווג׳ אחד של יהלומים">
+                דרך התהילה ושליטי הערים לא מחלקים יהלומים בכוונה, והגלגל מחלק אותם
+                מווג׳ יחיד שעולה לאט: <b className="nums">{WHEEL_PREMIUM_BASE}</b> ביום
+                הראשון, ועוד <b className="nums">{WHEEL_PREMIUM_STEP}</b> בכל עדכון יומי —
+                אותה כמות בדיוק כמו ווג׳ האזרחים. בכוונה זה המסלול הזוחל ולא הכפלה כמו
+                המשאבים: מקור חוזר ומתפוצץ של מטבע פרימיום היה מרוקן מתוכן כל מה שנקנה
+                בו.
               </Note>
 
               <div className="flex justify-center">
@@ -2174,7 +2432,7 @@ export default async function GuidePage() {
               </div>
             </GuideSection>
 
-            {/* ============================ 21 roadmap ============================ */}
+            {/* ============================ 22 roadmap ============================ */}
             <GuideSection meta={SECTIONS.roadmap} index={INDEX.roadmap}>
               <Lead>
                 אם אתה לא יודע מה לעשות עכשיו — זה הסדר שעובד. כל שלב פותח את הבא אחריו.
@@ -2208,7 +2466,7 @@ export default async function GuidePage() {
                   },
                   {
                     title: "עיר, ואז שליט העיר",
-                    body: "כל עיר מכפילה את כל הכלכלה שלך. אחריה מגיע השליט: ניצחון אחד בין עדכונים, שלל עצום וחפץ מובטח.",
+                    body: "כל עיר מכפילה את כל הכלכלה שלך. אחריה מגיע השליט: אין מכסת תקיפות ואין צורך להפיל אותו במכה אחת — כל יציאה מורידה מהחיים שלו ומשלמת שלל לפי הנזק, וההפלה עצמה מוסיפה את הפרס הגדול וחפץ מובטח.",
                   },
                   {
                     title: "הצטרף לברית",

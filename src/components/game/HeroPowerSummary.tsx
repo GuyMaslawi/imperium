@@ -71,6 +71,7 @@ function StatRow({
 function ResourcesRow({
   pointsPct,
   classPct = 0,
+  itemPct = 0,
   itemFlat,
   itemNote,
 }: {
@@ -78,13 +79,15 @@ function ResourcesRow({
   pointsPct: number;
   /** % from the chosen hero class (הסוחר) — multiplies mine production too. */
   classPct?: number;
-  /** Flat resource units the equipped relic conjures each regular tick. */
+  /** % from the percent-paying resource items (חרב, מגן) — multiplies mines. */
+  itemPct?: number;
+  /** Flat resource units the flat resource items conjure each regular tick. */
   itemFlat: number;
-  /** Which resources the relic feeds (or a waiting hint when none equipped). */
+  /** Which resources the flat items feed (or a hint when none equipped). */
   itemNote: ReactNode;
 }) {
   const meta = HERO_STAT_META.resources;
-  const totalPctValue = pointsPct + classPct;
+  const totalPctValue = pointsPct + classPct + itemPct;
   const active = totalPctValue > 0 || itemFlat > 0;
   return (
     <Tip
@@ -93,7 +96,7 @@ function ResourcesRow({
         <>
           {meta.description}
           <br />
-          נקודות מכפילות את תפוקת המכרות; החפץ מוסיף כמות קבועה בכל עדכון רגיל.
+          האחוזים מכפילים את תפוקת המכרות; הכמות הקבועה נוספת מעליה בכל עדכון רגיל.
         </>
       }
     >
@@ -113,8 +116,9 @@ function ResourcesRow({
               </p>
             )}
             {classPct > 0 && <p>דמות +{classPct}% — יתרון הסוחר</p>}
+            {itemPct > 0 && <p>חרב ומגן +{itemPct}% — מכפיל תפוקת מכרות</p>}
             {itemFlat > 0 ? (
-              <p>פרי שטן +{formatNumber(itemFlat)} — {itemNote}</p>
+              <p>כמות קבועה +{formatNumber(itemFlat)} — {itemNote}</p>
             ) : (
               totalPctValue === 0 && <p>{itemNote}</p>
             )}
@@ -152,14 +156,17 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
-  const { points, itemsPct, itemsFlat, itemsFlatByResource, classPct, totalPct } = bonuses;
+  const { points, itemsPct, itemsResourcePct, itemsFlat, itemsFlatByResource, classPct, totalPct } =
+    bonuses;
 
   /** "· דמות +X%" appended only when the class actually contributes. */
   const classNote = (pct: number) => (pct > 0 ? ` · דמות +${pct}%` : "");
 
-  // A resource item (relic) feeds only the specific resources its tier covers —
-  // gold only for a פשוט relic, up to all four for an אגדי. Name exactly those,
-  // so the flat "resources" line never overstates its reach as "every resource".
+  // A flat resource item (פרי שטן, מכנסיים, נעליים) feeds only the specific
+  // resources its tier covers — one for a פשוט piece, up to all four for an
+  // אגדי. Name exactly those, so the flat "resources" line never overstates its
+  // reach as "every resource". (חרב and מגן pay a percentage instead and
+  // multiply every mine, so they never appear here — see SlotStatWeight.)
   const coveredResources = (["gold", "wood", "iron", "stone"] as StorableResource[]).filter(
     (r) => itemsFlatByResource[r] > 0
   );
@@ -180,7 +187,7 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
         — בכל עדכון רגיל
       </>
     ) : (
-      "מחפץ פרי שטן — המשאבים לפי דרגת החפץ"
+      "מפרי שטן, מכנסיים או נעליים — המשאבים לפי דרגת החפץ"
     );
 
   // התקפה/הגנה = נקודות + חפצים; ריגול מגיע מחפצים בלבד.
@@ -258,10 +265,11 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
 
         {/* resources: hybrid — % from points (mines) + flat from the relic */}
         <section>
-          <SectionLabel>תפוקת משאבים · נקודות + חפץ</SectionLabel>
+          <SectionLabel>תפוקת משאבים · אחוזים + כמות</SectionLabel>
           <ResourcesRow
             pointsPct={points.resources}
             classPct={classPct.resources}
+            itemPct={itemsResourcePct}
             itemFlat={itemsFlat.resources}
             itemNote={resourcesNote}
           />

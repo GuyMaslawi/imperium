@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import {
+  BANK_DAILY_INTEREST_MAX_LEVEL,
   DEFENSE_BONUS,
   ENSLAVE_MIN_SOLDIERS,
   ENSLAVE_RATE,
@@ -29,6 +30,7 @@ import {
   type HeroPercentStat,
 } from "@/lib/game/hero";
 import { CITY_BOSSES, bossHeroXp, bossPower, bossReward, bossTurnCost } from "@/lib/game/bosses";
+import { bossSiegeMaxHp, bossSortiesToKill } from "@/lib/game/bossBattle";
 import { formatShort } from "./GuideUi";
 
 /* ========================================================================
@@ -526,7 +528,7 @@ export function BankCalc() {
     <CalcShell title="מחשבון ריבית בנק">
       <div className="grid gap-x-5 gap-y-3 sm:grid-cols-3">
         <Field label="זהב מופקד" icon="bank" value={balance} onChange={setBalance} max={1_000_000_000} step={10_000} />
-        <Field label="רמת שדרוג ריבית" icon="upgrades" value={level} onChange={setLevel} max={15}
+        <Field label="רמת שדרוג ריבית" icon="upgrades" value={level} onChange={setLevel} max={BANK_DAILY_INTEREST_MAX_LEVEL}
           hint={`${Math.round(rate * 100)}% בכל עדכון יומי`} />
         <Field label="ימים" icon="turns" value={days} onChange={setDays} min={1} max={60}
           hint={`${updates} עדכונים יומיים (2 ליום)`} />
@@ -732,15 +734,20 @@ export function ItemUpgradeCalc() {
 export function BossLadder({
   powerMultiplier = 1,
   rewardMultiplier = 1,
+  hpMultiplier = 1,
 }: {
   powerMultiplier?: number;
   rewardMultiplier?: number;
+  hpMultiplier?: number;
 }) {
   const [day, setDay] = useState(1);
+  // The second field turns the ladder from a table into an answer: type in your
+  // own attack power and every row says how many sorties that army needs.
+  const [myPower, setMyPower] = useState(12_000);
 
   return (
     <div className="space-y-3">
-      <div className="panel-gold rounded-xl p-4">
+      <div className="panel-gold grid gap-3 rounded-xl p-4 sm:grid-cols-2">
         <Field
           label="יום בעונה"
           icon="turns"
@@ -750,11 +757,22 @@ export function BossLadder({
           max={90}
           hint="השלל גדל ב־20% מהבסיס בכל יום שעובר בעונה"
         />
+        <Field
+          label="כוח התקיפה שלך"
+          icon="attack"
+          value={myPower}
+          onChange={setMyPower}
+          min={0}
+          max={1e12}
+          hint="חיילים + נשקי תקיפה, אחרי בונוסי גיבור וברית"
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-2">
         {CITY_BOSSES.map((boss) => {
           const reward = bossReward(boss.tier, day, rewardMultiplier);
+          const maxHp = bossSiegeMaxHp(boss.tier, powerMultiplier, hpMultiplier);
+          const sorties = bossSortiesToKill(myPower, maxHp);
           return (
             <article
               key={boss.key}
@@ -793,8 +811,18 @@ export function BossLadder({
                       <b className="nums" dir="ltr">{int(bossTurnCost(boss.tier))}</b>
                     </span>
                     <span className="flex items-center gap-1 text-gold-bright">
-                      <Icon name="gold" size={12} /> שלל
+                      <Icon name="gold" size={12} /> שלל מחזור
                       <b className="nums" dir="ltr">{formatShort(reward.gold)}</b>
+                    </span>
+                    <span className="flex items-center gap-1 text-bone-bright">
+                      <Icon name="heart" size={12} /> חיים
+                      <b className="nums" dir="ltr">{formatShort(maxHp)}</b>
+                    </span>
+                    <span className="flex items-center gap-1 text-sky-300">
+                      <Icon name="army" size={12} /> יציאות
+                      <b className="nums" dir="ltr">
+                        {Number.isFinite(sorties) ? sorties : "—"}
+                      </b>
                     </span>
                     <span className="flex items-center gap-1 text-purple-300">
                       <Icon name="spark" size={12} /> ניסיון

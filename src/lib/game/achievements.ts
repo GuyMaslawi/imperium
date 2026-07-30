@@ -332,16 +332,21 @@ const WEAPON_TOTAL = 90;
 
 /**
  * The absolute ceiling of the citizen-intake upgrade: 10 levels per city, so
- * only an empire holding all ten cities can reach it. Pays 520 a day.
+ * only an empire holding all ten cities can reach it. Pays 1,020 a day.
  */
 const CITIZEN_GROWTH_CAP = citizenGrowthMaxLevel(MAX_CITIES);
 
 /**
- * The level that first pays a round 500 citizens per daily update.
+ * The level that first pays a round 500 citizens per daily update — level 48 on
+ * the shipped curve, about halfway up the ladder.
  *
- * Derived rather than written as `96`, so it follows if `citizensPerDailyUpdate`
- * is ever retuned. It is four levels short of the cap — the two are different
- * milestones and the base-screen board deliberately shows this one.
+ * Derived rather than written as a literal, so it follows when
+ * `citizensPerDailyUpdate` is retuned — as it was when each city went from
+ * paying 50 citizens a day to 100. Deliberately reads the *default* curve, not
+ * the live tunables: an achievement key is `citizenup_<goal>`, so a goal that
+ * moved with an admin edit would orphan every row already awarded under the old
+ * key. It is well short of the cap — the two are different milestones and the
+ * base-screen board deliberately shows this one.
  */
 const CITIZEN_GROWTH_500 = (() => {
   for (let level = 1; level <= CITIZEN_GROWTH_CAP; level += 1) {
@@ -740,8 +745,8 @@ const EMPIRE: AchievementDefinition[] = [
       { goal: 5, reward: ["citizens", 150] },
       { goal: 10, reward: ["citizens", 300] },
       // The round number the design aims at, and the rung the base-screen board
-      // draws (see GLORY_KEYS). 500 a day is level 96, not the cap — the cap is
-      // four levels further on and pays 520.
+      // draws (see GLORY_KEYS). 500 a day is level 48, not the cap — the cap is
+      // level 100 and pays 1,020.
       {
         goal: CITIZEN_GROWTH_500,
         reward: ["citizens", 1_000],
@@ -1099,8 +1104,8 @@ export const GLORY_TAGLINE: Record<string, string> = {
  * another, with the translation between the two.
  *
  * The citizen capstone is the only one so far. Its condition has to be the
- * upgrade level, because that is the stat the game stores — but level 96 is an
- * implementation detail of `citizensPerDailyUpdate` (20 + 5×level), not
+ * upgrade level, because that is the stat the game stores — but level 48 is an
+ * implementation detail of `citizensPerDailyUpdate` (20 + 10×level), not
  * something the player ever thinks in. The record is "500 citizens on every
  * daily update", so the ring, the bar and the counter all read in citizens per
  * update and the level is never shown.

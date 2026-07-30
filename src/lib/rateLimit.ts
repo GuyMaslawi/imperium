@@ -84,6 +84,43 @@ function localAllows(
 }
 
 /**
+ * A ceiling on a *polled read*, counted in this instance's memory only — never in
+ * Postgres.
+ *
+ * Per-instance state is precisely what the header above calls theatre, and for
+ * `login-email` it was. The difference is what is being defended. A login limiter
+ * IS the security boundary: an attacker who gets `limit × instances` tries has
+ * beaten it. A poll ceiling defends nothing but database load — there is no secret
+ * behind `getGlobalChat`, no state to guess, and a caller who gets through is
+ * merely reading their own chat again. The goal is to blunt a flood, and refusing
+ * past a share per instance does that.
+ *
+ * It has to be free, which is the other half of the reasoning. `rateLimit` costs
+ * one upsert, so putting it on a read path would add a query to every poll an
+ * *honest* client makes — the app is polled from every screen, so that is a
+ * guaranteed load increase to defend against a hypothetical one. This variant
+ * touches only the Map: an allowed poll costs nothing at all, and a refused one
+ * costs nothing either.
+ *
+ * A refused round is silent by construction — every caller already returns an
+ * empty view on failure and the client polls again in a few seconds.
+ */
+export function localRateLimit(key: string, limit: number, windowMs: number): boolean {
+  return localAllows(key, limit, windowMs, 1);
+}
+
+/**
+ * Budget for one polled read path, per player, per minute.
+ *
+ * Sized off the fastest poll in the app: the boss arena refreshes every 1.5s, so
+ * 40/min is what one honest tab spends there, and the chat's 5s panes spend 12.
+ * 240 leaves 6x headroom over the fastest and 20x over the chat — enough for a
+ * player with several tabs open and a re-render storm, far short of a loop.
+ */
+export const POLL_LIMIT = 240;
+export const POLL_WINDOW_MS = 60 * 1000;
+
+/**
  * How often (in hits) an instance bothers to clear expired rows. The sweep is
  * a single indexed DELETE and rows are tiny, so this is housekeeping, not a
  * correctness requirement — an expired row is already inert, since the upsert

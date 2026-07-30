@@ -33,6 +33,13 @@ export const GAME_TIMEZONE = "Asia/Jerusalem";
 export const REGULAR_TICK_MINUTES = 5;
 export const REGULAR_TICK_MS = REGULAR_TICK_MINUTES * 60 * 1000;
 
+/**
+ * Regular ticks in a day. Anything a tick grants is worth this much per day, so
+ * it is the figure that makes a per-tick reward legible — both to a player
+ * reading the turns upgrade and to the monitor's turn-burn ceiling.
+ */
+export const TICKS_PER_DAY = 86_400_000 / REGULAR_TICK_MS;
+
 /** Daily update wall times (Asia/Jerusalem). */
 export const DAILY_UPDATE_TIMES: ReadonlyArray<{ hour: number; minute: number }> = [
   { hour: 7, minute: 30 },
@@ -261,17 +268,56 @@ export interface EmpireUpgradeMeta {
   icon: IconName;
   description: string;
   /** Human-readable effect for a given level. */
-  effectLabel: (level: number) => string;
+  /**
+   * `rate` is only read by CITIZEN_GROWTH, whose effect is admin-tunable; every
+   * other upgrade derives its label from deploy-time constants and ignores it.
+   */
+  effectLabel: (level: number, rate?: CitizenRate) => string;
   /** Highest reachable level; undefined means uncapped. */
   maxLevel?: number;
 }
 
-/** Citizens received on each daily update. */
-export function citizensPerDailyUpdate(citizenGrowthLevel: number): number {
-  return 20 + citizenGrowthLevel * 5;
+/**
+ * The citizen-intake rate: a flat base plus a per-level step. Lives here rather
+ * than in config.ts so client code can render the curve, and so `DEFAULT_TUNABLES`
+ * and this function can never drift apart — config.ts seeds its defaults from
+ * these two constants.
+ */
+export const DEFAULT_CITIZENS_BASE = 20;
+export const DEFAULT_CITIZENS_PER_LEVEL = 10;
+
+/** The live half of `GameTunables["daily"]` that shapes the citizen curve. */
+export interface CitizenRate {
+  citizensBase: number;
+  citizensPerLevel: number;
 }
 
-/** Citizen-intake upgrade levels unlocked per city. */
+const DEFAULT_CITIZEN_RATE: CitizenRate = {
+  citizensBase: DEFAULT_CITIZENS_BASE,
+  citizensPerLevel: DEFAULT_CITIZENS_PER_LEVEL,
+};
+
+/**
+ * Citizens received on each daily update.
+ *
+ * `rate` is the live `daily` tunables — pass them anywhere the number is shown
+ * to a player, or an admin edit to the balance config will silently change what
+ * lands in the treasury while every screen keeps printing the old figure. The
+ * default is only for derived, deploy-time ladders (achievement goals), which
+ * must stay pinned to the shipped curve rather than move under a live edit.
+ */
+export function citizensPerDailyUpdate(
+  citizenGrowthLevel: number,
+  rate: CitizenRate = DEFAULT_CITIZEN_RATE
+): number {
+  return rate.citizensBase + citizenGrowthLevel * rate.citizensPerLevel;
+}
+
+/**
+ * Citizen-intake upgrade levels unlocked per city. At the default step of
+ * {@link DEFAULT_CITIZENS_PER_LEVEL} that makes each city worth 100 citizens
+ * per daily update.
+ */
 export const CITIZEN_GROWTH_LEVELS_PER_CITY = 10;
 
 /**
@@ -296,16 +342,57 @@ export function intelligencePowerMultiplier(intelligenceLevel: number): number {
   return 1 + intelligenceLevel * 0.1;
 }
 
-/** Top level of the wheel-luck upgrade — each level adds 1%, capped at 10%. */
-export const WHEEL_LUCK_MAX_LEVEL = 10;
+/** Top level of the wheel-luck upgrade — each level adds 1%, capped at 15%. */
+export const WHEEL_LUCK_MAX_LEVEL = 15;
 
 /**
  * Extra chance (as a fraction, e.g. 0.1 = +10%) the wheel-luck upgrade adds to
  * winning a wheel-of-fortune spin — both from throwing away an item and from a
- * winning attack. +1% per level, capped at +10% at level 10.
+ * winning attack. +1% per level, capped at +15% at level 15.
  */
 export function wheelLuckBonus(level: number): number {
   return Math.min(WHEEL_LUCK_MAX_LEVEL, level) * 0.01;
+}
+
+/**
+ * Wheel luck is the one upgrade priced as a luxury: free spins are the scarcest
+ * currency in the game, so every percent has to hurt. The curve is geometric,
+ * not linear like the other upgrades — the *first* purchase already costs three
+ * times a second city (3M gold), and the last one (14 → 15) lands near a
+ * billion. All 14 purchases together run to roughly 2.5B gold, an endgame sink.
+ *
+ * Declared here rather than beside the other cost functions further down because
+ * EMPIRE_UPGRADE_META prints the growth factor in its description, and that
+ * object literal is evaluated at module init — a `const` below it would be in
+ * its temporal dead zone.
+ */
+const WHEEL_LUCK_BASE_COST = {
+  gold: 3_000_000,
+  wood: 1_500_000,
+  iron: 1_500_000,
+  stone: 1_000_000,
+} as const;
+
+/** Each wheel-luck level multiplies the previous level's price by this. */
+export const WHEEL_LUCK_COST_GROWTH = 1.55;
+
+/** Round to three significant figures so prices read as prices, not as noise. */
+function roundPrice(value: number): number {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 2);
+  return Math.round(value / magnitude) * magnitude;
+}
+
+/** Cost to take wheel luck from `level` to `level + 1`. */
+export function wheelLuckUpgradeCost(level: number) {
+  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
+  const mult = WHEEL_LUCK_COST_GROWTH ** Math.max(0, level - 1);
+  return {
+    gold: roundPrice(WHEEL_LUCK_BASE_COST.gold * mult),
+    wood: roundPrice(WHEEL_LUCK_BASE_COST.wood * mult),
+    iron: roundPrice(WHEEL_LUCK_BASE_COST.iron * mult),
+    stone: roundPrice(WHEEL_LUCK_BASE_COST.stone * mult),
+  };
 }
 
 /** Highest number of deposits the upgrade can reach. */
@@ -318,29 +405,25 @@ export function allowedDepositsPerDailyPeriod(level: number): number {
   return Math.min(BANK_DEPOSIT_MAX, 1 + level);
 }
 
-/** Top level of the interest upgrade — 15 levels, 0.2% each, capped at 3%. */
-export const BANK_DAILY_INTEREST_MAX_LEVEL = 15;
+/** Top level of the interest upgrade — 6 levels, 1% each, capped at 6%. */
+export const BANK_DAILY_INTEREST_MAX_LEVEL = 6;
 
 /** Interest added per upgrade level, and the ceiling the ladder reaches. */
-export const BANK_INTEREST_PER_LEVEL = 0.002;
-export const BANK_INTEREST_MAX_RATE = 0.03;
+export const BANK_INTEREST_PER_LEVEL = 0.01;
+export const BANK_INTEREST_MAX_RATE = 0.06;
 
 /**
- * Bank interest per daily update: 0.2% per upgrade level, capped at 3% (reached
- * at level 15). The upgrade is also blocked once it hits
+ * Bank interest per daily update: 1% per upgrade level, capped at 6% (reached at
+ * level 6). The upgrade is also blocked once it hits
  * `BANK_DAILY_INTEREST_MAX_LEVEL`, so the rate never plateaus with wasted upgrades.
  *
- * The rate used to be 1%/level capped at **15% per daily update**, and there are
- * two daily updates a day — so the real figure was 32.25% a day, compounding,
- * with no ceiling on the principal. Over a 60-day season that is 1.3225^60 ≈
- * 8×10^6, and bank gold is the one pool `attackEmpire` cannot plunder: the
- * intended safe-haven mechanic was strictly better than playing the game. At 3%
- * the same season compounds to ~33×, which still rewards banking heavily without
- * making every other gold source irrelevant.
- *
- * The ladder keeps all 15 levels rather than being truncated to 3 — the levels
- * are a gold sink players have already paid into, so the per-level step moved
- * instead of the level count. Retuning is this one constant.
+ * The rate is still large: interest lands twice a day and compounds on gold
+ * `attackEmpire` cannot plunder, so at the ceiling the bank returns 12.4% a day.
+ * What holds it in check is the *price* of the ladder, not the rate —
+ * `bankInterestUpgradeCost` is geometric and the last rung costs more than three
+ * tenth-cities, so 6% is a late-season trophy rather than something an empire
+ * walks into. Every rung below it is a real decision between interest and
+ * expansion.
  */
 export function bankInterestRate(level: number): number {
   // Clamped at both ends: the ceiling is the fix for 15%-per-update compounding
@@ -350,6 +433,42 @@ export function bankInterestRate(level: number): number {
     BANK_INTEREST_MAX_RATE,
     Math.max(0, level) * BANK_INTEREST_PER_LEVEL
   );
+}
+
+/**
+ * Interest is the strongest compounding effect in the game, so its ladder is
+ * priced like wheel luck rather than like the generic linear upgrades: the first
+ * purchase (1 → 2) already costs twenty times a second city, and the last one
+ * (5 → 6) lands past 5B. All five purchases together run to roughly 6.8B gold —
+ * an endgame sink no empire clears in its first weeks.
+ *
+ * The growth factor is steep (×4) precisely *because* the ladder is short: with
+ * only five rungs a gentler curve would make 6% a mid-season formality. Shorten
+ * the ladder further and this factor has to rise again to keep the ceiling far.
+ *
+ * Declared above `EMPIRE_UPGRADE_META` because that object literal prints the
+ * growth factor in its description and is evaluated at module init.
+ */
+const BANK_INTEREST_BASE_COST = {
+  gold: 20_000_000,
+  wood: 10_000_000,
+  iron: 10_000_000,
+  stone: 7_000_000,
+} as const;
+
+/** Each interest level multiplies the previous level's price by this. */
+export const BANK_INTEREST_COST_GROWTH = 4;
+
+/** Cost to take bank interest from `level` to `level + 1`. */
+export function bankInterestUpgradeCost(level: number) {
+  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
+  const mult = BANK_INTEREST_COST_GROWTH ** Math.max(0, level - 1);
+  return {
+    gold: roundPrice(BANK_INTEREST_BASE_COST.gold * mult),
+    wood: roundPrice(BANK_INTEREST_BASE_COST.wood * mult),
+    iron: roundPrice(BANK_INTEREST_BASE_COST.iron * mult),
+    stone: roundPrice(BANK_INTEREST_BASE_COST.stone * mult),
+  };
 }
 
 /* ------------------------------ cities ------------------------------ */
@@ -424,6 +543,29 @@ export function turnsPerRegularUpdate(turnsUpgradeLevel: number): number {
   return turnsUpgradeLevel;
 }
 
+/**
+ * A turns level is worth far more than its five rungs suggest: ticks fire every
+ * {@link REGULAR_TICK_MINUTES} minutes, so each level is +288 turns a day, for
+ * good — roughly 29 more attacks a day at {@link ATTACK_TURN_COST} turns each.
+ * The ladder used to be linear off a 1,500-gold base, which put all four
+ * purchases at ~27K gold in total: less than one mid-level mine upgrade for the
+ * fuel to play the game four times over. It is geometric now, like interest and
+ * wheel luck, sized so the first rung is a second city's worth of gold and the
+ * last is a real mid-game decision (~7.6M gold for the whole ladder).
+ *
+ * Declared above `EMPIRE_UPGRADE_META` because that object literal prints the
+ * growth factor in its description and is evaluated at module init.
+ */
+const TURNS_UPGRADE_BASE_COST = {
+  gold: 300_000,
+  wood: 150_000,
+  iron: 150_000,
+  stone: 100_000,
+} as const;
+
+/** Each turns level multiplies the previous level's price by this. */
+export const TURNS_UPGRADE_COST_GROWTH = 2.5;
+
 // DIAMOND_YIELD is a retired upgrade: the enum value is kept in the DB for
 // existing rows, but it is no longer offered on the upgrades page or granted on
 // daily updates, so it is excluded from the metadata that drives the UI.
@@ -437,7 +579,8 @@ export const EMPIRE_UPGRADE_META: Record<
     label: "קבלת אזרחים",
     icon: "citizens",
     description: "מגדיל את כמות האזרחים שמתקבלת בכל עדכון יומי.",
-    effectLabel: (level) => `${citizensPerDailyUpdate(level)} אזרחים בכל עדכון יומי`,
+    effectLabel: (level, rate) =>
+      `${citizensPerDailyUpdate(level, rate)} אזרחים בכל עדכון יומי`,
   },
   INTELLIGENCE: {
     label: "מודיעין",
@@ -459,25 +602,26 @@ export const EMPIRE_UPGRADE_META: Record<
   BANK_DAILY_INTEREST: {
     label: "ריבית בנק",
     icon: "gold",
-    description: "מגדיל את הריבית שמתקבלת בבנק בכל עדכון יומי.",
-    // One decimal, not Math.round: the per-level step is 0.2%, so rounding to a
-    // whole percent showed the first two levels as a flat "0% ריבית".
+    description:
+      `מוסיף 1% לריבית שמתקבלת בבנק בכל עדכון יומי — עד ${Math.round(BANK_INTEREST_MAX_RATE * 100)}% ברמה ${BANK_DAILY_INTEREST_MAX_LEVEL}. הריבית מצטברת פעמיים ביום על זהב שאי אפשר לבזוז, ולכן הסולם יקר: כל רמה עולה פי ${BANK_INTEREST_COST_GROWTH} מקודמתה.`,
     effectLabel: (level) =>
-      `${(bankInterestRate(level) * 100).toFixed(1)}% ריבית בכל עדכון יומי`,
+      `${Math.round(bankInterestRate(level) * 100)}% ריבית בכל עדכון יומי`,
     maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
   },
   TURNS_PER_REGULAR_UPDATE: {
     label: "קבלת תורות",
     icon: "turns",
-    description: "מגדיל את כמות התורות שמתקבלת בכל עדכון רגיל.",
-    effectLabel: (level) => `+${turnsPerRegularUpdate(level)} תורות לעדכון רגיל`,
+    description:
+      `מוסיף תור אחד לכל עדכון רגיל — כלומר ${TICKS_PER_DAY} תורות נוספות ביום, לתמיד. לכן הסולם יקר: כל רמה עולה פי ${TURNS_UPGRADE_COST_GROWTH} מקודמתה.`,
+    effectLabel: (level) =>
+      `+${turnsPerRegularUpdate(level)} תורות לעדכון רגיל (${(turnsPerRegularUpdate(level) * TICKS_PER_DAY).toLocaleString("he-IL")} ביום)`,
     maxLevel: TURNS_UPGRADE_MAX_LEVEL,
   },
   WHEEL_LUCK: {
     label: "מזל הגלגל",
     icon: "wheel",
     description:
-      "מגדיל את הסיכוי לזכות בסיבוב גלגל מזל מזריקת חפץ ומתקיפה מנצחת.",
+      `מוסיף 1% לסיכוי לזכות בסיבוב גלגל מזל — מזריקת חפץ ומתקיפה מנצחת — עד ${WHEEL_LUCK_MAX_LEVEL}% ברמה המקסימלית. השדרוג היקר במשחק: כל רמה עולה פי ${WHEEL_LUCK_COST_GROWTH} מקודמתה.`,
     effectLabel: (level) => `+${Math.round(wheelLuckBonus(level) * 100)}% סיכוי לסיבוב גלגל מזל`,
     maxLevel: WHEEL_LUCK_MAX_LEVEL,
   },
@@ -510,21 +654,24 @@ export function empireUpgradeCost(level: number) {
   };
 }
 
-/** The turns-gain upgrade is priced steeper than the generic upgrades. */
+/** Cost to take the turns gain from `level` to `level + 1`. */
 export function turnsUpgradeCost(level: number) {
+  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
+  const mult = TURNS_UPGRADE_COST_GROWTH ** Math.max(0, level - 1);
   return {
-    gold: Math.round(1500 * level * 1.8),
-    wood: Math.round(800 * level * 1.6),
-    iron: Math.round(800 * level * 1.6),
-    stone: Math.round(600 * level * 1.5),
+    gold: roundPrice(TURNS_UPGRADE_BASE_COST.gold * mult),
+    wood: roundPrice(TURNS_UPGRADE_BASE_COST.wood * mult),
+    iron: roundPrice(TURNS_UPGRADE_BASE_COST.iron * mult),
+    stone: roundPrice(TURNS_UPGRADE_BASE_COST.stone * mult),
   };
 }
 
 /** Cost to upgrade the given empire upgrade from `level` to `level + 1`. */
 export function empireUpgradeCostFor(type: EmpireUpgradeType, level: number) {
-  return type === "TURNS_PER_REGULAR_UPDATE"
-    ? turnsUpgradeCost(level)
-    : empireUpgradeCost(level);
+  if (type === "TURNS_PER_REGULAR_UPDATE") return turnsUpgradeCost(level);
+  if (type === "WHEEL_LUCK") return wheelLuckUpgradeCost(level);
+  if (type === "BANK_DAILY_INTEREST") return bankInterestUpgradeCost(level);
+  return empireUpgradeCost(level);
 }
 
 /* ------------------------------ battle ------------------------------ */

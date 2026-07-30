@@ -15,7 +15,7 @@ import {
   SLOT_ORDER,
   itemPrimaryBonus,
   itemStatBonus,
-  statIsFlat,
+  slotStatIsFlat,
   slotPrimaryStat,
 } from "@/lib/game/hero";
 
@@ -88,7 +88,7 @@ export function ItemCatalog({
           .slice(1)
           .map((s) => ({
             stat: s.stat,
-            flat: statIsFlat(s.stat),
+            flat: slotStatIsFlat(slot, s.stat),
             value: itemStatBonus(slot, 100, s.stat),
           }));
         return (

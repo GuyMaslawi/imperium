@@ -24,6 +24,7 @@ import {
   itemUpgradeCost,
   nextTierLevel,
   slotGrants,
+  slotStatIsFlat,
   slotPrimaryStat,
   tierForLevel,
   xpToNextLevel,
@@ -237,6 +238,10 @@ describe("item stats", () => {
     for (const slot of SLOT_ORDER) {
       for (const stat of ["resources", "turns", "citizens"] as const) {
         if (!slotGrants(slot, stat)) continue;
+        // Only the slots that actually *pay* flat are bound by the floor —
+        // חרב and מגן pay resources as a percentage, and a first-rung
+        // percentage is genuinely worth a fraction of one (see SlotStatWeight).
+        if (!slotStatIsFlat(slot, stat)) continue;
         expect(itemStatBonus(slot, 1, stat)).toBe(1);
       }
     }
@@ -298,15 +303,41 @@ describe("item stats", () => {
     }
   });
 
-  it("gives each resource slot its own resource to lead with", () => {
+  it("gives each flat resource slot its own resource to lead with", () => {
     // A פשוט piece covers one resource. Which one is the slot's identity — it is
-    // what makes an early מגן and an early פרי שטן a real choice rather than the
-    // same gold faucet in two shapes.
-    const leads = SLOT_ORDER.filter((slot) => slotGrants(slot, "resources")).map(
+    // what makes an early מכנסיים and an early פרי שטן a real choice rather than
+    // the same gold faucet in two shapes. Only the flat slots have an identity
+    // to carry: a percentage multiplies every mine at once, so there is nothing
+    // to lead with.
+    const flatSlots = SLOT_ORDER.filter(
+      (slot) => slotGrants(slot, "resources") && slotStatIsFlat(slot, "resources")
+    );
+    const leads = flatSlots.map(
       (slot) => itemBonusLines(slot, 1).find((l) => l.resource)?.resource
     );
+    expect(flatSlots.length).toBeGreaterThanOrEqual(3);
     expect(leads.every(Boolean)).toBe(true);
-    expect(new Set(leads).size).toBeGreaterThanOrEqual(4);
+    // Every one of them distinct — no two flat slots are the same faucet.
+    expect(new Set(leads).size).toBe(leads.length);
+  });
+
+  it("pays resources as a percentage on exactly the slots that opt into it", () => {
+    // The percent slots carry the late game (a rung-40 extra is +14% of a
+    // multiplicative economy) and are deliberately tiny early, so they must not
+    // also emit per-resource lines — a percentage multiplies every mine at once.
+    const pctSlots = SLOT_ORDER.filter(
+      (slot) => slotGrants(slot, "resources") && !slotStatIsFlat(slot, "resources")
+    );
+    expect(pctSlots).toEqual(["SHIELD", "SWORD"]);
+    for (const slot of pctSlots) {
+      const lines = itemBonusLines(slot, 100).filter((l) => l.stat === "resources");
+      expect(lines).toHaveLength(1);
+      expect(lines[0].flat).toBe(false);
+      expect(lines[0].resource).toBeUndefined();
+      // Small at the start, meaningful at the end — the whole point of the mode.
+      expect(itemStatBonus(slot, 13, "resources")).toBeLessThan(3);
+      expect(itemStatBonus(slot, 100, "resources")).toBeGreaterThan(10);
+    }
   });
 
   it("never grants diamonds from gear", () => {

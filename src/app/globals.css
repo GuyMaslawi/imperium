@@ -765,6 +765,153 @@ body {
 }
 
 /* =========================================================================
+   Boss arena (BossArena.tsx) — the round-by-round city-boss fight.
+
+   Every animation here is a *reaction to a resolved round*, keyed off the
+   `flash` state the component holds for STRIKE_MS. That is deliberate: the
+   fight's tension comes from the pause between choosing a tactic and seeing
+   what it did, so the art has to land in that window and then get out of the
+   way. Nothing here loops except the two idle tells (the telegraph and a
+   charged fury meter), which exist to keep the screen alive while the player
+   reads it.
+   ========================================================================= */
+
+/* the stage's own frame glow, tinted by the boss's accent */
+.ba-stage {
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.8),
+    0 28px 80px -30px rgb(var(--boss-accent) / 0.55);
+}
+
+/* full-stage tint on a resolved round: gold when the read was right, red when
+   it was not. Short and low-opacity — it reads as a hit, not as a screen wipe. */
+@keyframes ba-flash {
+  0% { opacity: 0; }
+  25% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.ba-flash-good,
+.ba-flash-bad {
+  animation: ba-flash 0.55s ease-out both;
+}
+.ba-flash-fury {
+  animation: ba-flash 0.75s ease-out both;
+}
+.ba-flash-good {
+  background: radial-gradient(ellipse at center, rgb(212 175 55 / 0.3) 0%, transparent 70%);
+}
+.ba-flash-bad {
+  background: radial-gradient(ellipse at center, rgb(220 38 38 / 0.32) 0%, transparent 70%);
+}
+/* the hero's charged strike gets its own, hotter wash */
+.ba-flash-fury {
+  background: radial-gradient(ellipse at center, rgb(255 140 52 / 0.42) 0%, transparent 72%);
+}
+
+/* a freshly landed log row slides in, so the eye catches which line is new */
+@keyframes ba-log-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ba-log-in {
+  animation: ba-log-in 0.35s ease-out both;
+}
+
+/* the tyrant recoiling from a well-read blow */
+@keyframes ba-boss-hit {
+  0%, 100% { transform: translateX(0) scale(1); filter: none; }
+  15% { transform: translateX(6px) scale(0.985); filter: brightness(1.7) saturate(0.6); }
+  45% { transform: translateX(-4px) scale(1.005); filter: brightness(1.15); }
+  70% { transform: translateX(2px) scale(1); }
+}
+.ba-boss-hit {
+  animation: ba-boss-hit 0.6s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ...and swelling forward when the read was wrong: the blow was his, not yours */
+@keyframes ba-boss-roar {
+  0%, 100% { transform: scale(1); filter: none; }
+  30% { transform: scale(1.045); filter: brightness(1.2) saturate(1.3); }
+  60% { transform: scale(1.01); }
+}
+.ba-boss-roar {
+  animation: ba-boss-roar 0.6s ease-out both;
+}
+
+/* the damage number, rising off the portrait and fading */
+@keyframes ba-damage {
+  0% { transform: translateY(10px) scale(0.8); opacity: 0; }
+  20% { transform: translateY(0) scale(1.15); opacity: 1; }
+  60% { transform: translateY(-14px) scale(1); opacity: 1; }
+  100% { transform: translateY(-34px) scale(0.95); opacity: 0; }
+}
+.ba-damage {
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.9);
+  animation: ba-damage 0.9s ease-out both;
+}
+
+/* health bar: eased so a big hit visibly drains rather than snapping */
+.ba-hp {
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* the telegraph's idle tell — a slow tick, so the icon reads as a wind-up */
+@keyframes ba-tell {
+  0%, 100% { transform: rotate(-7deg) scale(1); }
+  50% { transform: rotate(7deg) scale(1.12); }
+}
+.ba-tell {
+  display: inline-block;
+  animation: ba-tell 1.8s ease-in-out infinite;
+}
+
+/* a charged fury button/meter, pulsing until it is spent */
+@keyframes ba-fury-ready {
+  0%, 100% { box-shadow: 0 0 14px -2px rgb(212 175 55 / 0.5); }
+  50% { box-shadow: 0 0 26px 2px rgb(212 175 55 / 0.85); }
+}
+.ba-fury-ready {
+  animation: ba-fury-ready 1.4s ease-in-out infinite;
+}
+@keyframes ba-fury-bar {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.5); }
+}
+.ba-fury-bar {
+  animation: ba-fury-bar 1.4s ease-in-out infinite;
+}
+
+/* the rout warning — the army is one bad round from breaking */
+@keyframes ba-rout-warn {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.ba-rout-warn {
+  animation: ba-rout-warn 1.1s ease-in-out infinite;
+}
+
+/* Reduced motion: keep the *state* legible (the flash tint, the eased bar) and
+   drop everything that moves for its own sake. A player who asked for less
+   motion still has to be able to tell a hit from a miss. */
+@media (prefers-reduced-motion: reduce) {
+  .ba-boss-hit,
+  .ba-boss-roar,
+  .ba-tell,
+  .ba-fury-ready,
+  .ba-fury-bar,
+  .ba-log-in,
+  .ba-rout-warn {
+    animation: none;
+  }
+  .ba-damage {
+    animation: ba-flash 0.9s ease-out both;
+  }
+  .ba-hp {
+    transition: none;
+  }
+}
+
+/* =========================================================================
    Hero item tiles — "treasure" shimmer: a diagonal light sweep that glides
    across the art, plus twinkling star sparkles tinted to the item's rarity.
    The tile art container is position:relative + overflow:hidden, so both the
@@ -5812,4 +5959,75 @@ body {
     animation: none;
   }
   .ssn-ember { display: none; }
+}
+
+/* ── Live chat dock ───────────────────────────────────────────────────────
+   The pane floats over whatever screen the player is on, so its motion is
+   deliberately small: it rises into place once and then stays still. Anything
+   louder competes with the page it is sitting on top of. */
+.chat-panel {
+  animation: chat-rise 180ms ease-out both;
+  transform-origin: bottom left;
+}
+@keyframes chat-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The shut launcher breathes only while the room has something unseen in it —
+   a permanent pulse in the corner of every screen would be noise. */
+.chat-dot {
+  animation: chat-dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes chat-dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(228, 195, 90, 0.5); }
+  50% { opacity: 0.55; box-shadow: 0 0 0 5px rgba(228, 195, 90, 0); }
+}
+
+/* A slim gold scrollbar, so the transcript does not carry the browser's default
+   grey bar through the middle of a black-and-gold panel. */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(196, 160, 50, 0.35) transparent;
+}
+.chat-scroll::-webkit-scrollbar { width: 6px; }
+.chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(196, 160, 50, 0.3);
+  border-radius: 999px;
+}
+.chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(196, 160, 50, 0.5); }
+
+/* The presence dot: a slow halo, so "online" reads as live rather than as a
+   coloured bullet. Deliberately quieter than the unread pulse — one is status,
+   the other is a demand for attention. */
+.chat-online {
+  box-shadow: 0 0 0 0 rgba(53, 211, 154, 0.55);
+  animation: chat-online-halo 2.6s ease-out infinite;
+}
+@keyframes chat-online-halo {
+  0% { box-shadow: 0 0 0 0 rgba(53, 211, 154, 0.5); }
+  70%, 100% { box-shadow: 0 0 0 4px rgba(53, 211, 154, 0); }
+}
+
+/* Three dots that bounce in sequence — the indicator has to be recognisable at
+   a glance, and the shape everyone already knows costs nine lines of CSS. */
+.chat-typing i {
+  display: block;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: chat-typing-bounce 1.1s ease-in-out infinite;
+}
+.chat-typing i:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes chat-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-3px); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel, .chat-dot, .chat-online { animation: none; }
+  .chat-typing i { animation: none; opacity: 0.8; }
 }

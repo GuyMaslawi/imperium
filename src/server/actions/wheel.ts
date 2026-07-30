@@ -14,15 +14,9 @@ import {
   type WheelGrant,
   type WheelPrizeDef,
 } from "@/lib/game/wheel";
-import {
-  INITIAL_WEAPON_UNLOCKED_TIER,
-  WEAPON_CATEGORIES,
-  weaponsOfCategory,
-} from "@/lib/game/weapons";
 import { HERO_BAG_CAPACITY, itemDisplayName, rollGuaranteedItem } from "@/lib/game/hero";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { FullEmpire } from "@/lib/game/updates";
-import { syncEmpirePower } from "@/server/empirePower";
 
 /** What a spin returns to the client so it can animate to the right wedge. */
 export type SpinResult =
@@ -48,7 +42,7 @@ const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
 /**
  * Grant a won prize to the empire and return the reveal message. Every branch
  * writes to the DB — the wheel actually pays out. Amount prizes grow with the
- * daily-update cycle; unit prizes (all weapons, hero item) are concrete grants.
+ * daily-update cycle; the one unit prize (a hero item) is a concrete grant.
  */
 async function grantPrize(
   tx: Prisma.TransactionClient,
@@ -63,9 +57,6 @@ async function grantPrize(
     case "diamonds":
       await tx.empire.update({ where: { id: empireId }, data: { diamonds: { increment: amount } } });
       return { message: `זכית ב־${heNum(amount)} יהלומים!`, grants: [{ key: "diamonds", amount }] };
-    case "turns":
-      await tx.empire.update({ where: { id: empireId }, data: { turns: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} תורות!`, grants: [{ key: "turns", amount }] };
     case "gold":
       await tx.empire.update({ where: { id: empireId }, data: { gold: { increment: amount } } });
       return { message: `זכית ב־${heNum(amount)} זהב!`, grants: [{ key: "gold", amount }] };
@@ -82,52 +73,6 @@ async function grantPrize(
       // Capped by city count — see grantCitizens.
       await grantCitizens(tx, empireId, amount);
       return { message: `זכית ב־${heNum(amount)} אזרחים!`, grants: [{ key: "citizens", amount }] };
-    case "loot": {
-      // Mixed resource pack: split the gold-value evenly across all four.
-      const each = Math.round(amount / 4);
-      await tx.empire.update({
-        where: { id: empireId },
-        data: {
-          gold: { increment: each },
-          wood: { increment: each },
-          iron: { increment: each },
-          stone: { increment: each },
-        },
-      });
-      return {
-        message: `זכית בחבילת שלל: ${heNum(each)} מכל משאב!`,
-        // Report the split so a batch totals each resource exactly.
-        grants: [
-          { key: "gold", amount: each },
-          { key: "wood", amount: each },
-          { key: "iron", amount: each },
-          { key: "stone", amount: each },
-        ],
-      };
-    }
-    case "allWeapons": {
-      // One of every weapon the empire has already unlocked, per category.
-      let granted = 0;
-      for (const category of WEAPON_CATEGORIES) {
-        const unlockedTier =
-          empire.weaponUnlocks.find((u) => u.category === category)?.unlockedTier ??
-          INITIAL_WEAPON_UNLOCKED_TIER;
-        for (const weapon of weaponsOfCategory(category)) {
-          if (weapon.tier > unlockedTier) continue;
-          await tx.empireWeapon.upsert({
-            where: { empireId_weaponKey: { empireId, weaponKey: weapon.key } },
-            create: { empireId, weaponKey: weapon.key, quantity: 1 },
-            update: { quantity: { increment: 1 } },
-          });
-          await syncEmpirePower(tx, empireId);
-          granted += 1;
-        }
-      }
-      return {
-        message: `זכית באחד מכל ${heNum(granted)} סוגי הנשק שפתחת!`,
-        grants: [{ key: "allWeapons", amount: granted }],
-      };
-    }
     case "item": {
       const hero = empire.hero;
       // Take the hero row lock and re-count the bag *under* it. `empire.hero.items`

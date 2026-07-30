@@ -18,6 +18,7 @@ import {
   MESSAGE_TITLE_MAX,
 } from "@/lib/game/messages";
 import type { ActionState } from "./game";
+import { settleDueAssault } from "@/server/bossSiege";
 import { logError } from "@/server/errorLog";
 
 async function requireOwnEmpireId(): Promise<string> {
@@ -39,10 +40,24 @@ export type LiveAlert = {
 /**
  * Latest unread inbox messages, polled by the WarAlerts client component to
  * pop live toasts when the player is attacked / spied on / messaged.
+ *
+ * It also settles a finished city-boss assault first, and that is deliberate
+ * rather than convenient. A boss assault runs for a minute of real time while the
+ * player is free to go anywhere in the game, so *something* has to notice it
+ * finished no matter which screen they are on — and this poll is the only thing
+ * that runs on all of them. The settle writes the very message this call is about
+ * to read, so the toast announcing the haul arrives in the same round trip. It is
+ * a cheap indexed lookup that finds nothing in the overwhelmingly common case, and
+ * it is idempotent under the empire row lock (see `settleDueAssault`).
  */
 export async function getUnreadAlerts(): Promise<LiveAlert[]> {
   try {
     const empireId = await requireOwnEmpireId();
+    if (await settleDueAssault(empireId)) {
+      // The haul moved resources, the army and the hero — the resource bar and
+      // the boss banner are both stale now.
+      revalidatePath("/game", "layout");
+    }
     const messages = await prisma.message.findMany({
       where: { empireId, readAt: null },
       orderBy: { createdAt: "desc" },

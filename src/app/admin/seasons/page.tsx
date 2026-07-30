@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledBool, LabeledInput, EditorSection } from "@/components/admin/fields";
+import { LocalTime, SeasonSchedule } from "@/components/admin/DateTimeField";
 import {
   createSeason,
   updateSeason,
@@ -12,12 +13,6 @@ import {
 } from "@/server/actions/admin";
 
 export const dynamic = "force-dynamic";
-
-/** Format a Date as the value a <input type="datetime-local"> expects. */
-function toLocalInput(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 export default async function AdminSeasonsPage() {
   await requireAdmin();
@@ -40,11 +35,10 @@ export default async function AdminSeasonsPage() {
 
       <EditorSection title="עונה חדשה" icon="➕">
         <ActionForm action={createSeason} submitLabel="צור עונה">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:max-w-xs">
             <LabeledInput label="שם" name="name" required placeholder="עונה 1" />
-            <LabeledInput label="התחלה" name="startsAt" type="datetime-local" required />
-            <LabeledInput label="סיום" name="endsAt" type="datetime-local" required />
           </div>
+          <SeasonSchedule />
         </ActionForm>
       </EditorSection>
 
@@ -63,7 +57,7 @@ export default async function AdminSeasonsPage() {
                     the whole game until the next season starts. */}
                 {s.closedAt && (
                   <span className="rounded bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300">
-                    נסגרה {toLocalInput(s.closedAt).replace("T", " ")}
+                    נסגרה <LocalTime iso={s.closedAt.toISOString()} />
                   </span>
                 )}
                 {(archivedBySeason.get(s.id) ?? 0) > 0 && (
@@ -79,11 +73,13 @@ export default async function AdminSeasonsPage() {
 
             <ActionForm action={updateSeason} submitLabel="שמור" submitVariant="secondary">
               <input type="hidden" name="id" value={s.id} />
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:max-w-xs">
                 <LabeledInput label="שם" name="name" defaultValue={s.name} required />
-                <LabeledInput label="התחלה" name="startsAt" type="datetime-local" defaultValue={toLocalInput(s.startsAt)} required />
-                <LabeledInput label="סיום" name="endsAt" type="datetime-local" defaultValue={toLocalInput(s.endsAt)} required />
               </div>
+              <SeasonSchedule
+                startISO={s.startsAt.toISOString()}
+                endISO={s.endsAt.toISOString()}
+              />
             </ActionForm>
 
             <div className="mt-3 flex flex-wrap gap-2">

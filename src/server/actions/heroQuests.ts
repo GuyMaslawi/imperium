@@ -98,10 +98,13 @@ export async function startHeroQuest(
   try {
     const empireId = await requireOwnEmpireId();
 
+    // Outside the transaction: see the note in game.ts's spyOnEmpire for why a
+    // transaction must not ask for a second connection while holding one.
+    const tunables = await getTunables();
+
     const result = await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
 
-      const tunables = await getTunables();
       if (tunables.heroQuest.enabled < 1) {
         return { error: "לוח המסעות סגור כרגע." };
       }

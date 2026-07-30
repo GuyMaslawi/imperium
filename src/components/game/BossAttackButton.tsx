@@ -8,10 +8,13 @@ function SubmitButton({
   bossName,
   disabled,
   title,
+  wounded,
 }: {
   bossName: string;
   disabled: boolean;
   title: string;
+  /** Whether the tyrant is already carrying wounds from an earlier assault. */
+  wounded: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -27,27 +30,38 @@ function SubmitButton({
         className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-l from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover/boss:translate-x-full"
       />
       <span className="relative">
-        {pending ? "צר על המצודה…" : `צא לקרב מול ${bossName}`}
+        {pending
+          ? "הצבא יוצא לדרך…"
+          : wounded
+            ? `תקוף שוב את ${bossName}`
+            : `תקוף את ${bossName}`}
       </span>
     </button>
   );
 }
 
 /**
- * Launches the city-boss run. The action redirects to the fight report on
- * success, so the only thing rendered back here is a refusal.
+ * Launches an assault on the city boss.
+ *
+ * The action pays the turns, rolls the battle and redirects into the arena, so the
+ * only thing rendered back here is a refusal. It deliberately stays a `<form>`
+ * rather than an onClick: the attack is a mutation that costs hundreds of turns,
+ * and a form submission is the one interaction the browser will not replay on a
+ * back navigation.
  */
 export function BossAttackButton({
   bossName,
   disabled,
   disabledReason,
   turnCost,
+  wounded = false,
 }: {
   bossName: string;
   disabled: boolean;
   /** Why the button is dead — shown as its tooltip. */
   disabledReason?: string;
   turnCost: number;
+  wounded?: boolean;
 }) {
   const [state, formAction] = useActionState<BossActionState, FormData>(
     () => attackCityBoss(),
@@ -59,10 +73,11 @@ export function BossAttackButton({
       <SubmitButton
         bossName={bossName}
         disabled={disabled}
+        wounded={wounded}
         title={
           disabled
             ? (disabledReason ?? "לא ניתן לתקוף כרגע")
-            : `עלות הקרב: ${turnCost.toLocaleString("he-IL")} תורות`
+            : `עלות התקיפה: ${turnCost.toLocaleString("he-IL")} תורות · הקרב רץ כדקה`
         }
       />
       {state.error && (

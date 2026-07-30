@@ -18,7 +18,7 @@ import {
   type FeedKind,
 } from "@/server/adminMonitor";
 import {
-  REGULAR_TICK_MS,
+  TICKS_PER_DAY,
   TURNS_UPGRADE_MAX_LEVEL,
 } from "@/lib/game/constants";
 
@@ -34,7 +34,6 @@ export const dynamic = "force-dynamic";
  * it — so a player above it either bought turn packages with diamonds or found
  * something the audits missed. That is exactly the question the row is asking.
  */
-const TICKS_PER_DAY = 86_400_000 / REGULAR_TICK_MS;
 const HERO_TURN_ALLOWANCE = 200;
 const DAILY_TURN_CEILING =
   TURNS_UPGRADE_MAX_LEVEL * TICKS_PER_DAY + HERO_TURN_ALLOWANCE;

@@ -652,7 +652,7 @@ function FullDossier({
             <Tile
               icon="upgrades"
               label="ריבית יומית"
-              value={`${intel.bank.interestPct.toFixed(1)}%`}
+              value={`${Math.round(intel.bank.interestPct)}%`}
               tone="text-emerald-400"
             />
           </div>

@@ -9,27 +9,51 @@ const UNITS = [
   { value: 1e6, suffix: "M" },
 ];
 
+/**
+ * Print `value` in the largest unit it fits in — *after* rounding.
+ *
+ * Choosing the unit by raw magnitude alone is off by a whole unit at the top of
+ * every band: 999,950,000,000 is short of a trillion, so it lands in the
+ * billions, and one decimal rounds its mantissa up to four digits — "1000B",
+ * which is not how anyone writes a trillion. Whenever the rounded mantissa
+ * reaches 1000 we climb one unit and re-round there, so the same figure reads
+ * "1T". The check has to happen on the rounded text, not on the value: it is
+ * the rounding itself that pushes it over.
+ *
+ * `digits` decides the decimals for a given mantissa, and is re-asked after a
+ * promotion because the mantissa changes (999.95B → 1.00T).
+ */
+function withUnit(value: number, digits: (mantissa: number) => number): string {
+  const abs = Math.abs(value);
+  let index = UNITS.findIndex((u) => abs >= u.value);
+  const print = (i: number) => {
+    const mantissa = value / UNITS[i].value;
+    return mantissa.toFixed(digits(Math.abs(mantissa)));
+  };
+  let text = print(index);
+  if (Math.abs(Number(text)) >= 1000 && index > 0) text = print(--index);
+  // Trailing zeros carry nothing: "1.00T" is a trillion, and so is "1T".
+  return `${text.replace(/\.?0+$/, "")}${UNITS[index].suffix}`;
+}
+
 export function formatNumber(value: number): string {
   const abs = Math.abs(value);
-  if (abs >= 1_000_000) {
-    const unit = UNITS.find((u) => abs >= u.value)!;
-    const scaled = value / unit.value;
-    // 2 significant decimals for < 10, else 1 — trim trailing zeros.
-    const digits = Math.abs(scaled) < 10 ? 2 : 1;
-    const text = scaled.toFixed(digits).replace(/\.?0+$/, "");
-    return `${text}${unit.suffix}`;
-  }
+  // 2 significant decimals for a mantissa < 10, else 1 — trailing zeros trimmed.
+  if (abs >= 1_000_000) return withUnit(value, (m) => (m < 10 ? 2 : 1));
   return nf.format(Math.floor(value));
 }
 
 export function formatCompact(value: number): string {
   const abs = Math.abs(value);
-  if (abs >= 1_000_000) {
-    const unit = UNITS.find((u) => abs >= u.value)!;
-    const text = (value / unit.value).toFixed(1).replace(/\.0$/, "");
-    return `${text}${unit.suffix}`;
+  if (abs >= 1_000_000) return withUnit(value, () => 1);
+  // Same boundary one unit down: 999,950 rounds to "1000K", i.e. a million.
+  if (abs >= 10_000) {
+    const text = (value / 1_000).toFixed(1);
+    if (Math.abs(Number(text)) >= 1000) {
+      return `${(value / 1e6).toFixed(1).replace(/\.0$/, "")}M`;
+    }
+    return `${text.replace(/\.0$/, "")}K`;
   }
-  if (abs >= 10_000) return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
   return nf.format(Math.floor(value));
 }
 

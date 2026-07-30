@@ -6,7 +6,7 @@ import {
   GiUpgrade, GiFlyingFlag, GiBowman, GiTrophy, GiRibbonMedal,
   GiScrollUnfurled, GiEnvelope, GiGears, GiExitDoor, GiCrown,
   GiRollingDices, GiShoppingBag, GiPresent, GiSparkles,
-  GiHeartInside, GiHealthPotion, GiCompass,
+  GiHeartInside, GiHealthPotion, GiCompass, GiTalk,
 } from "react-icons/gi";
 
 /**
@@ -23,7 +23,7 @@ export type IconName =
   | "bank" | "storage" | "upgrades" | "guild" | "hero" | "rankings"
   | "achievements" | "reports" | "messages" | "settings" | "logout"
   | "crown" | "dice" | "wheel" | "shop" | "gift" | "spark" | "heart" | "potion"
-  | "quest";
+  | "quest" | "chat";
 
 /**
  * The one glyph game-icons.net doesn't carry: a carnival prize wheel — a
@@ -79,6 +79,7 @@ const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   heart: GiHeartInside,
   potion: GiHealthPotion,
   quest: GiCompass,
+  chat: GiTalk,
 };
 
 export function Icon({

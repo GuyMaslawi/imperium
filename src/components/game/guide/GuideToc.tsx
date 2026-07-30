@@ -102,7 +102,9 @@ export function BackToTop() {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="חזרה לתוכן העניינים"
-      className={`fixed bottom-6 left-6 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-gold/60 bg-[#12100b]/95 text-gold-bright shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-all duration-200 hover:border-gold hover:bg-[#1b1710] ${
+      // Sits a launcher's height above the corner: the chat dock owns the
+      // bottom-left of every game screen.
+      className={`fixed bottom-20 left-6 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-gold/60 bg-[#12100b]/95 text-gold-bright shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-all duration-200 hover:border-gold hover:bg-[#1b1710] ${
         shown ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-3 opacity-0"
       }`}
     >

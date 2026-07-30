@@ -44,7 +44,8 @@ export default async function BankPage() {
     empire.upgrades.find((u) => u.type === "BANK_DEPOSIT_COUNT")?.level ?? 1;
 
   const rate = bankInterestRate(interestLevel);
-  const ratePercent = `${(rate * 100).toFixed(2)}%`;
+  // Whole percents: the ladder is 1% a rung, so decimals were always zeros.
+  const ratePercent = `${Math.round(rate * 100)}%`;
   const nextInterest = Math.floor(bankGold * rate);
 
   const allowedDeposits = allowedDepositsPerDailyPeriod(depositLevel);

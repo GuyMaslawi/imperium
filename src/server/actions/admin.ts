@@ -2054,6 +2054,13 @@ export async function clearEmpireHistory(
     }
     if (what === "boss" || what === "all") {
       count += (await prisma.bossFight.deleteMany({ where: { empireId } })).count;
+      // Reports first, then the sieges they came out of: BossFight.battleId is
+      // ON DELETE SET NULL, so a surviving report would keep a battle row alive
+      // that no longer has a siege to belong to. Dropping the siege cascades its
+      // battles, which also clears an open sortie — clearing a player's boss
+      // history and leaving them mid-fight against a boss with no record would
+      // be the stranger outcome.
+      count += (await prisma.bossSiege.deleteMany({ where: { empireId } })).count;
     }
     await logAdmin(admin, {
       action: "empire.history_clear",
@@ -2231,10 +2238,24 @@ export async function sendGift(
 /*                          SEASONS                             */
 /* ============================================================= */
 
+/**
+ * Read an **absolute** instant out of the form.
+ *
+ * The zone suffix is mandatory, and that is the whole point: a bare
+ * "YYYY-MM-DDTHH:mm" — what a raw `datetime-local` input posts — means the
+ * admin's timezone to the browser and the server's (UTC in production) to
+ * `new Date()`, a silent three-hour slip on every season boundary. The season
+ * form (`SeasonSchedule`) converts the picked wall-clock time to ISO in the
+ * browser, so anything arriving without an offset is a stale or hand-rolled
+ * submission and is rejected rather than guessed at.
+ */
 function parseDate(formData: FormData, key: string): Date {
   const raw = str(formData, key);
   const d = new Date(raw);
   if (Number.isNaN(d.getTime())) throw new AdminError(`תאריך לא תקין בשדה ${key}`);
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(raw)) {
+    throw new AdminError(`תאריך ללא אזור זמן בשדה ${key}`);
+  }
   return d;
 }
 

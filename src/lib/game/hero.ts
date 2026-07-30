@@ -221,8 +221,9 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
     icon: "mine",
     tone: "text-emerald-400",
     pointsField: "resourcePoints",
-    // Points give a %; items give flat resources (see HeroPowerSummary).
-    description: "כל אחוז נקודות מגדיל את תפוקת המכרות; חפצים מוסיפים משאבים בכמות קבועה.",
+    // Points give a %; items give either, decided per slot (see SlotStatWeight).
+    description:
+      "כל אחוז נקודות מגדיל את תפוקת המכרות. פרי שטן, מכנסיים ונעליים מוסיפים משאבים בכמות קבועה בכל עדכון רגיל; חרב ומגן מגדילים את תפוקת המכרות באחוזים.",
   },
   spy: {
     label: "ריגול",
@@ -249,6 +250,15 @@ export const HERO_STAT_META: Record<HeroStat, HeroStatMeta> = {
     description: "חפצים מוסיפים אזרחים בכמות קבועה בכל עדכון יומי (לא באחוזים).",
   },
 };
+
+/**
+ * Label for a resource line paid as a percentage. It cannot come from
+ * HERO_STAT_META like every other line, because `resources` is the one stat with
+ * two instruments and the two need different words: the flat lines name the
+ * resource and its cadence ("אבן לעדכון רגיל"), while a percentage multiplies
+ * every mine at once and has no cadence to state.
+ */
+export const RESOURCE_PCT_ITEM_LABEL = "תפוקת המכרות";
 
 export const HERO_STATS = Object.keys(HERO_STAT_META) as HeroStat[];
 
@@ -385,10 +395,45 @@ export function itemUpgradeCost(level: number): number | null {
 
 /* ------------------------------ item slots ------------------------------ */
 
-/** One stat an item's slot grants, and how heavily it weighs it. */
+/**
+ * How a slot pays a stat it grants. Every stat but `resources` has exactly one
+ * possible mode (see `statIsFlat`); `resources` is the one stat a slot can pay
+ * either way, and the slot decides — see `SlotStatWeight.mode`.
+ */
+export type SlotStatMode = "flat" | "pct";
+
+/**
+ * One stat an item's slot grants, how heavily it weighs it, and — for
+ * `resources` only — whether it pays in whole units or in percent.
+ *
+ * **Resources are the one stat with two instruments**, because mine output is
+ * multiplicative (slaves × mine level × cities) while a flat grant is additive.
+ * A single global choice therefore cannot work: measured against a played
+ * empire, a flat grant sized to matter at level 100 flattens the early game,
+ * and one sized for the early game is a rounding error by mid-game. So the two
+ * live side by side and cover different halves of the curve:
+ *
+ * - **flat** — פרי שטן, מכנסיים, נעליים. Whole units per regular update, on the
+ *   squared rung curve. That curve happens to track empire income almost
+ *   exactly, so a flat item holds a near-constant *share* of a mine's output at
+ *   every level (~11% for a primary at the current cap). This is the instrument
+ *   that carries the early game, when a mine produces hundreds per tick.
+ * - **pct** — חרב, מגן. A percentage on the linear rung curve, multiplying mine
+ *   production alongside the hero's allocated resource points. Deliberately
+ *   small early (a rung-6 extra is +2.1%) and dominant late (+14% at rung 40),
+ *   which is what a percentage of a multiplicative economy is worth.
+ *
+ * The two meet at roughly the same value at level 100, so neither instrument is
+ * strictly better — they are early-game and late-game answers to the same need.
+ *
+ * Omitted `mode` means the stat's own nature decides, which is the only option
+ * for every stat except `resources`.
+ */
 export interface SlotStatWeight {
   stat: HeroStat;
   weight: number;
+  /** Only meaningful on `resources`; ignored on every other stat. */
+  mode?: SlotStatMode;
 }
 
 export interface SlotMeta {
@@ -407,10 +452,12 @@ export interface SlotMeta {
    * `RESOURCE_TIER_COVERAGE`), so the *first* entry is what a פשוט piece of this
    * slot conjures, and only an אגדי reaches the fourth.
    *
-   * Each resource slot leads with a different resource, which is the cheapest
-   * way to make two items of the same tier a real choice: an early מגן solves a
-   * wood shortage, an early פרי שטן a gold one. Omitted on slots that grant no
-   * resources at all.
+   * Each flat resource slot leads with a different resource, which is the
+   * cheapest way to make two items of the same tier a real choice: an early
+   * מכנסיים solves an iron shortage, an early פרי שטן a gold one. Omitted on
+   * slots that grant no resources — and on the slots that pay them as a
+   * percentage, which multiplies every mine at once and so has nothing to lead
+   * with (see `SlotStatWeight.mode`).
    */
   resourceOrder?: readonly StorableResource[];
 }
@@ -466,10 +513,48 @@ export const EXTRA_WEIGHTS = [
   MINOR_EXTRA_WEIGHT,
 ] as const;
 
-const primary = (stat: HeroStat): SlotStatWeight => ({ stat, weight: PRIMARY_WEIGHT });
-const major = (stat: HeroStat): SlotStatWeight => ({ stat, weight: MAJOR_EXTRA_WEIGHT });
-const extra = (stat: HeroStat): SlotStatWeight => ({ stat, weight: EXTRA_WEIGHT });
-const minor = (stat: HeroStat): SlotStatWeight => ({ stat, weight: MINOR_EXTRA_WEIGHT });
+const primary = (stat: HeroStat, mode?: SlotStatMode): SlotStatWeight => ({
+  stat,
+  weight: PRIMARY_WEIGHT,
+  mode,
+});
+const major = (stat: HeroStat, mode?: SlotStatMode): SlotStatWeight => ({
+  stat,
+  weight: MAJOR_EXTRA_WEIGHT,
+  mode,
+});
+const extra = (stat: HeroStat, mode?: SlotStatMode): SlotStatWeight => ({
+  stat,
+  weight: EXTRA_WEIGHT,
+  mode,
+});
+const minor = (stat: HeroStat, mode?: SlotStatMode): SlotStatWeight => ({
+  stat,
+  weight: MINOR_EXTRA_WEIGHT,
+  mode,
+});
+
+/**
+ * How `slot` pays `stat`. Everything but `resources` has a single possible
+ * answer; a resource slot states its own, defaulting to flat so a new slot that
+ * forgets to declare behaves like the dedicated resource slots.
+ *
+ * Only meaningful for a stat the slot actually grants — check `slotGrants`
+ * first. For one it does not, the answer is that default rather than "neither",
+ * which would read as "this slot pays flat resources" if trusted on its own.
+ */
+export function slotStatMode(slot: HeroItemSlot, stat: HeroStat): SlotStatMode {
+  if (stat !== "resources") return statIsFlat(stat) ? "flat" : "pct";
+  return SLOT_META[slot].stats.find((s) => s.stat === stat)?.mode ?? "flat";
+}
+
+/**
+ * Whether this slot pays `stat` in whole units rather than percent. Carries the
+ * same precondition as `slotStatMode` — ask only about a stat the slot grants.
+ */
+export function slotStatIsFlat(slot: HeroItemSlot, stat: HeroStat): boolean {
+  return slotStatMode(slot, stat) === "flat";
+}
 
 /**
  * Slot → stat profile. Each line reads "primary ‖ extras, deepest first".
@@ -495,9 +580,9 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
     label: "חרב",
     icon: "🗡️",
     slug: "sword",
-    stats: [primary("attack"), extra("resources"), minor("citizens")],
-    // Spoils stripped off the slain: coin first, then their weapons' metal.
-    resourceOrder: ["gold", "iron", "stone", "wood"],
+    // No resourceOrder: a percentage multiplies every mine at once, so there is
+    // no single resource for the slot to lead with.
+    stats: [primary("attack"), extra("resources", "pct"), minor("citizens")],
   },
   GAUNTLETS: {
     label: "כפפות",
@@ -521,15 +606,14 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
     label: "מגן",
     icon: "🔰",
     slug: "buckler",
-    stats: [primary("defense"), extra("resources"), minor("turns")],
-    // A wall is timber and stone before it is anything else.
-    resourceOrder: ["wood", "stone", "iron", "gold"],
+    // No resourceOrder — see חרב above.
+    stats: [primary("defense"), extra("resources", "pct"), minor("turns")],
   },
   RELIC: {
     label: "פרי שטן",
     icon: "😈",
     slug: "demon-fruit",
-    stats: [primary("resources"), extra("attack"), minor("spy")],
+    stats: [primary("resources", "flat"), extra("attack"), minor("spy")],
     // The conjurer's slot — the canonical order, gold first.
     resourceOrder: ["gold", "wood", "iron", "stone"],
   },
@@ -545,7 +629,7 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
     label: "מכנסיים",
     icon: "👖",
     slug: "pants",
-    stats: [primary("resources"), extra("defense"), minor("citizens")],
+    stats: [primary("resources", "flat"), extra("defense"), minor("citizens")],
     // The quartermaster's pockets — what an army actually runs out of.
     resourceOrder: ["iron", "gold", "stone", "wood"],
   },
@@ -553,7 +637,7 @@ export const SLOT_META: Record<HeroItemSlot, SlotMeta> = {
     label: "נעליים",
     icon: "🥾",
     slug: "boots",
-    stats: [primary("citizens"), extra("turns"), minor("resources")],
+    stats: [primary("citizens"), extra("turns"), minor("resources", "flat")],
     // What you can carry home on foot: whatever you walked over.
     resourceOrder: ["stone", "wood", "gold", "iron"],
   },
@@ -609,7 +693,16 @@ export const PCT_PER_STEP = 1;
  * extra takes its weighted share of the same number.
  */
 export const FLAT_AT_MAX_STEP: Record<HeroFlatStat, number> = {
-  resources: 200,
+  // Sized against real mine output, not picked by feel. A played empire (hero
+  // 63, one city, 780 mine slaves, mines at L14-22) earns ~7,000 of each
+  // resource per regular update; at the old ceiling of 200 its relic paid 85 —
+  // 1.2% of a single mine. The squared curve held that ~1% at *every* level, so
+  // the shape was right and only the ceiling was wrong: the number was a
+  // rounding error for the whole game, which is why a low-weight slot like
+  // נעליים printed a literal +1. 2,000 puts a primary at ~11% of one mine and
+  // נעליים at ~2.8%, which is a slot you notice without one that decides the
+  // game. See SlotStatWeight for why the other resource slots pay percent.
+  resources: 2000,
   turns: 40,
   // Citizens are the largest number on the board because they are the cheapest
   // unit of anything: one citizen buys one soldier, spy or mine slave. There is
@@ -629,21 +722,42 @@ export const FLAT_AT_MAX_STEP: Record<HeroFlatStat, number> = {
  *
  * A flat bonus is added to an economy that itself grows by orders of magnitude
  * over a hundred levels, so to stay *proportionally* the same size it has to
- * grow superlinearly too. Squaring the rung keeps both ends honest: the caps at
- * rung 40 are unchanged (still 1,800 citizens / 200 resources / 40 turns), while
- * rung 1 is a rounding error, which is what a level-1 item should be.
+ * grow superlinearly too. Raising the rung to a power keeps both ends honest:
+ * the caps at rung 40 are untouched whatever the exponent, while rung 1 is a
+ * rounding error, which is what a level-1 item should be.
  *
- *   citizens, as a primary:  rung 1 → +1 · rung 4 (אגדי of the first series) →
- *   +18 · rung 8 → +72 · rung 20 → +450 · rung 40 → +1,800
+ * The exponent is **per stat**, because the thing each stat is measured against
+ * grows at its own rate:
  *
- * Note what this costs: on the small-ceilinged stats (turns, resources) the
- * first few rungs all round to +1, so those *lines* stand still early. The item
- * as a whole never does — its percentage extras move on every single rung, and a
- * resource item widens its coverage with every tier (see resourceItemResources).
- * Do not "fix" the stall by flooring the curve higher; that is the bug this
- * replaced.
+ * - `resources` (2) — mine output is multiplicative and roughly quadratic in
+ *   progression, and the squared curve tracks it almost exactly: a primary holds
+ *   ~11% of one mine's per-tick output at rung 4 and at rung 40 alike. Do not
+ *   raise this without re-measuring; the flatness of that share is the whole
+ *   point, and it is what lets the ceiling be set once (see FLAT_AT_MAX_STEP).
+ * - `turns` (2) — same reasoning, against a turn income that also scales.
+ * - `citizens` (2.5) — citizen intake does *not* keep pace. The empire's own
+ *   growth building pays 20 + 10·level per daily update and caps at 1,020 with
+ *   ten cities. The exponent was set when that step was 5 rather than 10: a
+ *   squared curve had a level-13 boot paying +41 against a base of 25 — one
+ *   cheap item at 164% of the building that exists for the job. Doubling the
+ *   step only widened the building's margin, so 2.5 stays right; the steeper
+ *   exponent pushes that power to the end of the ladder where the rest of the
+ *   economy has caught up, instead of lowering the ceiling.
+ *
+ *   citizens, as a primary:  rung 1 → +1 · rung 6 (a level-13 boot) → +16 ·
+ *   rung 8 → +32 · rung 20 → +318 · rung 40 → +1,800
+ *
+ * Note what this costs: on the small-ceilinged stats the first few rungs all
+ * round to +1, so those *lines* stand still early. The item as a whole never
+ * does — its percentage extras move on every single rung, and a resource item
+ * widens its coverage with every tier (see resourceItemResources). Do not "fix"
+ * the stall by flooring the curve higher; that is the bug this replaced.
  */
-export const FLAT_CURVE_EXPONENT = 2;
+export const FLAT_CURVE_EXPONENT: Record<HeroFlatStat, number> = {
+  resources: 2,
+  turns: 2,
+  citizens: 2.5,
+};
 
 /**
  * How many of its slot's resources a resource-granting item feeds, by tier: a
@@ -708,11 +822,14 @@ export function itemStatBonus(
   const weight = slotWeight(slot, stat);
   if (weight === 0) return 0;
   const step = upgradeStep(level);
-  if (!statIsFlat(stat)) return roundPct(step * PCT_PER_STEP * weight);
+  // The mode is the slot's, not the stat's: חרב and מגן pay resources as a
+  // percentage while פרי שטן, מכנסיים and נעליים pay them in whole units.
+  if (!slotStatIsFlat(slot, stat)) return roundPct(step * PCT_PER_STEP * weight);
+  const flat = stat as HeroFlatStat;
   const progress = step / MAX_UPGRADE_STEP;
   return Math.max(
     1,
-    Math.round(FLAT_AT_MAX_STEP[stat] * weight * progress ** FLAT_CURVE_EXPONENT)
+    Math.round(FLAT_AT_MAX_STEP[flat] * weight * progress ** FLAT_CURVE_EXPONENT[flat])
   );
 }
 
@@ -726,7 +843,11 @@ export function itemPrimaryBonus(
   level: number
 ): { stat: HeroStat; flat: boolean; value: number } {
   const stat = slotPrimaryStat(slot);
-  return { stat, flat: statIsFlat(stat), value: itemStatBonus(slot, level, stat) };
+  return {
+    stat,
+    flat: slotStatIsFlat(slot, stat),
+    value: itemStatBonus(slot, level, stat),
+  };
 }
 
 /** One line of what an item grants, ready to render. */
@@ -750,9 +871,16 @@ export interface ItemBonusLine {
  * Everything an item grants, primary first — the single entry point the UI
  * renders from.
  *
- * A resource stat expands into one line per resource its tier covers, because
- * that is what the player actually receives: an אגדי relic is not "+200
- * משאבים", it is +200 of each of the four.
+ * A **flat** resource stat expands into one line per resource its tier covers,
+ * because that is what the player actually receives: an אגדי relic is not
+ * "+2,000 משאבים", it is +2,000 of each of the four. A **percentage** resource
+ * stat stays a single line — it multiplies every mine at once, so there is
+ * nothing to split and no tier coverage to widen.
+ *
+ * Every line carries the cadence in its label. The flat resource lines used to
+ * print a bare "אבן" while the lines above them said "לעדכון יומי", which left
+ * no way to tell that resources are paid every five minutes and citizens twice a
+ * day — a 288× difference hidden in a missing suffix.
  */
 export function itemBonusLines(
   slot: HeroItemSlot,
@@ -763,7 +891,7 @@ export function itemBonusLines(
     const value = itemStatBonus(slot, level, stat);
     if (value === 0) continue;
     const primary = stat === slotPrimaryStat(slot);
-    if (stat === "resources") {
+    if (stat === "resources" && slotStatIsFlat(slot, stat)) {
       for (const resource of resourceItemResources(slot, level)) {
         lines.push({
           stat,
@@ -771,17 +899,21 @@ export function itemBonusLines(
           value,
           primary,
           resource,
-          label: RESOURCE_META[resource].label,
+          label: `${RESOURCE_META[resource].label} לעדכון רגיל`,
         });
       }
       continue;
     }
+    // Everything that is not a flat resource line: the percentage stats, the
+    // percent-paying resource line, and the other flat stats (turns/citizens),
+    // which are still whole units and must not print a % sign.
     lines.push({
       stat,
-      flat: statIsFlat(stat),
+      flat: slotStatIsFlat(slot, stat),
       value,
       primary,
-      label: HERO_STAT_META[stat].itemLabel,
+      label:
+        stat === "resources" ? RESOURCE_PCT_ITEM_LABEL : HERO_STAT_META[stat].itemLabel,
     });
   }
   return lines;
@@ -939,6 +1071,13 @@ export interface HeroBonuses {
   points: Record<HeroPointStat, number>;
   /** % from equipped items, for the percentage stats (attack/defense/spy). */
   itemsPct: Record<HeroPercentStat, number>;
+  /**
+   * % from equipped items that pay `resources` as a percentage (חרב, מגן). It
+   * is deliberately *not* part of `itemsPct` — that record covers the battle
+   * stats and is summed into `totalPct`, while this one multiplies mine
+   * production and belongs beside `points.resources` and `classPct.resources`.
+   */
+  itemsResourcePct: number;
   /** Flat unit counts from equipped items (resources/turns/citizens). */
   itemsFlat: Record<HeroFlatStat, number>;
   /**
@@ -967,6 +1106,7 @@ export function zeroHeroBonuses(): HeroBonuses {
   return {
     points: { attack: 0, defense: 0, resources: 0 },
     itemsPct: { attack: 0, defense: 0, spy: 0 },
+    itemsResourcePct: 0,
     itemsFlat: { resources: 0, turns: 0, citizens: 0 },
     itemsFlatByResource: { gold: 0, wood: 0, iron: 0, stone: 0 },
     classPct: { attack: 0, defense: 0, resources: 0, spy: 0 },
@@ -1007,6 +1147,7 @@ export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
     resources: hero?.resourcePoints ?? 0,
   };
   const itemsPct: Record<HeroPercentStat, number> = { attack: 0, defense: 0, spy: 0 };
+  let itemsResourcePct = 0;
   const itemsFlat: Record<HeroFlatStat, number> = {
     resources: 0,
     turns: 0,
@@ -1023,20 +1164,26 @@ export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
     for (const { stat } of SLOT_META[item.slot].stats) {
       const value = itemStatBonus(item.slot, item.level, stat);
       if (value === 0) continue;
-      if (statIsFlat(stat)) {
-        itemsFlat[stat] += value;
-        // A resource bonus feeds only the resources the item's tier covers —
-        // each at the full amount, which is what makes an אגדי piece worth four
-        // times a פשוט one beyond the raw number.
-        if (stat === "resources") {
-          for (const r of resourceItemResources(item.slot, item.level)) {
-            itemsFlatByResource[r] += value;
-          }
+      // Whether this counts as flat is the *slot's* call, not the stat's: חרב
+      // and מגן pay resources as a percentage of mine output.
+      if (!slotStatIsFlat(item.slot, stat)) {
+        if (stat === "resources") itemsResourcePct += value;
+        else itemsPct[stat as HeroPercentStat] += value;
+        continue;
+      }
+      itemsFlat[stat as HeroFlatStat] += value;
+      // A flat resource bonus feeds only the resources the item's tier covers —
+      // each at the full amount, which is what makes an אגדי piece worth four
+      // times a פשוט one beyond the raw number.
+      if (stat === "resources") {
+        for (const r of resourceItemResources(item.slot, item.level)) {
+          itemsFlatByResource[r] += value;
         }
-      } else itemsPct[stat] += value;
+      }
     }
   }
   for (const stat of HERO_PERCENT_STATS) itemsPct[stat] = roundPct(itemsPct[stat]);
+  itemsResourcePct = roundPct(itemsResourcePct);
   const cls = heroClassBonuses(hero?.heroClass);
   const classPct = {
     attack: cls.attack,
@@ -1052,7 +1199,28 @@ export function rawHeroBonuses(hero: HeroWithItems | null): HeroBonuses {
     defense: roundPct(points.defense + itemsPct.defense + classPct.defense),
     spy: roundPct(itemsPct.spy + classPct.spy),
   };
-  return { points, itemsPct, itemsFlat, itemsFlatByResource, classPct, totalPct };
+  return {
+    points,
+    itemsPct,
+    itemsResourcePct,
+    itemsFlat,
+    itemsFlatByResource,
+    classPct,
+    totalPct,
+  };
+}
+
+/**
+ * The full percentage multiplying mine production: allocated resource points +
+ * the class bonus + the percent-paying resource items. Every site that scales
+ * mine output must use this, so adding another resource-% source only has to
+ * land here. (The flat items are added *after* the multiplier — they are units,
+ * not a scaling of anything.)
+ */
+export function resourceProductionPct(bonuses: HeroBonuses): number {
+  return roundPct(
+    bonuses.points.resources + bonuses.classPct.resources + bonuses.itemsResourcePct
+  );
 }
 
 /** Multiplier form of a % bonus (e.g. 25 → 1.25). */

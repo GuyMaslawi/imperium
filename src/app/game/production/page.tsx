@@ -9,7 +9,7 @@ import {
   mineUpgradeCost,
 } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
-import { heroBonuses } from "@/lib/game/hero";
+import { heroBonuses, resourceProductionPct } from "@/lib/game/hero";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getActiveResourceBoosts } from "@/lib/game/diamondEffects";
 import { mineProductionBreakdown } from "@/lib/game/resources";
@@ -128,7 +128,7 @@ export default async function ProductionPage() {
             level: mine.level,
             assignedSlaves: mine.assignedSlaves,
             cities: empire.cities,
-            heroResourcesPct: heroBonus.points.resources + heroBonus.classPct.resources,
+            heroResourcesPct: resourceProductionPct(heroBonus),
             guildResourcesPct,
             diamondBoostPct: resourceBoosts[resource],
             heroItemFlat: heroBonus.itemsFlatByResource[resource],

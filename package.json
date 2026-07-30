@@ -32,7 +32,7 @@
     "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
-    "next": "16.2.11",
+    "next": "^16.2.12",
     "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -53,5 +53,10 @@
     "tsx": "^4.23.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "//overrides": "Forced past two high-severity advisories that Next bundles and cannot be reached by upgrading it (16.2.12 still ships postcss 8.4.31 and sharp 0.34.x; `npm audit fix --force` proposes next@9, a four-year downgrade). postcss: GHSA-qx2v-qp2m-jg93 / 6g55-p6wh-862q / r28c-9q8g-f849. sharp: GHSA-f88m-g3jw-g9cj (libvips CVE-2026-33327/33328/35590/35591). Both are same-major bumps and the full build plus both test suites pass on them. Drop these once Next's own ranges have moved past the fixed versions.",
+  "overrides": {
+    "postcss": "^8.5.25",
+    "sharp": "^0.35.3"
   }
 }

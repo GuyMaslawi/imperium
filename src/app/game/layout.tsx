@@ -20,6 +20,7 @@ import { InboxNav } from "@/components/game/InboxNav";
 import { AdminNav } from "@/components/game/AdminNav";
 import { ImpersonationBanner } from "@/components/game/ImpersonationBanner";
 import { WarAlerts } from "@/components/game/WarAlerts";
+import { ChatDock } from "@/components/game/ChatDock";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { MiniGamePanel } from "@/components/game/MiniGamePanel";
@@ -144,6 +145,10 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       <ImpersonationBanner empireName={empire.name} />
       {/* Live toasts for incoming attacks / spies / messages. */}
       <WarAlerts />
+      {/* The chat dock rides in the corner of every game screen — the public
+          room and private conversations, without leaving the page you are on.
+          Admins get the moderation control on each line. */}
+      <ChatDock canModerate={admin} />
       <ResourceBar
         resources={{
           gold: empire.gold,

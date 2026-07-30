@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { prisma } from "@/lib/prisma";
-import { BOSS_VICTORIES_PER_CYCLE } from "./bosses";
+import { DEFAULT_CITIZENS_BASE, DEFAULT_CITIZENS_PER_LEVEL } from "@/lib/game/constants";
 
 /**
  * Admin-editable global game balance. These are the *server-authoritative*
@@ -49,14 +49,21 @@ export interface GameTunables {
     mineProductionMultiplier: number;
   };
   /**
-   * City-boss balance. The shape of the curves lives in game/bosses.ts; these
-   * are the two global scalars on top of it plus the per-cycle victory cap, so
+   * City-boss balance. The shape of the curves lives in game/bosses.ts and the
+   * combat in game/bossBattle.ts; these are the global scalars on top of them, so
    * the boss can be softened or sharpened without a deploy.
    */
   boss: {
     powerMultiplier: number;
     rewardMultiplier: number;
-    victoriesPerCycle: number;
+    /**
+     * Scales only the health pool a boss life carries, not the printed power — the
+     * knob for "the boss should take more/fewer assaults to fell" that leaves the
+     * number players measure themselves against alone.
+     */
+    hpMultiplier: number;
+    /** 0 closes the boss entirely; 1 opens it. */
+    enabled: number;
   };
   /**
    * Hero expeditions. The durations, turn costs and loot odds live in
@@ -91,8 +98,10 @@ export const DEFAULT_TUNABLES: GameTunables = {
     wheelSpins: 4,
   },
   daily: {
-    citizensBase: 20,
-    citizensPerLevel: 5,
+    // Seeded from constants.ts so the shipped curve has exactly one definition:
+    // citizensPerDailyUpdate() and an empty overlay must agree.
+    citizensBase: DEFAULT_CITIZENS_BASE,
+    citizensPerLevel: DEFAULT_CITIZENS_PER_LEVEL,
     wheelSpins: 3,
   },
   battle: {
@@ -109,7 +118,8 @@ export const DEFAULT_TUNABLES: GameTunables = {
   boss: {
     powerMultiplier: 1,
     rewardMultiplier: 1,
-    victoriesPerCycle: BOSS_VICTORIES_PER_CYCLE,
+    hpMultiplier: 1,
+    enabled: 1,
   },
   heroQuest: {
     rewardMultiplier: 1,
@@ -177,7 +187,8 @@ export const TUNABLE_META: Record<
     fields: {
       powerMultiplier: { label: "מכפיל כוח הבוס (1 = ברירת מחדל)", step: 0.05 },
       rewardMultiplier: { label: "מכפיל שלל הבוס (1 = ברירת מחדל)", step: 0.05 },
-      victoriesPerCycle: { label: "ניצחונות מותרים בין עדכון יומי לעדכון יומי" },
+      hpMultiplier: { label: "מכפיל חיי הבוס (1 = ברירת מחדל)", step: 0.05 },
+      enabled: { label: "בוס פתוח (1 = כן, 0 = סגור)" },
     },
   },
   heroQuest: {
@@ -248,8 +259,11 @@ const TUNABLE_BOUNDS: {
     // A zero power multiplier would make every boss free to farm; keep a floor.
     powerMultiplier: [0.01, 1e3],
     rewardMultiplier: [0, 1e3],
-    // 0 closes the boss entirely, which is a legitimate kill switch.
-    victoriesPerCycle: [0, 1e3],
+    // Likewise a zero HP pool: the first round would fell every tyrant.
+    hpMultiplier: [0.01, 1e3],
+    // As on heroQuest.enabled, the read path tests `>= 1`, so a stray 0.5
+    // closes the boss rather than half-opening something with no half state.
+    enabled: [0, 1],
   },
   heroQuest: {
     rewardMultiplier: [0, 1e3],

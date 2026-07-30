@@ -651,8 +651,15 @@ export async function spyOnEmpire(
       return { error: "לא ניתן לרגל אחרי האימפריה שלך" };
     }
 
+    // Read before the transaction opens. `getTunables` goes to the database on a
+    // connection of its own, so asking for it *inside* a transaction means one
+    // caller holding a connection while waiting for a second — and on a serverless
+    // fleet with a small pool, a burst can end up with every connection held by a
+    // transaction waiting for one that will never be freed. It is React-cached per
+    // request, so hoisting it costs nothing.
+    const { spyTurnCost: SPY_TURN_COST } = (await getTunables()).battle;
+
     outcome = await prisma.$transaction(async (tx) => {
-      const { spyTurnCost: SPY_TURN_COST } = (await getTunables()).battle;
       const attacker = await applyPendingUpdates(empireId, tx);
       if (!attacker.army || attacker.army.spies < 1) {
         return { error: "נדרש לפחות מרגל אחד למשימת ריגול" };
@@ -799,6 +806,19 @@ export async function attackEmpire(
       return { error: "לא ניתן לתקוף את האימפריה שלך" };
     }
 
+    // Hoisted above the transaction for the reason spelled out in spyOnEmpire —
+    // and it matters most here, because this transaction holds locks on *two*
+    // empire rows. A caller blocked waiting for a second connection while sitting
+    // on two row locks is the worst version of that stall: it takes other players'
+    // battles down with it, not just its own.
+    const {
+      attackTurnCost: ATTACK_TURN_COST,
+      defenseBonus: DEFENSE_BONUS,
+      plunderRate: PLUNDER_RATE,
+      enslaveRate: ENSLAVE_RATE,
+      enslaveMinSoldiers: ENSLAVE_MIN_SOLDIERS,
+    } = (await getTunables()).battle;
+
     outcome = await prisma.$transaction(async (tx) => {
       // Serialize concurrent battles that involve either empire. The army
       // decrements and hero level-up / citizen grants below read a snapshot and
@@ -810,13 +830,6 @@ export async function attackEmpire(
       const [lockLo, lockHi] = [empireId, targetEmpireId].sort();
       await tx.$queryRaw`SELECT id FROM "Empire" WHERE id IN (${lockLo}, ${lockHi}) FOR UPDATE`;
 
-      const {
-        attackTurnCost: ATTACK_TURN_COST,
-        defenseBonus: DEFENSE_BONUS,
-        plunderRate: PLUNDER_RATE,
-        enslaveRate: ENSLAVE_RATE,
-        enslaveMinSoldiers: ENSLAVE_MIN_SOLDIERS,
-      } = (await getTunables()).battle;
       const attacker = await applyPendingUpdates(empireId, tx);
       if (attacker.turns < ATTACK_TURN_COST) {
         return { error: "אין לך מספיק תורות לביצוע תקיפה." };

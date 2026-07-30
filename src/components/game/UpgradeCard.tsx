@@ -5,7 +5,7 @@ import { upgradeEmpireUpgrade, type ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Card } from "@/components/ui/Card";
-import { Icon, type IconName } from "@/components/ui/Icon";
+import { Icon, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
 import { usePulse } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
@@ -119,7 +119,11 @@ export function UpgradeCard({
                   className={missing ? "font-semibold text-red-400" : undefined}
                   title={missing ? "אין מספיק מהמשאב הזה לשדרוג" : undefined}
                 >
-                  <Icon name={icon} size={14} className="inline align-[-2px]" />{" "}
+                  <Icon
+                    name={icon}
+                    size={14}
+                    className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[key]}`}
+                  />{" "}
                   <span className="nums" dir="ltr">
                     {formatNumber(upgradeCost[key])}
                   </span>
