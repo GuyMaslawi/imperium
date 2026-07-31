@@ -260,10 +260,11 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
         עמומות ממתינות לחפץ מתאים.
       </p>
 
-      {/* Three labelled groups laid side-by-side on wide screens so the
-          full-width footer fills its row instead of trailing off into blank
-          space; they stack on narrow screens. */}
-      <div className="grid gap-x-6 gap-y-5 lg:grid-cols-3">
+      {/* Three labelled groups. The panel only owns half the row from xl up
+          (it sits beside the quest board), so the columns go the other way
+          there: two abreast while the panel is full-width, one column once it
+          is halved and a three-way split would squeeze every value. */}
+      <div className="grid gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-1">
         {/* battle percentages: attack / defense / spy */}
         <section>
           <SectionLabel>בונוסי קרב · באחוזים</SectionLabel>
@@ -275,7 +276,10 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
         </section>
 
         {/* flat per-update yield from items: turns / citizens */}
-        <section className="lg:border-e lg:border-s lg:border-border-subtle lg:px-6">
+        {/* The dividers the three-column layout used to carry are gone: with
+            two-then-one columns the section labels already separate the groups,
+            and a rule down a two-column split reads as a page seam. */}
+        <section>
           <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
           <div className="flex flex-col gap-1.5">
             {flatRows.map(({ stat, value, note }) => (

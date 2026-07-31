@@ -253,6 +253,10 @@ export async function startBossAssault(empireId: string): Promise<BossSortieOutc
       attackPower: power,
       soldiers: army.soldiers,
       bossHp: siege.hp,
+      // The wall, not the pool: casualties are charged as a share of it, so an
+      // army under the wall bleeds in the same proportion it loots. Passing the
+      // tunable-scaled power keeps a softened boss cheap in blood too.
+      bossPower: bossPower(empire.cities, tunables.boss.powerMultiplier),
       heroLevel: empire.hero?.level ?? 1,
       heroAlive,
     });

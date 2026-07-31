@@ -117,6 +117,7 @@ import {
   BOSS_READ_CHANCE_BASE,
   BOSS_READ_CHANCE_MAX,
   BOSS_READ_CHANCE_NO_HERO,
+  BOSS_LOSS_ENGAGEMENT_FLOOR,
   BOSS_ROUT_LOOT_PENALTY,
   BOSS_ROUT_LOSS_FRACTION,
   BOSS_SORTIE_ROUNDS,
@@ -2022,8 +2023,12 @@ export default async function GuidePage() {
                     desc: `${Math.round(BOSS_KILL_SHARE * 100)}% נשמרים למכה שמפילה אותו, וגדלים עד ×${BOSS_GRADE_BONUS.S} בדירוג S — שנקבע לפי הקריאות הנכונות והצבא ששרד, ודורש לפחות ${BOSS_GRADE_MIN_DECISIONS} סבבים: הפלה במכה אחת לא מגיעה ל־S.`,
                   },
                   {
+                    term: "אבדות לפי הכוח",
+                    desc: `האבדות נגבות ביחס לכוח שלך מול כוח הבוס: צבא בחצי מהכוח משלם חצי מהמחיר בדם, בדיוק כמו שהוא מקבל בערך חצי מהשלל. מתחת ל־${Math.round(BOSS_LOSS_ENGAGEMENT_FLOOR * 100)}% מכוח הבוס המחיר נעצר ולא יורד יותר — אבל אף פעם לא תשלם מחיר מלא על נגיסה קטנה.`,
+                  },
+                  {
                     term: "שבירת הצבא",
-                    desc: `אם הצבא מאבד ${Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}% מכוחו הוא נסוג באמצע הקרב, ו-${Math.round((1 - BOSS_ROUT_LOOT_PENALTY) * 100)}% מהשלל שנצבר אובד.`,
+                    desc: `אם הצבא מאבד ${Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}% מכוחו הוא נסוג באמצע הקרב, ו-${Math.round((1 - BOSS_ROUT_LOOT_PENALTY) * 100)}% מהשלל שנצבר אובד. בפועל זה מאיים רק על צבא שנלחם מול בוס בסדר הגודל שלו.`,
                   },
                   {
                     term: "אין מכסה",

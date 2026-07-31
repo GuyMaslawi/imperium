@@ -7,6 +7,7 @@ import {
   BOSS_FURY_PER_ROUND,
   BOSS_HP_PER_POWER,
   BOSS_KILL_SHARE,
+  BOSS_LOSS_ENGAGEMENT_FLOOR,
   BOSS_MOVE_COUNTER,
   BOSS_MOVE_WEIGHTS,
   BOSS_ROUND_DAMAGE_BASE,
@@ -19,6 +20,7 @@ import {
   bossFightScore,
   bossGrade,
   bossKillFraction,
+  bossLossScale,
   bossPayout,
   bossExpectedSortieDamage,
   bossExpectedSortieLosses,
@@ -364,6 +366,79 @@ describe("the balance the whole fight rests on", () => {
       0
     );
     expect(BOSS_ROUND_LOSS_BASE * perfectPerRound * BOSS_SORTIE_ROUNDS).toBeLessThan(0.1);
+  });
+});
+
+describe("pricing the blood against the wall", () => {
+  const wall = bossPower(1);
+  const maxHp = bossSiegeMaxHp(1);
+
+  it("charges the full price at parity and above", () => {
+    expect(bossLossScale(wall, wall)).toBe(1);
+    expect(bossLossScale(wall * 10, wall)).toBe(1);
+  });
+
+  it("charges an army under the wall its own share of the price", () => {
+    expect(bossLossScale(wall / 2, wall)).toBeCloseTo(0.5, 10);
+    expect(bossLossScale(wall * 0.4, wall)).toBeCloseTo(0.4, 10);
+  });
+
+  it("never charges nothing, however far under the wall the army is", () => {
+    expect(bossLossScale(1, wall)).toBe(BOSS_LOSS_ENGAGEMENT_FLOOR);
+    expect(bossLossScale(0, wall)).toBe(BOSS_LOSS_ENGAGEMENT_FLOOR);
+    // A boss with no printed power at all must not divide by zero into a free fight.
+    expect(bossLossScale(1_000, 0)).toBe(1);
+  });
+
+  it("keeps the blood-per-loot ratio the same for a small empire as for a big one", () => {
+    // The whole point. Loot is pro-rata against the pool, so the price has to be
+    // pro-rata against the wall or being small is a punishment on its own.
+    const priced = (power: number) => {
+      const loot = bossChipFraction(bossExpectedSortieDamage(power, 1, true), maxHp);
+      const blood =
+        bossExpectedSortieLosses(1_000, 1, true, bossLossScale(power, wall)) / 1_000;
+      return blood / loot;
+    };
+    // A third of the wall against parity: the same deal, to the decimal.
+    expect(priced(wall / 3) / priced(wall)).toBeCloseTo(1, 6);
+    // Under the floor the deal does get worse — that is what the floor is for —
+    // but by a fraction rather than by the order of magnitude it used to be.
+    expect(priced(wall / 20) / priced(wall)).toBeLessThan(6);
+  });
+
+  it("takes a real bite out of what a small empire used to bleed", () => {
+    // The case that prompted this: 350 soldiers marching at the first tyrant with
+    // under a third of its power, losing ~45 of them for a sliver of the haul.
+    const soldiers = 350;
+    const power = soldiers * 10;
+    const before = bossExpectedSortieLosses(soldiers, 1, true);
+    const after = bossExpectedSortieLosses(soldiers, 1, true, bossLossScale(power, wall));
+    expect(before).toBeGreaterThan(40);
+    expect(after).toBeLessThan(before / 3);
+    // ...and well clear of the line that breaks a formation mid-fight.
+    expect(after / soldiers).toBeLessThan(BOSS_ROUT_LOSS_FRACTION / 3);
+  });
+
+  it("bleeds a scaled army less over a whole simulated assault", () => {
+    const small = { attackPower: 3_500, soldiers: 350, bossHp: maxHp, heroLevel: 1, heroAlive: true };
+    const unscaled = simulateBossSortie(small, () => 0.5);
+    const scaled = simulateBossSortie({ ...small, bossPower: wall }, () => 0.5);
+    expect(scaled.soldiersLost).toBeLessThan(unscaled.soldiersLost);
+    // Same rolls, same reads — only the price changed.
+    expect(scaled.damageDealt).toBe(unscaled.damageDealt);
+  });
+
+  it("leaves an army at parity paying exactly what it always did", () => {
+    const parity = {
+      attackPower: wall,
+      soldiers: 1_200,
+      bossHp: 1e9,
+      heroLevel: 30,
+      heroAlive: true,
+    };
+    const unscaled = simulateBossSortie(parity, () => 0.5);
+    const scaled = simulateBossSortie({ ...parity, bossPower: wall }, () => 0.5);
+    expect(scaled.soldiersLost).toBe(unscaled.soldiersLost);
   });
 });
 

@@ -311,20 +311,24 @@ export default async function HeroPage() {
         </div>
       </div>
 
-      {/* what the hero *does* when nobody is attacking — the one recurring
-          action on this page that isn't spending a point */}
-      <HeroQuestBoard
-        cities={empire.cities}
-        turns={empire.turns}
-        heroDead={dead}
-        active={activeQuest}
-        serverNow={serverNow.getTime()}
-        open={tunables.heroQuest.enabled >= 1}
-      />
+      {/* The footer row: what the hero *does* (the quest board, right in RTL)
+          beside what he is *worth* (the totals, left). Half and half on a wide
+          screen — the summary used to run the full width under a full-width
+          board, and neither block needed that much room. They stack back up
+          under xl, and `items-start` keeps the shorter panel from stretching to
+          the taller one's height. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
+        <HeroQuestBoard
+          cities={empire.cities}
+          turns={empire.turns}
+          heroDead={dead}
+          active={activeQuest}
+          serverNow={serverNow.getTime()}
+          open={tunables.heroQuest.enabled >= 1}
+        />
 
-      {/* everything the hero is actually worth, points and gear folded together —
-          a full-width footer under the whole hero section */}
-      <HeroPowerSummary bonuses={bonuses} />
+        <HeroPowerSummary bonuses={bonuses} />
+      </div>
     </div>
   );
 }

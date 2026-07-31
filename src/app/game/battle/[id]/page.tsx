@@ -10,7 +10,7 @@ import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { PotionBottle } from "@/components/game/PotionBottle";
 import { POTION_META, potionDurationLabel } from "@/lib/game/potions";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import {
   battlePowerLedger,
   type BattlePowerSources,
@@ -27,6 +27,35 @@ const RES = [
   { key: "stolenIron", icon: <Icon name="iron" size={14} className="inline-block align-middle text-slate-300" />, label: "ברזל" },
   { key: "stolenStone", icon: <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" />, label: "אבן" },
 ] as const;
+
+/**
+ * One fact from the aftermath — icon, label, number — sized to sit inline with
+ * its siblings in a single strip rather than owning a panel.
+ */
+function StatChip({
+  icon,
+  label,
+  value,
+  tone,
+  tip,
+}: {
+  icon: IconName;
+  label: string;
+  value: string;
+  tone: string;
+  tip?: string;
+}) {
+  const body = (
+    <span className={`inline-flex items-center gap-1.5 text-sm ${tip ? "cursor-help" : ""}`}>
+      <Icon name={icon} size={15} className={tone} />
+      <span className="text-xs text-zinc-400">{label}</span>
+      <span className={`nums font-black ${tone}`} dir="ltr">
+        {value}
+      </span>
+    </span>
+  );
+  return tip ? <Tip tip={tip}>{body}</Tip> : body;
+}
 
 export default async function BattleResultPage({
   params,
@@ -61,8 +90,6 @@ export default async function BattleResultPage({
   // Player battles no longer kill soldiers, but reports written before that
   // change still carry casualties — show the panels only when there were any.
   const hadCasualties = mySoldiersLost > 0 || foeSoldiersLost > 0;
-  const aftermathPanels =
-    (hadCasualties ? 2 : 0) + (report.enslavedSoldiers > 0 ? 1 : 0) + 1;
 
   // Plunder: attacker gains it on a win, defender loses it.
   const plunderTotal = report.stolenGold + report.stolenWood + report.stolenIron + report.stolenStone;
@@ -248,78 +275,59 @@ export default async function BattleResultPage({
         </div>
       </div>
 
-      {/* -------- aftermath -------- */}
-      <div
-        className={`grid gap-4 ${
-          aftermathPanels >= 4
-            ? "grid-cols-2 sm:grid-cols-4"
-            : aftermathPanels === 3
-              ? "sm:grid-cols-3"
-              : aftermathPanels === 2
-                ? "grid-cols-2"
-                : ""
-        }`}
-      >
-        {hadCasualties && (
+      {/* -------- aftermath: turns, casualties and hero XP on one line --------
+          These are one-number facts. Given a panel each they ate a full screen
+          of height above the report that actually matters, so they ride in a
+          single strip; the explanations moved into their tooltips. */}
+      <div className="panel flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-xl px-4 py-2.5">
+        <StatChip icon="turns" label="תורות" value={formatNumber(report.turnsSpent)} tone="text-gold" />
+        {hadCasualties ? (
           <>
-            <div className="panel-inset rounded-xl p-4 text-center">
-              <p className="text-xs text-zinc-400">אבדות שלך</p>
-              <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">−{formatNumber(mySoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
-            </div>
-            <div className="panel-inset rounded-xl p-4 text-center">
-              <p className="text-xs text-zinc-400">אבדות היריב</p>
-              <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">−{formatNumber(foeSoldiersLost)} <Icon name="army" size={18} className="inline-block align-middle" /></p>
-            </div>
+            <StatChip icon="army" label="אבדות שלך" value={`−${formatNumber(mySoldiersLost)}`} tone="text-red-400" />
+            <StatChip icon="army" label="אבדות היריב" value={`−${formatNumber(foeSoldiersLost)}`} tone="text-emerald-400" />
           </>
+        ) : (
+          <StatChip
+            icon="army"
+            label="אבדות"
+            value="אין"
+            tone="text-zinc-400"
+            tip="קרבות מול שחקנים אינם גורמים לאבדות בחיילים — רק קרב מול בוס עיר קוטל חיילים."
+          />
         )}
         {report.enslavedSoldiers > 0 && (
-          <div className="panel-inset rounded-xl p-4 text-center">
-            <Tip tip="ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים).">
-              <p className="cursor-help text-xs text-zinc-400">⛓️ שועבדו למכרות</p>
-            </Tip>
-            <p
-              className={`nums mt-1 text-xl font-black ${iAmAttacker ? "text-emerald-400" : "text-red-400"}`}
-              dir="ltr"
-            >
-              {iAmAttacker ? "+" : "−"}{formatNumber(report.enslavedSoldiers)} <Icon name="mine" size={18} className="inline-block align-middle" />
-            </p>
-          </div>
+          <StatChip
+            icon="mine"
+            label="שועבדו למכרות"
+            value={`${iAmAttacker ? "+" : "−"}${formatNumber(report.enslavedSoldiers)}`}
+            tone={iAmAttacker ? "text-emerald-400" : "text-red-400"}
+            tip="ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים)."
+          />
         )}
-        <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">תורות שנוצלו</p>
-          <p className="nums mt-1 text-xl font-black text-gold" dir="ltr">{formatNumber(report.turnsSpent)}</p>
-        </div>
+        {myHeroXp > 0 && (
+          <StatChip
+            icon="spark"
+            label="ניסיון לגיבור"
+            value={`+${formatNumber(myHeroXp)}`}
+            tone="text-purple-300"
+            tip="ניסיון לגיבור מהקרב הזה — ניצחון בתקיפה מעניק הכי הרבה. הכמות תלויה ברמת היריב ובעד כמה הקרב היה צמוד: מחיקת יריב חלש מזכה במעט, ניצחון מול יריב שווה־כוח או חזק ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה."
+          />
+        )}
+        {wonWheelSpin && (
+          <Link
+            href="/game/base"
+            className="inline-flex items-center gap-1.5 text-sm font-black text-gold-bright transition hover:text-gold"
+          >
+            🎡 זכית בסיבוב גלגל מזל!
+          </Link>
+        )}
       </div>
-      {!hadCasualties && (
-        <p className="text-center text-xs text-zinc-500">
-          קרבות מול שחקנים אינם גורמים לאבדות בחיילים — רק קרב מול בוס עיר קוטל חיילים.
-        </p>
-      )}
 
-      {/* -------- hero rewards -------- */}
-      {(myHeroXp > 0 || capturedItem || capturedPotion || wonWheelSpin) && (
+      {/* -------- what the battle dropped (only when something did) -------- */}
+      {(capturedItem || capturedPotion) && (
         <div className="panel rounded-xl p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="gift" size={18} className="text-crimson-bright" /> נלכד בקרב</h3>
           <div className="flex flex-wrap items-center gap-4">
-            <Tip tip="ניסיון לגיבור מהקרב הזה — ניצחון בתקיפה מעניק הכי הרבה. הכמות תלויה ברמת היריב ובעד כמה הקרב היה צמוד: מחיקת יריב חלש מזכה במעט, ניצחון מול יריב שווה־כוח או חזק ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה.">
-              <div className="panel-inset cursor-help rounded-lg p-3 text-center">
-                <p className="text-[11px] text-zinc-400">ניסיון שהתקבל</p>
-                <p className="nums mt-0.5 text-xl font-black text-purple-300" dir="ltr">
-                  +{formatNumber(myHeroXp)}
-                </p>
-              </div>
-            </Tip>
-            {wonWheelSpin && (
-              <Link
-                href="/game/base"
-                className="panel-inset rounded-lg p-3 text-center transition hover:border-gold/50"
-              >
-                <p className="text-[11px] text-zinc-400">🎡 גלגל המזל</p>
-                <p className="mt-0.5 text-sm font-black text-gold-bright">
-                  זכית בסיבוב גלגל מזל!
-                </p>
-              </Link>
-            )}
             {capturedPotion && (
               <div className="flex items-center gap-3">
                 <div className="w-16">

@@ -23,6 +23,7 @@ import {
   bossChipFraction,
   bossExpectedSortieDamage,
   bossExpectedSortieLosses,
+  bossLossScale,
   bossPayout,
   bossReadChance,
   bossSiegeMaxHp,
@@ -230,7 +231,14 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
     readChance: bossReadChance(heroLevel, heroAlive),
 
     soldiers,
-    expectedSortieLosses: bossExpectedSortieLosses(soldiers, heroLevel, heroAlive),
+    expectedSortieLosses: bossExpectedSortieLosses(
+      soldiers,
+      heroLevel,
+      heroAlive,
+      // Same scale the simulation charges, so the price on the banner is the
+      // price paid — an army under the wall is quoted its reduced share.
+      bossLossScale(myPower, power)
+    ),
     // Priced against the same pool the settle pays from, so the projection and
     // the payout cannot drift: the chip share of the haul, for the damage this
     // assault expects to land.

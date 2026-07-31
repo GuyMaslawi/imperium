@@ -20,10 +20,16 @@ import { POTION_KINDS, POTION_META } from "@/lib/game/potions";
 export function ActivePotions({
   activeUntil,
   serverNow,
+  href = "/game/hero",
 }: {
   /** Epoch ms at which each running brew wears off. */
   activeUntil: Partial<Record<PotionKind, number>>;
   serverNow: number;
+  /**
+   * Where a bottle leads. `null` for someone else's belt — a rival's running
+   * brews are intel to read, not a shortcut into your own bag.
+   */
+  href?: string | null;
 }) {
   const router = useRouter();
   const now = useServerNow(serverNow);
@@ -60,18 +66,28 @@ export function ActivePotions({
         const remaining = Math.max(0, (activeUntil[kind] ?? 0) - now);
         const minutes = Math.floor(remaining / 60_000);
         const seconds = Math.floor((remaining % 60_000) / 1000);
+        const className =
+          "flex items-center gap-1 rounded-lg border bg-black/50 px-1.5 py-0.5 text-[11px] font-bold";
+        const style = { borderColor: `${meta.liquid.glow}66`, color: meta.liquid.glow };
+        const face = (
+          <>
+            <PotionBottle kind={kind} className="h-4 w-4" />
+            <span className="tabular-nums" dir="ltr">
+              {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            </span>
+          </>
+        );
         return (
           <Tip key={kind} tip={`${meta.label} — ${meta.tagline}`} side="bottom">
-            <Link
-              href="/game/hero"
-              className="flex items-center gap-1 rounded-lg border bg-black/50 px-1.5 py-0.5 text-[11px] font-bold"
-              style={{ borderColor: `${meta.liquid.glow}66`, color: meta.liquid.glow }}
-            >
-              <PotionBottle kind={kind} className="h-4 w-4" />
-              <span className="tabular-nums" dir="ltr">
-                {String(minutes).padStart(2, "0")}:{String(seconds).padStart(2, "0")}
+            {href === null ? (
+              <span className={className} style={style}>
+                {face}
               </span>
-            </Link>
+            ) : (
+              <Link href={href} className={className} style={style}>
+                {face}
+              </Link>
+            )}
           </Tip>
         );
       })}

@@ -149,6 +149,10 @@ export const BOSS_ROUND_DAMAGE_BASE = 0.8;
  * it a dozen times over to see a kill. A third off the blood is the part of that
  * gap this constant can close; the rest is honesty, and lives in the banner's
  * pre-attack projection (see `bossExpectedSortieLosses`).
+ *
+ * A flat cut could only ever soften that, never fix it — the gap was a *ratio*, so
+ * `bossLossScale` closes the rest of it by charging each army its own share of
+ * this price. Read the two together: this is the full price, at the wall.
  */
 export const BOSS_ROUND_LOSS_BASE = 0.03;
 
@@ -161,11 +165,65 @@ export const BOSS_ROUND_LOSS_BASE = 0.03;
  * 28% sits just inside what bad luck reaches — the same relationship 40% had to
  * the old 37%. Set it much higher and the rout becomes decorative, which would
  * quietly delete the only thing that punishes a fight going badly.
+ *
+ * Read against `bossLossScale`: those figures are the ones an army *at the wall*
+ * faces, which is the fight this line is meant to police. An army far under it
+ * pays a fraction of the price and can no longer be routed for turning up.
  */
 export const BOSS_ROUT_LOSS_FRACTION = 0.28;
 
 /** Per-round spread on both damage and casualties, ±12%. */
 export const BOSS_ROUND_VARIANCE = 0.12;
+
+/* ------------------------------ paying for what you took ------------------------------ */
+
+/**
+ * Floor on the engagement scale below — the smallest share of the full price an
+ * assault can be charged, however far under the wall the army is.
+ *
+ * Not zero, and not much lower than this: a march on a tyrant ten times your size
+ * still has to cost blood, or the boss becomes a free faucet for anyone willing to
+ * spend turns. A quarter of the price is enough to keep the trade honest at the
+ * bottom while removing the trap it used to be.
+ */
+export const BOSS_LOSS_ENGAGEMENT_FLOOR = 0.25;
+
+/**
+ * How much of the full casualty price this army actually pays.
+ *
+ * Casualties used to be a flat fraction of the army no matter who marched, and
+ * that was the single worst deal in the game — because the *loot* is not flat.
+ * Chip loot is pro-rata against the boss's health pool (`bossChipFraction`), so an
+ * empire at a fraction of the wall earned that fraction of the haul and bled
+ * exactly the same percentage as one at parity. Measured at city 1 over 4,000
+ * assaults, hero level 1:
+ *
+ *   350 soldiers (3,500 power vs a 12,000 wall)   45 lost, 12.8%   ~20,000 gold
+ *   1,200 soldiers (at the wall)                 154 lost, 12.8%   ~67,000 gold
+ *
+ * Identical blood, a third of the bread — and the small empire had to pay it four
+ * or five times over before it ever saw the kill share or the gear. That reads as
+ * a punishment for being new, and it was.
+ *
+ * So the price is scaled by the army's share of the printed wall, which is very
+ * nearly the share of the haul it will earn (damage per assault is ~6.3× battle
+ * power against a pool of 6.5× boss power). The cost-to-reward ratio is now the
+ * same for everyone: chip a tenth, pay a tenth. The 350-soldier army above now
+ * loses 13 per assault instead of 45 for the same haul; an army at parity or above
+ * is unchanged — it pays the full price, and it kills, which is what the price
+ * buys.
+ *
+ * It also puts the rout out of a small empire's reach. Breaking the formation is
+ * meant to be the risk of a *real* fight going badly, not the standing hazard of a
+ * young empire marching at the only boss it is allowed to attack.
+ */
+export function bossLossScale(attackPower: number, bossReferencePower: number): number {
+  if (!(bossReferencePower > 0)) return 1;
+  return Math.min(
+    1,
+    Math.max(BOSS_LOSS_ENGAGEMENT_FLOOR, Math.max(0, attackPower) / bossReferencePower)
+  );
+}
 
 /* ------------------------------ the tactic matrix ------------------------------ */
 
@@ -419,6 +477,12 @@ export interface RoundInput {
   soldiersAtStart: number;
   /** The boss's remaining cycle health. */
   bossHp: number;
+  /**
+   * The boss's *printed* battle power — the wall, not the pool. Only the casualty
+   * price reads it (see `bossLossScale`). Omitted means "charge the full price",
+   * which is what every caller that does not know the wall should get.
+   */
+  bossPower?: number;
   fury: number;
   heroLevel: number;
   heroAlive: boolean;
@@ -461,6 +525,7 @@ export function resolveBossRound(
     soldiers,
     soldiersAtStart,
     bossHp,
+    bossPower: wallPower,
     fury,
     heroLevel,
     heroAlive,
@@ -485,7 +550,11 @@ export function resolveBossRound(
   );
 
   const takenMultiplier = mods.taken * (furyUsed ? BOSS_FURY_LOSS_MULTIPLIER : 1);
-  const rawLoss = soldiersAtStart * BOSS_ROUND_LOSS_BASE * takenMultiplier * jitter(random);
+  // Scaled by how much of this wall the army can actually engage, so the blood
+  // costs the same *per unit of haul* for everyone — see `bossLossScale`.
+  const engagement = wallPower == null ? 1 : bossLossScale(attackPower, wallPower);
+  const rawLoss =
+    soldiersAtStart * BOSS_ROUND_LOSS_BASE * takenMultiplier * engagement * jitter(random);
   // A blow that lands kills at least one soldier. Without the floor, rounding
   // made any army under about six men *immortal* in the fight — it took literally
   // zero casualties every round and could never be routed, only run out of
@@ -558,6 +627,8 @@ export interface SortieInput {
   attackPower: number;
   soldiers: number;
   bossHp: number;
+  /** The boss's printed power — prices the casualties (see `bossLossScale`). */
+  bossPower?: number;
   heroLevel: number;
   heroAlive: boolean;
   rounds?: number;
@@ -611,6 +682,7 @@ export function simulateBossSortie(
         soldiers,
         soldiersAtStart: input.soldiers,
         bossHp: hp,
+        bossPower: input.bossPower,
         fury,
         heroLevel: input.heroLevel,
         heroAlive: input.heroAlive,
@@ -892,6 +964,8 @@ export function bossExpectedSortieLosses(
   soldiers: number,
   heroLevel: number,
   heroAlive: boolean,
+  /** The army's share of the full price — `bossLossScale`, 1 when unknown. */
+  lossScale = 1,
   rounds = BOSS_SORTIE_ROUNDS
 ): number {
   const p = bossReadChance(heroLevel, heroAlive);
@@ -901,7 +975,7 @@ export function bossExpectedSortieLosses(
   const multiplier =
     ordinary * (rounds - furyRounds) +
     furyRounds * readRightLossMultiplier() * BOSS_FURY_LOSS_MULTIPLIER;
-  return Math.min(soldiers, soldiers * BOSS_ROUND_LOSS_BASE * multiplier);
+  return Math.min(soldiers, soldiers * BOSS_ROUND_LOSS_BASE * multiplier * lossScale);
 }
 
 /**

@@ -22,20 +22,17 @@ import {
   WEAPON_CATEGORY_META,
   weaponByKey,
 } from "@/lib/game/weapons";
-import { GUILD_ROLE_META, GUILD_SPELL_META } from "@/lib/game/guild";
+import { GUILD_SPELL_META } from "@/lib/game/guild";
 import { POTION_META } from "@/lib/game/potions";
 import { shieldMeta } from "@/lib/game/diamondShop";
 import {
-  HERO_CLASS_META,
   HERO_MAX_HEALTH,
   HERO_STAT_META,
   SLOT_META,
   SLOT_ORDER,
-  heroClassImage,
   xpToNextLevel,
 } from "@/lib/game/hero";
 import { ItemTile } from "@/components/game/ItemTile";
-import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SpyEffectsBoard, type SpyEffectRow } from "@/components/game/SpyEffectsBoard";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
@@ -300,7 +297,6 @@ export default async function SpyResultPage({
         (intel ? (
           <FullDossier
             intel={intel}
-            foeName={foe.name}
             serverNow={serverNow}
             plunderRate={plunderRate}
             enslaveRate={enslaveRate}
@@ -448,14 +444,12 @@ function LegacyDossier({
 
 function FullDossier({
   intel,
-  foeName,
   serverNow,
   plunderRate,
   enslaveRate,
   enslaveMinSoldiers,
 }: {
   intel: SpyIntel;
-  foeName: string;
   serverNow: number;
   plunderRate: number;
   enslaveRate: number;
@@ -467,77 +461,10 @@ function FullDossier({
   const shieldedSoldiers = intel.shields.some((s) => s.key === "soldiers");
 
   const totalStored = intel.storages.reduce((sum, s) => sum + s.stored, 0);
-  const heroClassMeta = HERO_CLASS_META[intel.hero?.heroClass ?? "WARLORD"];
   const equippedBySlot = new Map((intel.hero?.items ?? []).map((i) => [i.slot, i]));
 
   return (
     <>
-      {/* ---------------- target header ---------------- */}
-      <div className="panel-gold rounded-xl p-5">
-        <div className="flex flex-wrap items-center gap-5">
-          <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-gold/50 bg-gradient-to-b from-gold-deep/40 to-black">
-            <LivingPortrait
-              src={heroClassImage(intel.hero?.heroClass ?? "WARLORD")}
-              alt={heroClassMeta.label}
-              className="absolute inset-0"
-              accent={heroClassMeta.accent}
-              tilt={3}
-              drift={22}
-            />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-2xl font-black text-gold-bright">{foeName}</h2>
-            <p className="mt-0.5 text-sm text-zinc-400">
-              {intel.ruler ?? "שליט אלמוני"} · {heroClassMeta.label}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright" dir="ltr">
-                {/* The hero level, not `intel.level` — the empire column behind
-                    that field is never incremented, so it read 1 on every
-                    report an admin had not hand-edited. */}
-                <Icon name="crown" size={13} /> גיבור רמה {intel.hero?.level ?? 1}
-              </span>
-              <span className="nums inline-flex items-center gap-1 rounded-md border border-gold/40 bg-panel-inset px-2 py-0.5 font-bold text-gold" dir="ltr">
-                <Icon name="spark" size={13} /> {formatNumber(intel.power.general)}
-              </span>
-              <span className="nums inline-flex items-center gap-1 rounded-md border border-border-subtle bg-panel-inset px-2 py-0.5 font-bold text-zinc-300" dir="ltr">
-                <Icon name="base" size={13} /> {intel.cities} ערים
-              </span>
-              {intel.guild && (
-                <span className="inline-flex items-center gap-1 rounded-md border border-gold/40 bg-gold/10 px-2 py-0.5 font-bold text-gold-bright">
-                  <Icon name="guild" size={13} /> {intel.guild.name}
-                  <span className="text-zinc-400">
-                    · {GUILD_ROLE_META[intel.guild.role].label}
-                  </span>
-                </span>
-              )}
-              {intel.hero && (
-                <span
-                  className={`nums inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold ${
-                    intel.hero.dead
-                      ? "border-red-500/50 bg-red-500/15 text-red-400"
-                      : "border-red-500/40 bg-red-500/10 text-red-400"
-                  }`}
-                  dir="ltr"
-                >
-                  {intel.hero.dead ? "☠" : intel.hero.health} <Icon name="heart" size={13} />
-                </span>
-              )}
-              {intel.shields.map((s) => (
-                <ShieldGlyph key={s.key} shieldKey={s.key} size={14} title={shieldMeta(s.key).badge} />
-              ))}
-            </div>
-          </div>
-        </div>
-        <p className="mt-4 border-t border-border-subtle pt-3 text-[11px] text-zinc-500">
-          <Icon name="reports" size={13} className="inline-block align-middle" /> תמונת מצב שנלכדה
-          ב־<span className="nums" dir="ltr">{formatDate(new Date(intel.capturedAt))}</span>
-          {intel.seasonName && ` · עונת ${intel.seasonName}`}
-          {" · האימפריה נוסדה ב־"}
-          <span className="nums" dir="ltr">{formatDate(new Date(intel.foundedAt))}</span>
-        </p>
-      </div>
-
       {/* ---------------- active magic & timers ----------------
           A side note, not a section: only what is still burning, in a narrow
           panel tucked against the left margin so it never eats the dossier. */}
