@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { PayPalCheckout } from "@/components/game/PayPalCheckout";
@@ -479,6 +480,27 @@ function CheckoutModal({
                 </button>
               </form>
             )}
+
+            {/* Said out loud because the PayPal logo makes players assume an
+                account is required and close the modal — the card button is the
+                one most Israeli buyers actually want. */}
+            {paypalClientId && (
+              <p className="text-center text-[11px] text-zinc-500">
+                אפשר לשלם בכרטיס אשראי או חיוב גם בלי חשבון PayPal.
+              </p>
+            )}
+
+            <p className="text-center text-[11px] leading-relaxed text-zinc-500">
+              בהשלמת הרכישה אתה מאשר את{" "}
+              <Link href="/terms" target="_blank" className="text-gold underline">
+                תנאי השימוש
+              </Link>{" "}
+              ואת{" "}
+              <Link href="/refund" target="_blank" className="text-gold underline">
+                מדיניות הביטולים
+              </Link>
+              .
+            </p>
 
             {testMode && (
               <p className="text-center text-[11px] text-zinc-500">

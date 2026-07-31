@@ -1,0 +1,170 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { LogoMark } from "@/components/ui/Logo";
+import { formatLegalDate, getLegalOperator } from "@/lib/legal";
+
+/**
+ * Shared furniture for the three public policy pages (/terms, /refund,
+ * /privacy).
+ *
+ * These are the only screens a stranger can reach without an account — a
+ * payment gateway's underwriter reads them before approving the merchant, and a
+ * player reads them after a charge they did not expect. So they are plain
+ * documents rather than game screens: no scene, no animation, no data. The
+ * frame is the game's, the typography is a legal page's.
+ */
+
+/** The policy pages, in the order the footer links them. */
+const PAGES = [
+  { href: "/terms", label: "תנאי שימוש" },
+  { href: "/refund", label: "ביטולים והחזרים" },
+  { href: "/privacy", label: "פרטיות" },
+] as const;
+
+export function LegalShell({
+  title,
+  lead,
+  updated,
+  current,
+  children,
+}: {
+  title: string;
+  /** One-paragraph summary in plain Hebrew, above the clauses. */
+  lead: string;
+  /** ISO date from LEGAL_UPDATED. */
+  updated: string;
+  /** Path of the page being rendered, so it is not linked to itself. */
+  current: (typeof PAGES)[number]["href"];
+  children: ReactNode;
+}) {
+  const operator = getLegalOperator();
+
+  return (
+    <main className="min-h-screen flex-1 px-4 py-10 sm:py-14">
+      <div className="mx-auto w-full max-w-3xl">
+        <header className="mb-8 flex flex-col items-center text-center">
+          <Link href="/" aria-label="חזרה לקראלדור">
+            <LogoMark size={56} className="drop-shadow-[0_6px_20px_rgba(224,35,51,0.35)]" />
+          </Link>
+          <h1 className="mt-4 text-2xl font-black tracking-wide text-gold-bright sm:text-3xl">
+            {title}
+          </h1>
+          <p className="mt-1 text-[11px] font-semibold tracking-[0.3em] text-bone-dim">
+            קראלדור
+          </p>
+          <p className="mt-3 text-xs text-zinc-500">
+            עודכן לאחרונה: {formatLegalDate(updated)}
+          </p>
+        </header>
+
+        <div className="ornate-shell rounded-2xl px-5 py-7 sm:px-9 sm:py-10">
+          <p className="border-r-2 border-gold-dim/50 pr-4 text-[0.95rem] leading-relaxed text-bone/90">
+            {lead}
+          </p>
+
+          <div className="mt-7 space-y-7">{children}</div>
+
+          {/* Who you are actually contracting with. Israeli distance-selling
+              rules require this on the page itself, not only in an email. */}
+          <section className="panel-inset mt-9 rounded-xl px-4 py-4 text-sm">
+            <h2 className="font-black text-gold-bright">פרטי המפעיל</h2>
+            <dl className="mt-2 space-y-1 text-zinc-400">
+              <div className="flex gap-2">
+                <dt className="text-zinc-500">שם:</dt>
+                <dd>{operator.name}</dd>
+              </div>
+              {operator.taxId && (
+                <div className="flex gap-2">
+                  <dt className="text-zinc-500">מספר עוסק:</dt>
+                  <dd dir="ltr" className="text-start">
+                    {operator.taxId}
+                  </dd>
+                </div>
+              )}
+              {operator.city && (
+                <div className="flex gap-2">
+                  <dt className="text-zinc-500">מקום העסק:</dt>
+                  <dd>{operator.city}</dd>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <dt className="text-zinc-500">דוא״ל:</dt>
+                <dd>
+                  <a href={`mailto:${operator.email}`} className="text-gold underline" dir="ltr">
+                    {operator.email}
+                  </a>
+                </dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+
+        <nav className="mt-6 flex flex-wrap items-center justify-center gap-3 text-sm">
+          {PAGES.filter((p) => p.href !== current).map((p) => (
+            <Link key={p.href} href={p.href} className="btn btn-ghost px-4 py-2">
+              {p.label}
+            </Link>
+          ))}
+          <Link href="/" className="btn btn-gold px-4 py-2">
+            חזרה למשחק
+          </Link>
+        </nav>
+      </div>
+    </main>
+  );
+}
+
+/** A numbered clause. The number is decorative — the title carries the meaning. */
+export function Clause({
+  n,
+  title,
+  children,
+}: {
+  n: number;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-2">
+      <h2 className="flex items-baseline gap-2 text-lg font-black text-gold-bright">
+        <span className="text-sm font-bold text-gold-dim">{n}.</span>
+        {title}
+      </h2>
+      <div className="space-y-2 text-[0.9rem] leading-relaxed text-zinc-300">{children}</div>
+    </section>
+  );
+}
+
+export function P({ children }: { children: ReactNode }) {
+  return <p>{children}</p>;
+}
+
+export function Bullets({ items }: { items: ReactNode[] }) {
+  return (
+    <ul className="space-y-1.5">
+      {items.map((item, i) => (
+        <li key={i} className="flex gap-2">
+          <span aria-hidden className="mt-[0.45rem] size-1.5 shrink-0 rounded-full bg-gold-dim" />
+          <span className="flex-1">{item}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * A clause the reader must not skim past — the ones that decide arguments
+ * later: diamonds have no cash value, a charge cannot be undone once spent.
+ */
+export function Callout({ children }: { children: ReactNode }) {
+  return (
+    <div className="rounded-xl border border-gold-dim/40 bg-gold-dim/[0.06] px-4 py-3 text-[0.9rem] leading-relaxed text-bone/90">
+      {children}
+    </div>
+  );
+}
+
+/** Inline emphasis for a defined term or a hard number. */
+export function T({ children }: { children: ReactNode }) {
+  return <strong className="font-bold text-bone-bright">{children}</strong>;
+}
