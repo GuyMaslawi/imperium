@@ -4,15 +4,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
+import { useInboxPulse } from "./inboxPulse";
 
 export type InboxNavProps = {
   /**
    * Incoming reports since the last visit to the history page (red badge):
    * attacks on me and enemy spies I caught. My own attacks and missions never
    * count — they are not news to the player who ordered them.
+   *
+   * Server-rendered, and only the opening value: once the live pulse answers it
+   * takes over (see below), so a player standing still on one screen watches
+   * the number climb as the raids land.
    */
   newReports?: number;
-  /** Unread inbox messages (green badge). */
+  /** Unread inbox messages (green badge). Same handover to the live pulse. */
   unreadMessages?: number;
   /** Achievement rewards unlocked and not yet collected (gold badge). */
   collectableAchievements?: number;
@@ -75,13 +80,29 @@ export function InboxNav({
 }: InboxNavProps) {
   const pathname = usePathname();
 
+  /**
+   * The live counts, once the shared poller has answered. Being attacked or
+   * mailed is something *another player* does to you, so the number has to be
+   * able to change while you sit on a screen you never reload — the whole point
+   * of the badge is that it is the thing you notice without looking for it.
+   *
+   * The pulse wins outright rather than being maxed against the props: the
+   * props are a snapshot from whenever this screen was last server-rendered,
+   * which after a few minutes of standing still is the older of the two.
+   * Achievements stay server-only — nobody else can complete one for you, so
+   * every path that changes that count already re-renders the layout.
+   */
+  const pulse = useInboxPulse();
+  const liveReports = pulse?.newReports ?? newReports;
+  const liveMessages = pulse?.unreadMessages ?? unreadMessages;
+
   const allEntries: Entry[] = [
     {
       href: "/game/reports",
       label: "היסטוריה",
       icon: "reports",
       tip: "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי. ההתראה נדלקת רק כשתוקפים או מרגלים עליי",
-      count: newReports,
+      count: liveReports,
       tone: "red",
       clearsOnVisit: true,
     },
@@ -90,7 +111,7 @@ export function InboxNav({
       label: "הודעות",
       icon: "messages",
       tip: "תיבת הדואר: הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת",
-      count: unreadMessages,
+      count: liveMessages,
       tone: "green",
       clearsOnVisit: true,
     },

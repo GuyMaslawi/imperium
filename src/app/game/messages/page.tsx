@@ -69,7 +69,7 @@ export default async function MessagesPage() {
 
   return (
     <div className="space-y-6">
-      <MarkSeen action={markMessagesRead} />
+      <MarkSeen action={markMessagesRead} clears="messages" />
       <SectionHeading title="הודעות" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
 
       {/* -------- the loft --------

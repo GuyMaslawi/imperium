@@ -127,7 +127,7 @@ export default async function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <MarkSeen action={markReportsSeen} />
+      <MarkSeen action={markReportsSeen} clears="reports" />
       <SectionHeading title="היסטוריה" ornament={<Icon name="reports" size={22} className="text-crimson" />} />
 
       {/* -------- the dispatch desk --------

@@ -37,9 +37,36 @@ export type LiveAlert = {
   createdAt: number;
 };
 
+export type InboxPulse = {
+  /** Unread inbox messages — the green badge on the messages pill. */
+  unreadMessages: number;
+  /**
+   * Reports filed *against* me since my last visit to the history page — the
+   * red badge. Same rule as the layout's server-rendered count: attacks I
+   * defended and enemy spies my defenses caught. My own raids and missions are
+   * things I ordered on purpose, so they never light the badge.
+   */
+  newReports: number;
+  /** Newest unread messages, oldest first, for the live toasts. */
+  alerts: LiveAlert[];
+};
+
+const EMPTY_PULSE: InboxPulse = {
+  unreadMessages: 0,
+  newReports: 0,
+  alerts: [],
+};
+
 /**
- * Latest unread inbox messages, polled by the WarAlerts client component to
- * pop live toasts when the player is attacked / spied on / messaged.
+ * The live heartbeat of the top command bar: both badge counts plus the newest
+ * unread messages, in one round trip.
+ *
+ * Everything the player is meant to learn *without touching the keyboard* —
+ * that they were raided, that a spy was caught, that mail arrived — is answered
+ * here, because this is the one call that runs on every screen in the game.
+ * Badges and toasts deliberately share it: two pollers over the same data would
+ * double the load and still disagree with each other for seconds at a time,
+ * which is exactly the flicker the live badges exist to remove.
  *
  * It also settles a finished city-boss assault first, and that is deliberate
  * rather than convenient. A boss assault runs for a minute of real time while the
@@ -49,8 +76,13 @@ export type LiveAlert = {
  * to read, so the toast announcing the haul arrives in the same round trip. It is
  * a cheap indexed lookup that finds nothing in the overwhelmingly common case, and
  * it is idempotent under the empire row lock (see `settleDueAssault`).
+ *
+ * Held to a handful of indexed lookups on purpose: every logged-in player runs
+ * this every few seconds, so nothing that scans (the achievements snapshot, the
+ * guild-war fixtures, the rankings) may migrate in here. Those ride the far
+ * rarer `router.refresh()` that a genuinely new alert triggers.
  */
-export async function getUnreadAlerts(): Promise<LiveAlert[]> {
+export async function getInboxPulse(): Promise<InboxPulse> {
   try {
     const empireId = await requireOwnEmpireId();
     if (await settleDueAssault(empireId)) {
@@ -58,27 +90,56 @@ export async function getUnreadAlerts(): Promise<LiveAlert[]> {
       // the boss banner are both stale now.
       revalidatePath("/game", "layout");
     }
-    const messages = await prisma.message.findMany({
-      where: { empireId, readAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 8,
-      select: {
-        id: true,
-        kind: true,
-        title: true,
-        body: true,
-        href: true,
-        createdAt: true,
-      },
+
+    const empire = await prisma.empire.findUnique({
+      where: { id: empireId },
+      select: { reportsSeenAt: true },
     });
-    // Oldest first so toasts stack in chronological order.
-    return messages.reverse().map((m) => ({
-      ...m,
-      createdAt: m.createdAt.getTime(),
-    }));
+    if (!empire) return EMPTY_PULSE;
+    const seenAt = empire.reportsSeenAt;
+
+    const [messages, unreadMessages, battleReports, spyReports] =
+      await Promise.all([
+        prisma.message.findMany({
+          where: { empireId, readAt: null },
+          orderBy: { createdAt: "desc" },
+          take: 8,
+          select: {
+            id: true,
+            kind: true,
+            title: true,
+            body: true,
+            href: true,
+            createdAt: true,
+          },
+        }),
+        prisma.message.count({ where: { empireId, readAt: null } }),
+        prisma.battleReport.count({
+          where: { defenderEmpireId: empireId, createdAt: { gt: seenAt } },
+        }),
+        // A successful enemy spy stays invisible to its target; only the ones
+        // my defenses caught are news. Mirrors the layout and ReportsTabs.
+        prisma.spyReport.count({
+          where: {
+            defenderEmpireId: empireId,
+            success: false,
+            createdAt: { gt: seenAt },
+          },
+        }),
+      ]);
+
+    return {
+      unreadMessages,
+      newReports: battleReports + spyReports,
+      // Oldest first so toasts stack in chronological order.
+      alerts: messages.reverse().map((m) => ({
+        ...m,
+        createdAt: m.createdAt.getTime(),
+      })),
+    };
   } catch {
     // Polling is best-effort — a missed round just retries in a few seconds.
-    return [];
+    return EMPTY_PULSE;
   }
 }
 

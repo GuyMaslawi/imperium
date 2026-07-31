@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getUnreadAlerts, type LiveAlert } from "@/server/actions/messages";
+import type { LiveAlert } from "@/server/actions/messages";
 import { Icon } from "@/components/ui/Icon";
+import { useInboxPulse } from "./inboxPulse";
 
-const POLL_MS = 20_000;
 const TOAST_MS = 12_000;
 const MAX_VISIBLE = 4;
 const SEEN_KEY = "kraldor-alerts-seen";
@@ -98,17 +98,29 @@ function playHorn(kind: LiveAlert["kind"]) {
 }
 
 /**
- * Live war-room notifications: polls the inbox and pops a dramatic toast the
- * moment the player is attacked, spied on, or receives a message. A BATTLE
- * alert also flashes a red vignette across the whole screen so it can't be
- * missed. Dismissing a toast does NOT mark the message read — the inbox badge
- * stays until the player actually opens the messages page.
+ * Live war-room notifications: pops a dramatic toast the moment the player is
+ * attacked, spied on, or receives a message. A BATTLE alert also flashes a red
+ * vignette across the whole screen so it can't be missed. Dismissing a toast
+ * does NOT mark the message read — the inbox badge stays until the player
+ * actually opens the messages page.
+ *
+ * The polling itself lives in the shared inbox pulse, which the command-bar
+ * badges read from too, so the toast and the number that jumps behind it are
+ * always the same round trip.
  */
 export function WarAlerts() {
   const router = useRouter();
+  const pulse = useInboxPulse();
   const [toasts, setToasts] = useState<LiveAlert[]>([]);
   const [vignetteKey, setVignetteKey] = useState(0);
   const seenRef = useRef<Set<string> | null>(null);
+  /**
+   * Whether a pulse has already been processed in this mount. The first one is
+   * the backlog the player walked in with, so it shows silently: sounding the
+   * horn for mail that has been sitting there since yesterday trains people to
+   * ignore the horn.
+   */
+  const bootedRef = useRef(false);
   const timersRef = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const dismiss = useCallback((id: string) => {
@@ -119,63 +131,58 @@ export function WarAlerts() {
   }, []);
 
   useEffect(() => {
+    if (pulse === null) return;
+    const initial = !bootedRef.current;
+    bootedRef.current = true;
+
     seenRef.current ??= loadSeen();
-    let cancelled = false;
+    const seen = seenRef.current;
+    const fresh = pulse.alerts.filter((alert) => !seen.has(alert.id));
+    if (fresh.length === 0) return;
 
-    const poll = async (initial: boolean) => {
-      const alerts = await getUnreadAlerts();
-      const seen = seenRef.current;
-      if (cancelled || !seen) return;
-      const fresh = alerts.filter((alert) => !seen.has(alert.id));
-      if (fresh.length === 0) return;
+    fresh.forEach((alert) => seen.add(alert.id));
+    saveSeen(seen);
 
-      fresh.forEach((alert) => seen.add(alert.id));
-      saveSeen(seen);
-
-      setToasts((prev) => {
-        const next = [...prev, ...fresh];
-        // Overflowing toasts: drop the oldest, their timers included.
-        const dropped = next.slice(0, Math.max(0, next.length - MAX_VISIBLE));
-        dropped.forEach((toast) => {
-          const timer = timersRef.current.get(toast.id);
-          if (timer) clearTimeout(timer);
-          timersRef.current.delete(toast.id);
-        });
-        return next.slice(-MAX_VISIBLE);
+    setToasts((prev) => {
+      const next = [...prev, ...fresh];
+      // Overflowing toasts: drop the oldest, their timers included.
+      const dropped = next.slice(0, Math.max(0, next.length - MAX_VISIBLE));
+      dropped.forEach((toast) => {
+        const timer = timersRef.current.get(toast.id);
+        if (timer) clearTimeout(timer);
+        timersRef.current.delete(toast.id);
       });
-      fresh.forEach((alert) => {
-        timersRef.current.set(
-          alert.id,
-          setTimeout(() => dismiss(alert.id), TOAST_MS),
-        );
-      });
+      return next.slice(-MAX_VISIBLE);
+    });
+    fresh.forEach((alert) => {
+      timersRef.current.set(
+        alert.id,
+        setTimeout(() => dismiss(alert.id), TOAST_MS),
+      );
+    });
 
-      if (fresh.some((alert) => alert.kind === "BATTLE")) {
-        setVignetteKey((key) => key + 1);
-      }
-      if (!initial) {
-        playHorn(
-          fresh.find((alert) => alert.kind === "BATTLE")?.kind ??
-            fresh[fresh.length - 1].kind,
-        );
-        // New messages arrived mid-session — refresh the sidebar badges too.
-        router.refresh();
-      }
-    };
+    if (fresh.some((alert) => alert.kind === "BATTLE")) {
+      setVignetteKey((key) => key + 1);
+    }
+    if (!initial) {
+      playHorn(
+        fresh.find((alert) => alert.kind === "BATTLE")?.kind ??
+          fresh[fresh.length - 1].kind,
+      );
+      // The badges update themselves off the same pulse, but a raid also moved
+      // resources, soldiers and the hero — the rest of the server-rendered
+      // screen is stale now, so this one is worth the full refetch.
+      router.refresh();
+    }
+  }, [pulse, dismiss, router]);
 
-    void poll(true);
-    const interval = setInterval(() => void poll(false), POLL_MS);
-    const onFocus = () => void poll(false);
-    window.addEventListener("focus", onFocus);
+  useEffect(() => {
     const timers = timersRef.current;
     return () => {
-      cancelled = true;
-      clearInterval(interval);
-      window.removeEventListener("focus", onFocus);
       timers.forEach((timer) => clearTimeout(timer));
       timers.clear();
     };
-  }, [dismiss, router]);
+  }, []);
 
   return (
     <>
