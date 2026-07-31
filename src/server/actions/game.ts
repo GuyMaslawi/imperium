@@ -43,6 +43,7 @@ import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
+import { sharedGuild } from "@/lib/game/guildAllies";
 import { getActiveShields, getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { getActivePotionKinds, grantPotion } from "@/lib/game/potionEffects";
@@ -839,6 +840,16 @@ export async function attackEmpire(
         () => null
       );
       if (!defender) return { error: "האימפריה המבוקשת לא נמצאה" };
+
+      // Allies don't raid each other. Checked before the city gate so a
+      // guildmate hears the real reason, and inside the transaction so leaving
+      // the guild and swinging can't both count.
+      const allied = await sharedGuild(empireId, targetEmpireId, tx);
+      if (allied) {
+        return {
+          error: `לא ניתן לתקוף חבר לברית — שניכם בברית ${allied.name}.`,
+        };
+      }
 
       // Combat is confined to your own city — an empire is "in your city" when
       // it holds the same number of cities as you.

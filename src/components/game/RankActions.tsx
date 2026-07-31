@@ -43,16 +43,22 @@ function ActionButton({
 export function RankActions({
   targetEmpireId,
   currentTurns,
+  attackBlockedReason = null,
 }: {
   targetEmpireId: string;
   /** The viewer's available turns — used to disable unaffordable actions. */
   currentTurns: number;
+  /**
+   * Why this target may not be attacked at all (guildmates). Disables the
+   * attack half and says why; spying is untouched — the server allows it.
+   */
+  attackBlockedReason?: string | null;
 }) {
   const [spyState, spyAction] = useActionState<ActionState, FormData>(spyOnEmpire, {});
   const [attackState, attackAction] = useActionState<ActionState, FormData>(attackEmpire, {});
 
   const canSpy = currentTurns >= SPY_TURN_COST;
-  const canAttack = currentTurns >= ATTACK_TURN_COST;
+  const canAttack = currentTurns >= ATTACK_TURN_COST && !attackBlockedReason;
 
   return (
     <div className="w-full space-y-2 sm:w-80">
@@ -63,12 +69,20 @@ export function RankActions({
             tone="attack"
             pendingText="תוקף…"
             disabled={!canAttack}
-            title={canAttack ? `עלות תקיפה: ${ATTACK_TURN_COST} תורות` : "אין לך מספיק תורות לתקיפה"}
+            title={
+              attackBlockedReason ??
+              (canAttack
+                ? `עלות תקיפה: ${ATTACK_TURN_COST} תורות`
+                : "אין לך מספיק תורות לתקיפה")
+            }
           >
             <Icon name="attack" size={16} className="inline-block align-middle" /> תקיפה
           </ActionButton>
-          <p className="mt-1 text-center text-[10px] text-zinc-500 nums" dir="ltr">
-            {ATTACK_TURN_COST} תורות
+          <p
+            className={`mt-1 text-center text-[10px] ${attackBlockedReason ? "text-emerald-400/80" : "text-zinc-500 nums"}`}
+            dir={attackBlockedReason ? "rtl" : "ltr"}
+          >
+            {attackBlockedReason ?? `${ATTACK_TURN_COST} תורות`}
           </p>
         </form>
         <form action={spyAction}>

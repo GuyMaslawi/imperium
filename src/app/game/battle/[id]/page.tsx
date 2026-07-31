@@ -16,6 +16,7 @@ import {
   type BattlePowerSources,
   type LedgerRow,
 } from "@/lib/game/battleLedger";
+import { sharedGuild } from "@/lib/game/guildAllies";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 import { shieldMeta } from "@/lib/game/diamondShop";
 
@@ -90,6 +91,10 @@ export default async function BattleResultPage({
   // Player battles no longer kill soldiers, but reports written before that
   // change still carry casualties — show the panels only when there were any.
   const hadCasualties = mySoldiersLost > 0 || foeSoldiersLost > 0;
+
+  // A report outlives the feud: if the two of you have joined the same guild
+  // since, the rematch button is gone (see lib/game/guildAllies.ts).
+  const allied = await sharedGuild(me.id, foe.id);
 
   // Plunder: attacker gains it on a win, defender loses it.
   const plunderTotal = report.stolenGold + report.stolenWood + report.stolenIron + report.stolenStone;
@@ -209,11 +214,18 @@ export default async function BattleResultPage({
       {/* -------- actions (kept on top, ready for the next strike) -------- */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
-          <AttackAgainButton
-            targetEmpireId={foe.id}
-            currentTurns={me.turns}
-            label={iAmAttacker ? "⚔️ תקוף שוב" : "⚔️ נקום"}
-          />
+          {allied ? (
+            <p className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold-bright">
+              <Icon name="guild" size={14} />
+              אתם בברית {allied.name} מאז הקרב הזה — אין תקיפות בין חברי ברית.
+            </p>
+          ) : (
+            <AttackAgainButton
+              targetEmpireId={foe.id}
+              currentTurns={me.turns}
+              label={iAmAttacker ? "⚔️ תקוף שוב" : "⚔️ נקום"}
+            />
+          )}
           <Link href={`/game/empires/${foe.id}`} className="btn btn-ghost px-5 py-2 text-sm">
             <Icon name="crown" size={16} className="inline-block align-middle" /> לפרופיל היריב
           </Link>

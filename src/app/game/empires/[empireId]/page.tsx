@@ -10,6 +10,7 @@ import { MessageCompose } from "@/components/game/MessageCompose";
 import { ShieldBadges } from "@/components/game/ShieldBadges";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActiveShields } from "@/lib/game/diamondEffects";
+import { sharedGuild } from "@/lib/game/guildAllies";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
@@ -131,6 +132,9 @@ export default async function EmpireProfilePage({
   // city" when it holds the same number of cities as you.
   const sameCity = empire.cities === myEmpire.cities;
   const canEngage = !isMe && sameCity;
+  // Guildmates never raid each other (see lib/game/guildAllies.ts). Only the
+  // attack half is off — a spy mission against an ally still runs.
+  const allied = isMe ? null : await sharedGuild(myEmpire.id, empire.id);
 
   // Raid shields are public knowledge — no spy report needed. Knowing there is
   // nothing to take is precisely what should stop you wasting turns here.
@@ -227,6 +231,19 @@ export default async function EmpireProfilePage({
             <div className="min-w-[240px] flex-1 space-y-3">
               {/* Spelled out above the buttons, not just as a pill: turns spent
                   on a shielded target buy XP and loot rolls, but never spoils. */}
+              {/* An ally is announced before anything else on the dossier —
+                  it is the reason the attack button is dead. */}
+              {allied && (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold-bright">
+                  <Icon name="guild" size={14} />
+                  <span>
+                    בן ברית — שניכם חברים בברית {allied.name}. אין תקיפות בין חברי
+                    ברית
+                    {canEngage ? "; ריגול ודואר עדיין פתוחים." : "."}
+                  </span>
+                </div>
+              )}
+
               {canEngage && activeShields.length > 0 && (
                 <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
                   <ShieldBadges shields={shields} />
@@ -263,7 +280,11 @@ export default async function EmpireProfilePage({
               </div>
 
               {canEngage ? (
-                <RankActions targetEmpireId={empire.id} currentTurns={myEmpire.turns} />
+                <RankActions
+                  targetEmpireId={empire.id}
+                  currentTurns={myEmpire.turns}
+                  attackBlockedReason={allied ? "בן ברית — אין תקיפה" : null}
+                />
               ) : (
                 <p className="text-sm text-zinc-400">
                   אין כאן פעולות מלחמה — האימפריה הזו יושבת בעיר אחרת. דואר, לעומת

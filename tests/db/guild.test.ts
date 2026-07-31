@@ -4,6 +4,7 @@ config({ path: ".env.local", override: true });
 import { afterAll, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { ensureGuildLeader, repairGuildLeadership } from "@/server/guildLeadership";
+import { sharedGuild } from "@/lib/game/guildAllies";
 
 /**
  * The two guild invariants that have no other place to be tested.
@@ -211,5 +212,39 @@ describe("guild invitations", () => {
     });
     expect(invites).toHaveLength(1);
     expect(invites[0]!.expiresAt.getTime()).toBe(second.getTime());
+  });
+});
+
+describe("guildmates", () => {
+  it("are recognised as allies in both directions", async () => {
+    const { guild, empires } = await makeGuild("allies", ["LEADER", "MEMBER"]);
+    const [a, b] = empires;
+
+    await expect(sharedGuild(a!.id, b!.id, prisma)).resolves.toMatchObject({
+      id: guild.id,
+    });
+    await expect(sharedGuild(b!.id, a!.id, prisma)).resolves.toMatchObject({
+      id: guild.id,
+    });
+  });
+
+  it("are not allies across two guilds, or when one is guildless", async () => {
+    const { empires: red } = await makeGuild("red", ["LEADER"]);
+    const { empires: blue } = await makeGuild("blue", ["LEADER"]);
+    const loner = await makeEmpire("loner");
+
+    expect(await sharedGuild(red[0]!.id, blue[0]!.id, prisma)).toBeNull();
+    expect(await sharedGuild(red[0]!.id, loner.id, prisma)).toBeNull();
+    // An empire is never its own ally — the self-attack guard owns that case.
+    expect(await sharedGuild(red[0]!.id, red[0]!.id, prisma)).toBeNull();
+  });
+
+  it("stop being allies the moment one leaves", async () => {
+    const { empires } = await makeGuild("parting", ["LEADER", "MEMBER"]);
+    const [leader, quitter] = empires;
+
+    await prisma.guildMember.delete({ where: { empireId: quitter!.id } });
+
+    expect(await sharedGuild(leader!.id, quitter!.id, prisma)).toBeNull();
   });
 });

@@ -323,7 +323,7 @@ function SidebarContent({
       {/* hero card */}
       <div className="panel-gold rounded-lg p-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="relative">
+          <div className="relative shrink-0">
             {/* a div, not a span: the portrait frame below is flow content */}
             <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
               {heroImage ? (
@@ -364,72 +364,66 @@ function SidebarContent({
               </Tip>
             </div>
             <p className="font-bold text-gold-bright">גיבור</p>
-            {/* Health, not a stat ratio: this is the bar that actually moves —
-                every breached defence takes a bite out of it, and at zero the
-                hero is out of the fight until he is raised. */}
-            {heroDead ? (
+            {/* The one badge in the card that asks for an action, so it is the
+                only thing in the identity block besides the name. */}
+            {heroPoints > 0 && (
               <Tip
-                tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
-                className="mt-1.5 w-full"
+                tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)"
+                className="mt-1"
               >
                 <Link
                   href="/game/hero"
-                  className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-0.5 text-[10px] font-black text-red-300"
+                  className="flex items-center gap-1 rounded-full border border-purple-400/50 bg-purple-600/25 px-2 py-0.5 text-[10px] font-black text-purple-200"
                 >
-                  💀 הגיבור מת
+                  <Icon name="spark" size={11} />
+                  {heroPoints} נקודות פנויות
                 </Link>
-              </Tip>
-            ) : (
-              <Tip tip={`בריאות הגיבור: ${heroHealthPct}%`} className="mt-1.5 w-full">
-                <Meter value={heroHealthPct} tone="health" className="w-full" />
               </Tip>
             )}
           </div>
         </div>
-        <div className="mt-3 flex items-center justify-between text-xs">
-          <Tip tip="אחוז ההתקדמות לרמה הבאה של הגיבור">
-            <span className="flex items-center gap-1 text-purple-300"><Icon name="spark" size={14} /> {xpPct}%</span>
-          </Tip>
-          <div className="flex items-center gap-1.5">
-            <Tip tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)">
-              <span className="rounded bg-purple-600/80 px-1.5 py-0.5 text-[10px] font-black text-white">
-                {heroPoints}
-              </span>
-            </Tip>
-            <Tip tip="רמת הגיבור">
-              <span className="rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-black">
-                {heroLevel}
-              </span>
-            </Tip>
+        {/* Both gauges read the same way — label on the right, its number on the
+            left, the bar directly beneath — so health and experience line up
+            instead of scattering numbers around the card. Level lives on the
+            portrait badge only, and each number appears exactly once. */}
+        <div className="mt-3 flex flex-col gap-2">
+          {/* Health, not a stat ratio: this is the bar that actually moves —
+              every breached defence takes a bite out of it, and at zero the
+              hero is out of the fight until he is raised. */}
+          {heroDead ? (
             <Tip
-              tip={
-                heroDead
-                  ? "הגיבור מת — חוזר לחיים שעה אחרי שנפל, או מיידית תמורת יהלומים"
-                  : "בריאות הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ממנה"
-              }
+              tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
+              className="w-full"
             >
-              <span
-                className={`flex items-center gap-0.5 ${
-                  heroDead ? "font-black text-red-500" : "text-red-400"
-                }`}
+              <Link
+                href="/game/hero"
+                className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-1 text-[10px] font-black text-red-300"
               >
-                {heroHealthPct} <Icon name="heart" size={13} />
-              </span>
+                💀 הגיבור מת
+              </Link>
             </Tip>
-          </div>
+          ) : (
+            <HeroGauge
+              icon="heart"
+              label="בריאות"
+              value={`${heroHealthPct}%`}
+              accent="text-red-300"
+              tone="health"
+              meterValue={heroHealthPct}
+              tip="בריאות הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ממנה"
+            />
+          )}
+          <HeroGauge
+            icon="spark"
+            label="ניסיון"
+            value={`${formatCompact(heroXp)}/${formatCompact(heroXpMax)} · ${xpPct}%`}
+            accent="text-purple-300"
+            tone="xp"
+            meterValue={heroXp}
+            meterMax={heroXpMax}
+            tip="ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה. במלוא הבר הגיבור עולה רמה"
+          />
         </div>
-        <Tip
-          tip="ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה"
-          className="mt-2 w-full"
-        >
-          <Meter value={heroXp} max={heroXpMax} tone="xp" className="w-full" />
-        </Tip>
-        <p className="mt-1 text-left text-[10px] text-zinc-500">
-          <span className="nums" dir="ltr">
-            {formatCompact(heroXp)}/{formatCompact(heroXpMax)}
-          </span>{" "}
-          ניסיון
-        </p>
       </div>
 
       {/* nav sections */}
@@ -485,5 +479,53 @@ function SidebarContent({
         </ul>
       </nav>
     </>
+  );
+}
+
+/**
+ * One gauge in the hero card: an icon+label on the leading edge, its number on
+ * the trailing one, and the bar underneath spanning both. Every bar in the card
+ * uses it, so they all say where their number came from — a bare bar with a
+ * figure floating somewhere else in the panel is what made the card unreadable.
+ * Spans throughout: the Tip trigger is itself a span.
+ */
+function HeroGauge({
+  icon,
+  label,
+  value,
+  accent,
+  tone,
+  meterValue,
+  meterMax = 100,
+  tip,
+}: {
+  icon: IconName;
+  label: string;
+  /** Already-formatted reading — a percentage, or "have/need · pct". */
+  value: string;
+  /** Text colour class shared by the label and the number. */
+  accent: string;
+  tone: "xp" | "health";
+  meterValue: number;
+  meterMax?: number;
+  tip: string;
+}) {
+  return (
+    <Tip tip={tip} className="w-full">
+      <span className="block w-full">
+        <span
+          className={`flex items-baseline justify-between gap-2 text-[11px] font-semibold ${accent}`}
+        >
+          <span className="flex items-center gap-1">
+            <Icon name={icon} size={12} />
+            {label}
+          </span>
+          <span className="nums" dir="ltr">
+            {value}
+          </span>
+        </span>
+        <Meter value={meterValue} max={meterMax} tone={tone} className="mt-1 w-full" />
+      </span>
+    </Tip>
   );
 }
