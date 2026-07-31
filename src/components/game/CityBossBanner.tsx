@@ -225,7 +225,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             <div className="grid gap-x-3 gap-y-1.5 rounded-lg border border-border-subtle bg-black/40 px-2.5 py-2 text-[11px] sm:grid-cols-3">
               <div>
                 <p className="font-bold text-gold-dim">תקיפה אחת תוריד לו</p>
-                <p className="nums mt-0.5 font-black text-gold-bright" dir="ltr">
+                <p className="nums mt-0.5 text-right font-black text-gold-bright" dir="ltr">
                   ~{formatNumber(Math.round(expectedSortieDamage))}
                   <span className="font-normal text-zinc-500"> ({Math.round(bitePct)}%)</span>
                 </p>
@@ -256,7 +256,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               </div>
               <div>
                 <p className="font-bold text-gold-dim">ותעלה לך</p>
-                <p className="nums mt-0.5 font-black text-red-300" dir="ltr">
+                <p className="nums mt-0.5 text-right font-black text-red-300" dir="ltr">
                   ~{formatNumber(Math.round(expectedSortieLosses))} ⚔
                   <span className="font-normal text-zinc-500"> ({Math.round(lossPct)}%)</span>
                 </p>

@@ -9,12 +9,11 @@ import { formatCompact, formatDate, formatNumber } from "@/lib/game/format";
 import { cityFullName, cityName } from "@/lib/game/cities";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { CityBossBanner } from "@/components/game/CityBossBanner";
-import { ShieldBadges, ShieldGlyph } from "@/components/game/ShieldBadges";
+import { ShieldBadges } from "@/components/game/ShieldBadges";
 import { getShieldsForEmpires } from "@/lib/game/diamondEffects";
 import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PresenceDot } from "@/components/ui/PresenceDot";
-import { PRESENCE_ONLINE_MS } from "@/lib/game/chat";
 import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
@@ -201,28 +200,10 @@ export default async function RankingsPage({
               </span>
             </Tip>
           </h2>
-          {/* Wraps: three legend pills and a link do not fit one phone line. */}
+          {/* Wraps: the rank readout and a link do not always fit one phone line.
+              The presence and shield legends that used to sit here are gone —
+              the rows spell both out in words, so the key only repeated itself. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            {/* Legend for the presence pill on the rows below. The rows say
-                "מחובר" in words, so this only has to answer the question the
-                word raises: connected as of when? */}
-            <Tip
-              tip={`"מחובר" = המשחק היה פתוח אצל השחקן ב-${Math.round(
-                PRESENCE_ONLINE_MS / 60000
-              )} הדקות האחרונות. הטבלה מתרעננת לבדה כל 30 שניות.`}
-            >
-              <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
-                <PresenceDot online label />
-                <PresenceDot online={false} label />
-              </span>
-            </Tip>
-            {/* Legend for the shield pills on the rows below. */}
-            <Tip tip="שחקן עם מגן משאבים לא ניתן לביזה, ושחקן עם מגן חיילים לא ניתן לשעבוד. אפשר עדיין לתקוף אותו — פשוט אין ממה להרוויח שלל.">
-              <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
-                <ShieldGlyph shieldKey="resources" label />
-                <ShieldGlyph shieldKey="soldiers" label />
-              </span>
-            </Tip>
             <span className="text-xs text-zinc-400">
               הדירוג שלך:{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
