@@ -2198,7 +2198,7 @@ export default async function GuidePage() {
                   icon="turns"
                   label="נקודה ירוקה"
                   value={`${Math.round(PRESENCE_ONLINE_MS / 60000)} דק׳`}
-                  hint="מאז שהמשחק היה פתוח אצלו"
+                  hint="מאז שהמשחק היה פתוח אצלו — גם ליד כל שם בדירוג"
                   tone="text-emerald-300"
                 />
                 <Fact

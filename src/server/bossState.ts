@@ -20,7 +20,10 @@ import {
 } from "@/lib/game/bosses";
 import {
   BOSS_SORTIE_ROUNDS,
+  bossChipFraction,
   bossExpectedSortieDamage,
+  bossExpectedSortieLosses,
+  bossPayout,
   bossReadChance,
   bossSiegeMaxHp,
   bossSortiesToKill,
@@ -65,6 +68,30 @@ export interface CityBossState {
   roundsPerSortie: number;
   /** How often this hero's officers read the tyrant right, as a fraction. */
   readChance: number;
+
+  /**
+   * The trade one assault offers, priced before the turns are paid: soldiers it
+   * is expected to cost, against the share of the haul the damage above would
+   * earn. Printed together, because half a trade is what made the boss read as a
+   * bad deal — the blood was only ever visible in the report, afterwards.
+   */
+  soldiers: number;
+  expectedSortieLosses: number;
+  expectedSortieLoot: BossReward;
+
+  /**
+   * Every term the attack power is built from, so "how do I hit harder" has an
+   * answer on the screen rather than in a wiki. Same decomposition the assault
+   * itself computes (see `battlePower` in bossSiege.ts).
+   */
+  armyPower: number;
+  weaponPower: number;
+  heroBonusPct: number;
+  guildBonusPct: number;
+  guildAidPower: number;
+  /** The hero, who is the only thing that moves the casualty side of the trade. */
+  heroLevel: number;
+  heroAlive: boolean;
 
   /** A running assault, if one is in flight. */
   activeBattleId: string | null;
@@ -131,8 +158,10 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
     ]);
 
   const heroBonusPct = heroBonuses(empire.hero).totalPct.attack;
+  const rawArmyPower = armyPower(empire.army);
+  const rawWeaponPower = weaponsPower(empire.weapons, "ATTACK");
   const myPower =
-    (armyPower(empire.army) + weaponsPower(empire.weapons, "ATTACK")) *
+    (rawArmyPower + rawWeaponPower) *
       bonusMultiplier(heroBonusPct) *
       bonusMultiplier(guildBonusPct) +
     guildAid.power;
@@ -153,6 +182,13 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
 
   const heroLevel = empire.hero?.level ?? 1;
   const heroAlive = empire.hero != null && !isHeroDead(empire.hero);
+  const soldiers = empire.army?.soldiers ?? 0;
+  const expectedDamage = bossExpectedSortieDamage(myPower, heroLevel, heroAlive);
+  const cycleHaul = bossReward(
+    empire.cities,
+    seasonPassDay(season, now.getTime()),
+    tunables.boss.rewardMultiplier
+  );
 
   const byEmpire = new Map<string, BossConqueror>();
   for (const row of recent) {
@@ -185,17 +221,28 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
     reviveMs: BOSS_REVIVE_MS,
     serverNow: now.getTime(),
 
-    lifeHaul: bossReward(
-      empire.cities,
-      seasonPassDay(season, now.getTime()),
-      tunables.boss.rewardMultiplier
-    ),
+    lifeHaul: cycleHaul,
     heroXp: bossHeroXp(empire.cities),
 
-    expectedSortieDamage: bossExpectedSortieDamage(myPower, heroLevel, heroAlive),
+    expectedSortieDamage: expectedDamage,
     sortiesToKill: bossSortiesToKill(myPower, hp, heroLevel, heroAlive),
     roundsPerSortie: BOSS_SORTIE_ROUNDS,
     readChance: bossReadChance(heroLevel, heroAlive),
+
+    soldiers,
+    expectedSortieLosses: bossExpectedSortieLosses(soldiers, heroLevel, heroAlive),
+    // Priced against the same pool the settle pays from, so the projection and
+    // the payout cannot drift: the chip share of the haul, for the damage this
+    // assault expects to land.
+    expectedSortieLoot: bossPayout(cycleHaul, bossChipFraction(expectedDamage, maxHp)),
+
+    armyPower: rawArmyPower,
+    weaponPower: rawWeaponPower,
+    heroBonusPct,
+    guildBonusPct,
+    guildAidPower: guildAid.power,
+    heroLevel,
+    heroAlive,
 
     activeBattleId: activeBattle?.id ?? null,
     activeEndsAt: activeBattle?.endsAt ?? null,

@@ -8,7 +8,13 @@ import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { formatNumber } from "@/lib/game/format";
 import { cityName } from "@/lib/game/cities";
 import { BOSS_REWARD_RESOURCES, bossImage } from "@/lib/game/bosses";
-import { BOSS_MOVE_META, BOSS_TACTIC_META } from "@/lib/game/bossBattle";
+import {
+  BOSS_CHIP_SHARE,
+  BOSS_KILL_SHARE,
+  BOSS_MOVE_COUNTER,
+  BOSS_MOVE_META,
+  BOSS_TACTIC_META,
+} from "@/lib/game/bossBattle";
 import { pollBossArena } from "@/server/actions/boss";
 import type { BossArenaState } from "@/server/bossBattleState";
 
@@ -16,16 +22,44 @@ import type { BossArenaState } from "@/server/bossBattleState";
 const POLL_MS = 3_000;
 
 /**
+ * Polls that told us nothing at all before we stop insisting a battle is running.
+ *
+ * Three of them is ~9 seconds, which is far longer than any settle takes. It only
+ * ever trips when there is genuinely nothing left to watch — and even then the
+ * screen says so and offers a link, rather than navigating out from under the
+ * player (see the history in the poll's own doc comment).
+ */
+const EMPTY_POLLS_BEFORE_GIVING_UP = 3;
+
+/** Under this many seconds left, the clock turns and the last beat reads as urgent. */
+const URGENT_MS = 10_000;
+
+/** Geometry of the countdown ring. */
+const RING_R = 43;
+const RING_C = 2 * Math.PI * RING_R;
+
+/**
  * The arena: an assault playing itself out.
  *
  * There is nothing to press. The battle was decided the moment the player sent the
- * army, and this screen is its reveal — a round lands every ten seconds or so,
- * the tyrant's health drains, and when the clock runs out the verdict replaces it.
+ * army, and this screen is its reveal — a round lands every nine seconds or so,
+ * the tyrant's health drains, and when the clock runs out the report replaces it.
  *
- * Which makes the *leaving* the important interaction. The whole reason the fight
- * is timed rather than instant is that a player can walk away mid-battle and be
- * told what happened wherever they are (the inbox poll settles it and pops a
- * toast), so this screen says so out loud rather than trapping them here.
+ * Three things this screen has to do, all learned the hard way:
+ *
+ *  1. **Say how long is left, loudly.** The countdown used to be a chip reading
+ *     "נותרו 33 שנ׳" in the corner of a busy stage, which is not a clock — it is a
+ *     number. It is now a draining ring with the digits inside it, next to the
+ *     round pips, so the pacing of the fight is legible at a glance.
+ *  2. **Narrate.** Every round is a sentence ("he raised the hammer, the officers
+ *     answered with the shield wall"), because a log of multipliers explains
+ *     nothing to a player who has never read the tactic matrix.
+ *  3. **Never navigate out from under the player.** An empty poll used to send
+ *     them to the ladder — which raced the settle's own push to the report and
+ *     produced the "the report flashed for a second and then I was on the
+ *     rankings page" bug. Nothing here leaves for the ladder any more; the only
+ *     destination is the report, and if there is nothing to show, the screen says
+ *     so and waits.
  *
  * The client holds no authority and no secrets: `revealed` only ever contains
  * rounds whose moment has passed, because the server filters the plan by elapsed
@@ -41,8 +75,13 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
   // the server anyway, since the server is what decides when the assault ends.
   const skew = useRef(0);
   const seen = useRef(initial.revealed.length);
-  const [flash, setFlash] = useState<{ correct: boolean; fury: boolean } | null>(null);
+  const [flash, setFlash] = useState<{
+    correct: boolean;
+    fury: boolean;
+  } | null>(null);
+  const [stranded, setStranded] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const empties = useRef(0);
   const done = useRef(false);
 
   useEffect(() => {
@@ -53,12 +92,16 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
   const poll = useCallback(async () => {
     if (done.current) return;
     const res = await pollBossArena();
+    // A refused round (rate limit, a hiccup) is not information. Change nothing.
+    if (res.retry) return;
+
     if (res.fightId) {
       done.current = true;
       router.push(`/game/boss/${res.fightId}`);
       return;
     }
     if (res.state) {
+      empties.current = 0;
       skew.current = res.state.serverNow - Date.now();
       // Newly landed rounds flash here, where they arrive, rather than in an
       // effect watching `state` — the strike is an event, not derived state.
@@ -72,11 +115,16 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
         }
       }
       setState(res.state);
-    } else {
-      // No running assault and no report id — someone else settled it. The banner
-      // knows what to show.
+      return;
+    }
+
+    // No running assault, no report, no refusal: there is really nothing here.
+    // Say so in place instead of moving the player somewhere they did not ask to
+    // go — the last thing they saw may well have been their own report.
+    empties.current += 1;
+    if (empties.current >= EMPTY_POLLS_BEFORE_GIVING_UP) {
       done.current = true;
-      router.replace("/game/rankings");
+      setStranded(true);
     }
   }, [router]);
 
@@ -96,31 +144,36 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
     if (now >= state.endsAt && !done.current) void poll();
   }, [now, state.endsAt, poll]);
 
-  useEffect(() => () => {
-    if (flashTimer.current) clearTimeout(flashTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    []
+  );
 
   const msLeft = Math.max(0, state.endsAt - now);
   const secondsLeft = Math.ceil(msLeft / 1000);
+  const clock = `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
   const elapsedPct = Math.min(
     100,
-    ((now - state.startedAt) / Math.max(1, state.endsAt - state.startedAt)) * 100
+    Math.max(0, ((now - state.startedAt) / Math.max(1, state.endsAt - state.startedAt)) * 100)
   );
   const hpPct = state.bossMaxHp > 0 ? (state.bossHp / state.bossMaxHp) * 100 : 0;
   const damagePct =
-    state.bossMaxHp > 0 ? (Math.min(state.damageSoFar, state.bossHpAtStart) / state.bossMaxHp) * 100 : 0;
+    state.bossMaxHp > 0
+      ? (Math.min(state.damageSoFar, state.bossHpAtStart) / state.bossMaxHp) * 100
+      : 0;
   const furyPct = (state.fury / state.furyMax) * 100;
   const lossPct =
     state.soldiersAtStart > 0 ? (state.soldiersLostSoFar / state.soldiersAtStart) * 100 : 0;
   const last = state.revealed.at(-1);
   const over = msLeft <= 0;
+  const urgent = !over && msLeft <= URGENT_MS;
+  const nextRoundIn =
+    state.nextRoundAt != null ? Math.max(0, Math.ceil((state.nextRoundAt - now) / 1000)) : null;
 
   return (
-    <div
-      dir="rtl"
-      className="space-y-4"
-      style={{ ["--boss-accent" as string]: state.boss.accent }}
-    >
+    <div dir="rtl" className="space-y-4" style={{ ["--boss-accent" as string]: state.boss.accent }}>
       {/* ---------------- the battle ---------------- */}
       <section className="ba-stage relative overflow-hidden rounded-2xl border border-[rgb(var(--boss-accent))]/45 bg-[#0a0709]">
         <div
@@ -173,32 +226,132 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             )}
           </div>
 
-          {/* name, health, the clock */}
+          {/* name, the clock, health */}
           <div className="flex min-w-0 flex-col justify-center gap-3">
-            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
-              <div className="min-w-0">
-                <p className="text-xl font-black leading-tight text-[rgb(var(--boss-accent))] sm:text-2xl">
-                  {state.boss.name}
+            <div className="min-w-0">
+              <p className="text-xl font-black leading-tight text-[rgb(var(--boss-accent))] sm:text-2xl">
+                {state.boss.name}
+              </p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
+                {state.boss.title} · עיר {cityName(state.cityTier)}
+              </p>
+            </div>
+
+            {/* ---------------- the clock ----------------
+                A real countdown: a ring that drains, the digits inside it, and
+                the rounds as pips beside it. This is the element the whole screen
+                is paced by, so it is the biggest thing in the column — it used to
+                be a 12px chip in the corner, which read as a status label rather
+                than as time running out. */}
+            <div
+              className={`flex items-center gap-3.5 rounded-xl border px-3 py-2.5 ${
+                over
+                  ? "border-gold/45 bg-gold/[0.07]"
+                  : urgent
+                    ? "border-red-500/45 bg-red-950/20"
+                    : "border-border-subtle bg-black/45"
+              }`}
+            >
+              <div className="relative h-[74px] w-[74px] shrink-0 sm:h-[86px] sm:w-[86px]">
+                <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden>
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={RING_R}
+                    fill="none"
+                    stroke="rgba(255,255,255,0.07)"
+                    strokeWidth="9"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r={RING_R}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="9"
+                    strokeLinecap="round"
+                    strokeDasharray={RING_C}
+                    strokeDashoffset={RING_C * (elapsedPct / 100)}
+                    className={`ba-ring ${urgent ? "text-red-400" : "text-gold-bright"}`}
+                  />
+                </svg>
+                <span
+                  role="timer"
+                  aria-live="off"
+                  className={`nums absolute inset-0 flex items-center justify-center text-xl font-black sm:text-2xl ${
+                    over ? "text-gold-bright" : urgent ? "text-red-300" : "text-zinc-100"
+                  }`}
+                  dir="ltr"
+                >
+                  {over ? "✓" : clock}
+                </span>
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold-dim">
+                  {over ? "הקרב הוכרע" : "הקרב נגמר בעוד"}
                 </p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
-                  {state.boss.title} · עיר {cityName(state.cityTier)}
+                <p className="mt-0.5 truncate text-sm font-bold text-zinc-100">
+                  {over ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span aria-hidden className="ba-spin inline-block">
+                        ⏳
+                      </span>
+                      מסכמים את השלל…
+                    </span>
+                  ) : (
+                    <>
+                      סבב{" "}
+                      <span className="nums" dir="ltr">
+                        {Math.min(state.revealed.length + 1, state.totalRounds)}
+                      </span>{" "}
+                      מתוך{" "}
+                      <span className="nums" dir="ltr">
+                        {state.totalRounds}
+                      </span>
+                      {nextRoundIn != null && (
+                        <span className="font-normal text-zinc-400">
+                          {" "}
+                          · המכה הבאה בעוד{" "}
+                          <span className="nums" dir="ltr">
+                            {nextRoundIn}
+                          </span>{" "}
+                          שנ׳
+                        </span>
+                      )}
+                    </>
+                  )}
+                </p>
+
+                {/* one pip per round of the plan, filling as they land */}
+                <div className="mt-2 flex items-center gap-1">
+                  {Array.from({ length: state.totalRounds }).map((_, i) => {
+                    const round = state.revealed[i];
+                    const tone = round
+                      ? round.furyUsed
+                        ? "bg-gold-bright"
+                        : round.correct
+                          ? "bg-emerald-400"
+                          : "bg-red-500"
+                      : "bg-white/10";
+                    const pending = !round && i === state.revealed.length && !over;
+                    return (
+                      <span
+                        key={i}
+                        aria-hidden
+                        className={`h-1.5 flex-1 rounded-full ${tone} ${
+                          pending ? "ba-pip-next" : ""
+                        }`}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5 text-[11px] text-zinc-500">
+                  {over
+                    ? "אל תסגור — דוח הקרב המלא נפתח בעוד רגע."
+                    : "הצבא נלחם לבד. אין מה ללחוץ — אפשר גם לצאת ולחזור."}
                 </p>
               </div>
-              <span
-                className={`nums shrink-0 rounded-md border px-2.5 py-1 text-xs font-black ${
-                  over
-                    ? "border-gold/60 bg-gold/10 text-gold-bright"
-                    : "border-[rgb(var(--boss-accent))]/50 bg-black/60 text-[rgb(var(--boss-accent))]"
-                }`}
-              >
-                {over ? (
-                  "מסכמים…"
-                ) : (
-                  <>
-                    נותרו <span dir="ltr">{secondsLeft}</span> שנ׳
-                  </>
-                )}
-              </span>
             </div>
 
             {/* the tyrant's health, with this assault's damage marked behind it */}
@@ -223,30 +376,77 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                   }}
                 />
               </div>
-            </div>
-
-            {/* the assault's own clock */}
-            <div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-                <span
-                  className="block h-full rounded-full bg-gradient-to-l from-gold-bright to-gold-deep transition-[width] duration-300 ease-linear"
-                  style={{ width: `${elapsedPct}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-[11px] text-zinc-500">
-                סבב{" "}
-                <span className="nums" dir="ltr">
-                  {state.revealed.length}
-                </span>{" "}
-                מתוך{" "}
-                <span className="nums" dir="ltr">
-                  {state.totalRounds}
-                </span>{" "}
-                · הצבא נלחם לבד — אין מה ללחוץ
+              <p className="mt-1 text-[11px] text-zinc-500">
+                הפסים המוזהבים הם הנזק של התקיפה הזו. הפצעים נשארים עליו גם אחרי שהקרב נגמר.
               </p>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* ---------------- the play-by-play ----------------
+          One sentence for the round that just landed, in words rather than
+          multipliers. This is the only place the screen explains *why* a round
+          went the way it did, and it is why the log below is now readable. */}
+      <section
+        className={`rounded-xl border px-4 py-3 text-sm leading-relaxed ${
+          last
+            ? last.furyUsed
+              ? "border-gold/40 bg-gold/[0.06] text-gold-bright"
+              : last.correct
+                ? "border-emerald-500/30 bg-emerald-950/20 text-emerald-200"
+                : "border-red-500/30 bg-red-950/20 text-red-200"
+            : "border-border-subtle bg-panel-inset text-zinc-400"
+        }`}
+        aria-live="polite"
+      >
+        {stranded ? (
+          <>הקרב הזה כבר הסתיים. הדוח נשלח אליך להודעות.</>
+        ) : !last ? (
+          <>הכוחות מסתערים על השער… המכה הראשונה נופלת עוד רגע.</>
+        ) : last.furyUsed ? (
+          <>
+            <b>הגיבור השתחרר.</b> {BOSS_MOVE_META[last.move]?.label} של {state.boss.name} לא הספיק —
+            מכת זעם אחת הורידה לו{" "}
+            <span className="nums" dir="ltr">
+              {formatNumber(last.damage)}
+            </span>{" "}
+            חיים.
+          </>
+        ) : (
+          <>
+            <b>
+              {state.boss.name} {BOSS_MOVE_META[last.move]?.telegraph}
+            </b>{" "}
+            — הקצינים ענו ב{BOSS_TACTIC_META[last.tactic]?.label}
+            {last.correct ? (
+              <>
+                , וזו התשובה הנכונה: נזק כפול ובקושי אבדות (
+                <span className="nums" dir="ltr">
+                  −{formatNumber(last.damage)}
+                </span>{" "}
+                חיים,{" "}
+                <span className="nums" dir="ltr">
+                  −{formatNumber(last.soldiersLost)}
+                </span>{" "}
+                חיילים).
+              </>
+            ) : (
+              <>
+                , וזו התשובה הלא נכונה — היה צריך{" "}
+                {BOSS_TACTIC_META[BOSS_MOVE_COUNTER[last.move]]?.label}. הנזק נחלש והמכה נכנסה (
+                <span className="nums" dir="ltr">
+                  −{formatNumber(last.damage)}
+                </span>{" "}
+                חיים,{" "}
+                <span className="nums" dir="ltr">
+                  −{formatNumber(last.soldiersLost)}
+                </span>{" "}
+                חיילים).
+              </>
+            )}
+          </>
+        )}
       </section>
 
       {/* ---------------- you can go ---------------- */}
@@ -255,14 +455,19 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
           <span aria-hidden className="mr-1">
             📨
           </span>
-          אפשר לצאת ולעשות דברים אחרים — כשהקרב ייגמר תקבל הודעה עם כל השלל.
+          {stranded
+            ? "אפשר לחזור לבוס העיר או לקרוא את הדוח בהודעות."
+            : "אפשר לצאת ולעשות דברים אחרים — כשהקרב ייגמר תקבל הודעה עם כל השלל."}
         </p>
         <div className="flex gap-2">
           <Link href="/game/base" className="btn btn-ghost px-4 py-1.5 text-xs">
             <Icon name="base" size={14} className="inline-block align-middle" /> לבסיס
           </Link>
-          <Link href="/game/rankings" className="btn btn-ghost px-4 py-1.5 text-xs">
-            <Icon name="rankings" size={14} className="inline-block align-middle" /> לדירוג
+          <Link
+            href="/game/rankings"
+            className={`btn px-4 py-1.5 text-xs ${stranded ? "btn-gold" : "btn-ghost"}`}
+          >
+            <Icon name="rankings" size={14} className="inline-block align-middle" /> לבוס העיר
           </Link>
         </div>
       </section>
@@ -285,7 +490,9 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
           <div className="h-2.5 overflow-hidden rounded-full border border-black/60 bg-white/5">
             <span
               className="block h-full rounded-full bg-gradient-to-l from-amber-400 to-amber-700 transition-[width] duration-500"
-              style={{ width: `${Math.min(100, (lossPct / (state.routLine * 100)) * 100)}%` }}
+              style={{
+                width: `${Math.min(100, (lossPct / (state.routLine * 100)) * 100)}%`,
+              }}
             />
           </div>
           <p className="mt-1.5 text-[11px] text-zinc-500">
@@ -343,8 +550,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             )}
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
-            נצבר לפי הנזק שנגרם עד כה. הפלת הבוס משלמת את האוצר כולו מעל זה, והכול משולם בסוף
-            הקרב.
+            נצבר לפי הנזק שנגרם עד כה. הפלת הבוס משלמת את האוצר כולו מעל זה, והכול משולם בסוף הקרב.
           </p>
         </div>
       </section>
@@ -355,52 +561,163 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
           יומן הקרב
         </p>
         {state.revealed.length === 0 ? (
-          <p className="px-2 py-4 text-center text-xs text-zinc-500">
-            הכוחות מתקרבים לשער…
-          </p>
+          <p className="px-2 py-4 text-center text-xs text-zinc-500">הכוחות מתקרבים לשער…</p>
         ) : (
-          <ul className="space-y-1">
-            {[...state.revealed].reverse().map((entry) => (
-              <li
-                key={entry.round}
-                className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-[11px] odd:bg-white/[0.03] ${
-                  entry.round === state.revealed.length ? "ba-log-in" : ""
-                }`}
-              >
-                <span className="nums w-8 shrink-0 text-zinc-500" dir="ltr">
-                  #{entry.round}
-                </span>
-                <span className="shrink-0 text-zinc-400">
-                  {BOSS_MOVE_META[entry.move]?.label ?? entry.move}
-                </span>
-                <span aria-hidden className="text-zinc-600">
-                  ←
-                </span>
-                <span
-                  className={`shrink-0 font-bold ${
-                    entry.furyUsed ? "text-gold-bright" : "text-zinc-200"
+          <>
+            {/* A header row, because the log is five unlabelled columns otherwise
+                and every one of them needed guessing. */}
+            <div className="flex flex-wrap items-center gap-x-2 px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">
+              <span className="w-8 shrink-0">סבב</span>
+              <span className="shrink-0">המהלך שלו</span>
+              <span aria-hidden className="opacity-0">
+                ←
+              </span>
+              <span className="shrink-0">התשובה שלנו</span>
+              <span className="mr-auto shrink-0">נזק</span>
+              <span className="shrink-0">אבדות</span>
+            </div>
+            <ul className="space-y-1">
+              {[...state.revealed].reverse().map((entry) => (
+                <li
+                  key={entry.round}
+                  className={`flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md px-2 py-1.5 text-[11px] odd:bg-white/[0.03] ${
+                    entry.round === state.revealed.length ? "ba-log-in" : ""
                   }`}
                 >
-                  {BOSS_TACTIC_META[entry.tactic]?.label ?? entry.tactic}
-                </span>
-                <span
-                  className={`shrink-0 font-bold ${
-                    entry.correct ? "text-emerald-400" : "text-red-400"
-                  }`}
-                >
-                  {entry.furyUsed ? "🔥" : entry.correct ? "✔ קריאה נכונה" : "✘ קריאה שגויה"}
-                </span>
-                <span className="nums mr-auto shrink-0 font-bold text-gold-bright" dir="ltr">
-                  −{formatNumber(entry.damage)}
-                </span>
-                <span className="nums shrink-0 text-red-300" dir="ltr">
-                  −{formatNumber(entry.soldiersLost)} ⚔
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <span className="nums w-8 shrink-0 text-zinc-500" dir="ltr">
+                    #{entry.round}
+                  </span>
+                  <span className="shrink-0 text-zinc-400">
+                    {BOSS_MOVE_META[entry.move]?.icon}{" "}
+                    {BOSS_MOVE_META[entry.move]?.label ?? entry.move}
+                  </span>
+                  <span aria-hidden className="text-zinc-600">
+                    ←
+                  </span>
+                  <span
+                    className={`shrink-0 font-bold ${
+                      entry.furyUsed ? "text-gold-bright" : "text-zinc-200"
+                    }`}
+                  >
+                    {BOSS_TACTIC_META[entry.tactic]?.label ?? entry.tactic}
+                  </span>
+                  <span
+                    className={`shrink-0 font-bold ${
+                      entry.correct ? "text-emerald-400" : "text-red-400"
+                    }`}
+                  >
+                    {entry.furyUsed ? "🔥" : entry.correct ? "✔ קריאה נכונה" : "✘ קריאה שגויה"}
+                  </span>
+                  <span className="nums mr-auto shrink-0 font-bold text-gold-bright" dir="ltr">
+                    −{formatNumber(entry.damage)}
+                  </span>
+                  <span className="nums shrink-0 text-red-300" dir="ltr">
+                    −{formatNumber(entry.soldiersLost)} ⚔
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 px-2 text-[11px] text-zinc-500">
+              קריאות נכונות עד כה:{" "}
+              <span className="nums text-emerald-300" dir="ltr">
+                {state.correctSoFar}
+              </span>{" "}
+              מתוך{" "}
+              <span className="nums" dir="ltr">
+                {state.revealed.length}
+              </span>{" "}
+              — הן קובעות גם את דירוג הקרב וגם את גודל אוצר ההפלה.
+            </p>
+          </>
         )}
       </section>
+
+      {/* ---------------- what am I even watching ---------------- */}
+      <details className="panel group rounded-xl p-3">
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 px-1 text-[11px] font-bold text-gold-dim transition-colors hover:text-gold-bright [&::-webkit-details-marker]:hidden">
+          <span
+            aria-hidden
+            className="inline-block transition-transform group-open:rotate-90 rtl:-scale-x-100"
+          >
+            ▸
+          </span>
+          מה בעצם קורה כאן, ואיך משפרים את התוצאה
+        </summary>
+
+        <div className="mt-3 space-y-3 px-1">
+          <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-400">
+            <li>
+              <b className="text-zinc-200">1.</b> שילמת תורות ושלחת את הצבא. מרגע הלחיצה הכול כבר
+              מוכרע — הדקה הזו היא הצפייה, לא ההחלטה.
+            </li>
+            <li>
+              <b className="text-zinc-200">2.</b> בכל סבב {state.boss.name} מבצע מהלך, והקצינים שלך
+              מנסים לקרוא אותו ולענות בתשובה הנכונה. סיכוי הקריאה שלך כרגע:{" "}
+              <b className="nums text-gold-bright" dir="ltr">
+                {Math.round(state.readChance * 100)}%
+              </b>{" "}
+              — הוא נקבע ברמת הגיבור.
+            </li>
+            <li>
+              <b className="text-zinc-200">3.</b> כשהמונה נגמר משולם השלל, נכנסות האבדות, ונשלחת
+              אליך הודעה עם הסיכום — גם אם עברת בינתיים למסך אחר.
+            </li>
+          </ol>
+
+          <div>
+            <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
+              שלוש התשובות
+            </p>
+            <ul className="space-y-1">
+              {(["SMASH", "SWEEP", "EXPOSED"] as const).map((move) => {
+                const meta = BOSS_MOVE_META[move];
+                const counter = BOSS_TACTIC_META[BOSS_MOVE_COUNTER[move]];
+                return (
+                  <li
+                    key={move}
+                    className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded border border-border-subtle bg-panel-inset px-2 py-1 text-[11px]"
+                  >
+                    <span aria-hidden>{meta.icon}</span>
+                    <b className={meta.tone}>{meta.label}</b>
+                    <span aria-hidden className="text-zinc-600">
+                      ←
+                    </span>
+                    <span aria-hidden>{counter.icon}</span>
+                    <b className="text-zinc-200">{counter.label}</b>
+                    <span className="text-zinc-500">{meta.effect}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            <p className="rounded-lg border border-border-subtle bg-panel-inset p-2.5 text-[11px] leading-relaxed text-zinc-400">
+              <b className="text-emerald-300">כדי לפגוע בו יותר:</b> כוח התקיפה. עוד חיילים, נשקי
+              תקיפה, ציוד ונקודות תקיפה לגיבור, באפ גילדה ושיקוי כוח — הנזק בכל סבב הוא אחוז מהכוח
+              הזה.
+            </p>
+            <p className="rounded-lg border border-border-subtle bg-panel-inset p-2.5 text-[11px] leading-relaxed text-zinc-400">
+              <b className="text-sky-300">כדי לאבד פחות חיילים:</b> הגיבור. רמה גבוהה יותר = קריאות
+              נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם. גיבור מת מוריד את הקריאה לניחוש ומבטל את
+              הזעם.
+            </p>
+          </div>
+
+          <p className="text-[11px] leading-relaxed text-zinc-500">
+            השלל:{" "}
+            <span className="nums" dir="ltr">
+              {Math.round(BOSS_CHIP_SHARE * 100)}%
+            </span>{" "}
+            מהאוצר משולם לפי הנזק שגרמת — גם בקרב שלא הפיל אותו — והשאר (
+            <span className="nums" dir="ltr">
+              {Math.round(BOSS_KILL_SHARE * 100)}%
+            </span>{" "}
+            + ציוד גיבור מובטח) משולם רק למי שמנחית את המכה האחרונה. הפצעים נשארים על הבוס בין
+            תקיפות, אז כל תקיפה מקרבת את ההפלה.
+          </p>
+        </div>
+      </details>
     </div>
   );
 }

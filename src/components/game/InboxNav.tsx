@@ -32,6 +32,13 @@ type Entry = {
    * already-crowded bar only while something is actually waiting.
    */
   onlyWhenWaiting?: boolean;
+  /**
+   * Walking in is what clears this badge — the destination marks its content
+   * seen on arrival. Rewards are the exception: they are cleared by collecting
+   * them, not by looking at them, so the gold pill keeps counting while you
+   * stand on the achievements page.
+   */
+  clearsOnVisit?: boolean;
 };
 
 const TONE = {
@@ -76,6 +83,7 @@ export function InboxNav({
       tip: "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי. ההתראה נדלקת רק כשתוקפים או מרגלים עליי",
       count: newReports,
       tone: "red",
+      clearsOnVisit: true,
     },
     {
       href: "/game/messages",
@@ -84,6 +92,7 @@ export function InboxNav({
       tip: "תיבת הדואר: הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת",
       count: unreadMessages,
       tone: "green",
+      clearsOnVisit: true,
     },
     {
       href: "/game/achievements",
@@ -95,7 +104,29 @@ export function InboxNav({
       onlyWhenWaiting: true,
     },
   ];
-  const entries = allEntries.filter((e) => !e.onlyWhenWaiting || e.count > 0);
+
+  /**
+   * Standing on the destination is enough to put its badge out.
+   *
+   * The counts arrive server-rendered, while the write that actually marks the
+   * mail read runs *after* the page paints (MarkSeen → markMessagesRead), so
+   * without this the player sits inside the inbox for a whole round trip with
+   * "3 new" still pulsing at them — which reads as broken, and worse, teaches
+   * them the badge is noise. Walking in is the acknowledgement; the server
+   * write behind it is what makes it stick after they leave.
+   *
+   * Deliberately not a subtraction against the count seen on arrival: mail that
+   * lands while the player is parked on the inbox stays silent here, but it is
+   * already announced by the live toast (WarAlerts) and by the page itself, and
+   * a counter that flickers back to life on the screen that is supposed to be
+   * clearing it is worse than one that waits until they walk away.
+   */
+  const entries = allEntries
+    .map((e) => ({
+      ...e,
+      count: e.clearsOnVisit && pathname.startsWith(e.href) ? 0 : e.count,
+    }))
+    .filter((e) => !e.onlyWhenWaiting || e.count > 0);
 
   return (
     <div dir="rtl" className="flex shrink-0 items-center gap-1.5 sm:gap-2">

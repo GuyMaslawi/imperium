@@ -32,6 +32,7 @@ const TAG = `ld${Date.now().toString(36)}`;
 const SOLO_TIER = 91;
 const TIE_TIER = 92;
 const PAGED_TIER = 93;
+const PRESENCE_TIER = 94;
 
 afterAll(async () => {
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
@@ -48,7 +49,8 @@ async function makeEmpire(
   tier: number,
   power: number,
   hero: { level: number; resets: number } | null = { level: 1, resets: 0 },
-  soldiers = 0
+  soldiers = 0,
+  lastSeenAt: Date | null = null
 ): Promise<Fixture> {
   const user = await prisma.user.create({
     data: {
@@ -69,6 +71,7 @@ async function makeEmpire(
       // Written straight in: the ladder ranks off this denormalised column, and
       // what keeps it true is tests/db/empirePower.test.ts, not this file.
       militaryPower: power,
+      lastSeenAt,
     },
   });
   await prisma.army.create({ data: { empireId: empire.id, soldiers } });
@@ -173,6 +176,42 @@ describe("getCityLadderPage", () => {
     // Out-of-range requests are clamped rather than serving an empty table.
     expect((await pageFor(PAGED_TIER, eleventh, 99)).page).toBe(2);
     expect((await pageFor(PAGED_TIER, eleventh, -5)).page).toBe(1);
+  });
+
+  it("marks each row online off its heartbeat, and the viewer always", async () => {
+    const now = Date.now();
+    // Powers descend so the rows come back in a known order.
+    const here = await makeEmpire(
+      "seen-now",
+      PRESENCE_TIER,
+      4_000,
+      null,
+      0,
+      new Date(now - 30 * 1000)
+    );
+    const away = await makeEmpire(
+      "seen-old",
+      PRESENCE_TIER,
+      3_000,
+      null,
+      0,
+      // Comfortably past PRESENCE_ONLINE_MS (3 minutes).
+      new Date(now - 60 * 60 * 1000)
+    );
+    const never = await makeEmpire("seen-never", PRESENCE_TIER, 2_000, null, 0, null);
+
+    // Read by an empire that is not itself in the tier, so no row is the
+    // viewer's and every answer comes from the column.
+    const seen = await getCityLadderPage(PRESENCE_TIER, "nobody", NaN);
+    expect(seen.rows.map((r) => r.id)).toEqual([here.id, away.id, never.id]);
+    expect(seen.rows.map((r) => r.online)).toEqual([true, false, false]);
+
+    // The viewer is reading the page, so their own row says so even though
+    // their heartbeat is an hour old — the chat poll that stamps it has not run
+    // yet on a fresh tab.
+    const mine = await getCityLadderPage(PRESENCE_TIER, away.id, NaN);
+    expect(mine.rows.find((r) => r.id === away.id)?.online).toBe(true);
+    expect(mine.rows.find((r) => r.id === never.id)?.online).toBe(false);
   });
 
   it("reads an empty tier without pretending it has a page of rows", async () => {

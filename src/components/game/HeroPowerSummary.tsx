@@ -159,8 +159,18 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
   const { points, itemsPct, itemsResourcePct, itemsFlat, itemsFlatByResource, classPct, totalPct } =
     bonuses;
 
-  /** "· דמות +X%" appended only when the class actually contributes. */
-  const classNote = (pct: number) => (pct > 0 ? ` · דמות +${pct}%` : "");
+  /**
+   * The breakdown note lists only the sources that actually pay out — a
+   * "חפצים +0%" term is noise the player has to read past, so zero terms are
+   * dropped. When nothing contributes at all the row falls back to a hint about
+   * where the bonus would come from.
+   */
+  const bonusNote = (parts: [string, number][], empty: string) => {
+    const paying = parts.filter(([, pct]) => pct > 0);
+    return paying.length > 0
+      ? paying.map(([label, pct]) => `${label} +${formatBonus(pct)}%`).join(" · ")
+      : empty;
+  };
 
   // A flat resource item (פרי שטן, מכנסיים, נעליים) feeds only the specific
   // resources its tier covers — one for a פשוט piece, up to all four for an
@@ -195,20 +205,37 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
     {
       stat: "attack",
       value: totalPct.attack,
-      note: `נקודות +${points.attack}% · חפצים +${formatBonus(itemsPct.attack)}%${classNote(classPct.attack)}`,
+      note: bonusNote(
+        [
+          ["נקודות", points.attack],
+          ["חפצים", itemsPct.attack],
+          ["דמות", classPct.attack],
+        ],
+        "מנקודות התקפה ומחפצים לבושים"
+      ),
     },
     {
       stat: "defense",
       value: totalPct.defense,
-      note: `נקודות +${points.defense}% · חפצים +${formatBonus(itemsPct.defense)}%${classNote(classPct.defense)}`,
+      note: bonusNote(
+        [
+          ["נקודות", points.defense],
+          ["חפצים", itemsPct.defense],
+          ["דמות", classPct.defense],
+        ],
+        "מנקודות הגנה ומחפצים לבושים"
+      ),
     },
     {
       stat: "spy",
       value: totalPct.spy,
-      note:
-        classPct.spy > 0
-          ? `חפצים +${formatBonus(itemsPct.spy)}%${classNote(classPct.spy)}`
-          : "מחפצי ריגול לבושים בלבד",
+      note: bonusNote(
+        [
+          ["חפצים", itemsPct.spy],
+          ["דמות", classPct.spy],
+        ],
+        "מחפצי ריגול לבושים בלבד"
+      ),
     },
   ];
 

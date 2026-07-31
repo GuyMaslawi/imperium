@@ -9,7 +9,12 @@ import { Tip } from "@/components/ui/Tip";
 import { ItemTile } from "@/components/game/ItemTile";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
-import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
+import {
+  HERO_CLASS_META,
+  SLOT_META,
+  heroClassImage,
+  itemDisplayName,
+} from "@/lib/game/hero";
 import { RESOURCE_META } from "@/lib/game/constants";
 import { BOSS_REWARD_RESOURCES, bossByKey, bossImage } from "@/lib/game/bosses";
 import {
@@ -103,6 +108,11 @@ export default async function BossFightPage({
   const boss = bossByKey(fight.bossKey);
   if (!boss) notFound();
 
+  // Portrait for the attacking side: the class the player picked at signup.
+  // Empires predating the hero system fall back to the founding class.
+  const myClass = me.hero?.heroClass ?? "WARLORD";
+  const myClassMeta = HERO_CLASS_META[myClass];
+
   const ending = ENDING_META[fight.endedBy ?? (fight.victory ? "KILLED" : "SPENT")];
   const grade = (fight.grade ?? null) as BossGrade | null;
   const log: BossRoundLogEntry[] = Array.isArray(fight.battle?.log)
@@ -190,11 +200,21 @@ export default async function BossFightPage({
         <div className="relative mt-5 flex items-start justify-between gap-3">
           {/* my side */}
           <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-xl border-2 border-emerald-500/50 bg-gradient-to-b from-emerald-900/30 to-black shadow-[0_0_30px_-8px_rgba(52,211,153,0.5)] sm:h-20 sm:w-20">
-              <Icon name="hero" size={32} className="text-emerald-300" />
+            <div className="relative h-16 w-16 overflow-hidden rounded-xl border-2 border-emerald-500/50 bg-gradient-to-b from-emerald-900/30 to-black shadow-[0_0_30px_-8px_rgba(52,211,153,0.5)] sm:h-20 sm:w-20">
+              {/* Same thumbnail treatment as the boss opposite: the attacker's
+                  own class portrait, so the banner reads as two faces and not
+                  a face against a generic silhouette. */}
+              <LivingPortrait
+                src={heroClassImage(myClass)}
+                alt={myClassMeta.label}
+                className="absolute inset-0"
+                accent={myClassMeta.accent}
+                tilt={3}
+                drift={20}
+              />
             </div>
             <p className="max-w-full truncate font-black text-emerald-300">{me.name}</p>
-            <p className="text-[11px] text-zinc-500">תוקף</p>
+            <p className="text-[11px] text-zinc-500">{myClassMeta.label} · תוקף</p>
           </div>
 
           <p className="shrink-0 pt-6 text-xs text-zinc-500">מול</p>

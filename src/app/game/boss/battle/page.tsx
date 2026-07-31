@@ -1,18 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
-import { getBossArenaState } from "@/server/bossBattleState";
+import { getBossArenaState, recentBossFightId } from "@/server/bossBattleState";
 import { BossArena } from "@/components/game/BossArena";
 import { Icon } from "@/components/ui/Icon";
 
 export const metadata = { title: "קרב בוס | IMPERIUM" };
-
-/**
- * How recently a sortie must have settled for this route to forward to its
- * report rather than back to the banner.
- */
-const JUST_SETTLED_MS = 3 * 60 * 1000;
 
 /**
  * The arena — a running assault, watched.
@@ -31,15 +24,8 @@ export default async function BossBattlePage() {
   const me = await requireEmpire();
   const state = await getBossArenaState(me.id);
   if (!state) {
-    // `new Date()`, not `Date.now()`: the purity lint flags the latter inside a
-    // component render, and this is a render.
-    const cutoff = new Date(new Date().getTime() - JUST_SETTLED_MS);
-    const justSettled = await prisma.bossFight.findFirst({
-      where: { empireId: me.id, createdAt: { gt: cutoff } },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-    redirect(justSettled ? `/game/boss/${justSettled.id}` : "/game/rankings");
+    const justSettled = await recentBossFightId(me.id);
+    redirect(justSettled ? `/game/boss/${justSettled}` : "/game/rankings");
   }
 
   return (

@@ -10,6 +10,7 @@ import {
   BOSS_MOVE_COUNTER,
   BOSS_MOVE_WEIGHTS,
   BOSS_ROUND_DAMAGE_BASE,
+  BOSS_ROUND_LOSS_BASE,
   BOSS_ROUT_LOSS_FRACTION,
   BOSS_SORTIE_ROUNDS,
   BOSS_TACTIC_MATRIX,
@@ -20,6 +21,7 @@ import {
   bossKillFraction,
   bossPayout,
   bossExpectedSortieDamage,
+  bossExpectedSortieLosses,
   bossReadChance,
   bossSiegeMaxHp,
   bossSortiesToKill,
@@ -350,7 +352,7 @@ describe("the balance the whole fight rests on", () => {
           Math.max(...COUNTERS.map((t) => BOSS_TACTIC_MATRIX[move][t].taken)),
       0
     );
-    expect(0.045 * worstPerRound * BOSS_SORTIE_ROUNDS).toBeGreaterThan(
+    expect(BOSS_ROUND_LOSS_BASE * worstPerRound * BOSS_SORTIE_ROUNDS).toBeGreaterThan(
       BOSS_ROUT_LOSS_FRACTION * 0.85
     );
   });
@@ -361,7 +363,31 @@ describe("the balance the whole fight rests on", () => {
         sum + BOSS_MOVE_WEIGHTS[move] * BOSS_TACTIC_MATRIX[move][BOSS_MOVE_COUNTER[move]].taken,
       0
     );
-    expect(0.045 * perfectPerRound * BOSS_SORTIE_ROUNDS).toBeLessThan(0.15);
+    expect(BOSS_ROUND_LOSS_BASE * perfectPerRound * BOSS_SORTIE_ROUNDS).toBeLessThan(0.1);
+  });
+});
+
+describe("projecting what an assault costs", () => {
+  // The banner prints this number *before* the turns are paid, so it has to be
+  // the same trade the simulation actually makes.
+  it("prices a full assault in the tenth-to-quarter band, never the whole army", () => {
+    const green = bossExpectedSortieLosses(1_000, 1, true);
+    expect(green).toBeGreaterThan(1_000 * 0.05);
+    expect(green).toBeLessThan(1_000 * BOSS_ROUT_LOSS_FRACTION);
+  });
+
+  it("makes the hero the defensive stat: a better read bleeds less", () => {
+    const rookie = bossExpectedSortieLosses(1_000, 1, true);
+    const veteran = bossExpectedSortieLosses(1_000, 60, true);
+    const corpse = bossExpectedSortieLosses(1_000, 60, false);
+    expect(veteran).toBeLessThan(rookie);
+    // A dead hero drops the officers to pure chance *and* forfeits the fury round.
+    expect(corpse).toBeGreaterThan(veteran);
+  });
+
+  it("never projects more casualties than the army that marched", () => {
+    expect(bossExpectedSortieLosses(3, 1, false)).toBeLessThanOrEqual(3);
+    expect(bossExpectedSortieLosses(0, 1, true)).toBe(0);
   });
 });
 

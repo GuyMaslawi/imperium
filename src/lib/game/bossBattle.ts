@@ -135,25 +135,34 @@ export const BOSS_ROUND_DAMAGE_BASE = 0.8;
 
 /**
  * Soldiers one round costs, as a fraction of the army that marched, before the
- * matrix (~0.2–1.8). Six rounds of correct reads costs ~10% of the army; six
- * rounds of guessing ~22%; six rounds of misreads ~37%.
+ * matrix (~0.2–1.8). Six rounds of correct reads costs ~6% of the army; six
+ * rounds at a level-1 hero's read rate ~13%; six rounds of pure misreads ~25%.
  *
  * Measured against the army *at launch*, not the survivors, so the rout line
  * below is a straight cumulative fraction and the losses do not quietly taper as
  * the army shrinks.
+ *
+ * **Retuned down from 0.045 (2026-07-31)**, because the price was being paid by
+ * the wrong player. Casualties are a fraction of the *army*, while chip loot is a
+ * fraction of the *boss's pool* — so an empire under the wall bled the same
+ * percentage as one at parity while earning a sliver of the haul, and had to do
+ * it a dozen times over to see a kill. A third off the blood is the part of that
+ * gap this constant can close; the rest is honesty, and lives in the banner's
+ * pre-attack projection (see `bossExpectedSortieLosses`).
  */
-export const BOSS_ROUND_LOSS_BASE = 0.045;
+export const BOSS_ROUND_LOSS_BASE = 0.03;
 
 /**
  * Cumulative losses that break the army. Reaching it ends the assault early as a
  * rout, which pays only `BOSS_ROUT_LOOT_PENALTY` of what the damage earned.
  *
- * 40%, not half, and the difference matters: an assault of pure misreads costs
- * ~37%, so the line sits just inside the range bad luck actually reaches. At 50% a
- * rout was arithmetically almost unreachable, which would have made the rule
- * decorative — and it is the only thing that punishes a fight going badly.
+ * Moved with `BOSS_ROUND_LOSS_BASE`, and it has to be: the line is only a rule if
+ * a bad assault can actually reach it. An assault of pure misreads costs ~25%, so
+ * 28% sits just inside what bad luck reaches — the same relationship 40% had to
+ * the old 37%. Set it much higher and the rout becomes decorative, which would
+ * quietly delete the only thing that punishes a fight going badly.
  */
-export const BOSS_ROUT_LOSS_FRACTION = 0.4;
+export const BOSS_ROUT_LOSS_FRACTION = 0.28;
 
 /** Per-round spread on both damage and casualties, ±12%. */
 export const BOSS_ROUND_VARIANCE = 0.12;
@@ -844,6 +853,55 @@ export function bossExpectedSortieDamage(
   const multiplier =
     ordinary * (rounds - furyRounds) + furyRounds * bossFuryMultiplier(heroLevel);
   return attackPower * BOSS_ROUND_DAMAGE_BASE * multiplier;
+}
+
+/** Mean casualty multiplier of a correctly-read round, over the move distribution. */
+function readRightLossMultiplier(): number {
+  return (Object.keys(BOSS_MOVE_WEIGHTS) as BossMove[]).reduce(
+    (sum, move) =>
+      sum + BOSS_MOVE_WEIGHTS[move] * BOSS_TACTIC_MATRIX[move][BOSS_MOVE_COUNTER[move]].taken,
+    0
+  );
+}
+
+/** Mean casualty multiplier of a misread round — the average of the two wrong cells. */
+function readWrongLossMultiplier(): number {
+  return (Object.keys(BOSS_MOVE_WEIGHTS) as BossMove[]).reduce((sum, move) => {
+    const counter = BOSS_MOVE_COUNTER[move];
+    const wrong = (["ASSAULT", "SHIELD", "FLANK"] as BossCounter[])
+      .filter((t) => t !== counter)
+      .map((t) => BOSS_TACTIC_MATRIX[move][t].taken);
+    return sum + BOSS_MOVE_WEIGHTS[move] * (wrong.reduce((a, b) => a + b, 0) / wrong.length);
+  }, 0);
+}
+
+/**
+ * Soldiers one assault is *expected* to cost — the other half of the deal.
+ *
+ * The mirror of `bossExpectedSortieDamage`, and it exists for one reason: the
+ * price of a sortie used to be invisible until the report. A player marched, lost
+ * a fifth of their army and found out afterwards, which is how "I lost dozens for
+ * nothing" happens. Shown *before* the attack, next to the loot the same assault
+ * is expected to earn, the whole trade is on the screen where the decision is.
+ *
+ * Same shape as the damage projection: reads land at `bossReadChance` (which is
+ * why a levelled, living hero is the defensive stat), and the fury round costs
+ * half what an ordinary one does.
+ */
+export function bossExpectedSortieLosses(
+  soldiers: number,
+  heroLevel: number,
+  heroAlive: boolean,
+  rounds = BOSS_SORTIE_ROUNDS
+): number {
+  const p = bossReadChance(heroLevel, heroAlive);
+  const ordinary = p * readRightLossMultiplier() + (1 - p) * readWrongLossMultiplier();
+  const furyRounds =
+    heroAlive && rounds > Math.ceil(BOSS_FURY_MAX / BOSS_FURY_PER_ROUND) ? 1 : 0;
+  const multiplier =
+    ordinary * (rounds - furyRounds) +
+    furyRounds * readRightLossMultiplier() * BOSS_FURY_LOSS_MULTIPLIER;
+  return Math.min(soldiers, soldiers * BOSS_ROUND_LOSS_BASE * multiplier);
 }
 
 /**

@@ -7,6 +7,7 @@ import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { useServerNow } from "@/components/game/HeroPotions";
+import { QuestLock } from "@/components/game/QuestLock";
 import { collectHeroQuest, startHeroQuest } from "@/server/actions/heroQuests";
 import type { HeroQuestHaul } from "@/server/actions/heroQuests";
 import type { ActionState } from "@/server/actions/game";
@@ -463,7 +464,7 @@ function QuestRow({
 
   return (
     <li
-      className={`panel-inset rounded-xl p-3 transition ${unlocked ? "" : "opacity-45"}`}
+      className={`panel-inset rounded-xl p-3 transition ${unlocked ? "" : "quest-row-locked"}`}
       // A 3px stripe in the quest's own colour down the leading edge — the one
       // thing that keeps ten near-identical rows from reading as a wall.
       style={
@@ -475,10 +476,20 @@ function QuestRow({
           : undefined
       }
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+      {/* A rung he cannot be sent on yet is chained shut rather than greyed out:
+          the seal states its own price and rattles when pulled. See QuestLock. */}
+      {!unlocked && (
+        <QuestLock label={`${quest.name} — מסע נעול`} hint={`נפתח עם העיר ה-${tier}`} />
+      )}
+
+      <div
+        className={`flex flex-wrap items-start justify-between gap-x-3 gap-y-2 ${
+          unlocked ? "" : "quest-row-body"
+        }`}
+      >
         <div className="min-w-[13rem] flex-1">
           <h3 className="flex items-center gap-2 text-sm font-bold text-bone">
-            <span aria-hidden>{unlocked ? quest.sigil : "🔒"}</span>
+            <span aria-hidden>{quest.sigil}</span>
             {quest.name}
             <span className="rounded-md border border-border-subtle px-1.5 py-px text-[10px] font-bold text-zinc-400">
               {heroQuestDurationLabel(tier)}

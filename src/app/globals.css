@@ -881,6 +881,31 @@ body {
   animation: ba-fury-bar 1.4s ease-in-out infinite;
 }
 
+/* the countdown ring, draining. Eased on the same beat the client ticks at, so
+   the sweep reads as continuous motion rather than as four steps a second. */
+.ba-ring {
+  transition: stroke-dashoffset 0.3s linear;
+}
+
+/* the pip of the round that is about to land — the only thing on the clock that
+   moves while nothing is happening, which is what makes the wait legible */
+@keyframes ba-pip-next {
+  0%, 100% { background-color: rgb(255 255 255 / 0.1); }
+  50% { background-color: rgb(212 175 55 / 0.75); }
+}
+.ba-pip-next {
+  animation: ba-pip-next 1.2s ease-in-out infinite;
+}
+
+/* the settling hourglass, while the server writes the report */
+@keyframes ba-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.ba-spin {
+  animation: ba-spin 1.6s linear infinite;
+}
+
 /* the rout warning — the army is one bad round from breaking */
 @keyframes ba-rout-warn {
   0%, 100% { opacity: 1; }
@@ -900,14 +925,21 @@ body {
   .ba-fury-ready,
   .ba-fury-bar,
   .ba-log-in,
+  .ba-pip-next,
+  .ba-spin,
   .ba-rout-warn {
     animation: none;
   }
   .ba-damage {
     animation: ba-flash 0.9s ease-out both;
   }
-  .ba-hp {
+  .ba-hp,
+  .ba-ring {
     transition: none;
+  }
+  /* the pending pip still has to be *findable* without its pulse */
+  .ba-pip-next {
+    background-color: rgb(212 175 55 / 0.5);
   }
 }
 
@@ -6001,11 +6033,11 @@ body {
 /* The presence dot: a slow halo, so "online" reads as live rather than as a
    coloured bullet. Deliberately quieter than the unread pulse — one is status,
    the other is a demand for attention. */
-.chat-online {
+.presence-online {
   box-shadow: 0 0 0 0 rgba(53, 211, 154, 0.55);
-  animation: chat-online-halo 2.6s ease-out infinite;
+  animation: presence-online-halo 2.6s ease-out infinite;
 }
-@keyframes chat-online-halo {
+@keyframes presence-online-halo {
   0% { box-shadow: 0 0 0 0 rgba(53, 211, 154, 0.5); }
   70%, 100% { box-shadow: 0 0 0 4px rgba(53, 211, 154, 0); }
 }
@@ -6028,6 +6060,212 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-panel, .chat-dot, .chat-online { animation: none; }
+  .chat-panel, .chat-dot, .presence-online { animation: none; }
   .chat-typing i { animation: none; opacity: 0.8; }
+}
+
+/* =========================================================================
+   Locked hero quest — the chained padlock.
+
+   A locked row is not merely dimmed: it is chained shut, and tugging on it
+   answers back. The whole rig is one absolutely-positioned overlay over the
+   row (`.quest-lock`), so nothing inside the row has to know it is locked
+   beyond wearing `.quest-row-body` for the grayscale.
+
+   `.is-tugged` is added for the length of the deny animation and removed
+   again, which is what lets the same click be refused twice in a row.
+   ========================================================================= */
+
+.quest-row-locked {
+  position: relative;
+  overflow: hidden;
+}
+.quest-row-locked .quest-row-body {
+  filter: grayscale(0.9);
+  opacity: 0.55;
+}
+
+.quest-lock {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+  background: radial-gradient(120% 90%, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0.55));
+}
+.quest-lock-rig {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* the two chains, drawn as one repeating link tile so the band can be any
+   width without the links stretching */
+.quest-chain {
+  position: absolute;
+  top: 50%;
+  left: -14%;
+  width: 128%;
+  height: 16px;
+  transform: translateY(-50%) rotate(var(--tilt));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='18' viewBox='0 0 24 18'%3E%3Cg fill='none' stroke='%2318191e' stroke-width='4'%3E%3Cellipse cx='0' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='9' rx='8.5' ry='4.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%237e8798' stroke-width='2'%3E%3Cellipse cx='0' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='9' rx='8.5' ry='4.5'/%3E%3C/g%3E%3Cg fill='none' stroke='rgba(233,240,255,0.5)' stroke-width='0.8'%3E%3Cellipse cx='0' cy='7.6' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='7.6' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='7.8' rx='8.5' ry='4.5'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 22px 16px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.7));
+}
+.quest-chain-a { --tilt: -5.5deg; }
+.quest-chain-b { --tilt: 5.5deg; opacity: 0.92; }
+
+.quest-lock-hub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.quest-lock-hang {
+  position: relative;
+  display: block;
+  transform-origin: 50% 12%;
+}
+.quest-lock-svg {
+  display: block;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.75));
+}
+.quest-lock-shackle {
+  transform-box: fill-box;
+  transform-origin: 50%;
+}
+.quest-lock-key {
+  fill: #241a05;
+}
+.quest-lock-plate {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--border-gold-strong);
+  border-radius: 0.5rem;
+  background: rgba(6, 5, 8, 0.88);
+  color: var(--gold-bright);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+}
+.quest-lock-spark {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(232, 82, 82, 0.75), rgba(232, 82, 82, 0) 68%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.quest-lock:hover .quest-lock-svg,
+.quest-lock:focus-visible .quest-lock-svg {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 10px rgba(228, 195, 90, 0.45));
+}
+.quest-lock:focus-visible {
+  outline: 2px solid var(--border-gold-strong);
+  outline-offset: -3px;
+}
+.quest-lock:active .quest-lock-hub {
+  transform: translateY(1px);
+}
+
+/* the refusal: chains rattle, the lock jolts on its hanger, the shackle jumps
+   in its seat, the keyhole flashes red and the plate shakes */
+@keyframes qlock-chain-rattle {
+  0% { transform: translateY(-50%) rotate(var(--tilt)); }
+  12% { transform: translateY(-50%) rotate(calc(var(--tilt) * 0.72)) scaleX(1.012); }
+  28% { transform: translateY(-50%) rotate(calc(var(--tilt) * 1.22)) translateY(1px); }
+  44% { transform: translateY(-50%) rotate(calc(var(--tilt) * 0.86)); }
+  62% { transform: translateY(-50%) rotate(calc(var(--tilt) * 1.1)); }
+  80% { transform: translateY(-50%) rotate(calc(var(--tilt) * 0.96)); }
+  100% { transform: translateY(-50%) rotate(var(--tilt)); }
+}
+@keyframes qlock-jolt {
+  0% { transform: translateY(0) rotate(0); }
+  10% { transform: translateY(2.5px) rotate(-8deg); }
+  24% { transform: translateY(0.5px) rotate(6.5deg); }
+  40% { transform: translateY(1.5px) rotate(-4.5deg); }
+  56% { transform: translateY(0) rotate(3deg); }
+  72% { transform: rotate(-1.6deg); }
+  86% { transform: rotate(0.8deg); }
+  100% { transform: translateY(0) rotate(0); }
+}
+@keyframes qlock-shackle {
+  0% { transform: translateY(0); }
+  14% { transform: translateY(-1.8px); }
+  26% { transform: translateY(0.5px); }
+  38% { transform: translateY(-0.9px); }
+  52% { transform: translateY(0.2px); }
+  70%, 100% { transform: translateY(0); }
+}
+@keyframes qlock-deny-key {
+  0%, 100% { fill: #241a05; }
+  20%, 60% { fill: #ff5a5a; }
+}
+@keyframes qlock-spark {
+  0% { opacity: 0; transform: scale(0.5); }
+  22% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes qlock-deny-plate {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-3px); }
+  35% { transform: translateX(3px); }
+  55% { transform: translateX(-2px); }
+  75% { transform: translateX(1.5px); }
+}
+@keyframes qlock-deny-plate-tint {
+  0%, 100% { border-color: var(--border-gold-strong); color: var(--gold-bright); }
+  15%, 65% { border-color: rgba(232, 82, 82, 0.75); color: #ff8b8b; }
+}
+
+.quest-lock-rig.is-tugged .quest-chain {
+  animation: qlock-chain-rattle 0.62s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.quest-lock-rig.is-tugged .quest-chain-b { animation-delay: 40ms; }
+.quest-lock-rig.is-tugged .quest-lock-hang {
+  animation: qlock-jolt 0.62s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.quest-lock-rig.is-tugged .quest-lock-shackle { animation: qlock-shackle 0.62s ease-out both; }
+.quest-lock-rig.is-tugged .quest-lock-key { animation: qlock-deny-key 0.62s ease-out both; }
+.quest-lock-rig.is-tugged .quest-lock-spark { animation: qlock-spark 0.6s ease-out both; }
+.quest-lock-rig.is-tugged .quest-lock-plate {
+  animation:
+    qlock-deny-plate 0.55s ease-out both,
+    qlock-deny-plate-tint 1.1s ease-out both;
+}
+
+/* the idle sway — only for players who did not ask for stillness */
+@media (prefers-reduced-motion: no-preference) {
+  .quest-lock-rig:not(.is-tugged) .quest-lock-hang {
+    animation: qlock-sway 5.5s ease-in-out infinite;
+  }
+}
+@keyframes qlock-sway {
+  0%, 100% { transform: rotate(-1.2deg); }
+  50% { transform: rotate(1.2deg); }
+}
+
+/* Reduced motion: the refusal still has to *read* as a refusal, so the plate
+   keeps its red state and only the movement goes. */
+@media (prefers-reduced-motion: reduce) {
+  .quest-lock-rig.is-tugged .quest-chain,
+  .quest-lock-rig.is-tugged .quest-lock-hang,
+  .quest-lock-rig.is-tugged .quest-lock-shackle,
+  .quest-lock-rig.is-tugged .quest-lock-spark,
+  .quest-lock-rig.is-tugged .quest-lock-plate {
+    animation: none;
+  }
+  .quest-lock-rig.is-tugged .quest-lock-plate {
+    border-color: rgba(232, 82, 82, 0.75);
+    color: #ff8b8b;
+  }
 }

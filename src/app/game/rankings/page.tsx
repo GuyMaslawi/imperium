@@ -13,6 +13,8 @@ import { ShieldBadges, ShieldGlyph } from "@/components/game/ShieldBadges";
 import { getShieldsForEmpires } from "@/lib/game/diamondEffects";
 import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { PresenceDot } from "@/components/ui/PresenceDot";
+import { PRESENCE_ONLINE_MS } from "@/lib/game/chat";
 import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
@@ -199,7 +201,21 @@ export default async function RankingsPage({
               </span>
             </Tip>
           </h2>
-          <div className="flex items-center gap-3">
+          {/* Wraps: three legend pills and a link do not fit one phone line. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {/* Legend for the presence pill on the rows below. The rows say
+                "מחובר" in words, so this only has to answer the question the
+                word raises: connected as of when? */}
+            <Tip
+              tip={`"מחובר" = המשחק היה פתוח אצל השחקן ב-${Math.round(
+                PRESENCE_ONLINE_MS / 60000
+              )} הדקות האחרונות. הטבלה מתרעננת לבדה כל 30 שניות.`}
+            >
+              <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
+                <PresenceDot online label />
+                <PresenceDot online={false} label />
+              </span>
+            </Tip>
             {/* Legend for the shield pills on the rows below. */}
             <Tip tip="שחקן עם מגן משאבים לא ניתן לביזה, ושחקן עם מגן חיילים לא ניתן לשעבוד. אפשר עדיין לתקוף אותו — פשוט אין ממה להרוויח שלל.">
               <span className="inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] text-zinc-300">
@@ -337,6 +353,13 @@ export default async function RankingsPage({
                               and a two-icon shield rebus. Everything that stayed
                               now says what it is in words. */}
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 empty:mt-0">
+                            {/* Is this player at the keyboard right now? On a
+                                board people read to pick targets that is the
+                                first thing worth knowing — an offline empire
+                                cannot move its gold to the bank or answer the
+                                raid — so it leads the line, in words rather than
+                                as a bare dot needing a legend. */}
+                            <PresenceDot online={empire.online} label />
                             {/* Everyone on this ladder holds the same number of
                                 cities — that is what the bucket *is* — so the
                                 city under each name is the same one. It is

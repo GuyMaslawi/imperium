@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { isOnline } from "@/lib/game/chat";
 
 /**
  * The city ladder: every empire in one city tier, ranked by military power.
@@ -32,6 +33,16 @@ export interface LadderRow {
   army: { soldiers: number } | null;
   hero: { level: number; resets: number } | null;
   power: number;
+  /**
+   * Whether this player had the game open in the last few minutes.
+   *
+   * A boolean, never the timestamp behind it. `Empire.lastSeenAt` is the same
+   * heartbeat the chat presence dot reads, and shipping the raw hour of it would
+   * hand every reader a free activity log of everyone in their city — when a
+   * target sleeps, and therefore when they cannot answer a raid. The dot answers
+   * "now or not now" and that is all the ladder needs.
+   */
+  online: boolean;
 }
 
 /** Ranked rows per page. */
@@ -156,10 +167,11 @@ export async function getCityLadderPage(
       soldiers: number | null;
       level: number | null;
       resets: number | null;
+      lastSeenAt: Date | null;
     }[]
   >`
     SELECT e.id, e.name, e.gold, e."militaryPower" AS power,
-           a.soldiers, h.level, h.resets
+           e."lastSeenAt", a.soldiers, h.level, h.resets
     FROM "Empire" e
     LEFT JOIN "Army" a ON a."empireId" = e.id
     LEFT JOIN "Hero" h ON h."empireId" = e.id
@@ -167,6 +179,11 @@ export async function getCityLadderPage(
     ORDER BY ${LADDER_ORDER}
     LIMIT ${PAGE_SIZE} OFFSET ${firstRank - 1}
   `;
+
+  // One clock for the whole page, so ten rows read against the same instant
+  // rather than each against its own — two players last seen the same second
+  // must not come back one online and one not.
+  const now = new Date();
 
   return {
     rows: rows.map((r) => ({
@@ -176,6 +193,11 @@ export async function getCityLadderPage(
       power: r.power,
       army: r.soldiers === null ? null : { soldiers: r.soldiers },
       hero: r.level === null ? null : { level: r.level, resets: r.resets ?? 0 },
+      // The viewer is here by definition — they are reading this. Their own
+      // heartbeat is stamped by the chat dock's poll, which on a fresh tab has
+      // not run yet, so trusting the column alone would draw "לא מחובר" on the
+      // one row whose reader knows better.
+      online: r.id === viewerId || isOnline(r.lastSeenAt, now),
     })),
     total,
     myRank,

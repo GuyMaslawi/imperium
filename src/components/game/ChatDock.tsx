@@ -11,6 +11,8 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+// The dot is shared with the rankings ladder — see components/ui/PresenceDot.
+import { PresenceDot } from "@/components/ui/PresenceDot";
 import {
   CHAT_BODY_MAX,
   CHAT_SEARCH_MIN,
@@ -120,28 +122,6 @@ function mergeLines(current: ChatLine[], incoming: ChatLine[], cap: number) {
 }
 
 const LINE_CAP = 120;
-
-/**
- * The presence dot. Green means a browser had the game open in the last few
- * minutes (see PRESENCE_ONLINE_MS); hollow grey means the player is somewhere
- * else — not that they are unreachable, since a private line waits in their
- * badge either way, which is what the title says out loud.
- */
-function PresenceDot({ online }: { online?: boolean }) {
-  // Undisclosed presence draws nothing. A hollow dot reads as "this player is
-  // away", and search results genuinely do not know — see searchChatPlayers.
-  if (online === undefined) return null;
-  return (
-    <span
-      title={online ? "מחובר עכשיו" : "לא מחובר"}
-      className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-        online
-          ? "chat-online bg-accent-green"
-          : "border border-bone-dim/50 bg-transparent"
-      }`}
-    />
-  );
-}
 
 export function ChatDock({ canModerate = false }: { canModerate?: boolean }) {
   const mounted = useSyncExternalStore(

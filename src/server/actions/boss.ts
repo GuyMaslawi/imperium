@@ -9,7 +9,11 @@ import {
   startBossAssault,
   type BossSortieOutcome,
 } from "@/server/bossSiege";
-import { getBossArenaState, type BossArenaState } from "@/server/bossBattleState";
+import {
+  getBossArenaState,
+  recentBossFightId,
+  type BossArenaState,
+} from "@/server/bossBattleState";
 import { logError } from "@/server/errorLog";
 
 export interface BossActionState {
@@ -18,11 +22,19 @@ export interface BossActionState {
 
 /**
  * What the arena polls for. Either the assault is still running (`state`), or it
- * has settled and the report is ready (`fightId`).
+ * has settled and the report is ready (`fightId`) — or the round told us nothing
+ * at all (`retry`), which is a different thing from "there is nothing left".
+ *
+ * That third case has to be explicit. A refused round (rate limit, a signed-out
+ * tab, a transient error) used to be indistinguishable from a finished siege, and
+ * the arena treated both as "leave" — so a throttled poll could yank a player off
+ * a battle that was still running.
  */
 export interface BossArenaPoll {
   state?: BossArenaState | null;
   fightId?: string;
+  /** Nothing was learned this round; ask again, change nothing. */
+  retry?: boolean;
 }
 
 /**
@@ -62,14 +74,14 @@ export async function attackCityBoss(): Promise<BossActionState> {
 export async function pollBossArena(): Promise<BossArenaPoll> {
   try {
     const empireId = await getActiveEmpireId();
-    if (empireId === null) return {};
+    if (empireId === null) return { retry: true };
 
     // The fastest poll in the game (1.5s), and until this it had no upper bound at
     // all. Free to allow — see `localRateLimit` for why a read path gets the
     // in-process ceiling rather than the Postgres-counted one. A refused round is
     // indistinguishable from a slow one: the arena asks again immediately.
     if (!localRateLimit(`poll:arena:${empireId}`, POLL_LIMIT, POLL_WINDOW_MS)) {
-      return {};
+      return { retry: true };
     }
 
     const settled = await settleDueAssault(empireId);
@@ -79,9 +91,18 @@ export async function pollBossArena(): Promise<BossArenaPoll> {
       revalidatePath("/game", "layout");
       return { fightId: settled.fightId };
     }
-    return { state: await getBossArenaState(empireId) };
+
+    const state = await getBossArenaState(empireId);
+    if (state) return { state };
+
+    // No running assault and this call did not settle one — which almost always
+    // means somebody else just did (the inbox poll runs on every screen and races
+    // this one). The report is still what the player is waiting for, so hand it
+    // over instead of reporting emptiness.
+    const fightId = await recentBossFightId(empireId);
+    return fightId ? { fightId } : {};
   } catch (err) {
     await logError("boss.pollBossArena", err);
-    return {};
+    return { retry: true };
   }
 }
