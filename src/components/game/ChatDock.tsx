@@ -57,9 +57,9 @@ const POLL_OPEN_MS = 4_000;
 const POLL_THREADS_MS = 8_000;
 const POLL_CLOSED_MS = 25_000;
 
-const OPEN_KEY = "imperium-chat-open";
-const TAB_KEY = "imperium-chat-tab";
-const ROOM_SEEN_KEY = "imperium-chat-room-seen";
+const OPEN_KEY = "kraldor-chat-open";
+const TAB_KEY = "kraldor-chat-tab";
+const ROOM_SEEN_KEY = "kraldor-chat-room-seen";
 
 type Tab = "global" | "direct";
 

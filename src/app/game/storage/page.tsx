@@ -12,7 +12,7 @@ import { oreVars } from "@/components/game/oreTint";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
-export const metadata = { title: "מחסנים | אימפריום" };
+export const metadata = { title: "מחסנים | קראלדור" };
 
 /** Dust drifting through the warehouse district — fixed table, no randomness. */
 const DUST = [

@@ -5,7 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import { ItemCatalog } from "@/components/game/ItemCatalog";
 import { catalogKey } from "@/components/game/heroItemView";
 
-export const metadata = { title: "כל הפריטים | IMPERIUM" };
+export const metadata = { title: "כל הפריטים | KRALDOR" };
 
 /** The complete hero item catalog: every tier level in every slot. */
 export default async function HeroItemsPage() {

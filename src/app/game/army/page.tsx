@@ -5,7 +5,7 @@ import { TrainCard } from "@/components/game/TrainCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 
-export const metadata = { title: "צבא | אימפריום" };
+export const metadata = { title: "צבא | קראלדור" };
 
 export default async function ArmyPage() {
   const empire = await requireEmpire();

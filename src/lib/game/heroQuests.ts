@@ -153,7 +153,7 @@ const QUEST_TABLE: ReadonlyArray<Omit<HeroQuest, "tier" | "hours">> = [
   {
     key: "crown_tower",
     name: "עלייה למגדל הכתר השבור",
-    lore: "המגדל שממנו שלט הקיסר האפל הראשון. יממה שלמה של טיפוס, ובראשו כל מה שנשאר מהאימפריום הישן.",
+    lore: "המגדל שממנו שלט הקיסר האפל הראשון. יממה שלמה של טיפוס, ובראשו כל מה שנשאר מקראלדור הישנה.",
     sigil: "👑",
     itemChance: 0.8,
     potionChance: 0.75,

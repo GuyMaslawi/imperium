@@ -5,7 +5,7 @@ import { getBossArenaState, recentBossFightId } from "@/server/bossBattleState";
 import { BossArena } from "@/components/game/BossArena";
 import { Icon } from "@/components/ui/Icon";
 
-export const metadata = { title: "קרב בוס | IMPERIUM" };
+export const metadata = { title: "קרב בוס | KRALDOR" };
 
 /**
  * The arena — a running assault, watched.

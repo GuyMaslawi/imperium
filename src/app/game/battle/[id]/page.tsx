@@ -19,7 +19,7 @@ import {
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 import { shieldMeta } from "@/lib/game/diamondShop";
 
-export const metadata = { title: "תוצאת קרב | IMPERIUM" };
+export const metadata = { title: "תוצאת קרב | KRALDOR" };
 
 const RES = [
   { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" />, label: "זהב" },

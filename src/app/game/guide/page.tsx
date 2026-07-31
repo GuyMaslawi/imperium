@@ -197,7 +197,7 @@ import {
   type GuideSectionMeta,
 } from "@/components/game/guide/GuideUi";
 
-export const metadata = { title: "מדריך המשחק | IMPERIUM" };
+export const metadata = { title: "מדריך המשחק | KRALDOR" };
 
 /* ------------------------------------------------------------------ *
  * The manual's spine. The order here drives the numerals, the table
@@ -304,7 +304,7 @@ export default async function GuidePage() {
     <div className="space-y-6">
       <SectionHeading
         title="מדריך המשחק"
-        subtitle="THE IMPERIUM FIELD MANUAL"
+        subtitle="THE KRALDOR FIELD MANUAL"
         ornament={<Icon name="reports" size={22} className="text-crimson" />}
       />
 
@@ -372,7 +372,7 @@ export default async function GuidePage() {
             {/* ============================ 01 overview ============================ */}
             <GuideSection meta={SECTIONS.overview} index={INDEX.overview}>
               <Lead>
-                אימפריום הוא משחק אסטרטגיה של אימפריות שרצות על שעון אמיתי. אתה לא
+                קראלדור הוא משחק אסטרטגיה של אימפריות שרצות על שעון אמיתי. אתה לא
                 &quot;משחק תור&quot; — האימפריה שלך מייצרת, גדלה ונשדדת גם כשאתה לא מחובר.
                 כל מה שתעשה מסתובב בלולאה אחת קבועה:
               </Lead>
@@ -1173,7 +1173,7 @@ export default async function GuidePage() {
             {/* ============================ 11 battle ============================ */}
             <GuideSection meta={SECTIONS.battle} index={INDEX.battle}>
               <Lead>
-                קרב באימפריום הוא <b>דטרמיניסטי</b> — אין קובייה ואין מזל. שני מספרים
+                קרב בקראלדור הוא <b>דטרמיניסטי</b> — אין קובייה ואין מזל. שני מספרים
                 מושווים, והגדול מנצח. זה אומר שכל תקיפה ניתנת לחישוב מראש, וזה בדיוק מה
                 שהמחשבון למטה עושה.
               </Lead>

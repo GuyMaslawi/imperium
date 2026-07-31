@@ -17,7 +17,7 @@ import { Card, CardTitle } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
-export const metadata = { title: "שדרוגים | אימפריום" };
+export const metadata = { title: "שדרוגים | קראלדור" };
 
 export default async function UpgradesPage() {
   const empire = await requireEmpire();

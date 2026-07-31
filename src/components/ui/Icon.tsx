@@ -10,7 +10,7 @@ import {
 } from "react-icons/gi";
 
 /**
- * IMPERIUM icon set — professional game-art silhouettes (game-icons.net via
+ * KRALDOR icon set — professional game-art silhouettes (game-icons.net via
  * react-icons). Each icon renders in `currentColor`, so it takes the antique
  * gold of a heading or the bone tone of the nav automatically. One shared
  * component keeps every call site (`<Icon name="gold" />`) stable regardless of

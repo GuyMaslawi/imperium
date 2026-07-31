@@ -13,7 +13,7 @@ import {
   type ShieldKey,
 } from "@/lib/game/diamondShop";
 
-export const metadata = { title: "יהלומים | IMPERIUM" };
+export const metadata = { title: "יהלומים | KRALDOR" };
 
 export default async function DiamondsPage() {
   const empire = await requireEmpire();

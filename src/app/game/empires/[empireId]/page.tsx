@@ -18,7 +18,7 @@ import {
   tierForLevel,
 } from "@/lib/game/hero";
 
-export const metadata = { title: "פרופיל אימפריה | אימפריום" };
+export const metadata = { title: "פרופיל אימפריה | קראלדור" };
 
 /**
  * A dossier is one panel: the hero, what he wears, and the buttons you came to

@@ -16,7 +16,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 
-export const metadata = { title: "בנק | אימפריום" };
+export const metadata = { title: "בנק | קראלדור" };
 
 const TRANSACTION_META: Record<
   BankTransactionType,

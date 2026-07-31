@@ -39,7 +39,7 @@ import { prisma } from "@/lib/prisma";
 import { getTunables } from "@/lib/game/config";
 import { heroQuestXp } from "@/lib/game/heroQuests";
 
-export const metadata = { title: "גיבור | IMPERIUM" };
+export const metadata = { title: "גיבור | KRALDOR" };
 
 export default async function HeroPage() {
   const empire = await requireEmpire();

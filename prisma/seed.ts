@@ -68,7 +68,7 @@ interface DemoEmpire {
 
 const DEMO_EMPIRES: DemoEmpire[] = [
   {
-    email: "leviathan@demo.imperium",
+    email: "leviathan@demo.kraldor",
     userName: "אריאל",
     empireName: "ממלכת הלווייתן",
     level: 8,
@@ -77,7 +77,7 @@ const DEMO_EMPIRES: DemoEmpire[] = [
     soldiers: 400, spies: 8, mineSlaves: 150, upgradeLevel: 4,
   },
   {
-    email: "desert@demo.imperium",
+    email: "desert@demo.kraldor",
     userName: "נועה",
     empireName: "נסיכות המדבר",
     level: 6,
@@ -86,7 +86,7 @@ const DEMO_EMPIRES: DemoEmpire[] = [
     soldiers: 250, spies: 5, mineSlaves: 100, upgradeLevel: 3,
   },
   {
-    email: "north@demo.imperium",
+    email: "north@demo.kraldor",
     userName: "עידו",
     empireName: "מבצר הצפון",
     level: 5,
@@ -95,7 +95,7 @@ const DEMO_EMPIRES: DemoEmpire[] = [
     soldiers: 180, spies: 3, mineSlaves: 80, upgradeLevel: 2,
   },
   {
-    email: "valley@demo.imperium",
+    email: "valley@demo.kraldor",
     userName: "מאיה",
     empireName: "עמק הזהב",
     level: 4,
@@ -104,7 +104,7 @@ const DEMO_EMPIRES: DemoEmpire[] = [
     soldiers: 120, spies: 2, mineSlaves: 60, upgradeLevel: 2,
   },
   {
-    email: "storm@demo.imperium",
+    email: "storm@demo.kraldor",
     userName: "יונתן",
     empireName: "לגיון הסערה",
     level: 3,
@@ -113,7 +113,7 @@ const DEMO_EMPIRES: DemoEmpire[] = [
     soldiers: 90, spies: 1, mineSlaves: 40, upgradeLevel: 1,
   },
   {
-    email: "dawn@demo.imperium",
+    email: "dawn@demo.kraldor",
     userName: "תמר",
     empireName: "שומרי השחר",
     level: 2,
@@ -187,7 +187,7 @@ function demoHero(empireLevel: number) {
  * Refuse to seed a production database.
  *
  * The demo empires below share one well-known password, and their addresses are
- * on a `.imperium` pseudo-TLD that nobody can ever receive mail at — so a demo
+ * on a `.kraldor` pseudo-TLD that nobody can ever receive mail at — so a demo
  * row in production is an unauthenticated login for anyone who reads this file,
  * and (while such an address sits in ADMIN_EMAILS) a route to ADMIN. The build
  * command runs `prisma migrate deploy` against the production database, so a

@@ -85,7 +85,7 @@ export function newEmpireData(
       create: [
         {
           kind: "SYSTEM",
-          title: "📣 ברוך הבא לאימפריום!",
+          title: "📣 ברוך הבא לקראלדור!",
           body: "האימפריה שלך נוסדה. אמן חיילים, שדרג מכרות ופתח במלחמה — הכל מתחיל בבסיס.",
           href: "/game/base",
         },

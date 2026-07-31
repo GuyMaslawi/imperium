@@ -12,7 +12,7 @@ import {
   type SpyRow,
 } from "@/components/game/ReportsTabs";
 
-export const metadata = { title: "דוחות | אימפריום" };
+export const metadata = { title: "דוחות | קראלדור" };
 
 /** The stack of dispatches on the desk — how far each sheet is turned. */
 const PAPERS = ["-11deg", "6deg", "-2deg"];

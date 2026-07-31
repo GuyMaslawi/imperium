@@ -8,7 +8,7 @@ import { applyPendingUpdates } from "@/lib/game/updates";
 import { isBanned } from "@/lib/ban";
 import { getSeasonGate } from "@/server/seasonClose";
 
-const SESSION_COOKIE = "imperium_session";
+const SESSION_COOKIE = "kraldor_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 /**
@@ -84,7 +84,7 @@ export async function destroySession(): Promise<void> {
  * admin's `tokenVersion` for the same reason the session does, so a password
  * reset (or a ban) during the impersonation invalidates the way back too.
  */
-const IMPERSONATION_COOKIE = "imperium_admin_return";
+const IMPERSONATION_COOKIE = "kraldor_admin_return";
 /** Short-lived on purpose: an impersonation is a task, not a mode to live in. */
 const IMPERSONATION_DURATION_SECONDS = 60 * 60 * 4; // 4 hours
 

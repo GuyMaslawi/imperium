@@ -35,7 +35,7 @@ export function isMailLive(): boolean {
 
 /** Raw MAIL_FROM, in either `you@example.com` or `Name <you@example.com>` form. */
 function fromAddress(): string {
-  return process.env.MAIL_FROM ?? "Imperium <onboarding@resend.dev>";
+  return process.env.MAIL_FROM ?? "Kraldor <onboarding@resend.dev>";
 }
 
 /**
@@ -45,7 +45,7 @@ function fromAddress(): string {
  */
 function parseFrom(raw: string): { name: string; email: string } {
   const m = raw.match(/^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/);
-  const name = (m ? m[1] : "").trim() || "Imperium";
+  const name = (m ? m[1] : "").trim() || "Kraldor";
   const email = (m ? m[2]! : raw).trim();
   return { name: name.slice(0, 70), email };
 }

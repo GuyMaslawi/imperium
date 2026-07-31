@@ -40,7 +40,7 @@ import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SpyEffectsBoard, type SpyEffectRow } from "@/components/game/SpyEffectsBoard";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 
-export const metadata = { title: "דוח ריגול | IMPERIUM" };
+export const metadata = { title: "דוח ריגול | KRALDOR" };
 
 /* ============================ presentational atoms ============================ */
 

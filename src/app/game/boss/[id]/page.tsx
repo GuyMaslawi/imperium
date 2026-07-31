@@ -28,7 +28,7 @@ import {
 import type { BossRoundLogEntry } from "@/server/bossSiege";
 import { cityName } from "@/lib/game/cities";
 
-export const metadata = { title: "קרב בוס | IMPERIUM" };
+export const metadata = { title: "קרב בוס | KRALDOR" };
 
 /** Reward columns, paired with the report field that holds each amount. */
 const REWARD_FIELDS = {

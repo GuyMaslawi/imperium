@@ -5,7 +5,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { AchievementList } from "@/components/game/AchievementList";
 import { getAchievementsState } from "@/server/achievementState";
 
-export const metadata = { title: "הישגים | IMPERIUM" };
+export const metadata = { title: "הישגים | KRALDOR" };
 
 /** Dust settling through the case — fixed, so SSR and hydration agree. */
 const CASE_DUST = [

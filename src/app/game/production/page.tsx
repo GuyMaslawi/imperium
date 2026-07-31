@@ -18,7 +18,7 @@ import { MineSlaveQuickActions } from "@/components/game/MineSlaveQuickActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 
-export const metadata = { title: "ייצור | אימפריום" };
+export const metadata = { title: "ייצור | קראלדור" };
 
 /** Furnace smoke behind the industry banner — fixed table, no randomness. */
 const SMOKE = [

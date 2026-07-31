@@ -11,7 +11,7 @@ import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
-export const metadata = { title: "טבלאות מובילים | IMPERIUM" };
+export const metadata = { title: "טבלאות מובילים | KRALDOR" };
 
 type Period = "day" | "week";
 

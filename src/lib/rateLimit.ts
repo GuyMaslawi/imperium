@@ -251,3 +251,19 @@ export async function clientIp(): Promise<string> {
     return "unknown";
   }
 }
+
+/**
+ * The client IP to *store* against an account, or null when there is nothing
+ * worth storing.
+ *
+ * `clientIp` returns the sentinel `"unknown"` so the rate limiter always has a
+ * bucket key, but that sentinel must never be written to a row: it is not an
+ * address, and persisting it would make every account whose IP could not be read
+ * cluster together under one fake "shared address" — turning a dev environment,
+ * or any run behind a proxy we do not trust, into a wall of false alt rings.
+ * Storing null instead keeps those accounts out of every cluster.
+ */
+export async function clientIpForStorage(): Promise<string | null> {
+  const ip = await clientIp();
+  return ip === "unknown" ? null : ip;
+}

@@ -18,7 +18,7 @@ import { PRESENCE_ONLINE_MS } from "@/lib/game/chat";
 import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
-export const metadata = { title: "דירוג | אימפריום" };
+export const metadata = { title: "דירוג | קראלדור" };
 
 /** Page links to draw around the current one, either side. */
 const PAGER_SPREAD = 2;

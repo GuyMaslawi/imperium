@@ -36,7 +36,7 @@ export const CITY_NAMES: readonly CityName[] = [
   { name: "מגידו", epithet: "שדה הקרב האחרון" },
   { name: "פתרוס", epithet: "עיר הכבשנים" },
   { name: "בבל", epithet: "צל המגדל" },
-  { name: "אימפריום", epithet: "כס הכתר השבור" },
+  { name: "קראלדור", epithet: "כס הכתר השבור" },
 ].map((city, index) => ({ ...city, tier: index + 1 }));
 
 /** The city at a given tier; clamped to the catalog's ends. */

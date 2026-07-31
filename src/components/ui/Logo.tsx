@@ -1,5 +1,5 @@
 /**
- * IMPERIUM brandmark — "Obsidian & Crimson".
+ * KRALDOR brandmark — "Obsidian & Crimson".
  * A dark imperial crest: an obsidian shield edged in crimson, a bone crown
  * notch, and a crimson blade-pillar monogram at its heart. Self-contained SVG,
  * no external assets — scales cleanly anywhere.
@@ -44,7 +44,7 @@ export function LogoMark({ size = 36, className }: { size?: number; className?: 
       />
       {/* crown notch */}
       <path d="M16 9l4 3 4-4 4 4 4-3-1.4 5H17.4z" fill="var(--bone)" opacity="0.85" />
-      {/* crimson blade-pillar monogram (the "I" of Imperium) */}
+      {/* gilded blade-pillar at the crest's heart */}
       <path d="M24 15l3 3-3 14-3-14z" fill={`url(#${id}-blade)`} />
       <rect x="18.5" y="14.2" width="11" height="2.4" rx="1" fill="var(--bone)" />
       <circle cx="24" cy="34" r="1.6" fill="#e4c35a" />
@@ -70,14 +70,14 @@ export function Logo({
           className="font-black tracking-[0.22em] text-bone-bright"
           style={{ fontSize: size * 0.5 }}
         >
-          IMP<span className="text-crimson-bright">E</span>RIUM
+          KRA<span className="text-crimson-bright">L</span>DOR
         </span>
         {subtitle && (
           <span
             className="mt-1 tracking-[0.42em] text-bone-dim"
             style={{ fontSize: size * 0.2 }}
           >
-            אימפריום
+            קראלדור
           </span>
         )}
       </div>

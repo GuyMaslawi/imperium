@@ -25,7 +25,7 @@ const SPARKS = [
  *
  * It is also the one element both screens share, so the vault scene lives
  * here: a cut stone turning on its axis, a wheel of light off its facets and
- * sparks in the air. Cold blues, deliberately — everything else in IMPERIUM
+ * sparks in the air. Cold blues, deliberately — everything else in KRALDOR
  * is gold and firelight, and diamonds are the one currency you cannot mine.
  */
 export function DiamondsHeader({

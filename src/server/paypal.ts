@@ -53,7 +53,7 @@ export function getPaypalConfig(): PaypalConfig | null {
     apiBase:
       env === "live" ? "https://api-m.paypal.com" : "https://api-m.sandbox.paypal.com",
     webhookId: process.env.PAYPAL_WEBHOOK_ID?.trim() || null,
-    brandName: process.env.PAYPAL_BRAND_NAME?.trim() || "IMPERIUM",
+    brandName: process.env.PAYPAL_BRAND_NAME?.trim() || "KRALDOR",
   };
 }
 

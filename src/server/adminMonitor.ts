@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { bannedWhere, notBannedWhere } from "@/lib/ban";
+import { bannedWhere, isBanned, notBannedWhere } from "@/lib/ban";
 import { ATTACK_TURN_COST, SPY_TURN_COST } from "@/lib/game/constants";
 
 /**
@@ -218,6 +218,116 @@ export async function getFailedLogins(take = 10): Promise<FailedLoginRow[]> {
     },
   });
   return users.map((u) => ({ userId: u.id, ...u }));
+}
+
+/* ------------------------------ alt clusters ------------------------------ */
+
+/** One account inside a shared-address cluster. */
+export interface AltAccount {
+  userId: string;
+  name: string;
+  email: string;
+  /** The empire's name, or null for an account that never finished onboarding. */
+  empireName: string | null;
+  createdAt: Date;
+  banned: boolean;
+}
+
+/** A single address, and the accounts that registered from or signed in from it. */
+export interface IpCluster {
+  ip: string;
+  count: number;
+  accounts: AltAccount[];
+}
+
+/**
+ * Accounts that share a client address — the alt-farm signal.
+ *
+ * Several accounts behind one IP are one person's farm far more often than a
+ * coincidence, and a farm is how a player manufactures guaranteed wins: stand up
+ * weak alts, beat them for plunder, captives, hero XP and item drops that a real
+ * opponent would never hand over. This surfaces the rings; it does **not** act on
+ * them. A shared address is also a household, a dorm, a workplace or a mobile
+ * carrier's NAT, so every cluster here is a lead for a human to judge — the raw
+ * IP is shown precisely so that judgement can be made (a residential ISP reads
+ * very differently from a datacenter or VPN) — never grounds for an automatic ban.
+ *
+ * "Shared" spans both slots: an address counts if it appears as the signup *or*
+ * the last-login IP of two or more distinct accounts, because a farmer who
+ * registers over a VPN still tends to log the alts in from home (or the reverse).
+ * The inner `UNION` dedupes each (account, address) pair, so an account whose two
+ * slots hold the same address is counted once, not twice.
+ */
+export async function getSharedIpClusters(take = 12): Promise<IpCluster[]> {
+  const shared = await prisma.$queryRaw<{ ip: string; n: number }[]>`
+    WITH ips AS (
+      SELECT id, "signupIp" AS ip FROM "User" WHERE "signupIp" IS NOT NULL
+      UNION
+      SELECT id, "lastLoginIp" AS ip FROM "User" WHERE "lastLoginIp" IS NOT NULL
+    )
+    SELECT ip, COUNT(*)::int AS n
+    FROM ips
+    GROUP BY ip
+    HAVING COUNT(*) >= 2
+    ORDER BY COUNT(*) DESC, ip ASC
+    LIMIT ${take}
+  `;
+  if (shared.length === 0) return [];
+
+  const ips = shared.map((s) => s.ip);
+  const users = await prisma.user.findMany({
+    where: {
+      OR: [{ signupIp: { in: ips } }, { lastLoginIp: { in: ips } }],
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      createdAt: true,
+      bannedAt: true,
+      bannedUntil: true,
+      signupIp: true,
+      lastLoginIp: true,
+      empire: { select: { name: true } },
+    },
+  });
+
+  // Bucket each account under every shared address it touches. A set of ids per
+  // bucket keeps an account from being listed twice when both its slots hold the
+  // same shared address.
+  const byIp = new Map<string, { accounts: AltAccount[]; ids: Set<string> }>();
+  for (const s of shared) byIp.set(s.ip, { accounts: [], ids: new Set() });
+
+  for (const u of users) {
+    const account: AltAccount = {
+      userId: u.id,
+      name: u.name,
+      email: u.email,
+      empireName: u.empire?.name ?? null,
+      createdAt: u.createdAt,
+      banned: isBanned(u),
+    };
+    for (const slot of [u.signupIp, u.lastLoginIp]) {
+      const bucket = slot ? byIp.get(slot) : undefined;
+      if (bucket && !bucket.ids.has(u.id)) {
+        bucket.ids.add(u.id);
+        bucket.accounts.push(account);
+      }
+    }
+  }
+
+  return shared
+    .map((s) => ({
+      ip: s.ip,
+      count: Number(s.n),
+      // Oldest first: the original account, then the alts stood up after it.
+      accounts: (byIp.get(s.ip)?.accounts ?? []).sort(
+        (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+      ),
+    }))
+    // A row can only fall below two here if accounts were deleted between the two
+    // queries; drop it rather than show a "cluster" of one.
+    .filter((c) => c.accounts.length >= 2);
 }
 
 /* ------------------------------ anomalies ------------------------------ */

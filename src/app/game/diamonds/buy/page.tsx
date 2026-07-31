@@ -7,7 +7,7 @@ import { getCheckoutConfig } from "@/server/payments";
 import { DiamondStore } from "@/components/game/DiamondStore";
 import { DiamondsHeader } from "@/components/game/DiamondsHeader";
 
-export const metadata = { title: "רכישת יהלומים | IMPERIUM" };
+export const metadata = { title: "רכישת יהלומים | KRALDOR" };
 
 export default async function BuyDiamondsPage() {
   const empire = await requireEmpire();

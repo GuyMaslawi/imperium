@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 
-export const metadata = { title: "ניהול | אימפריום" };
+export const metadata = { title: "ניהול | קראלדור" };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const admin = await requireAdmin();

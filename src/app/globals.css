@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 /* =========================================================================
-   IMPERIUM — war-room design system
+   KRALDOR — war-room design system
    A dark, ornate strategy-game aesthetic: warscape background, gold-framed
    panels with corner brackets, parchment-tan CTAs, faction color accents.
    ========================================================================= */
 
 :root {
   /* ===================================================================
-     IMPERIUM — "Obsidian & Crimson" identity
+     KRALDOR — "Obsidian & Crimson" identity
      Obsidian black surfaces, blood-crimson primary accents, warm bone
      for text / secondary. Dark-fantasy, gothic, sharp.
      The historical token NAMES (--gold*, --tan*) are preserved and simply

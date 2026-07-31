@@ -7,7 +7,7 @@ import { AuthShell } from "@/components/auth/AuthShell";
 import { ResendVerification } from "@/components/auth/ResendVerification";
 import { FormMessage } from "@/components/ui/FormMessage";
 
-export const metadata = { title: "אימות אימייל | אימפריום" };
+export const metadata = { title: "אימות אימייל | קראלדור" };
 
 /**
  * Two jobs in one route:

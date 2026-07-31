@@ -12,6 +12,7 @@ import {
   getHotThrottles,
   getPulse,
   getRecentErrors,
+  getSharedIpClusters,
   getTurnBurn,
   countErrors,
   type AnomalyRow,
@@ -181,17 +182,27 @@ export default async function AdminMonitorPage() {
   const now = new Date();
 
   // Every panel is independent, so they load together rather than in sequence.
-  const [pulse, throttles, failedLogins, turnBurn, diamondGap, feed, errors, errorCount] =
-    await Promise.all([
-      getPulse(now),
-      getHotThrottles(now),
-      getFailedLogins(),
-      getTurnBurn(now, DAILY_TURN_CEILING),
-      getDiamondGap(FREE_DIAMOND_ALLOWANCE),
-      getFeed(now),
-      getRecentErrors(),
-      countErrors(now),
-    ]);
+  const [
+    pulse,
+    throttles,
+    failedLogins,
+    altClusters,
+    turnBurn,
+    diamondGap,
+    feed,
+    errors,
+    errorCount,
+  ] = await Promise.all([
+    getPulse(now),
+    getHotThrottles(now),
+    getFailedLogins(),
+    getSharedIpClusters(),
+    getTurnBurn(now, DAILY_TURN_CEILING),
+    getDiamondGap(FREE_DIAMOND_ALLOWANCE),
+    getFeed(now),
+    getRecentErrors(),
+    countErrors(now),
+  ]);
 
   const flagged =
     turnBurn.filter((r) => r.flagged).length +
@@ -332,6 +343,66 @@ export default async function AdminMonitorPage() {
           )}
         </Panel>
       </div>
+
+      {/* -------- alt clusters -------- */}
+      <Panel
+        title="חשבונות שחולקים כתובת"
+        icon="👥"
+        hint="חשבונות שנרשמו או התחברו מאותה כתובת IP — לרוב חווה של שחקן אחד. זה רמז לבדיקה, לא הוכחה: גם בית, מעונות או רשת סלולרית נראים ככה. שקול לפני חסימה."
+      >
+        {altClusters.length === 0 ? (
+          <Empty>אף כתובת לא משותפת ליותר מחשבון אחד.</Empty>
+        ) : (
+          <ul className="space-y-2.5">
+            {altClusters.map((c) => (
+              <li key={c.ip} className="rounded-lg bg-black/30 p-3">
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <span className="nums text-xs text-zinc-500" dir="ltr">
+                    {c.ip}
+                  </span>
+                  <span
+                    className={`rounded px-1.5 text-[10px] font-black ${
+                      c.count >= 3
+                        ? "bg-red-500/15 text-red-300"
+                        : "bg-amber-500/15 text-amber-300"
+                    }`}
+                  >
+                    {c.count} חשבונות
+                  </span>
+                </div>
+                <ul className="space-y-1">
+                  {c.accounts.map((a) => (
+                    <li
+                      key={a.userId}
+                      className="flex items-center justify-between gap-3 text-sm"
+                    >
+                      <Link
+                        href={`/admin/users/${a.userId}`}
+                        className="min-w-0 truncate text-zinc-200 hover:text-gold-bright"
+                      >
+                        {a.empireName ?? a.name}{" "}
+                        <span className="text-[11px] text-zinc-600" dir="ltr">
+                          {a.email}
+                        </span>
+                      </Link>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {a.banned && (
+                          <span className="rounded bg-red-500/15 px-1.5 text-[10px] font-bold text-red-300">
+                            בבאן
+                          </span>
+                        )}
+                        <span className="text-[10px] text-zinc-600">
+                          {a.createdAt.toLocaleDateString("he-IL")}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
 
       {/* -------- anomalies -------- */}
       <Panel

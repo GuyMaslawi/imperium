@@ -8,7 +8,7 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "אימפריום | Imperium",
+  title: "קראלדור | Kraldor",
   description: "בנה אימפריה. צור ברית. כבוש את הדירוג.",
 };
 

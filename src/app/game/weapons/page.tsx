@@ -13,7 +13,7 @@ import {
   weaponTierUnlockCost,
 } from "@/lib/game/weapons";
 
-export const metadata = { title: "נשקים | אימפריום" };
+export const metadata = { title: "נשקים | קראלדור" };
 
 const TAB_POWER_LABELS = {
   ATTACK: "כוח התקפה כולל מנשקים",

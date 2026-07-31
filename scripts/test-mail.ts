@@ -6,7 +6,7 @@
  * ever clear the verification gate.
  *
  *   BREVO_API_KEY=xkeysib-... \
- *   MAIL_FROM='Imperium <you@example.com>' \
+ *   MAIL_FROM='Kraldor <you@example.com>' \
  *   npx tsx scripts/test-mail.ts you@example.com
  *
  * Deliberately does NOT import src/server/mailer.ts: that module is marked
@@ -19,11 +19,11 @@
 
 function parseFrom(raw: string): { name: string; email: string } {
   const m = raw.match(/^\s*(.*?)\s*<\s*([^>]+)\s*>\s*$/);
-  if (m) return { name: m[1] || "Imperium", email: m[2]! };
-  return { name: "Imperium", email: raw.trim() };
+  if (m) return { name: m[1] || "Kraldor", email: m[2]! };
+  return { name: "Kraldor", email: raw.trim() };
 }
 
-const SUBJECT = "בדיקת שליחה — אימפריום";
+const SUBJECT = "בדיקת שליחה — קראלדור";
 const TEXT = "אם הגיע אליך המייל הזה, שליחת המיילים מוגדרת נכון.";
 const HTML =
   '<div dir="rtl" style="font-family:system-ui,sans-serif">אם הגיע אליך המייל הזה, שליחת המיילים מוגדרת נכון. ✅</div>';

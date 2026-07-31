@@ -24,7 +24,7 @@ import { selectGlory } from "@/lib/game/achievements";
 import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
 
-export const metadata = { title: "בסיס | IMPERIUM" };
+export const metadata = { title: "בסיס | KRALDOR" };
 
 export default async function BasePage() {
   const empire = await requireEmpire();

@@ -3,7 +3,7 @@ import { getSessionUserId } from "@/lib/auth";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { LoginForm } from "@/components/auth/LoginForm";
 
-export const metadata = { title: "התחברות | אימפריום" };
+export const metadata = { title: "התחברות | קראלדור" };
 
 export default async function LoginPage() {
   if (await getSessionUserId()) redirect("/game/base");

@@ -7,7 +7,7 @@ import { formatDate } from "@/lib/game/format";
 import { logout } from "@/server/actions/auth";
 import { AccountSecurity } from "@/components/game/AccountSecurity";
 
-export const metadata = { title: "הגדרות | אימפריום" };
+export const metadata = { title: "הגדרות | קראלדור" };
 
 export default async function SettingsPage() {
   const empire = await requireEmpire();

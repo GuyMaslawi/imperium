@@ -11,7 +11,7 @@ import { MessageCompose, type PlayerOption } from "@/components/game/MessageComp
 import type { MessageKind } from "@prisma/client";
 import type { CSSProperties, ReactNode } from "react";
 
-export const metadata = { title: "הודעות | אימפריום" };
+export const metadata = { title: "הודעות | קראלדור" };
 
 /** The night sky over the loft — fixed, so SSR and hydration agree. */
 const STARS = [

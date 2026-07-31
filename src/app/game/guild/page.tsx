@@ -29,7 +29,7 @@ import { GuildAidCard } from "@/components/game/GuildAidCard";
 import { GuildMemberActions } from "@/components/game/GuildMemberActions";
 import { GuildLeaveButton } from "@/components/game/GuildLeaveButton";
 
-export const metadata = { title: "הברית שלי | IMPERIUM" };
+export const metadata = { title: "הברית שלי | KRALDOR" };
 
 /** How many guilds the recruitment browser lists. */
 const GUILD_BROWSE_LIMIT = 100;

@@ -76,11 +76,30 @@ model User {
   /// blocks all gameplay (see requireEmpire / getActiveEmpireId). Google
   /// sign-ins are verified on arrival via the provider's email_verified claim.
   emailVerified DateTime?
+  /// The client IP this account registered from, and the one it most recently
+  /// signed in from. Stored to surface *alt clusters* — several accounts that
+  /// share an address are one person's farm more often than a coincidence — in
+  /// the admin monitor (getSharedIpClusters). Deliberately a *signal for a human
+  /// to review*, never an automatic block: a shared address is also a household,
+  /// a dorm, a workplace or a phone carrier's NAT, so the false-positive rate is
+  /// far too high to act on without eyes.
+  ///
+  /// Raw, not hashed, on purpose: hashing preserves "do these two match" but
+  /// destroys the judgement the review depends on — a residential ISP address
+  /// reads very differently from a datacenter/VPN one, and only the raw value
+  /// tells them apart. The table is admin-only. `null` when the IP could not be
+  /// read (dev, or a direct connection); nulls never cluster — see clientIp.
+  signupIp      String?
+  lastLoginIp   String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   empire             Empire?
   verificationTokens EmailVerificationToken[]
+
+  /// The alt-cluster lookups: group accounts by the address they share.
+  @@index([signupIp])
+  @@index([lastLoginIp])
 }
 
 /// One outstanding "confirm your email" link.

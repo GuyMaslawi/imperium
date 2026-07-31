@@ -8,7 +8,7 @@ import type { HeroClass } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { createSession, destroySession, getSessionUserId } from "@/lib/auth";
 import { banNotice, isBanned } from "@/lib/ban";
-import { clientIp, rateLimit } from "@/lib/rateLimit";
+import { clientIp, clientIpForStorage, rateLimit } from "@/lib/rateLimit";
 import { verifyGoogleIdToken } from "@/lib/google";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
@@ -91,13 +91,13 @@ async function sendVerificationEmail(user: {
   const link = `${appBaseUrl()}/verify-email?token=${encodeURIComponent(raw)}`;
   return sendMail({
     to: user.email,
-    subject: "אימות כתובת האימייל שלך באימפריום",
-    text: `שלום ${user.name},\n\nכדי להפעיל את החשבון שלך באימפריום, פתח את הקישור:\n${link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.`,
+    subject: "אימות כתובת האימייל שלך בקראלדור",
+    text: `שלום ${user.name},\n\nכדי להפעיל את החשבון שלך בקראלדור, פתח את הקישור:\n${link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.`,
     html: `<div dir="rtl" style="font-family:system-ui,sans-serif;line-height:1.6">
-      <h2>ברוך הבא לאימפריום, ${escapeHtml(user.name)}</h2>
+      <h2>ברוך הבא לקראלדור, ${escapeHtml(user.name)}</h2>
       <p>כדי להפעיל את החשבון ולהתחיל לשחק, אשר את כתובת האימייל שלך:</p>
       <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#b8892b;color:#fff;border-radius:8px;text-decoration:none">אימות האימייל</a></p>
-      <p style="color:#666;font-size:13px">הקישור תקף ל-24 שעות. אם לא נרשמת לאימפריום, אפשר להתעלם מההודעה.</p>
+      <p style="color:#666;font-size:13px">הקישור תקף ל-24 שעות. אם לא נרשמת לקראלדור, אפשר להתעלם מההודעה.</p>
     </div>`,
   });
 }
@@ -266,11 +266,17 @@ export async function register(
     getTunables(),
   ]);
 
+  // Recorded so the admin monitor can surface accounts that all registered from
+  // one address (see getSharedIpClusters). Not the rate-limit `ip` above, which
+  // may be the "unknown" sentinel — that must not be stored (see
+  // clientIpForStorage).
+  const signupIp = await clientIpForStorage();
+
   let user;
   try {
     user = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
-        data: { email, passwordHash, name },
+        data: { email, passwordHash, name, signupIp, lastLoginIp: signupIp },
       });
       await tx.empire.create({
         data: newEmpireData(
@@ -437,16 +443,19 @@ export async function login(
   const rehash = isStaleHash(user.passwordHash!)
     ? await hashPassword(password)
     : null;
-  if (user.failedLogins !== 0 || user.lockedUntil || rehash) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        failedLogins: 0,
-        lockedUntil: null,
-        ...(rehash ? { passwordHash: rehash } : {}),
-      },
-    });
-  }
+  // Stamp the address this sign-in came from (see getSharedIpClusters). This is
+  // why the update is now unconditional: it used to fire only when there was a
+  // streak, a lock or a rehash to clear, but the login IP has to be recorded on
+  // every success — an alt farmer signs in far more often than they fail.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      failedLogins: 0,
+      lockedUntil: null,
+      lastLoginIp: await clientIpForStorage(),
+      ...(rehash ? { passwordHash: rehash } : {}),
+    },
+  });
 
   await createSession(user.id, user.tokenVersion);
   redirect("/game/base");
@@ -637,6 +646,11 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
     }
   }
 
+  // The address this sign-in came from, recorded on the row below. Google is a
+  // full account-creation *and* login path, so it carries the same alt signal as
+  // register/login — see getSharedIpClusters.
+  const googleIp = await clientIpForStorage();
+
   // 3) Brand-new user → create a password-less account (no empire yet).
   if (!user) {
     try {
@@ -648,6 +662,8 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
           image: identity.picture ?? null,
           // Verified by Google — no confirmation link needed.
           emailVerified: new Date(),
+          signupIp: googleIp,
+          lastLoginIp: googleIp,
         },
       });
     } catch (e) {
@@ -670,6 +686,13 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
   if (isBanned(user)) {
     return { error: banNotice(user) };
   }
+
+  // Stamp the login address on every Google sign-in, returning users included —
+  // the create branch above only covers brand-new accounts.
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { lastLoginIp: googleIp },
+  });
 
   await createSession(user.id, user.tokenVersion);
 

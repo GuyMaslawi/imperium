@@ -39,7 +39,7 @@ import {
  * assembling what the screen renders.
  *
  * The campaign is automatic but the game has no cron, so the war is driven the
- * way every other clock in IMPERIUM is — lazily. `advanceWar` materialises
+ * way every other clock in KRALDOR is — lazily. `advanceWar` materialises
  * whatever minute-rounds have come due since it last ran, and it is called from
  * the page load, from the live poll and from settlement. During the window a
  * poll arrives every few seconds, so in practice rounds appear on time; if

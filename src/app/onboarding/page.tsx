@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { OnboardingForm } from "@/components/auth/OnboardingForm";
 
-export const metadata = { title: "הקמת אימפריה | אימפריום" };
+export const metadata = { title: "הקמת אימפריה | קראלדור" };
 
 // Where a signed-in user without an empire (typically a fresh Google sign-up)
 // names and creates their empire. Already-signed-in users with an empire, and

@@ -23,7 +23,7 @@ import {
 import { GuildWarBoard } from "@/components/game/GuildWarBoard";
 import { GuildWarRegister } from "@/components/game/GuildWarRegister";
 
-export const metadata = { title: "מלחמת בריתות | IMPERIUM" };
+export const metadata = { title: "מלחמת בריתות | KRALDOR" };
 
 /** "יום רביעי, 29.7" — pinned to Jerusalem, so every player reads one clock. */
 const bellDayFormatter = new Intl.DateTimeFormat("he-IL", {

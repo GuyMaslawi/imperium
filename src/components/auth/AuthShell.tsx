@@ -17,7 +17,7 @@ export function AuthShell({
           <h1 className="text-4xl font-black tracking-[0.18em] text-bone-bright">
             IMP<span className="text-crimson-bright">E</span>RIUM
           </h1>
-          <p className="mt-1 text-xs font-semibold tracking-[0.4em] text-bone-dim">אימפריום</p>
+          <p className="mt-1 text-xs font-semibold tracking-[0.4em] text-bone-dim">קראלדור</p>
           <p className="mt-3 text-sm text-zinc-400">
             בנה אימפריה. צור ברית. כבוש את הדירוג.
           </p>

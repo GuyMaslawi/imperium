@@ -9,7 +9,7 @@ import { OrnateFrame } from "@/components/ui/OrnateFrame";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 
-export const metadata = { title: "העונה הסתיימה | אימפריום" };
+export const metadata = { title: "העונה הסתיימה | קראלדור" };
 export const dynamic = "force-dynamic";
 
 /**
