@@ -214,9 +214,27 @@ export const requireEmpire = cache(async () => {
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
+  // An explicit select, never `include: { user: true }`. The relation carries
+  // `passwordHash`, `googleId`, `tokenVersion`, `signupIp` and `lastLoginIp`,
+  // and this object is spread into the return value of the function every
+  // `/game/*` page builds itself from — so a whole-row include is one careless
+  // `<SomeClientComponent empire={empire} />` away from serialising the account's
+  // password digest into the RSC payload of every screen in the game. Only the
+  // five fields something actually reads leave the database.
   const existing = await prisma.empire.findUnique({
     where: { userId },
-    include: { user: true },
+    select: {
+      id: true,
+      user: {
+        select: {
+          name: true,
+          email: true,
+          emailVerified: true,
+          bannedAt: true,
+          bannedUntil: true,
+        },
+      },
+    },
   });
   if (!existing) redirect("/login");
   // Banned users lose all game access, until the ban's deadline passes.

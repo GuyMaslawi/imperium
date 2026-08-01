@@ -4,8 +4,10 @@ import {
   HERO_DAMAGE_PER_LOST_DEFENSE,
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
+  HERO_RESET_POINTS,
   HERO_REVIVE_MS,
   EXTRA_WEIGHTS,
+  POINTS_PER_LEVEL,
   ITEM_LEVELS,
   PRIMARY_WEIGHT,
   RARITY_ORDER,
@@ -17,6 +19,9 @@ import {
   canEquipItem,
   canUpgradeItem,
   damagedHealth,
+  heroPointPool,
+  heroPointsHeld,
+  heroResetPoints,
   heroReviveAt,
   isHeroDead,
   itemBonusLines,
@@ -65,6 +70,68 @@ describe("levelling", () => {
     const negative = applyHeroXp({ level: 5, xp: 10 }, -100);
     expect(negative.level).toBe(5);
     expect(negative.xp).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("the point pool", () => {
+  it("is one point per level the hero stands at", () => {
+    expect(heroPointPool(1, 0)).toBe(1);
+    expect(heroPointPool(16, 0)).toBe(16);
+    expect(heroPointPool(HERO_MAX_LEVEL, 0)).toBe(HERO_MAX_LEVEL);
+  });
+
+  it("grows by exactly one with every level gained", () => {
+    for (let l = 2; l <= HERO_MAX_LEVEL; l++) {
+      expect(heroPointPool(l, 0) - heroPointPool(l - 1, 0)).toBe(POINTS_PER_LEVEL);
+    }
+  });
+
+  it("keeps the grant of every reset, not just the last one", () => {
+    for (let r = 0; r <= 4; r++) {
+      expect(heroPointPool(1, r)).toBe(1 + r * HERO_RESET_POINTS);
+      expect(heroPointPool(HERO_MAX_LEVEL, r)).toBe(
+        HERO_MAX_LEVEL + r * HERO_RESET_POINTS
+      );
+    }
+    // The figure the reset screen promises: 125 at the cap on the first reset.
+    expect(heroPointPool(HERO_MAX_LEVEL, 1)).toBe(125);
+  });
+
+  it("hands a reset hero his whole new pool as unspent points", () => {
+    expect(heroResetPoints(1)).toBe(heroPointPool(1, 1));
+    expect(heroResetPoints(2) - heroResetPoints(1)).toBe(HERO_RESET_POINTS);
+  });
+
+  it("matches what levelling actually pays out, from birth to the cap", () => {
+    // A newborn hero holds the level-1 point; every level after that adds one,
+    // so the running total never drifts from the pool. This is the invariant
+    // applyPendingUpdates reconciles rows against.
+    let held = heroPointPool(1, 0);
+    let hero = { level: 1, xp: 0 };
+    while (hero.level < HERO_MAX_LEVEL) {
+      const next = applyHeroXp(hero, xpToNextLevel(hero.level));
+      held += next.pointsGained;
+      hero = { level: next.level, xp: next.xp };
+      expect(held).toBe(heroPointPool(hero.level, 0));
+    }
+    expect(held).toBe(HERO_MAX_LEVEL);
+  });
+
+  it("clamps a level out of range instead of paying for it", () => {
+    expect(heroPointPool(0, 0)).toBe(1);
+    expect(heroPointPool(HERO_MAX_LEVEL + 50, 0)).toBe(HERO_MAX_LEVEL);
+    expect(heroPointPool(10, -3)).toBe(10);
+  });
+
+  it("sums the four columns a hero's points live in", () => {
+    expect(
+      heroPointsHeld({
+        unspentPoints: 4,
+        attackPoints: 9,
+        defensePoints: 2,
+        resourcePoints: 1,
+      })
+    ).toBe(16);
   });
 });
 

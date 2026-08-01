@@ -7,16 +7,22 @@ import {
   HERO_MAX_LEVEL,
   HERO_RESET_CITIZENS,
   HERO_RESET_POINTS,
+  HERO_RESET_TURNS,
+  heroResetPoints,
 } from "@/lib/game/hero";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 
 /**
  * Level-100 prestige reset with a two-step confirm: the hero returns to
- * level 1 (marked with a reset badge), all allocated points are wiped, and
- * the empire immediately receives 2,500 citizens + 25 fresh hero points.
+ * level 1 (marked with a reset badge), all allocated points are wiped, and the
+ * empire immediately receives 3,000 citizens, 6,000 turns and a fresh point
+ * pool. The pool is the reason `resets` is a prop: every reset is worth another
+ * permanent 25 points, so the promise has to name *this* player's figure (25 on
+ * the first reset, 50 on the second) rather than the constant.
  */
-export function HeroResetButton() {
+export function HeroResetButton({ resets }: { resets: number }) {
+  const freshPoints = heroResetPoints(resets + 1);
   const [state, formAction] = useActionState<ActionState, FormData>(resetHero, {});
   const [confirming, setConfirming] = useState(false);
 
@@ -29,9 +35,16 @@ export function HeroResetButton() {
         איפוס הגיבור יחזיר אותו לרמה 1 ויעניק מיד{" "}
         <b className="text-emerald-400">
           {formatNumber(HERO_RESET_CITIZENS)} אזרחים
-        </b>{" "}
-        ו-<b className="text-gold-bright">{HERO_RESET_POINTS} נקודות גיבור</b>.
-        כל הנקודות שהוקצו יימחקו.
+        </b>
+        ,{" "}
+        <b className="text-amber-300">{formatNumber(HERO_RESET_TURNS)} תורות</b>{" "}
+        ו-<b className="text-gold-bright">{freshPoints} נקודות גיבור</b>. כל
+        הנקודות שהוקצו יימחקו — אך כל איפוס מוסיף {HERO_RESET_POINTS} נקודות
+        פתיחה לצמיתות, כך שתחזור לרמה {HERO_MAX_LEVEL} עם{" "}
+        <b className="text-gold-bright">
+          {formatNumber(freshPoints + HERO_MAX_LEVEL - 1)} נקודות
+        </b>
+        .
       </p>
       <p className="mt-1.5 text-xs leading-relaxed text-zinc-300">
         <b className="text-emerald-400">הציוד הלבוש נשאר עליך</b> וממשיך להעניק

@@ -1,10 +1,14 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { sendPlayerMessage } from "@/server/actions/messages";
+import { useActionState, useEffect, useMemo, useState } from "react";
+import {
+  searchMessageRecipients,
+  sendPlayerMessage,
+} from "@/server/actions/messages";
 import {
   MESSAGE_BODY_MAX,
   MESSAGE_MAX_RECIPIENTS,
+  MESSAGE_SEARCH_MIN,
   MESSAGE_TITLE_MAX,
 } from "@/lib/game/messages";
 import type { ActionState } from "@/server/actions/game";
@@ -19,6 +23,14 @@ export type PlayerOption = { id: string; name: string };
  * "Send a message" box: pick one or more players out of the game's roster (a
  * closed list — you can only write to empires that exist, never to a free-text
  * name), then write a subject and a body.
+ *
+ * `players` is a *seed*, not the roster: an alphabetical first page the list
+ * shows at rest. Typing queries the server (searchMessageRecipients) instead of
+ * filtering a copy of the whole directory in the browser — see
+ * MESSAGE_ROSTER_SEED for why. The picked addressees are held as whole
+ * `{id, name}` pairs rather than ids, because a name that came back from a
+ * search has to keep rendering in its chip after the search that found it is
+ * gone from the list.
  *
  * With `lockedRecipient` the roster picker is dropped and the addressee is
  * fixed — the shape a profile page needs, where you already know who you are
@@ -37,10 +49,15 @@ export function MessageCompose({
   triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<string[]>(
-    lockedRecipient ? [lockedRecipient.id] : []
+  const [selected, setSelected] = useState<PlayerOption[]>(
+    lockedRecipient ? [lockedRecipient] : []
   );
   const [query, setQuery] = useState("");
+  // Tagged with the query it answers, so "is this result current?" is a
+  // comparison rather than a second piece of state the effect has to clear.
+  const [found, setFound] = useState<{ q: string; rows: PlayerOption[] } | null>(
+    null
+  );
   const [state, action] = useActionState<ActionState, FormData>(
     sendPlayerMessage,
     {}
@@ -57,41 +74,59 @@ export function MessageCompose({
     if (state.success) {
       // A locked addressee survives the reset — the next message from this
       // profile still goes to the same empire.
-      setSelected(lockedRecipient ? [lockedRecipient.id] : []);
+      setSelected(lockedRecipient ? [lockedRecipient] : []);
       setQuery("");
+      setFound(null);
       setFormKey((k) => k + 1);
     }
   }
 
-  const byId = useMemo(
-    () =>
-      new Map(
-        [...players, ...(lockedRecipient ? [lockedRecipient] : [])].map((p) => [
-          p.id,
-          p.name,
-        ])
-      ),
-    [players, lockedRecipient]
-  );
+  const trimmed = query.trim();
+  const searchable = trimmed.length >= MESSAGE_SEARCH_MIN;
+
+  // Ask the server for anything past the seed. Debounced so a typed name is one
+  // query rather than one per keystroke, and guarded by `stale` so a slow early
+  // reply cannot overwrite the answer to what is in the box now.
+  useEffect(() => {
+    if (!open || lockedRecipient || !searchable) return;
+    let stale = false;
+    const timer = setTimeout(() => {
+      void searchMessageRecipients(trimmed)
+        .then((rows) => {
+          if (!stale) setFound({ q: trimmed, rows });
+        })
+        .catch(() => {
+          if (!stale) setFound({ q: trimmed, rows: [] });
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [open, lockedRecipient, searchable, trimmed]);
 
   const matches = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = q
-      ? players.filter((p) => p.name.toLowerCase().includes(q))
-      : players;
-    // The roster can be long — the search box is how you reach the rest.
-    return list.slice(0, 60);
-  }, [players, query]);
+    // Below the search floor a single character still narrows the seed locally —
+    // that costs nothing, and an empty box shows the seed as it came.
+    if (!searchable) {
+      const q = trimmed.toLowerCase();
+      return q ? players.filter((p) => p.name.toLowerCase().includes(q)) : players;
+    }
+    return found?.q === trimmed ? found.rows : [];
+  }, [players, found, searchable, trimmed]);
+
+  /** The box holds a query the server has not answered yet. */
+  const searching = searchable && found?.q !== trimmed;
 
   const atCap = selected.length >= MESSAGE_MAX_RECIPIENTS;
 
-  function toggle(id: string) {
+  function toggle(player: PlayerOption) {
     setSelected((prev) =>
-      prev.includes(id)
-        ? prev.filter((x) => x !== id)
+      prev.some((p) => p.id === player.id)
+        ? prev.filter((p) => p.id !== player.id)
         : prev.length >= MESSAGE_MAX_RECIPIENTS
           ? prev
-          : [...prev, id]
+          : [...prev, player]
     );
   }
 
@@ -149,16 +184,16 @@ export function MessageCompose({
 
             {selected.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
-                {selected.map((id) => (
+                {selected.map((p) => (
                   <span
-                    key={id}
+                    key={p.id}
                     className="flex items-center gap-1 rounded-full border border-gold/40 bg-gold/10 px-2 py-0.5 text-xs font-bold text-gold-bright"
                   >
-                    {byId.get(id) ?? "—"}
+                    {p.name}
                     <button
                       type="button"
-                      onClick={() => toggle(id)}
-                      aria-label={`הסרת ${byId.get(id) ?? ""}`}
+                      onClick={() => toggle(p)}
+                      aria-label={`הסרת ${p.name}`}
                       className="text-gold-dim hover:text-white"
                     >
                       ×
@@ -169,8 +204,8 @@ export function MessageCompose({
             )}
 
             {/* The picked ids ride along with the form submission. */}
-            {selected.map((id) => (
-              <input key={id} type="hidden" name="recipients" value={id} />
+            {selected.map((p) => (
+              <input key={p.id} type="hidden" name="recipients" value={p.id} />
             ))}
 
             <input
@@ -183,13 +218,17 @@ export function MessageCompose({
             />
 
             <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-border-subtle bg-panel-inset p-1">
-              {matches.length === 0 ? (
+              {searching ? (
+                <li className="px-2 py-3 text-center text-xs text-zinc-500">
+                  מחפש…
+                </li>
+              ) : matches.length === 0 ? (
                 <li className="px-2 py-3 text-center text-xs text-zinc-500">
                   לא נמצא שחקן בשם הזה.
                 </li>
               ) : (
                 matches.map((p) => {
-                  const checked = selected.includes(p.id);
+                  const checked = selected.some((s) => s.id === p.id);
                   return (
                     <li key={p.id}>
                       <label
@@ -203,7 +242,7 @@ export function MessageCompose({
                           type="checkbox"
                           checked={checked}
                           disabled={!checked && atCap}
-                          onChange={() => toggle(p.id)}
+                          onChange={() => toggle(p)}
                           className="accent-[var(--gold)]"
                         />
                         <span className="truncate font-semibold">{p.name}</span>
@@ -213,6 +252,12 @@ export function MessageCompose({
                 })
               )}
             </ul>
+            {!searchable && players.length > 0 && (
+              <p className="mt-1 text-[11px] text-zinc-500">
+                מוצגים {players.length} השחקנים הראשונים — הקלד שם כדי לחפש בכל
+                המשחק.
+              </p>
+            )}
             {atCap && (
               <p className="mt-1 text-[11px] text-zinc-500">
                 הגעת למקסימום {MESSAGE_MAX_RECIPIENTS} נמענים בהודעה אחת.

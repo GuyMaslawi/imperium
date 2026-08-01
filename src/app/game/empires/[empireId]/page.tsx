@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { PresenceDot } from "@/components/ui/PresenceDot";
+import { isOnline } from "@/lib/game/chat";
 import { cityName } from "@/lib/game/cities";
 import { RankActions } from "@/components/game/RankActions";
 import { MessageCompose } from "@/components/game/MessageCompose";
@@ -14,6 +16,8 @@ import { sharedGuild } from "@/lib/game/guildAllies";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
+import { EmpireMedals } from "@/components/game/EmpireMedals";
+import { getEmpireMedals } from "@/server/empireMedals";
 import type { HeroItemView } from "@/components/game/heroItemView";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import {
@@ -105,10 +109,16 @@ export default async function EmpireProfilePage({
   const { empireId } = await params;
   const myEmpire = await requireEmpire();
 
+  // `user` is selected down to the display name on purpose. This is a *rival's*
+  // dossier: `include: { user: true }` pulled his email, password digest, Google
+  // id, token version and both of his recorded IP addresses into the render, all
+  // to print one name in the subtitle. Nothing here ever crossed to the browser,
+  // but the row sat one prop away from doing so on the one page in the game that
+  // every player opens about somebody else.
   const empire = await prisma.empire.findUnique({
     where: { id: empireId },
     include: {
-      user: true,
+      user: { select: { name: true } },
       hero: { include: { items: { where: { equipped: true } } } },
     },
   });
@@ -147,6 +157,14 @@ export default async function EmpireProfilePage({
   // like shields — knowing what is in force is exactly what should decide
   // whether this hour is the hour to hit him.
   const now = new Date();
+
+  // Is he at the keyboard right now? `lastSeenAt` is a plain scalar on the row
+  // above, and it is collapsed to a boolean here — the timestamp itself never
+  // becomes a prop, or the dossier would ship "away since 03:14" to every rival.
+  // Your own dossier always reads online: you are demonstrably here, and your own
+  // heartbeat can be up to PRESENCE_TOUCH_MS old.
+  const online = isMe || isOnline(empire.lastSeenAt, now);
+
   const potionExpiries = isMe
     ? {}
     : await getActivePotionExpiries(empire.id, undefined, now);
@@ -154,6 +172,11 @@ export default async function EmpireProfilePage({
     Object.entries(potionExpiries).map(([kind, at]) => [kind, at.getTime()])
   );
   const potionsRunning = Object.keys(potionActiveUntil).length > 0;
+
+  // The medal case. Two indexed receipt lookups, not an achievement snapshot —
+  // see src/server/empireMedals.ts for why the cheap read is the right one on
+  // the page every player opens about everybody else.
+  const medals = await getEmpireMedals(empire.id);
 
   // The dossier's own history: everything the two of you ever took off each other.
   const feud = isMe ? null : await loadFeud(myEmpire.id, empire.id);
@@ -165,140 +188,168 @@ export default async function EmpireProfilePage({
 
   return (
     <div className="space-y-6">
-      {/* With the banner gone, the heading is what names the empire. */}
+      {/* With the banner gone, the heading is what names the empire.
+          The presence dot rides the sub-line beside the player's name, labelled:
+          this is the one page you open *about* somebody, and whether he is at the
+          keyboard decides whether the raid below finds a bank account or an empty
+          treasury. */}
       <SectionHeading
         title={empire.name}
-        subtitle={`${empire.user.name} · ${cityName(empire.cities)}`}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
+            <span>
+              {empire.user.name} · {cityName(empire.cities)}
+            </span>
+            <PresenceDot online={online} label />
+          </span>
+        }
         ornament={<Icon name="crown" size={22} className="text-crimson" />}
       />
 
-      <div className="panel rounded-xl p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <Icon name="attack" size={20} className="text-crimson-bright" />
-            הגיבור וציודו
-          </h3>
-          <span className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
-            <Icon name="attack" size={14} /> גיבור רמה{" "}
-            <span className="nums" dir="ltr">
-              {heroLevel}
-            </span>
-            {heroResets > 0 && (
-              <span className="nums text-purple-300" dir="ltr">
-                ↻×{heroResets}
+      {/* -------- the dossier proper, and the wall of medals beside it --------
+          The case is placed *after* the hero in the DOM and lands at the start
+          of the flex line, which on this RTL screen is the left edge — the same
+          order a phone reads top-down, hero first and honours under it. The
+          feud ledger stays out of this row and spans the page below: its table
+          is four number columns wide and has nothing to gain from sharing the
+          line with a 288px column. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="panel min-w-0 flex-1 rounded-xl p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
+              <Icon name="attack" size={20} className="text-crimson-bright" />
+              הגיבור וציודו
+            </h3>
+            <span className="inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
+              <Icon name="attack" size={14} /> גיבור רמה{" "}
+              <span className="nums" dir="ltr">
+                {heroLevel}
               </span>
-            )}
-          </span>
-        </div>
-
-        {/* Figure at the start edge, war actions filling the band beside it —
-            the space the paperdoll's 320px cap leaves open on desktop. Below
-            `lg` they stack, buttons under the hero. */}
-        <div className="flex flex-wrap items-start gap-6">
-          {/* The sockets carry a 54px floor, so a frame much under 240px is all
-              medallion and no hero. Read-only: dressing him stays on the hero
-              page. */}
-          <div className="w-full max-w-[320px]">
-            <HeroPaperdoll
-              readOnly
-              portrait={heroClassImage(heroClassKey)}
-              portraitAlt={HERO_CLASS_META[heroClassKey].label}
-              portraitAccent={HERO_CLASS_META[heroClassKey].accent}
-              equipped={equippedView}
-              heroLevel={heroLevel}
-            />
-            {equippedView.length === 0 && (
-              <p className="mt-3 text-xs text-zinc-600">
-                {isMe
-                  ? "הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד הגיבור."
-                  : "הגיבור הזה יוצא לקרב בלי ציוד — תשעת הסלוטים שלו ריקים."}
-              </p>
-            )}
-            {isMe && equippedView.length > 0 && (
-              <Link
-                href="/game/hero"
-                className="mt-3 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
-              >
-                ניהול הגיבור ←
-              </Link>
-            )}
+              {heroResets > 0 && (
+                <span className="nums text-purple-300" dir="ltr">
+                  ↻×{heroResets}
+                </span>
+              )}
+            </span>
           </div>
 
-          {/* -------- war actions, on every dossier but your own --------
-              Mail crosses cities and levels even where turns cannot, so the
-              message button survives the `canEngage` gate that guards the rest. */}
-          {!isMe && (
-            <div className="min-w-[240px] flex-1 space-y-3">
-              {/* Spelled out above the buttons, not just as a pill: turns spent
-                  on a shielded target buy XP and loot rolls, but never spoils. */}
-              {/* An ally is announced before anything else on the dossier —
-                  it is the reason the attack button is dead. */}
-              {allied && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold-bright">
-                  <Icon name="guild" size={14} />
-                  <span>
-                    בן ברית — שניכם חברים בברית {allied.name}. אין תקיפות בין חברי
-                    ברית
-                    {canEngage ? "; ריגול ודואר עדיין פתוחים." : "."}
-                  </span>
-                </div>
-              )}
-
-              {canEngage && activeShields.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
-                  <ShieldBadges shields={shields} />
-                  <span>
-                    לאימפריה הזו {activeShields.map((s) => s.label).join(" ו")} — ניצחון
-                    עליה לא יניב{" "}
-                    {activeShields
-                      .map((s) => (s.key === "resources" ? "שלל" : "שבויים"))
-                      .join(" או ")}
-                    . התקיפה עצמה עדיין אפשרית (ניסיון, חפצים ושיקויים).
-                  </span>
-                </div>
-              )}
-
-              {/* What is bent in his favour right now, and for how much longer.
-                  The strip counts itself down and refreshes the page when a
-                  window closes, so the dossier never claims a dead buff. */}
-              <div className="rounded-lg border border-border-subtle bg-panel-inset px-3 py-2">
-                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
-                  <Icon name="potion" size={14} className="text-violet-300" />
-                  שיקויים פעילים
+          {/* Figure at the start edge, war actions filling the band beside it —
+              the space the paperdoll's 320px cap leaves open on desktop. Below
+              `lg` they stack, buttons under the hero. */}
+          <div className="flex flex-wrap items-start gap-6">
+            {/* The sockets carry a 54px floor, so a frame much under 240px is all
+                medallion and no hero. Read-only: dressing him stays on the hero
+                page. */}
+            <div className="w-full max-w-[320px]">
+              <HeroPaperdoll
+                readOnly
+                portrait={heroClassImage(heroClassKey)}
+                portraitAlt={HERO_CLASS_META[heroClassKey].label}
+                portraitAccent={HERO_CLASS_META[heroClassKey].accent}
+                equipped={equippedView}
+                heroLevel={heroLevel}
+              />
+              {equippedView.length === 0 && (
+                <p className="mt-3 text-xs text-zinc-600">
+                  {isMe
+                    ? "הגיבור שלך עדיין לא לובש ציוד — לכוד חפצים בתקיפות ולבש אותם בעמוד הגיבור."
+                    : "הגיבור הזה יוצא לקרב בלי ציוד — תשעת הסלוטים שלו ריקים."}
                 </p>
-                {potionsRunning ? (
-                  <ActivePotions
-                    activeUntil={potionActiveUntil}
-                    serverNow={now.getTime()}
-                    href={null}
+              )}
+              {isMe && equippedView.length > 0 && (
+                <Link
+                  href="/game/hero"
+                  className="mt-3 inline-block text-sm font-semibold text-gold hover:text-gold-bright"
+                >
+                  ניהול הגיבור ←
+                </Link>
+              )}
+            </div>
+
+            {/* -------- war actions, on every dossier but your own --------
+                Mail crosses cities and levels even where turns cannot, so the
+                message button survives the `canEngage` gate that guards the rest. */}
+            {!isMe && (
+              <div className="min-w-[240px] flex-1 space-y-3">
+                {/* Spelled out above the buttons, not just as a pill: turns spent
+                    on a shielded target buy XP and loot rolls, but never spoils. */}
+                {/* An ally is announced before anything else on the dossier —
+                    it is the reason the attack button is dead. */}
+                {allied && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold-bright">
+                    <Icon name="guild" size={14} />
+                    <span>
+                      בן ברית — שניכם חברים בברית {allied.name}. אין תקיפות בין חברי
+                      ברית
+                      {canEngage ? "ריגול ודואר עדיין פתוחים." : "."}
+                    </span>
+                  </div>
+                )}
+
+                {canEngage && activeShields.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                    <ShieldBadges shields={shields} />
+                    <span>
+                      לאימפריה הזו {activeShields.map((s) => s.label).join(" ו")} — ניצחון
+                      עליה לא יניב{" "}
+                      {activeShields
+                        .map((s) => (s.key === "resources" ? "שלל" : "שבויים"))
+                        .join(" או ")}
+                      . התקיפה עצמה עדיין אפשרית (ניסיון, חפצים ושיקויים).
+                    </span>
+                  </div>
+                )}
+
+                {/* What is bent in his favour right now, and for how much longer.
+                    The strip counts itself down and refreshes the page when a
+                    window closes, so the dossier never claims a dead buff. */}
+                <div className="rounded-lg border border-border-subtle bg-panel-inset px-3 py-2">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                    <Icon name="potion" size={14} className="text-violet-300" />
+                    שיקויים פעילים
+                  </p>
+                  {potionsRunning ? (
+                    <ActivePotions
+                      activeUntil={potionActiveUntil}
+                      serverNow={now.getTime()}
+                      href={null}
+                    />
+                  ) : (
+                    <p className="text-xs text-zinc-500">
+                      אין שיקוי פעיל — הוא נלחם בלי חיזוקים כרגע.
+                    </p>
+                  )}
+                </div>
+
+                {canEngage ? (
+                  <RankActions
+                    targetEmpireId={empire.id}
+                    currentTurns={myEmpire.turns}
+                    attackBlockedReason={allied ? "בן ברית — אין תקיפה" : null}
                   />
                 ) : (
-                  <p className="text-xs text-zinc-500">
-                    אין שיקוי פעיל — הוא נלחם בלי חיזוקים כרגע.
+                  <p className="text-sm text-zinc-400">
+                    אין כאן פעולות מלחמה — האימפריה הזו יושבת בעיר אחרת. דואר, לעומת
+                    זאת, עובר בכל מצב: אפשר לכתוב לכל שחקן במשחק, בכל עיר ובכל רמה.
                   </p>
                 )}
-              </div>
 
-              {canEngage ? (
-                <RankActions
-                  targetEmpireId={empire.id}
-                  currentTurns={myEmpire.turns}
-                  attackBlockedReason={allied ? "בן ברית — אין תקיפה" : null}
+                <MessageCompose
+                  lockedRecipient={{ id: empire.id, name: empire.name }}
+                  triggerLabel="שלח הודעה"
                 />
-              ) : (
-                <p className="text-sm text-zinc-400">
-                  אין כאן פעולות מלחמה — האימפריה הזו יושבת בעיר אחרת. דואר, לעומת
-                  זאת, עובר בכל מצב: אפשר לכתוב לכל שחקן במשחק, בכל עיר ובכל רמה.
-                </p>
-              )}
-
-              <MessageCompose
-                lockedRecipient={{ id: empire.id, name: empire.name }}
-                triggerLabel="שלח הודעה"
-              />
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {medals.length > 0 && (
+          <EmpireMedals
+            items={medals}
+            isMe={isMe}
+            className="w-full lg:w-[288px] lg:shrink-0"
+          />
+        )}
       </div>
 
       {/* -------- the ledger of the feud --------
@@ -384,25 +435,33 @@ export default async function EmpireProfilePage({
                             />{" "}
                             {res.label}
                           </td>
-                          <td className="nums px-2 py-1.5 text-end font-bold text-emerald-400" dir="ltr">
-                            {took > 0 ? `+${formatNumber(took)}` : "—"}
+                          {/* dir="ltr" belongs on the digits, not the cell: on
+                              the cell it flips `text-end` to the physical right
+                              while the RTL header above it ends on the left, and
+                              the column and its title drift apart. */}
+                          <td className="nums px-2 py-1.5 text-end font-bold text-emerald-400">
+                            <span dir="ltr">
+                              {took > 0 ? `+${formatNumber(took)}` : "—"}
+                            </span>
                           </td>
-                          <td className="nums px-2 py-1.5 text-end font-bold text-red-400" dir="ltr">
-                            {lost > 0 ? `−${formatNumber(lost)}` : "—"}
+                          <td className="nums px-2 py-1.5 text-end font-bold text-red-400">
+                            <span dir="ltr">
+                              {lost > 0 ? `−${formatNumber(lost)}` : "—"}
+                            </span>
                           </td>
                           <td
-                            className={`nums px-2 py-1.5 text-end font-black ${
-                              net > 0
+                            className={`nums px-2 py-1.5 text-end font-black ${net > 0
                                 ? "text-emerald-400"
                                 : net < 0
                                   ? "text-red-400"
                                   : "text-zinc-500"
-                            }`}
-                            dir="ltr"
+                              }`}
                           >
-                            {net === 0
-                              ? "0"
-                              : `${net > 0 ? "+" : "−"}${formatNumber(Math.abs(net))}`}
+                            <span dir="ltr">
+                              {net === 0
+                                ? "0"
+                                : `${net > 0 ? "+" : "−"}${formatNumber(Math.abs(net))}`}
+                            </span>
                           </td>
                         </tr>
                       );

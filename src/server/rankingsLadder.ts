@@ -214,6 +214,14 @@ export interface BoardRow {
   empireId: string;
   name: string;
   value: number;
+  /**
+   * Whether that player has the game open right now — same boolean, same rule
+   * and same dot as the city ladder's `LadderRow.online`. A leaderboard is read
+   * to pick a target as much as to admire a number, so the top ten say which of
+   * them are at the keyboard. Never the timestamp behind it: see the note on
+   * LadderRow.online.
+   */
+  online: boolean;
 }
 
 export type BoardKey = "slaves" | "bank" | "spy" | "power";
@@ -249,6 +257,10 @@ const BOARD_SIZE = 10;
  * the moment the game does.
  */
 export async function getGlobalBoards(): Promise<GlobalBoards> {
+  // One `now` for all four boards, so a player who happens to sit on two of them
+  // cannot come back online on one and away on the other.
+  const now = new Date();
+
   const top = async (
     orderBy: Prisma.EmpireOrderByWithRelationInput,
     pick: (e: {
@@ -268,12 +280,20 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
         name: true,
         generalPower: true,
         spyPower: true,
+        lastSeenAt: true,
         army: { select: { mineSlaves: true } },
         bankAccount: { select: { goldBalance: true } },
       },
     });
     return rows
-      .map((e) => ({ empireId: e.id, name: e.name, value: Math.floor(pick(e)) }))
+      .map((e) => ({
+        empireId: e.id,
+        name: e.name,
+        value: Math.floor(pick(e)),
+        // The heartbeat is collapsed to a boolean here and the Date is dropped:
+        // what ships to the browser must not be the timestamp itself.
+        online: isOnline(e.lastSeenAt, now),
+      }))
       // A board of empires with nothing to show is noise, not a ranking.
       .filter((r) => r.value > 0);
   };
@@ -313,12 +333,16 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   // top ten, and a raider need not be on any of them.
   const named = await prisma.empire.findMany({
     where: { id: { in: sums.map((t) => t.attackerEmpireId) } },
-    select: { id: true, name: true },
+    select: { id: true, name: true, lastSeenAt: true },
   });
-  const names = new Map(named.map((e) => [e.id, e.name]));
+  const byId = new Map(named.map((e) => [e.id, e]));
+  const now = new Date();
   return sums.map((t) => ({
     empireId: t.attackerEmpireId,
-    name: names.get(t.attackerEmpireId) ?? "אימפריה",
+    name: byId.get(t.attackerEmpireId)?.name ?? "אימפריה",
     value: Math.floor(t._sum.stolenGold ?? 0),
+    // A raider whose empire row has since been deleted reads as away, which is
+    // the truthful answer for a name that is no longer anybody.
+    online: isOnline(byId.get(t.attackerEmpireId)?.lastSeenAt, now),
   }));
 }

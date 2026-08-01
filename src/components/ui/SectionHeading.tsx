@@ -12,7 +12,8 @@ export function SectionHeading({
   className = "",
 }: {
   title: ReactNode;
-  subtitle?: string;
+  /** A node, not just a string: the empire dossier hangs its presence dot here. */
+  subtitle?: ReactNode;
   /** Emoji/icon node shown on both sides of the title. */
   ornament?: ReactNode;
   className?: string;

@@ -6269,3 +6269,442 @@ body {
     color: #ff8b8b;
   }
 }
+
+/* =========================================================================
+   חנות היהלומים הנעולה — השרשראות והמנעול. Prefix: seal-.
+
+   The same object as the hero-quest lock above (`quest-*`) at the scale of a
+   whole screen: four chains bound across the package grid and a lock hanging
+   where the middle two cross. It borrows that rig's keyframes outright — the
+   rattle, the jolt, the shackle bounce, the red keyhole — because a store that
+   refuses a click should refuse it in exactly the same voice as a quest rung
+   that refuses one.
+
+   The overlay is one absolutely-positioned button over `.seal-wrap`, so nothing
+   inside the grid knows it is sealed beyond wearing `.seal-body` for the grey.
+   ========================================================================= */
+
+.seal-wrap {
+  position: relative;
+  overflow: hidden;
+}
+.seal-body {
+  filter: grayscale(0.7) brightness(0.95);
+  opacity: 0.7;
+  pointer-events: none;
+  user-select: none;
+}
+
+.seal {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  cursor: pointer;
+  background: radial-gradient(120% 90%, rgba(3, 6, 12, 0.24), rgba(3, 6, 12, 0.56));
+}
+.seal-rig {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* A slow band of light crossing the sealed window — the one thing that keeps
+   a shut store from looking like a screenshot. */
+.seal-rig::after {
+  content: "";
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(
+    104deg,
+    transparent 42%,
+    rgba(186, 222, 255, 0.09) 50%,
+    transparent 58%
+  );
+  pointer-events: none;
+  animation: seal-sheen 9s ease-in-out infinite;
+}
+@keyframes seal-sheen {
+  0%, 100% { transform: translateX(-22%); }
+  50% { transform: translateX(22%); }
+}
+
+/* The chains: one repeating link tile, so a band can be any width without the
+   links stretching. Same tile as the quest lock, one size up. */
+.seal-chain {
+  position: absolute;
+  left: -12%;
+  width: 124%;
+  height: 17px;
+  transform: translateY(-50%) rotate(var(--tilt));
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='18' viewBox='0 0 24 18'%3E%3Cg fill='none' stroke='%2318191e' stroke-width='4'%3E%3Cellipse cx='0' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='9' rx='8.5' ry='4.5'/%3E%3C/g%3E%3Cg fill='none' stroke='%237e8798' stroke-width='2'%3E%3Cellipse cx='0' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='9' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='9' rx='8.5' ry='4.5'/%3E%3C/g%3E%3Cg fill='none' stroke='rgba(233,240,255,0.5)' stroke-width='0.8'%3E%3Cellipse cx='0' cy='7.6' rx='4.5' ry='7.2'/%3E%3Cellipse cx='24' cy='7.6' rx='4.5' ry='7.2'/%3E%3Cellipse cx='12' cy='7.8' rx='8.5' ry='4.5'/%3E%3C/g%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-size: 24px 17px;
+  /* Iron, not chrome: at this width the tile's highlights read as glossy, and a
+     bright chain in front of grey cards inverts the hierarchy — the store is
+     supposed to stay the thing you look at. */
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.75)) brightness(0.72) saturate(0.85);
+}
+/* Three bands, not a curtain: one across the headline card and two over the
+   grid, tilted just enough to look thrown on rather than ruled. The lock hangs
+   on the middle one. */
+.seal-chain-top { top: 21%; --tilt: -3.2deg; opacity: 0.92; }
+.seal-chain-a { top: 51%; --tilt: 2.4deg; }
+.seal-chain-b { top: 81%; --tilt: -2.6deg; opacity: 0.92; }
+
+.seal-hub {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1rem;
+}
+.seal-hang {
+  position: relative;
+  display: block;
+  transform-origin: 50% 12%;
+}
+.seal-svg {
+  display: block;
+  filter: drop-shadow(0 6px 9px rgba(0, 0, 0, 0.8));
+}
+.seal-shackle {
+  transform-box: fill-box;
+  transform-origin: 50%;
+}
+.seal-key {
+  fill: #241a05;
+}
+.seal-plate {
+  max-width: 24rem;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--border-gold-strong);
+  border-radius: 0.65rem;
+  background: rgba(6, 5, 8, 0.9);
+  color: var(--gold-bright);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: balance;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.75);
+}
+.seal-spark {
+  position: absolute;
+  top: 58%;
+  left: 50%;
+  width: 72px;
+  height: 72px;
+  margin: -36px 0 0 -36px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(232, 82, 82, 0.75), rgba(232, 82, 82, 0) 68%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.seal:hover .seal-svg,
+.seal:focus-visible .seal-svg {
+  filter: drop-shadow(0 6px 9px rgba(0, 0, 0, 0.8)) drop-shadow(0 0 14px rgba(228, 195, 90, 0.5));
+}
+.seal:focus-visible {
+  outline: 2px solid var(--border-gold-strong);
+  outline-offset: -3px;
+}
+.seal:active .seal-hub {
+  transform: translateY(1px);
+}
+
+/* The refusal, borrowed whole from the quest lock. */
+.seal-rig.is-tugged .seal-chain {
+  animation: qlock-chain-rattle 0.62s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.seal-rig.is-tugged .seal-chain-a { animation-delay: 40ms; }
+.seal-rig.is-tugged .seal-chain-b { animation-delay: 75ms; }
+.seal-rig.is-tugged .seal-hang {
+  animation: qlock-jolt 0.62s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.seal-rig.is-tugged .seal-shackle { animation: qlock-shackle 0.62s ease-out both; }
+.seal-rig.is-tugged .seal-key { animation: qlock-deny-key 0.62s ease-out both; }
+.seal-rig.is-tugged .seal-spark { animation: qlock-spark 0.6s ease-out both; }
+.seal-rig.is-tugged .seal-plate {
+  animation:
+    qlock-deny-plate 0.55s ease-out both,
+    qlock-deny-plate-tint 1.1s ease-out both;
+}
+
+/* the idle sway — only for players who did not ask for stillness */
+@media (prefers-reduced-motion: no-preference) {
+  .seal-rig:not(.is-tugged) .seal-hang {
+    animation: qlock-sway 6.5s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seal-rig::after { animation: none; }
+  .seal-rig.is-tugged .seal-chain,
+  .seal-rig.is-tugged .seal-hang,
+  .seal-rig.is-tugged .seal-shackle,
+  .seal-rig.is-tugged .seal-spark,
+  .seal-rig.is-tugged .seal-plate {
+    animation: none;
+  }
+  .seal-rig.is-tugged .seal-plate {
+    border-color: rgba(232, 82, 82, 0.75);
+    color: #ff8b8b;
+  }
+}
+
+/* ==========================================================================
+   אותות כבוד — the medal case down the side of an empire profile
+   (src/components/game/EmpireMedals.tsx)
+
+   Deliberately its own namespace rather than a reuse of `.glory-*`. The
+   records board is a wide grid of five cards that each carry a progress ring,
+   a bar and a record holder, because its job is to show what has NOT been
+   reached yet. This is a narrow column that only ever renders earned medals,
+   so there is no progress to draw and the geometry is nothing alike; sharing
+   the classes would have meant every rule growing a "but on the profile"
+   branch. What they do share is the vocabulary — gold frame, sheen, halo,
+   sparks — so the two read as the same game.
+
+   All of the movement is decorative and all of it is off under
+   prefers-reduced-motion. Nothing here conveys information by moving.
+   ========================================================================== */
+
+.medal-case {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  border: 1px solid var(--border-gold);
+  background:
+    radial-gradient(120% 60% at 50% -10%, rgba(196, 160, 50, 0.14), transparent 62%),
+    linear-gradient(180deg, rgba(26, 25, 32, 0.94), rgba(13, 12, 16, 0.96));
+  box-shadow: inset 0 0 40px -22px rgba(228, 195, 90, 0.9);
+  padding: 1rem 0.9rem 0.85rem;
+}
+
+/* The one band of light that crosses the whole case. Slow and dim: the medals
+   inside have their own sheen, and two fast highlights in one column reads as
+   a glitch rather than as gold. */
+@media (prefers-reduced-motion: no-preference) {
+  .medal-case::before {
+    content: "";
+    position: absolute;
+    inset: -40% -20%;
+    pointer-events: none;
+    background: linear-gradient(
+      100deg,
+      transparent 44%,
+      rgba(228, 195, 90, 0.07) 50%,
+      transparent 56%
+    );
+    animation: medal-sweep 11s ease-in-out infinite;
+  }
+}
+@keyframes medal-sweep {
+  0%, 100% { transform: translateX(-26%); }
+  50% { transform: translateX(26%); }
+}
+
+.medal-case-head {
+  position: relative;
+  border-bottom: 1px solid var(--border-gold);
+  padding-bottom: 0.6rem;
+}
+.medal-case-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 18px rgba(228, 195, 90, 0.35);
+}
+.medal-case-sub {
+  margin-top: 0.15rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: #7d7668;
+}
+
+.medal-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.7rem;
+}
+
+.medal {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  overflow: hidden;
+  border-radius: 0.6rem;
+  border: 1px solid var(--border-gold-strong);
+  background: linear-gradient(100deg, rgba(68, 52, 19, 0.5), rgba(13, 12, 16, 0.95) 64%);
+  box-shadow: inset 0 0 30px -18px rgba(228, 195, 90, 1);
+  padding: 0.55rem 0.6rem;
+}
+
+/* Holding the world record is a louder thing than having earned the medal, so
+   the crowned plate gets the brighter frame, the halo and the sparks — exactly
+   the split the records board draws. */
+.medal.is-crowned {
+  border-color: rgba(228, 195, 90, 0.75);
+  background: linear-gradient(100deg, rgba(96, 73, 24, 0.58), rgba(15, 13, 17, 0.95) 68%);
+  box-shadow:
+    inset 0 0 36px -14px rgba(228, 195, 90, 1),
+    0 0 24px -12px rgba(228, 195, 90, 0.85);
+}
+
+/* The sheen crossing a plate, offset per medal so a decorated column does not
+   flash in unison. */
+@media (prefers-reduced-motion: no-preference) {
+  .medal::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      75deg,
+      transparent 40%,
+      rgba(255, 240, 176, 0.14) 50%,
+      transparent 60%
+    );
+    transform: translateX(-120%);
+    animation: medal-sheen 7s ease-in-out infinite;
+    animation-delay: calc(var(--i) * 620ms);
+  }
+  .medal {
+    animation: medal-in 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    animation-delay: calc(var(--i) * 70ms);
+  }
+}
+@keyframes medal-sheen {
+  0%, 64% { transform: translateX(-120%); }
+  88%, 100% { transform: translateX(120%); }
+}
+@keyframes medal-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- the disc --- */
+.medal-disc {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  height: 2.9rem;
+  width: 2.9rem;
+  border-radius: 9999px;
+  /* A full gold rim, not an arc: there is no progress left to read here. */
+  background: conic-gradient(from 180deg, var(--gold-bright), var(--gold-deep), var(--gold-bright));
+  padding: 2px;
+  box-shadow: 0 0 16px -6px rgba(228, 195, 90, 0.9);
+}
+.medal-disc-face {
+  display: grid;
+  height: 100%;
+  width: 100%;
+  place-items: center;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 50% 30%, #4b3a14, #100d08 80%);
+  color: var(--gold-bright);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .medal.is-crowned .medal-disc {
+    animation: medal-halo 3.4s ease-in-out infinite;
+  }
+}
+@keyframes medal-halo {
+  0%, 100% { box-shadow: 0 0 16px -6px rgba(228, 195, 90, 0.9); }
+  50% { box-shadow: 0 0 26px -4px rgba(255, 240, 176, 1); }
+}
+
+/* Sparks orbiting a crowned disc — placed by angle, each on its own beat.
+   Rendered only for crowned medals, so under reduced motion they are three
+   still points of light rather than clutter. */
+.medal-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 4px;
+  width: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 9999px;
+  background: #fff0b0;
+  box-shadow: 0 0 7px 2px rgba(255, 240, 176, 0.8);
+  transform: rotate(var(--a)) translateY(-1.6rem);
+  opacity: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .medal-spark {
+    animation: medal-spark 2.8s ease-in-out infinite;
+    animation-delay: var(--d);
+  }
+}
+@keyframes medal-spark {
+  0%, 100% { opacity: 0; transform: rotate(var(--a)) translateY(-1.6rem) scale(0.4); }
+  45% { opacity: 1; transform: rotate(var(--a)) translateY(-1.78rem) scale(1); }
+}
+
+/* --- the plate --- */
+.medal-name {
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--gold-bright);
+}
+.medal-tagline {
+  margin-top: 0.1rem;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: #8b8474;
+}
+.medal-first {
+  margin-top: 0.28rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(228, 195, 90, 0.55);
+  background: rgba(228, 195, 90, 0.12);
+  padding: 0.05rem 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #ffe9a8;
+}
+.medal-date {
+  margin-top: 0.25rem;
+  font-size: 0.62rem;
+  color: #5f5a50;
+}
+
+.medal-case-foot {
+  position: relative;
+  margin-top: 0.7rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.5rem;
+  text-align: center;
+  font-size: 0.68rem;
+  color: #7d7668;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .medal-case::before,
+  .medal::after,
+  .medal,
+  .medal.is-crowned .medal-disc,
+  .medal-spark {
+    animation: none;
+  }
+  /* The sparks are pure decoration; with the orbit off they would sit frozen
+     mid-arc, so they simply do not appear. */
+  .medal-spark { display: none; }
+}

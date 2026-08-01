@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/game/format";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { PresenceDot } from "@/components/ui/PresenceDot";
 
 export const metadata = { title: "טבלאות מובילים | KRALDOR" };
 
@@ -58,6 +59,15 @@ function Board({
                   <span className="nums w-5 shrink-0 text-center font-black text-gold" dir="ltr">
                     {medal ?? index + 1}
                   </span>
+                  {/* Between the rank and the name, which on this RTL row puts it
+                      hard against the start of the name. Bare dot, no word: these
+                      rows are one line each and already carry a number and a
+                      unit — the tooltip says it in words for anyone who cannot
+                      read the colour. `isMe` is forced on: the viewer is by
+                      definition at the keyboard, and his own heartbeat may be up
+                      to PRESENCE_TOUCH_MS stale, which would draw him away on
+                      his own board. */}
+                  <PresenceDot online={isMe || row.online} />
                   <Link
                     href={`/game/empires/${row.empireId}`}
                     className="truncate font-semibold text-zinc-100 underline-offset-4 hover:text-gold-bright hover:underline"
@@ -213,6 +223,7 @@ export default async function LeaderboardsPage({
                     <span className="nums w-5 shrink-0 text-center font-black text-gold" dir="ltr">
                       {medal ?? index + 1}
                     </span>
+                    <PresenceDot online={isMe || row.online} />
                     <Link
                       href={`/game/empires/${row.empireId}`}
                       className="truncate font-semibold text-zinc-100 underline-offset-4 hover:text-gold-bright hover:underline"

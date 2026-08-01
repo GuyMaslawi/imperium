@@ -34,8 +34,7 @@ import {
 import {
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
-  HERO_RESET_POINTS,
-  POINTS_PER_LEVEL,
+  heroPointPool,
   xpToNextLevel,
 } from "../src/lib/game/hero";
 
@@ -173,11 +172,12 @@ async function main() {
     const xp =
       level >= HERO_MAX_LEVEL ? 0 : Math.min(hero.xp, xpToNextLevel(level));
     const health = Math.min(HERO_MAX_HEALTH, hero.health);
-    // One point per level gained, plus the 25 a reset hands back (a reset wipes
-    // every allocated point, so only the most recent grant survives). Refilled
-    // in allocation order, exactly as `updateHero` does.
-    const poolSize =
-      (level - 1) * POINTS_PER_LEVEL + (hero.resets > 0 ? HERO_RESET_POINTS : 0);
+    // One point per level the hero stands at, plus 25 for every reset behind
+    // him. Refilled in allocation order, exactly as `updateHero` does — and the
+    // leftover goes to `unspentPoints`, so a hero who was shorted is topped up
+    // here as well as clamped (the same repair `applyPendingUpdates` performs
+    // lazily on every load).
+    const poolSize = heroPointPool(level, hero.resets);
     let left = poolSize;
     const take = (n: number) => {
       const got = Math.min(left, Math.max(0, n));
@@ -187,7 +187,8 @@ async function main() {
     const attackPoints = take(hero.attackPoints);
     const defensePoints = take(hero.defensePoints);
     const resourcePoints = take(hero.resourcePoints);
-    const unspentPoints = take(hero.unspentPoints);
+    // Everything the pool has left lands here, not just what the row claimed.
+    const unspentPoints = take(hero.unspentPoints) + left;
 
     const changed =
       level !== hero.level ||

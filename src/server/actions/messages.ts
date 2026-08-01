@@ -13,6 +13,8 @@ import {
   MESSAGE_PAIR_WINDOW_MS,
   MESSAGE_RECIPIENT_LIMIT,
   MESSAGE_RECIPIENT_WINDOW_MS,
+  MESSAGE_SEARCH_MAX_RESULTS,
+  MESSAGE_SEARCH_MIN,
   MESSAGE_SEND_LIMIT,
   MESSAGE_SEND_WINDOW_MS,
   MESSAGE_TITLE_MAX,
@@ -26,6 +28,55 @@ async function requireOwnEmpireId(): Promise<string> {
   const empireId = await getActiveEmpireId();
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
+}
+
+/** One addressee in the composer's picker. Nothing but what draws a row. */
+export type MessageRecipient = { id: string; name: string };
+
+/**
+ * Look up addressees by empire name for the compose box.
+ *
+ * This is what replaced shipping the whole player directory to the browser: the
+ * picker holds an alphabetical seed (MESSAGE_ROSTER_SEED) and asks here for
+ * anything past it, so the payload is bounded by what is on screen rather than
+ * by how many people play the game.
+ *
+ * Deliberately as thin as `searchChatPlayers`, and for the same reason — id and
+ * name only. A directory lookup must not become a free scouting report, so no
+ * presence, no city, no power: this answers "does an empire by this name exist
+ * and may I write to it", and nothing else.
+ */
+export async function searchMessageRecipients(
+  query: string
+): Promise<MessageRecipient[]> {
+  let empireId: string;
+  try {
+    empireId = await requireOwnEmpireId();
+  } catch {
+    return [];
+  }
+
+  const q = String(query ?? "").trim();
+  if (q.length < MESSAGE_SEARCH_MIN) return [];
+
+  // `contains` is a scan no index serves, and this fires from a keystroke
+  // handler. Generous enough that ordinary typing never trips it.
+  if (!(await rateLimit(`msg-search:${empireId}`, 40, 60 * 1000))) return [];
+
+  try {
+    return await prisma.empire.findMany({
+      where: {
+        id: { not: empireId },
+        name: { contains: q, mode: "insensitive" },
+        user: notBannedWhere(),
+      },
+      orderBy: { name: "asc" },
+      take: MESSAGE_SEARCH_MAX_RESULTS,
+      select: { id: true, name: true },
+    });
+  } catch {
+    return [];
+  }
 }
 
 export type LiveAlert = {

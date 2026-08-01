@@ -17,8 +17,9 @@ export default async function BuyDiamondsPage() {
 
   const checkout = getCheckoutConfig();
   // Before go-live only admins may actually pay, so only they get the PayPal
-  // buttons; everyone else keeps the old confirm form, whose action answers with
-  // the friendly "coming soon" panel instead of a PayPal error.
+  // buttons. Everyone else gets the store chained shut — the packages stay on
+  // display, but the seal says so up front instead of letting a click travel all
+  // the way to a "coming soon" modal.
   const canPay = checkout.live || (await isAdmin());
   const paypalClientId = canPay ? checkout.paypalClientId : null;
 
@@ -38,6 +39,7 @@ export default async function BuyDiamondsPage() {
       <DiamondStore
         discountPct={discountPct}
         purchasesLive={checkout.live}
+        locked={!canPay}
         paypalClientId={paypalClientId}
         testMode={checkout.testMode}
       />

@@ -3,6 +3,8 @@ import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { PresenceDot } from "@/components/ui/PresenceDot";
+import { isOnline } from "@/lib/game/chat";
 import { formatNumber } from "@/lib/game/format";
 import {
   GUILD_AID_MAX_LEVEL,
@@ -301,6 +303,9 @@ export default async function GuildPage() {
                 select: {
                   id: true,
                   name: true,
+                  // Collapsed to a boolean before it reaches the roster below —
+                  // the raw heartbeat never becomes a prop.
+                  lastSeenAt: true,
                   // The roster shows the hero level, not `empire.level` — that
                   // column is never incremented by gameplay.
                   hero: { select: { level: true } },
@@ -404,6 +409,17 @@ export default async function GuildPage() {
                   className="panel-inset gd-row flex flex-wrap items-center gap-2 rounded-lg px-3 py-2"
                   style={{ "--i": index } as CSSProperties}
                 >
+                  {/* Who is around right now is the first thing a guild roster
+                      is read for — whether the war call, the spell request or
+                      the mail you are about to send will be seen in the next
+                      minute or tomorrow morning. Before the name, which on this
+                      RTL row draws it at the name's right edge. */}
+                  <PresenceDot
+                    online={
+                      member.empireId === empire.id ||
+                      isOnline(member.empire.lastSeenAt, now)
+                    }
+                  />
                   <span className="text-sm font-semibold text-zinc-100">
                     {member.empire.name}
                     {member.empireId === empire.id && (

@@ -1199,6 +1199,125 @@ export function selectGlory(
   });
 }
 
+/* ------------------------------ medals of honour ------------------------------ */
+
+/**
+ * הישגים ראשיים — the handful of milestones worth wearing on a dossier.
+ *
+ * A profile is read by somebody sizing you up, and the full ladder is ~90 rungs
+ * of which most are tutorial beats ("send one letter"). Showing all of them
+ * would say nothing; showing these eleven says everything. Each one is either a
+ * ceiling of the game (all ten cities, hero at 100, every weapon model, all four
+ * mines maxed) or a feat that cannot be ground out on a schedule (rank 1 of your
+ * bucket, a legendary drop, every city boss felled).
+ *
+ * The list is the diamond capstones — the payouts rationed under
+ * ACHIEVEMENT_DIAMOND_BUDGET, i.e. the ones the economy already calls rare —
+ * *minus* `items_1` ("win your first hero item", a first-hour beat that is only
+ * paid in diamonds because it is the ladder's on-ramp), *plus* the citizen
+ * capstone that the world-records board also carries.
+ *
+ * Order is prestige, not progression: the two that require beating other people
+ * lead, then the ceilings, then the rare-drop feats. Unlike the ladder screen
+ * this list only ever renders what was *earned*, so the order is what a
+ * decorated empire's column reads like top-down.
+ */
+export const MEDAL_KEYS: readonly string[] = [
+  RANK_ONE_KEY,
+  "cities_10",
+  "herolvl_100",
+  "all_bosses",
+  "arsenal_90",
+  "minelvl_250",
+  `citizenup_${CITIZEN_GROWTH_500}`,
+  "upgrades_5",
+  "heroreset_1",
+  "legendary_1",
+  "full_gear",
+];
+
+/** Position in MEDAL_KEYS, for sorting an unordered set of earned keys. */
+const MEDAL_ORDER = new Map(MEDAL_KEYS.map((key, i) => [key, i]));
+
+/**
+ * What the profile column calls each medal.
+ *
+ * Most read fine off the catalog, which already names them as accolades
+ * ("קיסרות", "צייד העריצים"). The two overridden here are named for the *screen
+ * they came from*: `rank_one` is phrased as an instruction to the player who has
+ * not done it yet, and the citizen capstone is named after an upgrade level
+ * nobody thinks in. Neither survives being read as a title on somebody else's
+ * wall. GLORY_NAME is not reused for the same reason in reverse — that map
+ * rewrites all five capstones into goals to reach ("להגיע לעיר 10"), which is
+ * the right voice for a board of open records and the wrong one for a medal.
+ */
+const MEDAL_NAME: Record<string, string> = {
+  [RANK_ONE_KEY]: "מקום ראשון בדירוג",
+  [`citizenup_${CITIZEN_GROWTH_500}`]: "500 אזרחים ביום",
+};
+
+/**
+ * The line under each name: the feat, stated as a fact.
+ *
+ * Catalog hints are written for the ladder screen, where they are instructions
+ * to somebody who has not done it yet — "צייד את הגיבור בכל תשעת המשבצות".
+ * Printed under an earned medal on a rival's dossier that is the wrong tense
+ * entirely. The five capstones already have descriptive lines in GLORY_TAGLINE
+ * and reuse them; these six are the rest.
+ */
+const MEDAL_TAGLINE: Record<string, string> = {
+  [RANK_ONE_KEY]: "המקום הראשון בדירוג העיר",
+  all_bosses: `בוסי כל ${he(MAX_CITIES)} דרגות הערים`,
+  upgrades_5: "כל שדרוגי האימפריה ברמה 5 ומעלה",
+  heroreset_1: "הגיבור הגיע לשיא ונולד מחדש",
+  legendary_1: "פריט בדרגת הנדירות אגדי",
+  full_gear: "כל תשע משבצות הגיבור מלאות",
+};
+
+/** One earned medal, ready to render. */
+export interface MedalView {
+  key: string;
+  name: string;
+  /** The one-line feat, short enough for a narrow column. */
+  tagline: string;
+  icon: IconName;
+  /** "12.07.26" — when the empire reached it. */
+  earnedLabel: string;
+  /**
+   * First empire in the game to reach this capstone. Only ever true for a
+   * GLORY_KEYS medal — the other six have no world record to hold.
+   */
+  worldFirst: boolean;
+}
+
+/**
+ * Project a set of earned medals into the profile column, in MEDAL_KEYS order.
+ *
+ * Keys with no catalog entry are dropped, the same way `selectGlory` drops
+ * them: retuning a goal mints a new key (see `chain`), and a dossier is not the
+ * place to throw over a stale receipt.
+ */
+export function selectMedals(
+  earned: ReadonlyMap<string, { at: Date; worldFirst: boolean }>
+): MedalView[] {
+  return [...earned]
+    .flatMap(([key, held]) => {
+      const item = ACHIEVEMENT_BY_KEY.get(key);
+      if (!item || !MEDAL_ORDER.has(key)) return [];
+      return [
+        {
+          key,
+          name: MEDAL_NAME[key] ?? item.name,
+          tagline: MEDAL_TAGLINE[key] ?? GLORY_TAGLINE[key] ?? item.hint,
+          icon: item.icon,
+          earnedLabel: gloryDate.format(held.at),
+          worldFirst: held.worldFirst,
+        },
+      ];
+    })
+    .sort((a, b) => MEDAL_ORDER.get(a.key)! - MEDAL_ORDER.get(b.key)!);
+}
+
 /**
  * Read one achievement's progress, failing closed.
  *

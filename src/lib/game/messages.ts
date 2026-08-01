@@ -34,3 +34,25 @@ export const MESSAGE_RECIPIENT_WINDOW_MS = 5 * 60 * 1000;
 
 export const MESSAGE_PAIR_LIMIT = 5;
 export const MESSAGE_PAIR_WINDOW_MS = 60 * 60 * 1000;
+
+/* ------------------------- the addressee picker ------------------------- */
+
+/**
+ * How many empires the composer is seeded with, alphabetically, before anybody
+ * types.
+ *
+ * The picker used to be handed the *whole* game — a thousand `{id, name}` rows,
+ * serialised into the RSC payload of /game/messages on every load and every
+ * refresh of it, so that a search box could filter them in the browser. That is
+ * the entire player directory shipped to every client, repeatedly, to answer a
+ * question the database answers in one indexed query. The seed is what the list
+ * shows at rest; anything past it is reached by typing, which is what the search
+ * box was already for.
+ */
+export const MESSAGE_ROSTER_SEED = 40;
+
+/** Minimum characters before the composer asks the server for matches. */
+export const MESSAGE_SEARCH_MIN = 2;
+
+/** Most matches one search returns. */
+export const MESSAGE_SEARCH_MAX_RESULTS = 30;

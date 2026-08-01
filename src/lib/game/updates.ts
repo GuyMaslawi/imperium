@@ -16,6 +16,8 @@ import {
   HERO_MAX_HEALTH,
   bonusMultiplier,
   heroBonuses,
+  heroPointPool,
+  heroPointsHeld,
   heroShouldRevive,
   resourceProductionPct,
 } from "./hero";
@@ -81,6 +83,38 @@ export async function applyPendingUpdates(
     });
     deadHero.health = HERO_MAX_HEALTH;
     deadHero.diedAt = null;
+  }
+
+  // The point pool is an invariant, not a running total: a hero is owed one
+  // point per level he stands at plus 25 for every reset behind him
+  // (`heroPointPool`). Every grant path increments the column as it raises the
+  // level, but the columns are also written *absolutely* elsewhere — the admin
+  // editor sets all four from a form, and a hero created before a rule change
+  // never saw the difference — so a row can fall behind the pool and silently
+  // stay there (a level-16 hero holding 9 points). Reconciling here, on the same
+  // lazy clock that revives him, means the shortfall is repaid the next time the
+  // player so much as loads a page. Only a *deficit* is paid: an excess is left
+  // alone, since taking allocated points back would silently weaken an empire.
+  const hero = empire.hero;
+  if (hero) {
+    const owed = heroPointPool(hero.level, hero.resets) - heroPointsHeld(hero);
+    if (owed > 0) {
+      // Guarded on the exact snapshot that produced the figure, so a concurrent
+      // level-up (which increments the same column) can never be double-paid.
+      const paid = await tx.hero.updateMany({
+        where: {
+          id: hero.id,
+          level: hero.level,
+          resets: hero.resets,
+          unspentPoints: hero.unspentPoints,
+          attackPoints: hero.attackPoints,
+          defensePoints: hero.defensePoints,
+          resourcePoints: hero.resourcePoints,
+        },
+        data: { unspentPoints: { increment: owed } },
+      });
+      if (paid.count > 0) hero.unspentPoints += owed;
+    }
   }
 
   const tunables = await getTunables();

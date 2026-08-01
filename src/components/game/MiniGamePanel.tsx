@@ -17,7 +17,25 @@ import {
 } from "@/lib/game/minigame";
 import { Icon } from "@/components/ui/Icon";
 
-const POLL_MS = 10_000;
+/**
+ * Two rates, because this panel lives in the game's layout — it is mounted on
+ * every single `/game/*` screen, for every player, for as long as the tab is
+ * open.
+ *
+ * At one flat 10s beat that cost six round trips a minute per open tab forever,
+ * and the overwhelming majority of them asked a question with no answer: most of
+ * the time no event is running, so each poll was a session verification and a
+ * `loadLiveEvent()` that returned null. A hundred players idling on a page was
+ * ~36k empty queries an hour.
+ *
+ * LIVE is the old beat and applies only while an event is actually on screen,
+ * where the countdown and the rival board genuinely move. IDLE is the rest of
+ * the time, when the only thing being waited for is an event to be announced —
+ * and even that is belt-and-braces, since the layout renders the panel
+ * server-side, so any navigation picks up a new event at once.
+ */
+const POLL_LIVE_MS = 10_000;
+const POLL_IDLE_MS = 30_000;
 
 type Feedback = { text: string; tone: string; eventId: string };
 
@@ -129,22 +147,37 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
     if (!next) router.refresh();
   }, [router]);
 
+  // Derived rather than read off `state` inside the effect: the poll result is a
+  // new object every tick, so depending on `state` itself would tear down and
+  // rebuild the interval on every beat. This flips only when an event starts or
+  // ends, which is exactly when the rate should change.
+  const live = state !== null;
+
   // Poll for activation / end / rival progress.
   useEffect(() => {
     let alive = true;
     const tick = async () => {
+      // Nobody is watching a hidden tab, and the wake-up listeners below poll
+      // the moment it comes back — so skipping here is not falling behind, it is
+      // the difference between a backgrounded tab costing six requests a minute
+      // for hours and costing nothing. Same rule the chat dock already follows.
+      if (document.visibilityState === "hidden") return;
       const next = await getMiniGameState();
       if (alive) setState(next);
     };
-    const id = setInterval(tick, POLL_MS);
-    const onFocus = () => tick();
-    window.addEventListener("focus", onFocus);
+    const id = setInterval(tick, live ? POLL_LIVE_MS : POLL_IDLE_MS);
+    const onWake = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
     return () => {
       alive = false;
       clearInterval(id);
-      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
     };
-  }, []);
+  }, [live]);
 
   function play(eventId: string, value: number) {
     startTransition(async () => {

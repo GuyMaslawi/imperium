@@ -13,9 +13,60 @@ export const POINTS_PER_LEVEL = 1;
 /** Citizens the empire receives for each hero level gained. */
 export const CITIZENS_PER_LEVEL = 25;
 
-/** Reset ("prestige") at level 100: the hero returns to level 1 with these. */
-export const HERO_RESET_CITIZENS = 2500;
+/**
+ * Reset ("prestige") at level 100: the hero returns to level 1 with these.
+ *
+ * The points are **cumulative across resets** — every reset behind the hero is
+ * worth another 25, permanently. A hero on his first reset starts level 1 with
+ * 25 points and can reach 125 at the cap; his second reset starts him at 50, his
+ * third at 75. See `heroPointPool`, which is the single expression of that rule.
+ */
+export const HERO_RESET_CITIZENS = 3000;
+export const HERO_RESET_TURNS = 6000;
 export const HERO_RESET_POINTS = 25;
+
+/** The four columns hero points live in — what `heroPointsHeld` sums. */
+export type HeroPointColumns = Pick<
+  Hero,
+  "unspentPoints" | "attackPoints" | "defensePoints" | "resourcePoints"
+>;
+
+/** Every point the hero currently holds, spent and unspent alike. */
+export function heroPointsHeld(hero: HeroPointColumns): number {
+  return (
+    hero.unspentPoints + hero.attackPoints + hero.defensePoints + hero.resourcePoints
+  );
+}
+
+/**
+ * Every point a hero at this standing is entitled to — the invariant the whole
+ * point economy is built on, and the one place it is written down. Two sources,
+ * both permanent:
+ *
+ * - **one per level he stands at**, level 1 included. A newborn hero therefore
+ *   already holds one point, and the promise "every level gained is another
+ *   point" holds all the way up: level 16 → 16, level 100 → 100.
+ * - **25 per reset behind him**, and they *stack* — the grant of every reset
+ *   survives, not just the most recent one. A first reset means 25 points at
+ *   level 1 and 125 at the cap; a second, 50 at level 1 and 150 at the cap.
+ *
+ * Because it is a pure function of (level, resets), any hero row can be checked
+ * against it — which is exactly what `applyPendingUpdates` does on every load,
+ * topping up a hero who was shorted his points (the admin editor sets the point
+ * columns absolutely, so raising a level there used to leave the pool behind).
+ */
+export function heroPointPool(level: number, resets: number): number {
+  const lvl = Math.min(HERO_MAX_LEVEL, Math.max(1, Math.floor(level)));
+  return lvl * POINTS_PER_LEVEL + Math.max(0, Math.floor(resets)) * HERO_RESET_POINTS;
+}
+
+/**
+ * The unspent points a hero holds the moment a reset lands him back at level 1:
+ * his whole (larger) pool, since a reset wipes every allocated point.
+ */
+export function heroResetPoints(resetsAfter: number): number {
+  return heroPointPool(1, resetsAfter);
+}
 
 /**
  * Unequipped items the bag can hold — a 5×3 grid of slots. When it is full no

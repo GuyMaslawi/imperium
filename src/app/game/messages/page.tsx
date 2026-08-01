@@ -4,8 +4,11 @@ import { requireEmpire } from "@/lib/auth";
 import { notBannedWhere } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { PresenceDot } from "@/components/ui/PresenceDot";
+import { isOnline } from "@/lib/game/chat";
 import { formatDate } from "@/lib/game/format";
 import { markMessagesRead } from "@/server/actions/messages";
+import { MESSAGE_ROSTER_SEED } from "@/lib/game/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
 import { MessageCompose, type PlayerOption } from "@/components/game/MessageCompose";
 import type { MessageKind } from "@prisma/client";
@@ -45,16 +48,21 @@ export default async function MessagesPage() {
       where: { empireId: empire.id },
       orderBy: { createdAt: "desc" },
       take: 50,
-      include: { sender: { select: { name: true } } },
+      // The sender is selected down to a name and a heartbeat, and the heartbeat
+      // is collapsed to a boolean below — the timestamp itself never crosses.
+      include: { sender: { select: { name: true, lastSeenAt: true } } },
     }),
-    // The closed list the compose form picks from: every live empire but mine.
-    // Only id + name leave the server — this is an address book, not a scouting
-    // report.
+    // The seed the compose form opens on — an alphabetical first page, not the
+    // roster. This used to be `take: 1000`, which meant every load of this page
+    // serialised the entire player directory into the RSC payload so a search
+    // box could filter it client-side; the box now asks the server instead (see
+    // searchMessageRecipients). Only id + name leave here either way — this is
+    // an address book, not a scouting report.
     prisma.empire.findMany({
       where: { id: { not: empire.id }, user: notBannedWhere() },
       select: { id: true, name: true },
       orderBy: { name: "asc" },
-      take: 1000,
+      take: MESSAGE_ROSTER_SEED,
     }),
   ]);
 
@@ -62,7 +70,8 @@ export default async function MessagesPage() {
 
   // "New" = unread, or read moments ago (so the highlight survives the
   // mark-read revalidation that clears the sidebar badge).
-  const freshCutoff = new Date(new Date().getTime() - 2 * 60 * 1000);
+  const now = new Date();
+  const freshCutoff = new Date(now.getTime() - 2 * 60 * 1000);
   const isNew = (m: (typeof messages)[number]) =>
     m.readAt === null || m.readAt > freshCutoff;
   const unread = messages.filter(isNew).length;
@@ -157,6 +166,12 @@ export default async function MessagesPage() {
             // loses the name (the FK is SetNull, not Cascade).
             const from =
               m.kind === "PLAYER" ? m.sender?.name ?? "שחקן שנמחק" : null;
+            // `undefined` for a deleted author, which draws no dot at all — a
+            // hollow ring would claim he is merely away. System mail (a battle
+            // report, a quest haul) has no sender to be online in the first place.
+            const fromOnline = m.sender
+              ? isOnline(m.sender.lastSeenAt, now)
+              : undefined;
             return (
               <li
                 key={m.id}
@@ -182,8 +197,14 @@ export default async function MessagesPage() {
                       )}
                     </div>
                     {from && (
-                      <p className="mt-0.5 text-xs text-emerald-300/90">
-                        מאת <span className="font-bold">{from}</span>
+                      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-300/90">
+                        <span>
+                          מאת <span className="font-bold">{from}</span>
+                        </span>
+                        {/* Whether the sender is at the keyboard is what decides
+                            if a reply is a conversation or a letter — so it sits
+                            on the "from" line, not somewhere else on the card. */}
+                        <PresenceDot online={fromOnline} />
                       </p>
                     )}
                     <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">

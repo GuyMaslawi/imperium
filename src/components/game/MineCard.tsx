@@ -200,9 +200,16 @@ export function MineCard({
         </SubmitButton>
       </form>
 
-      <form action={upgradeAction} className="mt-auto space-y-2">
-        <input type="hidden" name="resource" value={resource} />
-        {!isMaxLevel && (
+      {/* At the ceiling there is nothing left to buy, so the two upgrade
+          buttons and the cost line give way to a single "maxed out" plate. */}
+      {isMaxLevel ? (
+        <div className="mt-auto flex items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm font-bold text-gold-bright">
+          <Icon name="spark" size={16} className="text-gold-bright" />
+          המכונה משודרגת למקסימום
+        </div>
+      ) : (
+        <form action={upgradeAction} className="mt-auto space-y-2">
+          <input type="hidden" name="resource" value={resource} />
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
             <span className="nums" dir="ltr">
@@ -214,22 +221,21 @@ export function MineCard({
               {nis(upgradeCost[resource])} {resourceLabel}
             </span>
           </div>
-        )}
-        <div className="grid grid-cols-2 gap-2">
-          <SubmitButton className="btn btn-dark w-full" pendingText="משדרג..." disabled={isMaxLevel}>
-            {isMaxLevel ? "רמה מקסימלית" : "שדרג רמה"}
-          </SubmitButton>
-          <SubmitButton
-            formAction={maxAction}
-            variant="secondary"
-            className="btn btn-ghost w-full"
-            pendingText="משדרג..."
-            disabled={isMaxLevel}
-          >
-            שדרג למקסימום
-          </SubmitButton>
-        </div>
-      </form>
+          <div className="grid grid-cols-2 gap-2">
+            <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">
+              שדרג רמה
+            </SubmitButton>
+            <SubmitButton
+              formAction={maxAction}
+              variant="secondary"
+              className="btn btn-ghost w-full"
+              pendingText="משדרג..."
+            >
+              שדרג למקסימום
+            </SubmitButton>
+          </div>
+        </form>
+      )}
 
       <FormMessage
         error={upgradeState.error ?? maxState.error ?? assignState.error}

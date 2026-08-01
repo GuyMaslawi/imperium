@@ -34,8 +34,7 @@ import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
 import {
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
-  HERO_RESET_POINTS,
-  POINTS_PER_LEVEL,
+  heroPointPool,
   xpToNextLevel,
 } from "@/lib/game/hero";
 import {
@@ -286,13 +285,46 @@ function revalidateEmpire(userId?: string) {
   revalidatePath("/game", "layout");
 }
 
+/** Bounds on the "active players" window, in hours. */
+const ACTIVE_WINDOW_MIN_HOURS = 1;
+const ACTIVE_WINDOW_MAX_HOURS = 24 * 90;
+const ACTIVE_WINDOW_DEFAULT_HOURS = 24;
+
+/** Read the "active" scope's window out of `scopeId`, clamped to sane bounds. */
+function activeWindowHours(scopeId: string): number {
+  const raw = Math.floor(Number(scopeId));
+  if (!Number.isFinite(raw) || raw <= 0) return ACTIVE_WINDOW_DEFAULT_HOURS;
+  return Math.min(ACTIVE_WINDOW_MAX_HOURS, Math.max(ACTIVE_WINDOW_MIN_HOURS, raw));
+}
+
+/** The id an audit row files a target-scoped action under. */
+function scopeAuditId(scope: string, scopeId: string): string {
+  if (scope === "empire") return scopeId;
+  if (scope === "active") return `active:${activeWindowHours(scopeId)}h`;
+  return scope;
+}
+
 /**
  * Resolve a broadcast/gift target ("scope") to a concrete list of empire ids.
- * scope: "all" | "season" | "guild" | "empire"; scopeId used by the last three.
+ * scope: "all" | "active" | "season" | "guild" | "empire".
+ *
+ * `scopeId` carries a row id for season/guild/empire, and the window **in
+ * hours** for "active" — those players whose `lastSeenAt` heartbeat (stamped by
+ * the chat pulse that every game screen runs, open dock or not) falls inside
+ * it. That is deliberately looser than the monitor's "wrote a row" definition
+ * of active: a gift should reach everyone who showed up, not only the raiders.
  */
 async function resolveTargetEmpireIds(scope: string, scopeId: string): Promise<string[]> {
   if (scope === "empire") {
     return scopeId ? [scopeId] : [];
+  }
+  if (scope === "active") {
+    const since = new Date(Date.now() - activeWindowHours(scopeId) * 3_600_000);
+    const rows = await prisma.empire.findMany({
+      where: { lastSeenAt: { gte: since } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
   }
   if (scope === "season") {
     const rows = await prisma.empire.findMany({
@@ -933,14 +965,17 @@ export async function updateHero(
         ? 0
         : clampLevel(num(formData, "xp"), 0, xpToNextLevel(level));
 
-    // Stat points have exactly two sources: one per level gained, plus the 25
-    // handed back at a reset (which wipes every allocated point, so only the
-    // most recent reset's grant survives). Each point is a permanent +1% on a
-    // core combat stat, so an unbounded field here is a bigger cheat than any
-    // resource number. The pool is filled in allocation order and whatever
-    // exceeds it is dropped.
-    const pointPool =
-      (level - 1) * POINTS_PER_LEVEL + (resets > 0 ? HERO_RESET_POINTS : 0);
+    // Stat points have exactly two sources — one per level the hero stands at
+    // and 25 for every reset behind him — and `heroPointPool` is the only place
+    // that says so. Each point is a permanent +1% on a core combat stat, so an
+    // unbounded field here is a bigger cheat than any resource number. The pool
+    // is filled in allocation order and whatever exceeds it is dropped.
+    //
+    // What is *not* dropped is the remainder: a level raised here used to leave
+    // the extra points unwritten (the form posts the old figures), which is how
+    // a level-16 hero ended up holding 9 points. Whatever the four fields leave
+    // unspent now lands in `unspentPoints`, so the row always satisfies the pool.
+    const pointPool = heroPointPool(level, resets);
     let unallocated = pointPool;
     const takePoints = (key: string) => {
       const want = Math.max(0, Math.round(num(formData, key)));
@@ -958,7 +993,9 @@ export async function updateHero(
       attackPoints: takePoints("attackPoints"),
       defensePoints: takePoints("defensePoints"),
       resourcePoints: takePoints("resourcePoints"),
-      unspentPoints: takePoints("unspentPoints"),
+      // Takes what the form asked for and then keeps the rest of the pool —
+      // never less than the hero is owed.
+      unspentPoints: takePoints("unspentPoints") + unallocated,
       resets,
     };
     await prisma.hero.upsert({
@@ -2138,7 +2175,7 @@ export async function broadcastMessage(
     await logAdmin(admin, {
       action: "message.broadcast",
       targetType: "broadcast",
-      targetId: scope === "empire" ? scopeId : scope,
+      targetId: scopeAuditId(scope, scopeId),
       summary: `שידור "${title}" ל-${empireIds.length} אימפריות`,
       details: { scope, scopeId, count: empireIds.length },
     });
@@ -2223,7 +2260,7 @@ export async function sendGift(
     await logAdmin(admin, {
       action: "gift.send",
       targetType: "gift",
-      targetId: scope === "empire" ? scopeId : scope,
+      targetId: scopeAuditId(scope, scopeId),
       summary: `מתנה נשלחה ל-${empireIds.length} אימפריות`,
       details: { scope, scopeId, bundle, count: empireIds.length },
     });

@@ -50,6 +50,8 @@ export type SidebarProps = {
   heroXp: number;
   heroXpMax: number;
   recruits: number;
+  /** Mine slaves owned but not assigned to any machine — idle, producing nothing. */
+  freeMineSlaves?: number;
   /** Achievement rewards unlocked and waiting to be collected. */
   collectableAchievements?: number;
   /** The hero is back from an expedition and his haul is uncollected. */
@@ -230,6 +232,7 @@ function SidebarContent({
   heroXp,
   heroXpMax,
   recruits,
+  freeMineSlaves = 0,
   collectableAchievements = 0,
   heroQuestReady = false,
   inGuild = false,
@@ -253,7 +256,14 @@ function SidebarContent({
     { href: "/game/rankings", label: "דירוג", icon: "rankings" },
     { href: "/game/weapons", label: "מפעל", icon: "factory" },
     { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
-    { href: "/game/production", label: "מכונות", icon: "mine" },
+    // Idle mine slaves read exactly like waiting recruits on the row above:
+    // a neutral count of something sitting unused, not an alert.
+    {
+      href: "/game/production",
+      label: "מכונות",
+      icon: "mine",
+      badge: freeMineSlaves,
+    },
     { href: "/game/guild", label: "ברית", icon: "guild" },
     // Guild-only, and hidden rather than disabled: a locked door on the nav for
     // a screen a guildless player can do nothing with is just noise. The page

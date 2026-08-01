@@ -12,6 +12,12 @@
  * and the rankings ladder, where it answers "will they notice me coming?" — and
  * the two must never drift into two different-looking dots.
  *
+ * Away is a *filled* red dot rather than the hollow ring it started as: a hollow
+ * outline on a dark panel is easy to miss entirely, and on a board read to pick
+ * targets "not here" is a real answer, not the absence of one. It is dimmed and
+ * never animated, so a roster of sleeping players stays quiet — only the green
+ * one pulses.
+ *
  * Purely presentational (no hooks), so it renders in a server component as
  * happily as inside the client-side dock.
  */
@@ -37,9 +43,7 @@ export function PresenceDot({
     <span
       aria-hidden
       className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-        online
-          ? "presence-online bg-accent-green"
-          : "border border-bone-dim/50 bg-transparent"
+        online ? "presence-online bg-accent-green" : "bg-accent-red/60"
       }`}
     />
   );
@@ -54,7 +58,7 @@ export function PresenceDot({
       className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold ${
         online
           ? "border-accent-green/50 bg-accent-green/10 text-accent-green"
-          : "border-border-subtle bg-panel-inset text-zinc-500"
+          : "border-accent-red/40 bg-accent-red/10 text-accent-red/80"
       }`}
     >
       {dot}

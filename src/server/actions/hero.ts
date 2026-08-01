@@ -12,12 +12,13 @@ import {
   HERO_BAG_CAPACITY,
   HERO_MAX_LEVEL,
   HERO_RESET_CITIZENS,
-  HERO_RESET_POINTS,
+  HERO_RESET_TURNS,
   HERO_STAT_META,
   RARITY_META,
   SLOT_ORDER,
   canEquipItem,
   canUpgradeItem,
+  heroResetPoints,
   itemDisplayName,
   itemUpgradeCost,
   nextTierLevel,
@@ -113,8 +114,11 @@ export async function allocateHeroPoints(
 
 /**
  * Level-100 hero reset: the hero returns to level 1, all allocated points
- * are wiped, and the empire receives 2,500 citizens plus 25 fresh hero
- * points. The reset counter marks the hero as prestiged.
+ * are wiped, and the empire receives 3,000 citizens, 6,000 turns and a fresh
+ * pool of hero points. The reset counter marks the hero as prestiged — and it
+ * is what sizes the grant, since every reset is worth another permanent 25
+ * points (see `heroPointPool`): 25 after the first, 50 after the second, and so
+ * on, each carried all the way back up to the cap.
  */
 export async function resetHero(): Promise<ActionState> {
   try {
@@ -125,17 +129,24 @@ export async function resetHero(): Promise<ActionState> {
       const hero = empire.hero;
       if (!hero) return { error: "הגיבור לא נמצא" };
 
-      // Guarded on level — a double-submit can never reset twice.
+      // The new pool is a function of the reset the hero is about to complete,
+      // so it has to be computed from a `resets` we can trust — hence the guard
+      // below pins that column too, not just the level.
+      const resetsAfter = hero.resets + 1;
+      const freshPoints = heroResetPoints(resetsAfter);
+
+      // Guarded on level *and* resets — a double-submit can never reset twice,
+      // and can never write a point pool computed from a stale reset count.
       const reset = await tx.hero.updateMany({
-        where: { id: hero.id, level: { gte: HERO_MAX_LEVEL } },
+        where: { id: hero.id, level: { gte: HERO_MAX_LEVEL }, resets: hero.resets },
         data: {
           level: 1,
           xp: 0,
-          unspentPoints: HERO_RESET_POINTS,
+          unspentPoints: freshPoints,
           attackPoints: 0,
           defensePoints: 0,
           resourcePoints: 0,
-          resets: { increment: 1 },
+          resets: resetsAfter,
         },
       });
       if (reset.count === 0) {
@@ -151,15 +162,21 @@ export async function resetHero(): Promise<ActionState> {
       // hero climbs back to its level. Taking gear off after a reset is
       // therefore a one-way door, which is exactly the intended cost.
 
-      // Routed through grantCitizens so the city population ceiling holds. A raw
-      // increment here delivered HERO_RESET_CITIZENS (2,500) in one write — 2.5×
-      // the ceiling of even a ten-city empire, and 25× a one-city empire's —
-      // which `trainUnits` then converts one-for-one into mine slaves, i.e. an
-      // uncapped resource faucet one step downstream.
+      // Routed through grantCitizens like every other citizen source — the whole
+      // grant lands (there is no population ceiling any more), but going through
+      // the one helper is what keeps citizens auditable: `trainUnits` turns each
+      // one into a soldier, spy or mine slave, so the safety is in every faucet
+      // being rate-limited and accounted for, not in a lid on the pool.
       await grantCitizens(tx, empireId, HERO_RESET_CITIZENS);
+      // Turns have no ceiling of their own (they are spent, not stored against a
+      // cap), so they are a plain increment on the empire.
+      await tx.empire.update({
+        where: { id: empireId },
+        data: { turns: { increment: HERO_RESET_TURNS } },
+      });
 
       return {
-        success: `הגיבור אופס! קיבלת ${HERO_RESET_CITIZENS.toLocaleString("he-IL")} אזרחים ו-${HERO_RESET_POINTS} נקודות גיבור`,
+        success: `הגיבור אופס! קיבלת ${HERO_RESET_CITIZENS.toLocaleString("he-IL")} אזרחים, ${HERO_RESET_TURNS.toLocaleString("he-IL")} תורות ו-${freshPoints} נקודות גיבור`,
       };
     });
 

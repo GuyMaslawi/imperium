@@ -281,7 +281,7 @@ export default async function HeroPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              {atCap && <HeroResetButton />}
+              {atCap && <HeroResetButton resets={hero.resets} />}
               <Tip tip="חנות פריטים וחיזוקים לגיבור — בקרוב" side="bottom">
                 <button className="btn btn-ghost px-3 py-1.5 text-xs">
                   <Icon name="shop" size={14} className="inline align-[-2px]" /> חנות גיבור

@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CardTitle } from "@/components/ui/Card";
@@ -11,6 +12,15 @@ export const metadata = { title: "הגדרות | קראלדור" };
 
 export default async function SettingsPage() {
   const empire = await requireEmpire();
+
+  // Asked as a count rather than a `select: { passwordHash: true }`, so the
+  // digest is never loaded into the render at all — the page only ever needed
+  // to know whether one exists. `requireEmpire` deliberately does not carry it
+  // (see the select there); this is the one screen that asks.
+  const hasPassword =
+    (await prisma.user.count({
+      where: { id: empire.userId, passwordHash: { not: null } },
+    })) > 0;
 
   return (
     <div className="space-y-6">
@@ -60,7 +70,7 @@ export default async function SettingsPage() {
 
         {/* Only a boolean crosses the client boundary — never the hash itself. */}
         <div className="cog-panel" style={{ "--i": 2 } as CSSProperties}>
-          <AccountSecurity hasPassword={empire.user.passwordHash != null} />
+          <AccountSecurity hasPassword={hasPassword} />
         </div>
 
         <div className="panel-gold cog-panel rounded-xl p-4" style={{ "--i": 3 } as CSSProperties}>

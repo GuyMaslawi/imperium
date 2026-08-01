@@ -287,6 +287,52 @@ export default async function BattleResultPage({
         </div>
       </div>
 
+      {/* -------- the haul, straight under the verdict --------
+          This is the reason the raid was sent. It used to close the page, below
+          two power ledgers, so on a phone the number the player actually came
+          for was three screens down; everything else here is explanation. */}
+      {shieldsHeld.length > 0 && (
+        <div className="panel-inset rounded-xl border-emerald-500/40 p-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm">
+            {shieldsHeld.map((key) => (
+              <ShieldGlyph key={key} shieldKey={key} size={14} />
+            ))}
+            <span className="font-bold text-emerald-300">
+              {iAmAttacker ? "היעד היה מוגן" : "המגן שלך עמד"}
+            </span>
+            <span className="text-zinc-400">
+              {shieldsHeld.map((key) => shieldMeta(key).label).join(" ו")} חסמו{" "}
+              {shieldsHeld
+                .map((key) => (key === "resources" ? "את הביזה" : "את השעבוד"))
+                .join(" ו")}
+              {iAmAttacker ? " — הקרב נוצח, אך לא נלקח דבר." : " — לא נלקח ממך דבר."}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {plunderTotal > 0 && (
+        <div className="panel-gold rounded-xl p-4">
+          <h3 className="mb-3 text-sm font-bold text-gold-bright">
+            {iAmAttacker ? (
+              <><Icon name="gold" size={16} className="inline-block align-middle text-gold-bright" /> שלל הביזה</>
+            ) : (
+              "💸 נבזז ממך"
+            )}
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {RES.map((r) => (
+              <div key={r.key} className="panel-inset rounded-lg p-3 text-center">
+                <p className="text-[11px] text-zinc-400">{r.icon} {r.label}</p>
+                <p className={`nums mt-0.5 font-black ${iAmAttacker ? "text-emerald-400" : "text-red-400"}`} dir="ltr">
+                  {iAmAttacker ? "+" : "−"}{formatNumber(report[r.key])}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* -------- aftermath: turns, casualties and hero XP on one line --------
           These are one-number facts. Given a panel each they ate a full screen
           of height above the report that actually matters, so they ride in a
@@ -475,48 +521,6 @@ export default async function BattleResultPage({
           ממש מכוח המגן. שוויון נחשב הדיפה.
         </p>
       </div>
-
-      {shieldsHeld.length > 0 && (
-        <div className="panel-inset rounded-xl border-emerald-500/40 p-4">
-          <div className="flex flex-wrap items-center justify-center gap-2 text-center text-sm">
-            {shieldsHeld.map((key) => (
-              <ShieldGlyph key={key} shieldKey={key} size={14} />
-            ))}
-            <span className="font-bold text-emerald-300">
-              {iAmAttacker ? "היעד היה מוגן" : "המגן שלך עמד"}
-            </span>
-            <span className="text-zinc-400">
-              {shieldsHeld.map((key) => shieldMeta(key).label).join(" ו")} חסמו{" "}
-              {shieldsHeld
-                .map((key) => (key === "resources" ? "את הביזה" : "את השעבוד"))
-                .join(" ו")}
-              {iAmAttacker ? " — הקרב נוצח, אך לא נלקח דבר." : " — לא נלקח ממך דבר."}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {plunderTotal > 0 && (
-        <div className="panel-gold rounded-xl p-4">
-          <h3 className="mb-3 text-sm font-bold text-gold-bright">
-            {iAmAttacker ? (
-              <><Icon name="gold" size={16} className="inline-block align-middle text-gold-bright" /> שלל הביזה</>
-            ) : (
-              "💸 נבזז ממך"
-            )}
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {RES.map((r) => (
-              <div key={r.key} className="panel-inset rounded-lg p-3 text-center">
-                <p className="text-[11px] text-zinc-400">{r.icon} {r.label}</p>
-                <p className={`nums mt-0.5 font-black ${iAmAttacker ? "text-emerald-400" : "text-red-400"}`} dir="ltr">
-                  {iAmAttacker ? "+" : "−"}{formatNumber(report[r.key])}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
     </div>
   );

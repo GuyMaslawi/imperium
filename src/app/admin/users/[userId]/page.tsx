@@ -36,8 +36,7 @@ import {
   HERO_CLASS_ORDER,
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
-  HERO_RESET_POINTS,
-  POINTS_PER_LEVEL,
+  heroPointPool,
   SLOT_META,
   SLOT_ORDER,
 } from "@/lib/game/hero";
@@ -160,13 +159,10 @@ export default async function AdminUserDetail({
   if (!user) notFound();
   const empire = user.empire;
 
-  // Hero stat points the player could have earned at his current standing: one
-  // per level gained plus the 25 a reset hands back (a reset wipes every
-  // allocated point, so only the most recent grant survives). `updateHero`
-  // clamps to the same figure — the form only mirrors it.
-  const heroPointPool =
-    ((empire?.hero?.level ?? 1) - 1) * POINTS_PER_LEVEL +
-    ((empire?.hero?.resets ?? 0) > 0 ? HERO_RESET_POINTS : 0);
+  // Hero stat points the player is entitled to at his current standing: one per
+  // level he stands at plus 25 for every reset behind him. `updateHero` fills
+  // exactly this pool — the form only mirrors it.
+  const heroPoints = heroPointPool(empire?.hero?.level ?? 1, empire?.hero?.resets ?? 0);
 
   // Pickers and counters for the panels below. Guilds and seasons are small
   // tables; the history counts are indexed and only the totals are needed, so
@@ -560,14 +556,14 @@ export default async function AdminUserDetail({
 
           {/* ---------------- hero ---------------- */}
           <EditorSection title="גיבור" icon="🛡️">
-            {/* Stat points the hero could actually have earned: one per level
-                gained, plus the 25 a reset hands back (a reset wipes every
-                allocated point, so only the last grant survives). The server
-                fills the four fields from this pool in allocation order. */}
+            {/* Stat points the hero is entitled to: one per level he stands at,
+                plus 25 for every reset behind him. The server fills the four
+                fields from this pool in allocation order and hands whatever is
+                left over to "נק' פנויות", so the row always holds the full pool. */}
             <p className="mb-3 text-xs text-zinc-400">
               נקודות זמינות לחלוקה:{" "}
-              <b className="nums text-gold-bright">{heroPointPool}</b> — סכום
-              ארבעת שדות הנקודות לא יעלה על זה.
+              <b className="nums text-gold-bright">{heroPoints}</b> — סכום ארבעת
+              שדות הנקודות לא יעלה על זה, וכל יתרה תיזקף לנקודות הפנויות.
             </p>
             <ActionForm action={updateHero} submitLabel="שמור גיבור" className="mb-4">
               <input type="hidden" name="empireId" value={empire.id} />
@@ -592,10 +588,10 @@ export default async function AdminUserDetail({
                   hint={`מקסימום ${HERO_MAX_LEVEL}`}
                 />
                 <LabeledInput label="ניסיון" name="xp" type="number" min={0} defaultValue={empire.hero?.xp ?? 0} />
-                <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.unspentPoints ?? 0} />
-                <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.attackPoints ?? 0} />
-                <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.defensePoints ?? 0} />
-                <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} max={heroPointPool} defaultValue={empire.hero?.resourcePoints ?? 0} />
+                <LabeledInput label="נק' פנויות" name="unspentPoints" type="number" min={0} max={heroPoints} defaultValue={empire.hero?.unspentPoints ?? 0} />
+                <LabeledInput label="נק' התקפה" name="attackPoints" type="number" min={0} max={heroPoints} defaultValue={empire.hero?.attackPoints ?? 0} />
+                <LabeledInput label="נק' הגנה" name="defensePoints" type="number" min={0} max={heroPoints} defaultValue={empire.hero?.defensePoints ?? 0} />
+                <LabeledInput label="נק' משאבים" name="resourcePoints" type="number" min={0} max={heroPoints} defaultValue={empire.hero?.resourcePoints ?? 0} />
                 <LabeledInput label="איפוסים" name="resets" type="number" min={0} max={ADMIN_INT_MAX} defaultValue={empire.hero?.resets ?? 0} />
                 {/* 0 = הגיבור מת (וכל הבונוסים שלו מושבתים); כל ערך גבוה יותר מחייה אותו */}
                 <LabeledInput label="חיים (0=מת)" name="health" type="number" min={0} max={HERO_MAX_HEALTH} defaultValue={empire.hero?.health ?? HERO_MAX_HEALTH} />

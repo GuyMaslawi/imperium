@@ -279,6 +279,17 @@ export default async function RankingsPage({
                           <Icon name="crown" size={20} className="text-bone" />
                         </span>
                         <div className="min-w-0">
+                          {/* Is this player at the keyboard right now? On a board
+                              people read to pick targets that is the first thing
+                              worth knowing — an offline empire cannot move its
+                              gold to the bank or answer the raid — so it is
+                              pinned to the name itself rather than buried in the
+                              meta line below, where it used to sit as a word and
+                              wrapped away on a phone. Placed before the name in
+                              the DOM, which on this RTL row draws it at the
+                              name's right edge; the tooltip still says it in
+                              words for anyone who cannot read the colour. */}
+                          <PresenceDot online={empire.online} />{" "}
                           <Link
                             href={`/game/empires/${empire.id}`}
                             className="font-bold text-zinc-100 underline-offset-4 hover:text-gold-bright hover:underline"
@@ -334,13 +345,6 @@ export default async function RankingsPage({
                               and a two-icon shield rebus. Everything that stayed
                               now says what it is in words. */}
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 empty:mt-0">
-                            {/* Is this player at the keyboard right now? On a
-                                board people read to pick targets that is the
-                                first thing worth knowing — an offline empire
-                                cannot move its gold to the bank or answer the
-                                raid — so it leads the line, in words rather than
-                                as a bare dot needing a legend. */}
-                            <PresenceDot online={empire.online} label />
                             {/* Everyone on this ladder holds the same number of
                                 cities — that is what the bucket *is* — so the
                                 city under each name is the same one. It is

@@ -303,6 +303,41 @@ export default async function BossFightPage({
         </p>
       </div>
 
+      {/* -------- spoils, straight under the verdict --------
+          The haul is what the sortie was for, and unlike a player raid it pays
+          on every ending — so it leads, above the casualty tiles and the
+          round-by-round replay that explain how it was earned. */}
+      {paidAnything && (
+        <div className="panel-gold rounded-xl p-4">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
+            <Icon name="gold" size={16} className="text-gold-bright" />{" "}
+            {fight.victory ? `אוצר ${boss.name}` : "שלל הקרב"}
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {BOSS_REWARD_RESOURCES.map((res) => (
+              <div key={res} className="panel-inset rounded-lg p-3 text-center">
+                <p className="text-[11px] text-zinc-400">
+                  <Icon
+                    name={RESOURCE_ICON[res]}
+                    size={14}
+                    className={`inline-block align-middle ${RESOURCE_ICON_COLOR[res]}`}
+                  />{" "}
+                  {RESOURCE_META[res].label}
+                </p>
+                <p className="nums mt-0.5 font-black text-emerald-400" dir="ltr">
+                  +{formatNumber(fight[REWARD_FIELDS[res]])}
+                </p>
+              </div>
+            ))}
+          </div>
+          {!fight.victory && (
+            <p className="mt-2 text-[11px] text-zinc-500">
+              שולם לפי הנזק שגרמת מתוך מאגר החיים שלו. אוצר ההפלה עצמו עוד מחכה מעבר לשער.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* -------- aftermath -------- */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="panel-inset rounded-xl p-4 text-center">
@@ -390,38 +425,6 @@ export default async function BossFightPage({
               );
             })}
           </ul>
-        </div>
-      )}
-
-      {/* -------- spoils -------- */}
-      {paidAnything && (
-        <div className="panel-gold rounded-xl p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-            <Icon name="gold" size={16} className="text-gold-bright" />{" "}
-            {fight.victory ? `אוצר ${boss.name}` : "שלל הקרב"}
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {BOSS_REWARD_RESOURCES.map((res) => (
-              <div key={res} className="panel-inset rounded-lg p-3 text-center">
-                <p className="text-[11px] text-zinc-400">
-                  <Icon
-                    name={RESOURCE_ICON[res]}
-                    size={14}
-                    className={`inline-block align-middle ${RESOURCE_ICON_COLOR[res]}`}
-                  />{" "}
-                  {RESOURCE_META[res].label}
-                </p>
-                <p className="nums mt-0.5 font-black text-emerald-400" dir="ltr">
-                  +{formatNumber(fight[REWARD_FIELDS[res]])}
-                </p>
-              </div>
-            ))}
-          </div>
-          {!fight.victory && (
-            <p className="mt-2 text-[11px] text-zinc-500">
-              שולם לפי הנזק שגרמת מתוך מאגר החיים שלו. אוצר ההפלה עצמו עוד מחכה מעבר לשער.
-            </p>
-          )}
         </div>
       )}
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
 import { PayPalCheckout } from "@/components/game/PayPalCheckout";
+import { StoreSeal } from "@/components/game/StoreSeal";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { formatNumber } from "@/lib/game/format";
 import {
@@ -33,15 +34,24 @@ const TAG_META: Record<
   },
 };
 
+/** The line on the seal's plate while the store is shut. */
+const SEAL_NOTE = "עוד כמה ליטושים והיהלומים מוכנים";
+
 export function DiamondStore({
   discountPct,
   purchasesLive = false,
+  locked = false,
   paypalClientId = null,
   testMode = false,
 }: {
   discountPct: number;
   /** Whether real-money purchases are open to everyone (real provider wired). */
   purchasesLive?: boolean;
+  /**
+   * This viewer cannot pay yet, so the whole grid is chained shut instead of
+   * taking a click that only ever ends in a "coming soon" modal.
+   */
+  locked?: boolean;
   /**
    * PayPal browser-SDK client id. When set, checkout runs through the PayPal
    * buttons (approve → capture) instead of the single-call charge form.
@@ -78,7 +88,9 @@ export function DiamondStore({
                 <span className="nums font-black" dir="ltr">
                   {discountPct}%
                 </span>{" "}
-                הנחה. הזמן מוגבל — נצל את זה עכשיו.
+                {/* "נצל את זה עכשיו" in front of a chained store is a promise
+                    the page cannot keep. */}
+                {locked ? "הנחה — מחכה לך ברגע שהחנות תיפתח." : "הנחה. הזמן מוגבל — נצל את זה עכשיו."}
               </p>
             </div>
             <span
@@ -91,27 +103,40 @@ export function DiamondStore({
         </div>
       )}
 
-      <FeaturedPackage
-        pkg={featured}
-        discountPct={discountPct}
-        onBuy={() => setPending(featured)}
-      />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {rest.map((pkg) => (
-          <PackageCard
-            key={pkg.id}
-            pkg={pkg}
+      {/* Locked: the cards stay legible — the prices are the advertisement —
+          but they go grey behind the chains and their buttons go dead, so the
+          seal is the only thing on the page that answers a click. */}
+      <div className={locked ? "seal-wrap rounded-2xl" : undefined}>
+        <div className={locked ? "seal-body space-y-4" : "space-y-4"}>
+          <FeaturedPackage
+            pkg={featured}
             discountPct={discountPct}
-            onBuy={() => setPending(pkg)}
+            locked={locked}
+            onBuy={() => setPending(featured)}
           />
-        ))}
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {rest.map((pkg) => (
+              <PackageCard
+                key={pkg.id}
+                pkg={pkg}
+                discountPct={discountPct}
+                locked={locked}
+                onBuy={() => setPending(pkg)}
+              />
+            ))}
+          </div>
+        </div>
+
+        {locked && <StoreSeal note={SEAL_NOTE} />}
       </div>
 
       <p className="text-center text-xs text-zinc-500">
-        {purchasesLive
-          ? "התשלומים מעובדים בצורה מאובטחת. היהלומים נזקפים לחשבונך מיד לאחר הרכישה."
-          : "מערכת התשלומים בהרצה אחרונה. היהלומים נזקפים אוטומטית לחשבונך מיד עם סיום הרכישה."}
+        {locked
+          ? "החנות תיפתח ברגע שמערכת התשלומים תסיים את ההרצה. עד אז אפשר להרוויח יהלומים במשחק עצמו."
+          : purchasesLive
+            ? "התשלומים מעובדים בצורה מאובטחת. היהלומים נזקפים לחשבונך מיד לאחר הרכישה."
+            : "מערכת התשלומים בהרצה אחרונה. היהלומים נזקפים אוטומטית לחשבונך מיד עם סיום הרכישה."}
       </p>
 
       {pending && (
@@ -177,10 +202,12 @@ function PriceTag({
 function FeaturedPackage({
   pkg,
   discountPct,
+  locked,
   onBuy,
 }: {
   pkg: DiamondPackage;
   discountPct: number;
+  locked: boolean;
   onBuy: () => void;
 }) {
   const total = packageTotal(pkg);
@@ -232,9 +259,11 @@ function FeaturedPackage({
           <button
             type="button"
             onClick={onBuy}
+            disabled={locked}
+            tabIndex={locked ? -1 : undefined}
             className="btn btn-gold w-full px-6 py-2.5 text-sm sm:w-auto"
           >
-            רכישה מיידית
+            {locked ? "בקרוב" : "רכישה מיידית"}
           </button>
         </div>
       </div>
@@ -246,10 +275,12 @@ function FeaturedPackage({
 function PackageCard({
   pkg,
   discountPct,
+  locked,
   onBuy,
 }: {
   pkg: DiamondPackage;
   discountPct: number;
+  locked: boolean;
   onBuy: () => void;
 }) {
   const total = packageTotal(pkg);
@@ -258,7 +289,9 @@ function PackageCard({
 
   return (
     <div
-      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-3.5 text-center transition-transform duration-200 hover:-translate-y-1 ${
+      className={`group relative flex h-full flex-col overflow-hidden rounded-2xl border p-3.5 text-center transition-transform duration-200 ${
+        locked ? "" : "hover:-translate-y-1"
+      } ${
         tag
           ? "border-sky-400/50 bg-gradient-to-b from-sky-500/12 via-panel to-panel"
           : "border-sky-400/20 bg-gradient-to-b from-sky-500/5 via-panel to-panel"
@@ -306,9 +339,11 @@ function PackageCard({
         <button
           type="button"
           onClick={onBuy}
+          disabled={locked}
+          tabIndex={locked ? -1 : undefined}
           className="btn btn-ghost w-full px-3 py-2 text-sm"
         >
-          רכישה
+          {locked ? "בקרוב" : "רכישה"}
         </button>
       </div>
     </div>

@@ -916,7 +916,11 @@ model Hero {
   heroClass           HeroClass @default(WARLORD)
   level               Int       @default(1)
   xp                  Int       @default(0)
-  unspentPoints       Int       @default(0)
+  /// Points earned and not yet allocated. A newborn hero already holds one:
+  /// the pool is one point per level he *stands at* (level 1 included) plus 25
+  /// for every reset behind him — see heroPointPool in src/lib/game/hero.ts,
+  /// which applyPendingUpdates reconciles this row against on every load.
+  unspentPoints       Int       @default(1)
   attackPoints        Int       @default(0)
   defensePoints       Int       @default(0)
   resourcePoints      Int       @default(0)

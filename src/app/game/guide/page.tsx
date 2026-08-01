@@ -60,6 +60,8 @@ import {
   HERO_MAX_LEVEL,
   HERO_RESET_CITIZENS,
   HERO_RESET_POINTS,
+  HERO_RESET_TURNS,
+  heroPointPool,
   HERO_REVIVE_HOURS,
   ITEM_DROP_CHANCE,
   ITEM_DROP_CHANCE_BY_RARITY,
@@ -1428,7 +1430,10 @@ export default async function GuidePage() {
                   </>
                 }
                 legend={[
-                  { term: "נקודה לרמה", desc: "כל רמה = נקודה אחת = +1% התקפה/הגנה/תפוקה." },
+                  {
+                    term: "נקודה לרמה",
+                    desc: "כל רמה = נקודה אחת = +1% התקפה/הגנה/תפוקה. גיבור רמה 16 מחזיק 16 נקודות, ורמה 100 — 100.",
+                  },
                   { term: `+${CITIZENS_PER_LEVEL} אזרחים`, desc: "כל עליית רמה מביאה גם אזרחים." },
                 ]}
                 example={
@@ -1492,7 +1497,13 @@ export default async function GuidePage() {
                     <li>• זמין ברמה <b className="nums">{HERO_MAX_LEVEL}</b></li>
                     <li>
                       • חוזר לרמה 1 עם <b className="nums">+{nf(HERO_RESET_CITIZENS)}</b> אזרחים
-                      ו־<b className="nums">+{HERO_RESET_POINTS}</b> נקודות
+                      ו־<b className="nums">+{nf(HERO_RESET_TURNS)}</b> תורות
+                    </li>
+                    <li>
+                      • כל איפוס מוסיף <b className="nums">+{HERO_RESET_POINTS}</b> נקודות
+                      פתיחה לצמיתות: אחרי איפוס אחד מגיעים לרמה {HERO_MAX_LEVEL} עם{" "}
+                      <b className="nums">{heroPointPool(HERO_MAX_LEVEL, 1)}</b> נקודות,
+                      אחרי שניים עם <b className="nums">{heroPointPool(HERO_MAX_LEVEL, 2)}</b>
                     </li>
                     <li>
                       • הציוד הלבוש נשאר עליך וממשיך לפעול — אך חפץ שתסיר יינעל

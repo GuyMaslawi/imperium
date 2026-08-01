@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireEmpire } from "@/lib/auth";
 import { isAdmin } from "@/lib/admin";
 import { nextDailyUpdate, nextRegularUpdate, formatGameTime } from "@/lib/game/time";
+import { isProductionBuilding } from "@/lib/game/constants";
 import { liveWarStart } from "@/lib/game/guildWar";
 import {
   HERO_CLASS_META,
@@ -118,6 +119,16 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       where: { startsAt: warStart, status: "SCHEDULED" },
     })) > 0;
 
+  // Mine slaves standing idle — bought (or captured) but not put on a machine,
+  // so they produce nothing until someone assigns them. Same arithmetic the
+  // production page does, on the empire requireEmpire already loaded: no extra
+  // query, and the nav badge can never disagree with the screen it links to.
+  const assignedSlaves = empire.buildings.reduce(
+    (sum, b) => sum + (isProductionBuilding(b.type) ? b.slavesAssigned : 0),
+    0
+  );
+  const freeMineSlaves = Math.max(0, (empire.army?.mineSlaves ?? 0) - assignedSlaves);
+
   const sidebarProps: SidebarProps = {
     empireName: empire.name,
     heroClass: HERO_CLASS_META[hero?.heroClass ?? "WARLORD"].label,
@@ -133,6 +144,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
     heroXp,
     heroXpMax,
     recruits: empire.citizens,
+    freeMineSlaves,
     collectableAchievements,
     heroQuestReady: finishedQuest > 0,
     inGuild: guildMembership !== null,

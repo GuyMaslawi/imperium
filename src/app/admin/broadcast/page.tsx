@@ -29,7 +29,7 @@ export default async function AdminBroadcastPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <EditorSection title="שידור הודעה" icon="📣">
           <p className="mb-3 text-xs text-zinc-400">
-            שלח הודעת מערכת לכל השחקנים, לעונה, לברית או לשחקן בודד. ההודעה מופיעה בתיבת ההודעות ובהתראות החיות.
+            שלח הודעת מערכת לכל השחקנים, לפעילים בלבד, לעונה, לברית או לשחקן בודד. ההודעה מופיעה בתיבת ההודעות ובהתראות החיות.
           </p>
           <ActionForm action={broadcastMessage} submitLabel="שדר הודעה">
             <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />
@@ -59,7 +59,7 @@ export default async function AdminBroadcastPage() {
 
         <EditorSection title="שליחת מתנה / פרס" icon="🎁">
           <p className="mb-3 text-xs text-zinc-400">
-            הענק משאבים, יהלומים, אזרחים, תורות וסיבובי גלגל. אפשר לצרף הודעה שתישלח יחד עם המתנה.
+            הענק משאבים, יהלומים, אזרחים, תורות וסיבובי גלגל — לכולם או רק לשחקנים שהיו פעילים לאחרונה. אפשר לצרף הודעה שתישלח יחד עם המתנה.
           </p>
           <ActionForm action={sendGift} submitLabel="שלח מתנה" submitVariant="secondary">
             <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />
