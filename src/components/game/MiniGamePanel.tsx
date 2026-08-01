@@ -3,17 +3,23 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
+  type ClipboardEvent,
+  type CSSProperties,
   type FormEvent,
+  type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
 import { getMiniGameState, submitMiniGameGuess } from "@/server/actions/minigame";
 import {
   MINIGAME_TYPE_META,
   type MiniGameBoardRow,
+  type MiniGameHistoryRow,
   type MiniGameState,
+  type SafeMark,
 } from "@/lib/game/minigame";
 import { Icon } from "@/components/ui/Icon";
 
@@ -77,13 +83,13 @@ function Countdown({
     onExpire();
   }, [left, onExpire]);
 
-  if (left <= 0) return <span className="nums">00:00</span>;
+  if (left <= 0) return <span className="nums text-lg font-black leading-none">00:00</span>;
   const total = Math.floor(left / 1000);
   const h = Math.floor(total / 3600);
   const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
   const s = String(total % 60).padStart(2, "0");
   return (
-    <span className="nums" dir="ltr">
+    <span className="nums text-lg font-black leading-none tabular-nums" dir="ltr">
       {h > 0 ? `${String(h).padStart(2, "0")}:` : ""}
       {m}:{s}
     </span>
@@ -124,6 +130,296 @@ function BoardRow({ row, maxAttempts }: { row: MiniGameBoardRow; maxAttempts: nu
     </li>
   );
 }
+
+/* ========================================================================== */
+/*                          מצא את הכדור — the cups                           */
+/* ========================================================================== */
+
+/**
+ * A row of upturned cups on a table, drawn in CSS (see `.cup*` in globals.css).
+ * They are drawn rather than stood in for by an icon because the old panel
+ * offered a line of potion bottles and asked "which cup?" — the one thing the
+ * game is about was the one thing not on screen.
+ *
+ * A cup the player already lifted stays lifted, and cannot be picked again. The
+ * attempt log is server-side, so that survives a reload — which is the point:
+ * without it, the easiest way to lose is to spend a second attempt emptying a
+ * cup you already emptied.
+ */
+function CupsGame({
+  count,
+  history,
+  interactive,
+  pending,
+  onPick,
+}: {
+  count: number;
+  history: MiniGameHistoryRow[];
+  interactive: boolean;
+  pending: boolean;
+  onPick: (index: number) => void;
+}) {
+  const picks = useMemo(() => {
+    const map = new Map<number, boolean>();
+    for (const row of history) if (row.kind === "cup") map.set(row.pick, row.hit);
+    return map;
+  }, [history]);
+
+  // The shuffle is a mount-time flourish, gated on "has this player touched the
+  // game yet" rather than re-run per render — a poll tick hands down a new state
+  // object every 10s, and re-shuffling under a player mid-decision would read as
+  // the game cheating.
+  const shuffling = picks.size === 0;
+
+  return (
+    <div className="cups-stage" role="group" aria-label="כוסות">
+      <div className={`cups-row ${shuffling ? "is-shuffling" : ""}`}>
+        {Array.from({ length: count }).map((_, i) => {
+          const tried = picks.has(i);
+          const hit = picks.get(i) === true;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPick(i)}
+              disabled={!interactive || tried || pending}
+              className="cup"
+              data-state={hit ? "hit" : tried ? "tried" : "idle"}
+              style={{ "--i": i, "--dir": i % 2 === 0 ? 1 : -1 } as CSSProperties}
+              aria-label={
+                hit ? `כוס ${i + 1} — הכדור כאן!` : tried ? `כוס ${i + 1} — ריקה` : `כוס ${i + 1}`
+              }
+            >
+              {hit && <span className="cup-ball" aria-hidden />}
+              {/* Only the art lifts. The ball and the shadow are siblings of it,
+                  so the ball stays put on the table instead of being carried
+                  away by the tilt of the cup that was covering it. */}
+              <span className="cup-art" aria-hidden>
+                <span className="cup-body">
+                  <span className="cup-shine" />
+                </span>
+                <span className="cup-base" />
+                <span className="cup-mouth" />
+              </span>
+              <span className="cup-shadow" aria-hidden />
+              <span className="cup-empty" aria-hidden>
+                ✕
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="cups-table" aria-hidden />
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/*                        פריצת הכספת — the code lock                         */
+/* ========================================================================== */
+
+const MARK_CLASS: Record<SafeMark, string> = {
+  hit: "mark-hit",
+  near: "mark-near",
+  miss: "mark-miss",
+};
+
+/** The three marks, spelled out once above the log so the game is learnable. */
+function SafeLegend() {
+  return (
+    <ul className="safe-legend">
+      <li>
+        <span className="safe-pip mark-hit" aria-hidden />
+        ספרה נכונה במקום הנכון
+      </li>
+      <li>
+        <span className="safe-pip mark-near" aria-hidden />
+        ספרה נכונה במקום אחר
+      </li>
+      <li>
+        <span className="safe-pip mark-miss" aria-hidden />
+        לא בקוד
+      </li>
+    </ul>
+  );
+}
+
+/**
+ * The vault. Type a code and every digit comes back marked — right digit in the
+ * right slot, right digit in the wrong slot, or not in the code at all — so the
+ * attempt log below is a set of constraints to reason from rather than a list of
+ * failures. The marks are computed server-side (see scoreCode); the client only
+ * ever paints what it was handed.
+ */
+function SafeGame({
+  digits,
+  history,
+  interactive,
+  solved,
+  pending,
+  attempts,
+  onSubmit,
+}: {
+  digits: number;
+  history: MiniGameHistoryRow[];
+  interactive: boolean;
+  solved: boolean;
+  pending: boolean;
+  attempts: number;
+  onSubmit: (code: string) => void;
+}) {
+  const [code, setCode] = useState<string[]>(() => Array(digits).fill(""));
+  const slots = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Clear the dial once an attempt lands, keyed on the attempt count — that is
+  // the *server's* record that the submission was accepted, so a rejected one
+  // leaves the player's digits where they typed them.
+  //
+  // Adjusted during render rather than in an effect: an effect would paint the
+  // spent code for a frame before wiping it, and re-keying the component would
+  // remount the inputs and drop focus mid-game.
+  const [lastReset, setLastReset] = useState(`${digits}:${attempts}`);
+  if (lastReset !== `${digits}:${attempts}`) {
+    setLastReset(`${digits}:${attempts}`);
+    setCode(Array(digits).fill(""));
+  }
+
+  const rows = history.filter(
+    (r): r is Extract<MiniGameHistoryRow, { kind: "code" }> => r.kind === "code"
+  );
+  const ready = code.length === digits && code.every((d) => d !== "");
+  // A cracked safe keeps the winning code in the wheels. Three blank boxes under
+  // "הכספת פתוחה" read as a form waiting for input, which is the opposite of
+  // what just happened.
+  const shown = solved ? (rows[rows.length - 1]?.code.split("") ?? code) : code;
+
+  function put(index: number, value: string) {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    setCode((prev) => {
+      const next = [...prev];
+      next[index] = digit;
+      return next;
+    });
+    if (digit && index < digits - 1) slots.current[index + 1]?.focus();
+  }
+
+  function onKeyDown(index: number, e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !code[index] && index > 0) {
+      e.preventDefault();
+      slots.current[index - 1]?.focus();
+      setCode((prev) => {
+        const next = [...prev];
+        next[index - 1] = "";
+        return next;
+      });
+    }
+    if (e.key === "ArrowLeft" && index > 0) slots.current[index - 1]?.focus();
+    if (e.key === "ArrowRight" && index < digits - 1) slots.current[index + 1]?.focus();
+  }
+
+  // A player who wants to re-try an earlier code with one digit changed should be
+  // able to paste it back in rather than retype it slot by slot.
+  function onPaste(e: ClipboardEvent<HTMLInputElement>) {
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, digits);
+    if (!pasted) return;
+    e.preventDefault();
+    setCode(Array.from({ length: digits }, (_, i) => pasted[i] ?? ""));
+    slots.current[Math.min(pasted.length, digits - 1)]?.focus();
+  }
+
+  function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!ready || !interactive || pending) return;
+    onSubmit(code.join(""));
+  }
+
+  return (
+    <div className="safe-stage">
+      {/* --- the vault door --- */}
+      <div className={`safe-door ${solved ? "is-open" : ""}`} aria-hidden>
+        <span className="safe-vault">
+          <span className="safe-loot">💰</span>
+        </span>
+        <span className="safe-plate">
+          {/* One notch per attempt, so the dial visibly winds as the player works. */}
+          <span className="safe-dial" style={{ "--turn": attempts } as CSSProperties}>
+            <span className="safe-dial-face" />
+            <span className="safe-dial-mark" />
+          </span>
+          <span className="safe-rivets" />
+          <span className="safe-handle" />
+        </span>
+      </div>
+
+      {/* --- the keypad + the attempt log --- */}
+      <div className="safe-controls">
+        <form onSubmit={submit} className="space-y-2.5">
+          <p className="text-center text-sm text-zinc-300">
+            {solved ? (
+              <span className="font-bold text-emerald-300">הכספת פתוחה 🎉</span>
+            ) : (
+              <>
+                הזן קוד בן{" "}
+                <span className="nums font-bold text-gold-bright" dir="ltr">
+                  {digits}
+                </span>{" "}
+                ספרות
+              </>
+            )}
+          </p>
+          <div className="safe-slots" dir="ltr">
+            {Array.from({ length: digits }).map((_, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  slots.current[i] = el;
+                }}
+                value={shown[i] ?? ""}
+                onChange={(e) => put(i, e.target.value)}
+                onKeyDown={(e) => onKeyDown(i, e)}
+                onPaste={onPaste}
+                onFocus={(e) => e.target.select()}
+                disabled={!interactive || pending}
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={1}
+                className={`safe-slot nums ${solved ? "is-cracked" : ""}`}
+                aria-label={`ספרה ${i + 1}`}
+              />
+            ))}
+          </div>
+          {interactive && (
+            <div className="flex justify-center">
+              <button type="submit" disabled={!ready || pending} className="btn btn-gold px-6">
+                🔓 נסה לפרוץ
+              </button>
+            </div>
+          )}
+        </form>
+
+        {rows.length > 0 && (
+          <div className="safe-log">
+            <SafeLegend />
+            <ul dir="ltr">
+              {rows.map((row, i) => (
+                <li key={i} className="safe-log-row">
+                  <span className="safe-log-n nums">{i + 1}</span>
+                  {row.code.split("").map((digit, d) => (
+                    <span key={d} className={`safe-log-digit nums ${MARK_CLASS[row.marks[d]]}`}>
+                      {digit}
+                    </span>
+                  ))}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ========================================================================== */
 
 /**
  * The live mini-game, rendered big at the top of every game screen (under the
@@ -179,10 +475,10 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
     };
   }, [live]);
 
-  function play(eventId: string, value: number) {
+  function play(eventId: string, value: string) {
     startTransition(async () => {
       const fd = new FormData();
-      fd.set("guess", String(value));
+      fd.set("guess", value);
       const res = await submitMiniGameGuess({ state: null, feedback: "", tone: "info" }, fd);
       if (res.state) setState(res.state);
       setFeedback({ text: res.feedback, tone: res.tone, eventId });
@@ -190,22 +486,15 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
     });
   }
 
-  function onNumberSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!state) return;
-    const form = e.currentTarget;
-    const value = Number(new FormData(form).get("guess"));
-    if (Number.isFinite(value)) {
-      play(state.id, value);
-      form.reset();
-    }
-  }
-
   if (!state) return null;
 
   const meta = MINIGAME_TYPE_META[state.type];
   const attemptsLeft = Math.max(0, state.maxAttempts - state.attempts);
   const outOfAttempts = !state.solved && attemptsLeft === 0;
+  // A finished player keeps the board on screen in a read-only state rather than
+  // having it swapped out for a text box: the cracked safe and the cup with the
+  // ball under it ARE the payoff.
+  const interactive = !state.solved && !outOfAttempts;
   const fb = feedback && feedback.eventId === state.id ? feedback : null;
   const toneClass =
     fb?.tone === "win"
@@ -227,11 +516,15 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-gold/50 bg-black/40 ${
-              outOfAttempts || state.solved ? "" : "animate-bounce"
+              interactive ? "animate-bounce" : ""
             }`}
             aria-hidden
           >
-            <Icon name="dice" size={24} className="text-gold-bright" />
+            <Icon
+              name={state.type === "CRACK_SAFE" ? (state.solved ? "unlocked" : "lock") : "dice"}
+              size={24}
+              className="text-gold-bright"
+            />
           </span>
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-2 text-lg font-black leading-tight text-gold-bright">
@@ -266,8 +559,14 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
             </span>
           </span>
           {state.endsAt != null && (
-            <span className="flex items-center gap-1.5 rounded-md border border-gold/40 bg-black/30 px-2 py-1 font-bold text-gold-bright">
-              ⏳ נותר{" "}
+            // The clock is the one number on this banner that is actually
+            // urgent, so it is sized past the badges around it rather than
+            // sharing their 11px — at that size it read as another chip.
+            <span className="flex items-center gap-1.5 rounded-lg border border-gold/50 bg-black/45 px-2.5 py-1 text-[13px] font-bold text-gold-bright shadow-[0_0_16px_-6px_var(--gold)]">
+              <span aria-hidden className="text-base leading-none">
+                ⏳
+              </span>
+              נותר{" "}
               <Countdown
                 key={state.endsAt}
                 endsAt={state.endsAt}
@@ -281,10 +580,10 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
 
       {/* ── Play area + live standings ── */}
       <div className="grid gap-4 pt-4 md:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="min-w-0">
-          {state.solved ? (
-            <div className="panel-inset space-y-1 rounded-lg p-4 text-center">
-              <p className="text-2xl font-black text-emerald-300">
+        <div className="min-w-0 space-y-3">
+          {state.solved && (
+            <div className="panel-inset space-y-1 rounded-lg p-3 text-center">
+              <p className="text-xl font-black text-emerald-300">
                 {state.won ? "🎉 ניצחת!" : "✅ פתרת נכון"}
               </p>
               <p className="text-sm text-zinc-300">
@@ -292,83 +591,57 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
                   ? `הפרס נוסף לאימפריה שלך: ${state.prizeText}`
                   : "כל הפרסים כבר חולקו — אבל כל הכבוד!"}
               </p>
-              <p className="text-xs text-zinc-500">עקוב אחרי שאר השחקנים עד שהמשחק ייסגר ←</p>
             </div>
-          ) : outOfAttempts ? (
-            <div className="panel-inset space-y-1 rounded-lg p-4 text-center">
-              <p className="text-2xl font-black text-red-300">😔 נגמרו הניסיונות</p>
+          )}
+          {outOfAttempts && (
+            <div className="panel-inset space-y-1 rounded-lg p-3 text-center">
+              <p className="text-xl font-black text-red-300">😔 נגמרו הניסיונות</p>
               <p className="text-sm text-zinc-400">
                 יצאת מהמשחק, אבל הוא עדיין רץ — עקוב אחרי המתחרים עד שיסתיים.
               </p>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {state.type === "GUESS_NUMBER" ? (
-                <form onSubmit={onNumberSubmit} className="space-y-3">
-                  <p className="text-center text-sm text-zinc-300">
-                    נחש מספר בין{" "}
-                    <span className="nums font-bold text-gold-bright" dir="ltr">
-                      {state.min}
-                    </span>{" "}
-                    ל-
-                    <span className="nums font-bold text-gold-bright" dir="ltr">
-                      {state.max}
-                    </span>
-                  </p>
-                  <div className="mx-auto flex max-w-sm gap-2">
-                    <input
-                      name="guess"
-                      type="number"
-                      min={state.min ?? undefined}
-                      max={state.max ?? undefined}
-                      required
-                      dir="ltr"
-                      className="flex-1 rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-center text-lg font-bold text-zinc-100 outline-none focus:border-gold/60"
-                      placeholder="?"
-                    />
-                    <button type="submit" disabled={pending} className="btn btn-gold px-6">
-                      נחש
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-center text-sm text-zinc-300">באיזו כוס מסתתר הכדור? 🔮</p>
-                  <div className="flex flex-wrap justify-center gap-3">
-                    {Array.from({ length: state.cups ?? 3 }).map((_, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => play(state.id, i)}
-                        disabled={pending}
-                        className="btn btn-dark flex h-16 w-16 items-center justify-center transition-transform hover:-translate-y-1"
-                        title={`כוס ${i + 1}`}
-                      >
-                        <Icon name="potion" size={30} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          )}
 
-              <p className="text-center text-xs text-zinc-500">
+          {state.type === "CRACK_SAFE" ? (
+            <SafeGame
+              digits={state.digits ?? 3}
+              history={state.history}
+              interactive={interactive}
+              solved={state.solved}
+              pending={pending}
+              attempts={state.attempts}
+              onSubmit={(value) => play(state.id, value)}
+            />
+          ) : (
+            <CupsGame
+              count={state.cups ?? 3}
+              history={state.history}
+              interactive={interactive}
+              pending={pending}
+              onPick={(i) => play(state.id, String(i))}
+            />
+          )}
+
+          <p className="text-center text-xs text-zinc-500">
+            {interactive ? (
+              <>
                 נותרו{" "}
                 <span className="nums font-bold text-zinc-300" dir="ltr">
                   {attemptsLeft}
                 </span>{" "}
                 ניסיונות
-              </p>
-            </div>
-          )}
+              </>
+            ) : (
+              "עקוב אחרי שאר השחקנים עד שהמשחק ייסגר ←"
+            )}
+          </p>
 
-          {fb && <p className={`pt-2 text-center text-sm font-bold ${toneClass}`}>{fb.text}</p>}
+          {fb && <p className={`text-center text-sm font-bold ${toneClass}`}>{fb.text}</p>}
         </div>
 
         {/* Live standings — the reason a knocked-out player stays on the panel. */}
         <div className="panel-inset rounded-lg p-2">
-          <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">
-            🏁 מי משחק עכשיו
-          </p>
+          <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">🏁 מי משחק עכשיו</p>
           {state.board.length === 0 ? (
             <p className="px-1 py-3 text-center text-[11px] text-zinc-500">
               עדיין אף אחד לא ניסה — היה הראשון!

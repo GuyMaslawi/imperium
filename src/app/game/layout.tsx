@@ -26,6 +26,8 @@ import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { MiniGamePanel } from "@/components/game/MiniGamePanel";
 import { getMiniGameState } from "@/server/actions/minigame";
+import { HappyHourBanner } from "@/components/game/HappyHourBanner";
+import { getHappyHourState } from "@/server/actions/happyHour";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
 import { getCollectableAchievements } from "@/server/achievementState";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
@@ -52,6 +54,9 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
 
   const admin = await isAdmin();
   const miniGame = await getMiniGameState();
+  // Rendered server-side so a player who navigates during a release meets it on
+  // the first paint rather than one poll later.
+  const happyHour = await getHappyHourState();
 
   // Running potions ride in the command bar: a buff that is quietly doubling
   // plunder and XP has to be visible from the screens people actually play on,
@@ -206,7 +211,11 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
             {/* A released mini-game is an event, not a toolbar affordance: it
                 sits right under the season pass, full width, above the screen
                 the player came for. */}
+            {/* Happy Hour sits above even the mini-game: it is the loudest thing
+                that can be true about the game right now, and it is true for
+                every player at once. */}
             <div className="flex-1 pt-5">
+              <HappyHourBanner initial={happyHour} />
               <MiniGamePanel initial={miniGame} />
               {children}
             </div>

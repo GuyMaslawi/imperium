@@ -29,6 +29,7 @@ import {
   bossSiegeMaxHp,
   bossSortiesToKill,
 } from "@/lib/game/bossBattle";
+import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 
 /** One empire that has felled the city's boss, for the banner's honour roll. */
 export interface BossConqueror {
@@ -121,8 +122,16 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
   const boss = bossForCity(empire.cities);
   const tunables = await getTunables();
 
-  const [guildBonusPct, guildAid, season, life, activeBattle, myKills, recent] =
-    await Promise.all([
+  const [
+    guildBonusPct,
+    guildAid,
+    season,
+    life,
+    activeBattle,
+    myKills,
+    recent,
+    happyHour,
+  ] = await Promise.all([
       getActiveGuildBuffPct(empire.id, "ATTACK", prisma, now),
       getGuildAidBonus(empire.id),
       prisma.gameSeason.findFirst({
@@ -156,6 +165,7 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
           empire: { select: { name: true } },
         },
       }),
+      getLiveHappyHour(prisma, now),
     ]);
 
   const heroBonusPct = heroBonuses(empire.hero).totalPct.attack;
@@ -185,10 +195,16 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
   const heroAlive = empire.hero != null && !isHeroDead(empire.hero);
   const soldiers = empire.army?.soldiers ?? 0;
   const expectedDamage = bossExpectedSortieDamage(myPower, heroLevel, heroAlive);
-  const cycleHaul = bossReward(
-    empire.cities,
-    seasonPassDay(season, now.getTime()),
-    tunables.boss.rewardMultiplier
+  // Everything this banner quotes — the tyrant's full haul, the XP, the loot a
+  // single sortie expects — is quoted *including* a live Happy Hour, because it is
+  // the number the settle will pay. Advertising the un-boosted figure during the
+  // one hour the game is shouting about a bonus would be the worst possible
+  // moment to be off.
+  const happyPlunder = happyHourFactor(happyHour, "boostPlunder");
+  const cycleHaul = bossPayout(
+    bossReward(empire.cities, seasonPassDay(season, now.getTime()), tunables.boss.rewardMultiplier),
+    1,
+    happyPlunder
   );
 
   const byEmpire = new Map<string, BossConqueror>();
@@ -223,7 +239,9 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
     serverNow: now.getTime(),
 
     lifeHaul: cycleHaul,
-    heroXp: bossHeroXp(empire.cities),
+    heroXp: Math.round(
+      bossHeroXp(empire.cities) * happyHourFactor(happyHour, "boostXp")
+    ),
 
     expectedSortieDamage: expectedDamage,
     sortiesToKill: bossSortiesToKill(myPower, hp, heroLevel, heroAlive),

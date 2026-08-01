@@ -48,6 +48,7 @@ import { getActiveShields, getShopDiscountPct } from "@/lib/game/diamondEffects"
 import { applyShopDiscount } from "@/lib/game/diamondShop";
 import { getActivePotionKinds, grantPotion } from "@/lib/game/potionEffects";
 import { POTION_DOUBLE, rollPotionDrop } from "@/lib/game/potions";
+import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 import { armyPower, getEmpireIntelPower } from "@/lib/game/power";
 import {
   CITIZENS_PER_LEVEL,
@@ -870,6 +871,12 @@ export async function attackEmpire(
       const attackerPotions = await getActivePotionKinds(empireId, tx, now);
       const defenderPotions = await getActivePotionKinds(targetEmpireId, tx, now);
 
+      // Happy Hour — the same window, for everyone on the map at once. Read here
+      // alongside the potions and applied the same way: a multiplier on the XP
+      // and on the plunder rate, stacking with whatever the two sides already
+      // had running rather than replacing it.
+      const happyHour = await getLiveHappyHour(tx, now);
+
       // Paid raid shields, read under the same locks for the same reason. They
       // don't stop the raid — the battle resolves, the hero takes his blow and
       // the attacker still earns XP and loot rolls — they only put the
@@ -963,9 +970,16 @@ export async function attackEmpire(
       // deposited in warehouses (storedAmount) are protected from attacks.
       // שיקוי השפע doubles the attacker's share; the live clamp below still
       // caps the haul at what the defender actually holds.
-      const plunderRate =
+      // Happy Hour multiplies it further, for everyone at once. Capped at 1: with
+      // a ×10 window and a potion up the raw rate runs past 100%, and a haul
+      // that claims to take more than the defender owns is a lie the clamp
+      // below silently corrects — better to say "everything" and mean it.
+      const plunderRate = Math.min(
+        1,
         PLUNDER_RATE *
-        (attackerPotions.has("DOUBLE_RESOURCES") ? POTION_DOUBLE : 1);
+          (attackerPotions.has("DOUBLE_RESOURCES") ? POTION_DOUBLE : 1) *
+          happyHourFactor(happyHour, "boostPlunder")
+      );
       // מגן משאבים zeroes the haul outright — the raid is won, the vaults hold.
       const stolen =
         attackerWins && !resourceShielded
@@ -1098,12 +1112,14 @@ export async function attackEmpire(
       // שיקוי הניסיון doubles the winner's haul of XP. Folded in here rather
       // than at the hero write, so the battle report shows the XP that was
       // really earned instead of the un-doubled base.
-      const attackerXpMultiplier = attackerPotions.has("DOUBLE_XP")
-        ? POTION_DOUBLE
-        : 1;
-      const defenderXpMultiplier = defenderPotions.has("DOUBLE_XP")
-        ? POTION_DOUBLE
-        : 1;
+      // Happy Hour multiplies on top, and does so for *both* sides: the window is
+      // the server's, not one player's, so a defender who repels a raid during
+      // the golden hour is paid it too.
+      const happyXp = happyHourFactor(happyHour, "boostXp");
+      const attackerXpMultiplier =
+        (attackerPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
+      const defenderXpMultiplier =
+        (defenderPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
       const attackerHeroXp = attackerWins
         ? Math.round(
             attackWinXp(

@@ -33,21 +33,94 @@ export function prizeText(event: MiniGameEvent): string {
 }
 
 export const MINIGAME_TYPE_META: Record<MiniGameType, { label: string; icon: string }> = {
-  GUESS_NUMBER: { label: "נחש את המספר", icon: "🔢" },
-  FIND_BALL: { label: "מצא את הכדור", icon: "🔮" },
+  FIND_BALL: { label: "מצא את הכדור", icon: "🥤" },
+  CRACK_SAFE: { label: "פריצת הכספת", icon: "🔐" },
 };
+
+/** Bounds on the two games' shapes, shared by the admin form and the server. */
+export const CUPS_MIN = 2;
+export const CUPS_MAX = 6;
+export const SAFE_DIGITS_MIN = 3;
+export const SAFE_DIGITS_MAX = 5;
 
 /** Public (answer-free) parameters a player is allowed to see. */
 export interface MiniGamePublicConfig {
-  min: number | null;
-  max: number | null;
   cups: number | null;
+  digits: number | null;
 }
 
 export function publicConfig(event: MiniGameEvent): MiniGamePublicConfig {
   const cfg = (event.config ?? {}) as Record<string, unknown>;
   const n = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-  return { min: n(cfg.min), max: n(cfg.max), cups: n(cfg.cups) };
+  return { cups: n(cfg.cups), digits: n(cfg.digits) };
+}
+
+/* ---------------------------- attempt history ---------------------------- */
+
+/** How one digit of a submitted code scored against the secret one. */
+export type SafeMark = "hit" | "near" | "miss";
+
+/**
+ * One past attempt by the viewing player. Answer-free by construction: a cup row
+ * says which cup *this player* lifted, a code row says what they typed and how
+ * it scored — neither is enough to name the answer without playing for it.
+ */
+export type MiniGameHistoryRow =
+  | { kind: "cup"; pick: number; hit: boolean }
+  | { kind: "code"; code: string; marks: SafeMark[] };
+
+/** Most recent attempts kept per player — the safe's board never needs more. */
+export const HISTORY_LIMIT = 12;
+
+/** Read a stored `guesses` column back, dropping anything malformed. */
+export function parseHistory(value: unknown): MiniGameHistoryRow[] {
+  if (!Array.isArray(value)) return [];
+  const rows: MiniGameHistoryRow[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const r = raw as Record<string, unknown>;
+    if (r.kind === "cup" && typeof r.pick === "number" && Number.isInteger(r.pick)) {
+      rows.push({ kind: "cup", pick: r.pick, hit: r.hit === true });
+    } else if (r.kind === "code" && typeof r.code === "string" && Array.isArray(r.marks)) {
+      const marks = r.marks.filter(
+        (m): m is SafeMark => m === "hit" || m === "near" || m === "miss"
+      );
+      if (marks.length === r.marks.length) rows.push({ kind: "code", code: r.code, marks });
+    }
+  }
+  return rows.slice(-HISTORY_LIMIT);
+}
+
+/**
+ * Score a submitted code against the secret one, Mastermind-style:
+ * `hit` = right digit in the right slot, `near` = a digit that is in the code
+ * but not here, `miss` = not in the code at all.
+ *
+ * Two passes, with consumption, because duplicates otherwise lie: against the
+ * code `1 1 5`, the attempt `1 7 1` must score hit/miss/near — one of the two
+ * typed `1`s is already spoken for by the exact match, so the other may only
+ * claim the *second* `1`. A single pass that just asked `code.includes(digit)`
+ * would call both of them near and tell the player there are more `1`s than
+ * there are.
+ */
+export function scoreCode(guess: string, code: string): SafeMark[] {
+  const marks: SafeMark[] = new Array(guess.length).fill("miss");
+  // Digits of the code not already claimed by an exact match.
+  const spare = new Map<string, number>();
+
+  for (let i = 0; i < guess.length; i++) {
+    if (guess[i] === code[i]) marks[i] = "hit";
+    else spare.set(code[i], (spare.get(code[i]) ?? 0) + 1);
+  }
+  for (let i = 0; i < guess.length; i++) {
+    if (marks[i] === "hit") continue;
+    const left = spare.get(guess[i]) ?? 0;
+    if (left > 0) {
+      marks[i] = "near";
+      spare.set(guess[i], left - 1);
+    }
+  }
+  return marks;
 }
 
 /**
@@ -71,9 +144,10 @@ export interface MiniGameState {
   type: MiniGameType;
   title: string;
   prizeText: string;
-  min: number | null;
-  max: number | null;
   cups: number | null;
+  digits: number | null;
+  /** The viewer's own attempt log, oldest first. Never another player's. */
+  history: MiniGameHistoryRow[];
   attempts: number;
   maxAttempts: number;
   solved: boolean;

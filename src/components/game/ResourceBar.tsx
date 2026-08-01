@@ -115,7 +115,7 @@ export function ResourceBar({
         {/* brand emblem */}
         <div className="flex shrink-0 items-center gap-2">
           <span className="hidden text-sm font-black tracking-[0.2em] text-bone-bright sm:inline">
-            IMP<span className="text-crimson-bright">E</span>RIUM
+            KRA<span className="text-crimson-bright">L</span>DOR
           </span>
           <LogoMark size={34} />
         </div>

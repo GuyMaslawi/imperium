@@ -15,8 +15,10 @@ export function AuthShell({
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"}`}>
         <div className="mb-8 flex flex-col items-center text-center">
           <LogoMark size={72} className="mb-3 drop-shadow-[0_6px_20px_rgba(224,35,51,0.35)]" />
+          {/* Spelled out rather than reusing <Logo> so the wordmark can stack
+              above the crest at hero size; the crimson letter matches it. */}
           <h1 className="text-4xl font-black tracking-[0.18em] text-bone-bright">
-            IMP<span className="text-crimson-bright">E</span>RIUM
+            KRA<span className="text-crimson-bright">L</span>DOR
           </h1>
           <p className="mt-1 text-xs font-semibold tracking-[0.4em] text-bone-dim">קראלדור</p>
           <p className="mt-3 text-sm text-zinc-400">

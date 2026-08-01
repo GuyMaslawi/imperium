@@ -12,6 +12,7 @@ import {
   bossReadChance,
   type BossRound,
 } from "@/lib/game/bossBattle";
+import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 
 /**
  * Read model for the arena — the screen an assault plays out on.
@@ -107,7 +108,7 @@ export async function getBossArenaState(empireId: string): Promise<BossArenaStat
   });
   if (!battle) return null;
 
-  const [tunables, season, hero] = await Promise.all([
+  const [tunables, season, hero, happyHour] = await Promise.all([
     getTunables(),
     prisma.gameSeason.findFirst({
       where: { isActive: true },
@@ -120,6 +121,10 @@ export async function getBossArenaState(empireId: string): Promise<BossArenaStat
       where: { empireId },
       select: { level: true, health: true, diedAt: true },
     }),
+    // The running tally below is what the settle will actually pay, so a live
+    // Happy Hour has to be in it — otherwise the arena counts up one number and
+    // the report hands over a bigger one.
+    getLiveHappyHour(undefined, now),
   ]);
 
   const plan = Array.isArray(battle.log) ? (battle.log as unknown as BossRound[]) : [];
@@ -170,7 +175,8 @@ export async function getBossArenaState(empireId: string): Promise<BossArenaStat
 
     earned: bossPayout(
       lifeHaul,
-      bossChipFraction(Math.min(damageSoFar, battle.hpAtStart), battle.siege.maxHp)
+      bossChipFraction(Math.min(damageSoFar, battle.hpAtStart), battle.siege.maxHp),
+      happyHourFactor(happyHour, "boostPlunder")
     ),
   };
 }

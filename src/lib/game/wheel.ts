@@ -63,6 +63,12 @@ export interface WheelPrizeDef {
   label: string;
   /** Shared icon-set name — resource wedges resolve through `RESOURCE_ICON`. */
   icon: IconName;
+  /**
+   * Accent tint for this wedge. The wheel face is obsidian across the board —
+   * this colour is only mixed into the outer band of the wedge and into its
+   * icon glow, which is what keeps seven wedges legible without the wheel
+   * turning into a pie chart of saturated primaries.
+   */
   color: string;
   kind: WheelPrizeKind;
   /** Day-1 amount for `kind: "amount"` prizes; ignored for unit prizes. */
@@ -81,17 +87,19 @@ export interface WheelPrizeDef {
  * Deliberately only resources, diamonds, citizens and a hero item: army
  * weapons are earned in the factory, never handed out here, and there is no
  * mixed "loot" pack — it paid the same four resources the plain wedges do, so
- * it only added a wedge the player had to decode. Colors alternate red/black
- * with citizens (orange) and the item (purple) reading as the standouts.
+ * it only added a wedge the player had to decode. Each wedge carries the tint
+ * its resource wears everywhere else in the game (gold amber, iron steel,
+ * stone grey, wood umber, diamonds ice), with the hero item's violet as the
+ * one obvious standout.
  */
 export const WHEEL_PRIZES: WheelPrizeDef[] = [
-  { key: "diamonds", label: "יהלומים", icon: "diamond", color: "#6d1f1f", kind: "amount", base: WHEEL_PREMIUM_BASE, growth: "step", step: 1 },
-  { key: "gold", label: "זהב", icon: "gold", color: "#141414", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
-  { key: "iron", label: "ברזל", icon: "iron", color: "#6d1f1f", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
-  { key: "stone", label: "אבן", icon: "stone", color: "#141414", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
-  { key: "wood", label: "עץ", icon: "wood", color: "#6d1f1f", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
-  { key: "citizens", label: "אזרחים", icon: "citizens", color: "#c9761b", kind: "amount", base: WHEEL_PREMIUM_BASE, growth: "step", step: 1 },
-  { key: "item", label: "חפץ לגיבור", icon: "spark", color: "#6d28d9", kind: "unit", base: 1, step: 1, note: "דורש מקום פנוי בתיק הגיבור" },
+  { key: "diamonds", label: "יהלומים", icon: "diamond", color: "#7ad7e8", kind: "amount", base: WHEEL_PREMIUM_BASE, growth: "step", step: 1 },
+  { key: "gold", label: "זהב", icon: "gold", color: "#e4c35a", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
+  { key: "iron", label: "ברזל", icon: "iron", color: "#a9b6c6", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
+  { key: "stone", label: "אבן", icon: "stone", color: "#8e8a80", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
+  { key: "wood", label: "עץ", icon: "wood", color: "#b0793c", kind: "amount", base: WHEEL_RESOURCE_BASE, growth: "double", step: 50 },
+  { key: "citizens", label: "אזרחים", icon: "citizens", color: "#d8c9a6", kind: "amount", base: WHEEL_PREMIUM_BASE, growth: "step", step: 1 },
+  { key: "item", label: "חפץ לגיבור", icon: "spark", color: "#a074e8", kind: "unit", base: 1, step: 1, note: "דורש מקום פנוי בתיק הגיבור" },
 ];
 
 /** A concrete quantity actually granted by a spin, in the prize's own unit. */

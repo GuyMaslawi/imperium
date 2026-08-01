@@ -14,6 +14,7 @@ import { productionPerTick } from "@/lib/game/resources";
 import { heroBonuses } from "@/lib/game/hero";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
+import { GUILD_ROLE_META } from "@/lib/game/guild";
 import { attackPowerBreakdown, defensePowerBreakdown } from "@/lib/game/power";
 import { PowerSummary } from "@/components/game/PowerSummary";
 import { WheelCard } from "@/components/game/WheelCard";
@@ -37,6 +38,7 @@ export default async function BasePage() {
     guildAttackPct,
     guildDefensePct,
     guildAid,
+    guildMembership,
   ] = await Promise.all([
       prisma.battleReport.findMany({
         where: {
@@ -63,6 +65,10 @@ export default async function BasePage() {
       getActiveGuildBuffPct(empire.id, "ATTACK"),
       getActiveGuildBuffPct(empire.id, "DEFENSE"),
       getGuildAidBonus(empire.id),
+      prisma.guildMember.findUnique({
+        where: { empireId: empire.id },
+        select: { role: true, guild: { select: { name: true } } },
+      }),
     ]);
 
   // Real battle power for the attack/defense cards: same hero + guild
@@ -212,11 +218,22 @@ export default async function BasePage() {
             </div>
             <div className="flex items-center justify-between">
               <dt className="text-zinc-400">ברית</dt>
-              <dd className="font-bold text-red-400">ללא</dd>
+              {guildMembership ? (
+                <dd className="flex items-center gap-1.5 font-bold text-gold">
+                  <span>{guildMembership.guild.name}</span>
+                  <span className="text-xs font-normal text-zinc-400">
+                    {GUILD_ROLE_META[guildMembership.role].icon}{" "}
+                    {GUILD_ROLE_META[guildMembership.role].label}
+                  </span>
+                </dd>
+              ) : (
+                <dd className="font-bold text-red-400">ללא</dd>
+              )}
             </div>
           </dl>
           <Link href="/game/guild" className="btn btn-ghost mt-4 w-full py-2 text-sm">
-            <Icon name="guild" size={16} className="inline-block align-middle" /> הצטרף לברית
+            <Icon name="guild" size={16} className="inline-block align-middle" />{" "}
+            {guildMembership ? "לעמוד הברית" : "הצטרף לברית"}
           </Link>
         </Card>
 

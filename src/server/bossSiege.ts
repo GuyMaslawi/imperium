@@ -32,6 +32,7 @@ import {
 import { grantCitizens } from "@/lib/game/grants";
 import { getActivePotionKinds } from "@/lib/game/potionEffects";
 import { POTION_DOUBLE } from "@/lib/game/potions";
+import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 import { syncEmpirePower } from "@/server/empirePower";
 import { formatNumber } from "@/lib/game/format";
 import { RESOURCE_META } from "@/lib/game/constants";
@@ -417,7 +418,16 @@ async function settleBattle(
   const chip =
     bossChipFraction(credited, siege?.maxHp ?? 0) * (routed ? BOSS_ROUT_LOOT_PENALTY : 1);
   const fraction = chip + (grade ? bossKillFraction(grade) : 0);
-  const reward: BossReward = bossPayout(lifeHaul, fraction);
+  // Happy Hour, read once for both halves of the payout below. The window
+  // multiplies the *resources* the tyrant gives up and the hero's XP; the
+  // captives it frees are deliberately left alone, because a slave is a
+  // permanent addition to the production engine while a haul is spent.
+  const happyHour = await getLiveHappyHour(tx, now);
+  const reward: BossReward = bossPayout(
+    lifeHaul,
+    fraction,
+    happyHourFactor(happyHour, "boostPlunder")
+  );
 
   if (reward.gold > 0 || reward.wood > 0 || reward.iron > 0 || reward.stone > 0) {
     await tx.empire.update({
@@ -440,9 +450,10 @@ async function settleBattle(
   if (soldiersLost > 0 || reward.slaves > 0) await syncEmpirePower(tx, empireId);
 
   /* ---- hero: XP on the same split as the loot, gear only on the kill ---- */
-  const xpMultiplier = (await getActivePotionKinds(empireId, tx, now)).has("DOUBLE_XP")
-    ? POTION_DOUBLE
-    : 1;
+  const xpMultiplier =
+    ((await getActivePotionKinds(empireId, tx, now)).has("DOUBLE_XP")
+      ? POTION_DOUBLE
+      : 1) * happyHourFactor(happyHour, "boostXp");
   const heroXp = Math.round(bossHeroXp(cities) * fraction * xpMultiplier);
   let droppedItem: { slot: HeroItemSlot; level: number; rarity: HeroRarity } | null = null;
 

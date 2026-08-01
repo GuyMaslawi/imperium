@@ -30,7 +30,13 @@ import {
 import { BAN_DAYS_MAX, formatBanDate, isBanned } from "@/lib/ban";
 import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
-import { MINIGAME_TYPE_META } from "@/lib/game/minigame";
+import {
+  MINIGAME_TYPE_META,
+  CUPS_MIN,
+  CUPS_MAX,
+  SAFE_DIGITS_MIN,
+  SAFE_DIGITS_MAX,
+} from "@/lib/game/minigame";
 import {
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
@@ -46,6 +52,13 @@ import {
   type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { POTION_STACK_CAP } from "@/lib/game/potions";
+import {
+  HAPPY_HOUR_DEFAULT_TITLE,
+  HAPPY_HOUR_MAX_MINUTES,
+  HAPPY_HOUR_MAX_PCT,
+  HAPPY_HOUR_MIN_PCT,
+  multiplierLabel,
+} from "@/lib/game/happyHour";
 import { SEASON_PASS_XP_MAX } from "@/lib/game/seasonPass";
 import { ACHIEVEMENT_BY_KEY, GLORY_KEYS } from "@/lib/game/achievements";
 import { lastDailyUpdate } from "@/lib/game/time";
@@ -59,7 +72,7 @@ import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
 import { repairGuildLeadership } from "@/server/guildLeadership";
-import { archiveSeasonStandings } from "@/server/seasonClose";
+import { archiveSeasonStandings, closeSeason } from "@/server/seasonClose";
 
 export interface AdminActionState {
   error?: string;
@@ -2349,7 +2362,23 @@ export async function updateSeason(
   }
 }
 
-/** Activate a season (and deactivate all others). */
+/**
+ * Make a season the live one — and end whatever season was live before it.
+ *
+ * Activating is a season *transition*, not a flag flip. The outgoing season is
+ * treated exactly as if its clock had just run out: its `endsAt` is pulled back
+ * to now and `closeSeason` archives its podium and recap into היכל התהילה,
+ * before the new season takes over. Without that it would merely stop being
+ * active — never closed, never archived, its champions gone for good, because
+ * `getSeasonGate` only ever looks at the row flagged active.
+ *
+ * Every empire is re-homed onto the new season too, so `Empire.seasonId` (which
+ * drives broadcast/ban targeting and the counts on the seasons page) names the
+ * season players are actually playing. **Progress is untouched** — wiping the
+ * world stays the separate, confirmed `resetSeason`. The season passes reset
+ * themselves: `loadCycle` clears premium and the ladder the first time it sees
+ * a different active season.
+ */
 export async function activateSeason(
   _prev: AdminActionState,
   formData: FormData
@@ -2357,18 +2386,141 @@ export async function activateSeason(
   try {
     const admin = await requireAdmin();
     const id = str(formData, "id");
-    await prisma.$transaction([
-      prisma.gameSeason.updateMany({ data: { isActive: false } }),
-      prisma.gameSeason.update({ where: { id }, data: { isActive: true } }),
-    ]);
+    const now = new Date();
+
+    const target = await prisma.gameSeason.findUnique({
+      where: { id },
+      select: { id: true, name: true, isActive: true, endsAt: true, closedAt: true },
+    });
+    if (!target) return { error: "העונה לא נמצאה" };
+    if (target.isActive) return { error: "העונה כבר פעילה" };
+    if (target.closedAt) return { error: "העונה כבר נסגרה — צור עונה חדשה במקומה" };
+    // A season whose clock has already run out would be sealed by the gate on
+    // the very next page load, locking every player out of the game — the exact
+    // opposite of what pressing "הפעל עונה" means.
+    if (target.endsAt <= now) {
+      return { error: "מועד הסיום של העונה כבר עבר — עדכן את התאריכים לפני ההפעלה" };
+    }
+
+    const outgoing = await prisma.gameSeason.findFirst({
+      where: { isActive: true, id: { not: id } },
+      select: { id: true, name: true, endsAt: true, closedAt: true },
+    });
+
+    // Last chance to archive: the moment the flag moves, nothing looks at this
+    // season again. Truncating `endsAt` first keeps the record honest — the
+    // champions are stamped with the moment the season really ended, and the
+    // hall (ordered by `seasonEndsAt`) lists it in the right place.
+    if (outgoing && !outgoing.closedAt) {
+      if (outgoing.endsAt > now) {
+        await prisma.gameSeason.update({
+          where: { id: outgoing.id },
+          data: { endsAt: now },
+        });
+      }
+      await closeSeason(outgoing.id, now);
+    }
+
+    // One transaction, so the game is never left with the old season closed and
+    // no new one open — that gap is a locked game for every player in it.
+    const empires = await prisma.$transaction(async (tx) => {
+      await tx.gameSeason.updateMany({
+        where: { isActive: true },
+        data: { isActive: false },
+      });
+      await tx.gameSeason.update({ where: { id }, data: { isActive: true } });
+      // Unconditional: `updatedAt` on an empire moves on every write anyway
+      // (presence lives in `lastSeenAt`), so filtering to the rows that differ
+      // buys nothing but a nullable-column edge case.
+      const moved = await tx.empire.updateMany({ data: { seasonId: id } });
+      return moved.count;
+    });
+
     await logAdmin(admin, {
       action: "season.activate",
       targetType: "season",
       targetId: id,
-      summary: "עונה הופעלה",
+      summary: outgoing
+        ? `עונה ${target.name} הופעלה, ${outgoing.name} נסגרה`
+        : `עונה ${target.name} הופעלה`,
+      details: { empiresMoved: empires, closedSeasonId: outgoing?.id ?? null },
     });
     revalidatePath("/admin/seasons");
-    return { success: "העונה הופעלה" };
+    revalidatePath("/game", "layout");
+    return {
+      success: outgoing
+        ? `העונה הופעלה. ${outgoing.name} נסגרה והדירוג שלה נשמר בהיכל התהילה — ${empires} אימפריות עברו לעונה החדשה`
+        : `העונה הופעלה — ${empires} אימפריות שויכו אליה`,
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Cut an active season short — move its end forward, nothing else.
+ *
+ * Separate from `updateSeason` (which edits both dates freely) because ending a
+ * season early is the one schedule change with an immediate, irreversible
+ * effect: the moment `endsAt` is in the past, the gate archives the standings
+ * and shuts the game until the next season opens. That close is run here rather
+ * than left to whichever page load happens to cross the boundary, so the admin
+ * sees the result of their own click instead of a silent time bomb.
+ *
+ * Only ever earlier. Extending a season is `updateSeason` — the confirmation on
+ * this form promises a shorter season, so it must not be able to grant a longer one.
+ */
+export async function shortenSeason(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    const endsAt = parseDate(formData, "endsAt");
+    const now = new Date();
+
+    const season = await prisma.gameSeason.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        startsAt: true,
+        endsAt: true,
+        isActive: true,
+        closedAt: true,
+      },
+    });
+    if (!season) return { error: "העונה לא נמצאה" };
+    if (season.closedAt) return { error: "העונה כבר נסגרה" };
+    if (endsAt >= season.endsAt) {
+      return { error: "המועד החדש חייב להיות מוקדם מהסיום הנוכחי — להארכה, ערוך את התאריכים למעלה" };
+    }
+    if (endsAt <= season.startsAt) {
+      return { error: "הסיום חייב להיות אחרי תחילת העונה" };
+    }
+
+    await prisma.gameSeason.update({ where: { id }, data: { endsAt } });
+
+    // Already in the past: this click *is* the end of the season.
+    const closed = season.isActive && endsAt <= now ? await closeSeason(id, now) : false;
+
+    await logAdmin(admin, {
+      action: "season.shorten",
+      targetType: "season",
+      targetId: id,
+      summary: closed
+        ? `עונה ${season.name} קוצרה ונסגרה`
+        : `עונה ${season.name} קוצרה`,
+      details: { endsAt: endsAt.toISOString(), closed },
+    });
+    revalidatePath("/admin/seasons");
+    revalidatePath("/game", "layout");
+    return {
+      success: closed
+        ? "העונה הסתיימה — הדירוג נשמר בהיכל התהילה, והמשחק נעול עד תחילת העונה הבאה"
+        : "מועד הסיום עודכן",
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -2646,7 +2798,7 @@ export async function saveTunables(
 /*                         MINI-GAMES                           */
 /* ============================================================= */
 
-const miniTypeSchema = z.enum(["GUESS_NUMBER", "FIND_BALL"]);
+const miniTypeSchema = z.enum(["FIND_BALL", "CRACK_SAFE"]);
 
 /** Random integer in [min, max] (inclusive). */
 function randInt(min: number, max: number): number {
@@ -2661,12 +2813,28 @@ function randInt(min: number, max: number): number {
 /** Build a fresh secret config (with a new random answer) for a mini-game. */
 function freshConfig(
   type: MiniGameType,
-  params: { min: number; max: number; cups: number }
-): { min?: number; max?: number; cups?: number; answer: number } {
-  if (type === "GUESS_NUMBER") {
-    return { min: params.min, max: params.max, answer: randInt(params.min, params.max) };
+  params: { cups: number; digits: number }
+): { cups?: number; digits?: number; answer?: number; code?: string } {
+  if (type === "CRACK_SAFE") {
+    // Kept as a string, not a number: the code may legitimately start with a
+    // zero, and "047" must survive the round trip through the JSON column as
+    // three digits rather than come back as 47.
+    let code = "";
+    for (let i = 0; i < params.digits; i++) code += String(randInt(0, 9));
+    return { digits: params.digits, code };
   }
   return { cups: params.cups, answer: randInt(0, params.cups - 1) };
+}
+
+/** Clamp the admin-supplied shape of each game to what its UI can render. */
+function readShape(formData: FormData) {
+  return {
+    cups: Math.min(CUPS_MAX, Math.max(CUPS_MIN, Math.round(optNum(formData, "cups", 3)))),
+    digits: Math.min(
+      SAFE_DIGITS_MAX,
+      Math.max(SAFE_DIGITS_MIN, Math.round(optNum(formData, "digits", 3)))
+    ),
+  };
 }
 
 function readPrizeBundle(formData: FormData) {
@@ -2695,8 +2863,10 @@ async function activateEvent(
   event: { id: string; type: MiniGameType; config: unknown; title: string },
   durationMinutes: number
 ): Promise<void> {
+  // Re-activating reuses the event's own shape (cup count / code length) and
+  // only rolls a new secret behind it.
   const cfg = (event.config ?? {}) as Record<string, number>;
-  const params = { min: cfg.min ?? 1, max: cfg.max ?? 100, cups: cfg.cups ?? 3 };
+  const params = { cups: cfg.cups ?? 3, digits: cfg.digits ?? 3 };
   const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(durationMinutes)));
   const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
 
@@ -2741,13 +2911,11 @@ export async function createMiniGame(
     // fire off a game without typing anything.
     const title = str(formData, "title") || MINIGAME_TYPE_META[type].label;
 
-    const min = Math.round(optNum(formData, "min", 1));
-    const max = Math.round(optNum(formData, "max", 100));
-    const cups = Math.min(6, Math.max(2, Math.round(optNum(formData, "cups", 3))));
-    if (type === "GUESS_NUMBER" && max <= min) {
-      return { error: "הטווח לא תקין (מקסימום חייב להיות גדול ממינימום)" };
-    }
-    const maxAttempts = Math.max(1, Math.round(optNum(formData, "maxAttempts", 5)));
+    const shape = readShape(formData);
+    // Capped as well as floored: the attempt log lives in a JSON column and the
+    // panel renders every row of it, so an accidental extra zero here would
+    // otherwise mean an unbounded column and an unbounded list.
+    const maxAttempts = Math.min(30, Math.max(1, Math.round(optNum(formData, "maxAttempts", 5))));
     const maxWinners = Math.max(0, Math.round(optNum(formData, "maxWinners", 0)));
     const durationMinutes = Math.min(
       MAX_DURATION_MINUTES,
@@ -2758,7 +2926,7 @@ export async function createMiniGame(
       data: {
         type,
         title,
-        config: freshConfig(type, { min, max, cups }),
+        config: freshConfig(type, shape),
         maxAttempts,
         maxWinners,
         durationMinutes,
@@ -2883,6 +3051,218 @@ export async function resetTunables(
     });
     revalidatePath("/admin/balance");
     return { success: "האיזון אופס לברירת המחדל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ------------------------------ Happy Hour ------------------------------ */
+
+/**
+ * Release a golden hour to the whole server.
+ *
+ * The window itself is enforced on the clock (see server/happyHour.ts), so the
+ * only write is the row: a start, an end, and the bonus everyone is about to be
+ * paid. Any other window is closed in the same transaction — two overlapping
+ * releases would stack silently, and an admin firing a ×2 on top of a forgotten
+ * ×5 would be handing out ×10 without ever seeing that number on a screen.
+ */
+async function releaseHappyHour(
+  admin: Awaited<ReturnType<typeof requireAdmin>>,
+  id: string,
+  durationMinutes: number
+): Promise<{ endsAt: Date | null; minutes: number }> {
+  const minutes = Math.min(
+    HAPPY_HOUR_MAX_MINUTES,
+    Math.max(0, Math.round(durationMinutes))
+  );
+  const now = new Date();
+  const endsAt = minutes > 0 ? new Date(now.getTime() + minutes * 60_000) : null;
+
+  const [, released] = await prisma.$transaction([
+    // Closing, not just deactivating: a stopped window still has to carry a real
+    // `endsAt`, because the lazy mine clock prices an offline player's backlog
+    // against the edges of every window it overlaps.
+    prisma.happyHour.updateMany({
+      where: { isActive: true },
+      data: { isActive: false, endsAt: now, endedAt: now },
+    }),
+    prisma.happyHour.update({
+      where: { id },
+      data: {
+        isActive: true,
+        durationMinutes: minutes,
+        startsAt: now,
+        endsAt,
+        endedAt: null,
+      },
+    }),
+  ]);
+
+  await logAdmin(admin, {
+    action: "happyhour.release",
+    targetType: "happyhour",
+    targetId: id,
+    summary:
+      `שוחרר ${released.title} ${multiplierLabel(released.bonusPct)} לכל השחקנים` +
+      (minutes > 0 ? ` למשך ${minutes} דקות` : " ללא הגבלת זמן"),
+    details: {
+      bonusPct: released.bonusPct,
+      boostXp: released.boostXp,
+      boostPlunder: released.boostPlunder,
+      boostMines: released.boostMines,
+      minutes,
+    },
+  });
+  return { endsAt, minutes };
+}
+
+/** Read the three switches off the form, defaulting to on. */
+function readHappyHourEffects(formData: FormData) {
+  const on = (key: string) => str(formData, key) !== "0";
+  return {
+    boostXp: on("boostXp"),
+    boostPlunder: on("boostPlunder"),
+    boostMines: on("boostMines"),
+  };
+}
+
+/** Create a golden hour — and, from the launcher, release it in the same click. */
+export async function createHappyHour(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const title = str(formData, "title", 80) || HAPPY_HOUR_DEFAULT_TITLE;
+    const bonusPct = Math.min(
+      HAPPY_HOUR_MAX_PCT,
+      Math.max(HAPPY_HOUR_MIN_PCT, Math.round(optNum(formData, "bonusPct", 100)))
+    );
+    const effects = readHappyHourEffects(formData);
+    if (!effects.boostXp && !effects.boostPlunder && !effects.boostMines) {
+      return { error: "בחר לפחות הטבה אחת — אחרת אין מה לשחרר" };
+    }
+    const durationMinutes = Math.min(
+      HAPPY_HOUR_MAX_MINUTES,
+      Math.max(0, Math.round(optNum(formData, "durationMinutes", 60)))
+    );
+
+    const event = await prisma.happyHour.create({
+      data: { title, bonusPct, durationMinutes, ...effects },
+    });
+
+    if (str(formData, "activate") === "1") {
+      const { minutes } = await releaseHappyHour(admin, event.id, durationMinutes);
+      revalidatePath("/admin/happy-hour");
+      revalidatePath("/game", "layout");
+      return {
+        success:
+          `🔥 ${title} ${multiplierLabel(bonusPct)} באוויר!` +
+          (minutes > 0 ? ` נסגרת בעוד ${minutes} דקות.` : " רצה עד שתעצור אותה."),
+      };
+    }
+
+    await logAdmin(admin, {
+      action: "happyhour.create",
+      targetType: "happyhour",
+      targetId: event.id,
+      summary: `נוצר ${title} ${multiplierLabel(bonusPct)}`,
+    });
+    revalidatePath("/admin/happy-hour");
+    return { success: "ה-Happy Hour נוצר. שחרר אותו כדי להפעיל לכולם." };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Release an existing golden hour again, with a fresh clock. */
+export async function startHappyHour(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    const event = await prisma.happyHour.findUnique({ where: { id } });
+    if (!event) return { error: "ה-Happy Hour לא נמצא" };
+
+    // An omitted field re-runs it for however long it last ran.
+    const { minutes } = await releaseHappyHour(
+      admin,
+      id,
+      optNum(formData, "durationMinutes", event.durationMinutes)
+    );
+    revalidatePath("/admin/happy-hour");
+    revalidatePath("/game", "layout");
+    return {
+      success:
+        `🔥 ${event.title} ${multiplierLabel(event.bonusPct)} באוויר!` +
+        (minutes > 0 ? ` נסגרת בעוד ${minutes} דקות.` : " רצה עד שתעצור אותה."),
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Call off the running golden hour. */
+export async function stopHappyHour(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    const now = new Date();
+    // `endsAt: now` and not null — the backlog arithmetic needs to know exactly
+    // when the golden rate stopped, for every player still to settle their ticks.
+    await prisma.happyHour.update({
+      where: { id },
+      data: { isActive: false, endsAt: now, endedAt: now },
+    });
+    await logAdmin(admin, {
+      action: "happyhour.stop",
+      targetType: "happyhour",
+      targetId: id,
+      summary: "Happy Hour הופסק",
+    });
+    revalidatePath("/admin/happy-hour");
+    revalidatePath("/game", "layout");
+    return { success: "ה-Happy Hour הופסק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Delete a golden hour. Refused while it is live, and refused for one that has
+ * run: a window whose row is gone can no longer be found by the lazy mine clock,
+ * so deleting it would quietly rob every player who has not yet settled the
+ * ticks it covered.
+ */
+export async function deleteHappyHour(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    const event = await prisma.happyHour.findUnique({ where: { id } });
+    if (!event) return { error: "ה-Happy Hour לא נמצא" };
+    if (event.isActive) return { error: "עצור את ה-Happy Hour לפני מחיקה" };
+    if (event.startsAt) {
+      return { error: "Happy Hour שכבר רץ נשמר ביומן ואי אפשר למחוק" };
+    }
+
+    await prisma.happyHour.delete({ where: { id } });
+    await logAdmin(admin, {
+      action: "happyhour.delete",
+      targetType: "happyhour",
+      targetId: id,
+      summary: "נמחק Happy Hour שלא שוחרר",
+    });
+    revalidatePath("/admin/happy-hour");
+    return { success: "ה-Happy Hour נמחק" };
   } catch (e) {
     return toErr(e);
   }

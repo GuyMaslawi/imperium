@@ -9,10 +9,14 @@ import { awardSeasonPassXp } from "../seasonPassXp";
 import {
   prizeText,
   publicConfig,
+  parseHistory,
+  scoreCode,
+  HISTORY_LIMIT,
   PRIZE_FIELDS,
   type MiniGameState,
   type MiniGameBoardRow,
   type MiniGameGuessResult,
+  type MiniGameHistoryRow,
 } from "@/lib/game/minigame";
 
 /** How many rival rows the live board carries (the viewer is always included). */
@@ -29,7 +33,7 @@ async function ownEmpireId(): Promise<string | null> {
 
 function toState(
   event: MiniGameEvent,
-  entry: { attempts: number; solved: boolean; won: boolean } | null,
+  entry: { attempts: number; solved: boolean; won: boolean; guesses?: unknown } | null,
   board: Board = EMPTY_BOARD
 ): MiniGameState {
   const attempts = entry?.attempts ?? 0;
@@ -40,9 +44,9 @@ function toState(
     type: event.type,
     title: event.title,
     prizeText: prizeText(event),
-    min: pub.min,
-    max: pub.max,
     cups: pub.cups,
+    digits: pub.digits,
+    history: parseHistory(entry?.guesses),
     attempts,
     maxAttempts: event.maxAttempts,
     solved,
@@ -149,7 +153,7 @@ export async function getMiniGameState(): Promise<MiniGameState | null> {
     const [entry, board] = await Promise.all([
       prisma.miniGameEntry.findUnique({
         where: { eventId_empireId: { eventId: event.id, empireId } },
-        select: { attempts: true, solved: true, won: true },
+        select: { attempts: true, solved: true, won: true, guesses: true },
       }),
       loadBoard(event.id, empireId),
     ]);
@@ -182,13 +186,14 @@ function prizeIncrements(event: MiniGameEvent): Prisma.EmpireUpdateInput {
   return inc;
 }
 
-const HINT_TOO_LOW = "📉 נמוך מדי — נסה גבוה יותר";
-const HINT_TOO_HIGH = "📈 גבוה מדי — נסה נמוך יותר";
+/** Hebrew names of the three code marks, for the one-line result summary. */
+const MARK_WORD = { hit: "במקום", near: "בקוד", miss: "בחוץ" } as const;
 
 /**
- * Submit one guess to the active mini-game. Records the attempt, checks the
- * secret answer, and — on a correct first solve — atomically claims a prize
- * slot (respecting maxWinners) and grants the bundle.
+ * Submit one guess to the active mini-game — a cup index for FIND_BALL, a digit
+ * string for CRACK_SAFE. Records the attempt, checks the secret answer, and —
+ * on a correct first solve — atomically claims a prize slot (respecting
+ * maxWinners) and grants the bundle.
  */
 export async function submitMiniGameGuess(
   _prev: MiniGameGuessResult,
@@ -198,34 +203,42 @@ export async function submitMiniGameGuess(
     const empireId = await ownEmpireId();
     if (!empireId) return { state: null, feedback: "לא מחובר", tone: "error" };
 
-    const guess = Number(formData.get("guess"));
-    if (!Number.isFinite(guess)) {
+    const raw = formData.get("guess");
+    if (typeof raw !== "string") {
       return { state: null, feedback: "בחר ניחוש תקין", tone: "error" };
     }
+    const guess = raw.trim();
 
     const result = await prisma.$transaction(async (tx) => {
-      const event = await tx.miniGameEvent.findFirst({ where: { isActive: true } });
+      // Ordered exactly as loadLiveEvent orders it. An unordered findFirst picks
+      // an arbitrary row, so should two events ever be live at once the panel
+      // and the guess it submits could resolve to different games — the player
+      // would be scored against a board they were never shown.
+      const event = await tx.miniGameEvent.findFirst({
+        where: { isActive: true },
+        orderBy: { activatedAt: "desc" },
+      });
       // A timed release stops accepting guesses the moment its deadline passes,
       // even if no read has flipped `isActive` yet (see loadLiveEvent).
       if (!event || isExpired(event)) {
         return { state: null, feedback: "המשחק הסתיים", tone: "info" as const };
       }
       const cfg = (event.config ?? {}) as Record<string, unknown>;
-      const answer = Number(cfg.answer);
-
-      // Reject a guess outside the event's own domain *before* claiming an
-      // attempt slot. `Number.isFinite` alone let `1e308`, `-1` or a fractional
-      // value through — none of which can ever match the answer, so the only
-      // effect was that a malformed submission silently burned one of the
-      // player's limited attempts.
       const pub = publicConfig(event);
-      const lo = pub.min ?? 0;
-      const hi = pub.max ?? (pub.cups != null ? pub.cups - 1 : null);
-      if (
-        !Number.isInteger(guess) ||
-        guess < lo ||
-        (hi != null && guess > hi)
-      ) {
+
+      // Reject a guess outside the event's own shape *before* claiming an
+      // attempt slot. A malformed submission can never match the answer, so
+      // letting it through would only silently burn one of the player's
+      // limited attempts.
+      const code = typeof cfg.code === "string" ? cfg.code : "";
+      const cups = pub.cups ?? 0;
+      const valid =
+        event.type === "CRACK_SAFE"
+          ? code.length > 0 &&
+            guess.length === code.length &&
+            /^[0-9]+$/.test(guess)
+          : /^[0-9]{1,2}$/.test(guess) && Number(guess) < cups;
+      if (!valid) {
         return { state: null, feedback: "בחר ניחוש תקין", tone: "error" as const };
       }
 
@@ -265,18 +278,47 @@ export async function submitMiniGameGuess(
         };
       }
 
-      // We hold an attempt slot (attempts already incremented by 1 above).
-      const attempts = entry.attempts + 1;
-      const correct = guess === answer;
+      // We hold an attempt slot. Re-read the row rather than trusting the copy
+      // from before the claim: the guarded updateMany above took the row lock,
+      // so this reads *our* increment plus whatever history a guess that raced
+      // us already committed. Appending to the pre-claim copy would drop it.
+      const locked = await tx.miniGameEntry.findUniqueOrThrow({ where: { id: entry.id } });
+      const attempts = locked.attempts;
+
+      // Score the attempt and write the row the player will reason over. The
+      // safe's marks ARE the game — a code attempt with no marks tells the
+      // player nothing — so they are computed server-side, from the secret, and
+      // the client only ever renders them.
+      let correct: boolean;
+      let row: MiniGameHistoryRow;
+      let feedback: string;
+      if (event.type === "CRACK_SAFE") {
+        const marks = scoreCode(guess, code);
+        correct = marks.every((m) => m === "hit");
+        row = { kind: "code", code: guess, marks };
+        const tally = { hit: 0, near: 0, miss: 0 };
+        for (const m of marks) tally[m]++;
+        feedback = correct
+          ? ""
+          : `🔐 ${(["hit", "near", "miss"] as const)
+              .filter((m) => tally[m] > 0)
+              .map((m) => `${tally[m]} ${MARK_WORD[m]}`)
+              .join(" · ")}`;
+      } else {
+        correct = Number(guess) === Number(cfg.answer);
+        row = { kind: "cup", pick: Number(guess), hit: correct };
+        feedback = "🫙 הכוס ריקה…";
+      }
+      const history = [...parseHistory(locked.guesses), row].slice(-HISTORY_LIMIT);
 
       if (!correct) {
-        let feedback = "❌ לא נכון";
-        if (event.type === "GUESS_NUMBER") {
-          feedback = guess < answer ? HINT_TOO_LOW : HINT_TOO_HIGH;
-        }
         const finished = attempts >= event.maxAttempts;
+        const updated = await tx.miniGameEntry.update({
+          where: { id: entry.id },
+          data: { guesses: history },
+        });
         return {
-          state: toState(event, { attempts, solved: false, won: false }),
+          state: toState(event, updated),
           feedback: finished ? "😔 נגמרו הניסיונות — נסה בפעם הבאה" : feedback,
           tone: finished ? ("lose" as const) : ("hint" as const),
         };
@@ -324,6 +366,7 @@ export async function submitMiniGameGuess(
         data: {
           won,
           wonAt: won ? new Date() : null,
+          guesses: history,
         },
       });
 

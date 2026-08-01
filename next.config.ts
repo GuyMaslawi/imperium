@@ -12,8 +12,9 @@ import type { NextConfig } from "next";
  * an injected tag cannot pull code from an attacker's origin.
  *
  * The accounts.google.com / gstatic entries are what Google Identity Services
- * needs: the GIS client script, the iframe it renders the button into, the
- * token endpoint it calls, and the avatars it shows.
+ * needs: the GIS client script, the stylesheet it injects into our `<head>` to
+ * skin the button, the iframe it renders the button into, the token endpoint it
+ * calls, and the avatars it shows.
  *
  * The paypal.com / paypalobjects.com entries are what PayPal Checkout needs:
  * the SDK script itself, the buttons/approval iframes it renders, the endpoints
@@ -29,7 +30,7 @@ const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${devEval} https://accounts.google.com https://apis.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com`,
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://accounts.google.com",
   "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://*.paypal.com https://www.paypalobjects.com",
   "font-src 'self' data:",
   "connect-src 'self' https://accounts.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com",

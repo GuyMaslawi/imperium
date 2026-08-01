@@ -26,6 +26,7 @@ import { getActiveResourceBoosts } from "./diamondEffects";
 import { getActivePotionKinds } from "./potionEffects";
 import { POTION_DOUBLE } from "./potions";
 import { computePower } from "@/server/empirePower";
+import { mineTicksWithHappyHour } from "@/server/happyHour";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -153,13 +154,25 @@ export async function applyPendingUpdates(
       potionResources *
       tunables.economy.mineProductionMultiplier *
       cityProductionMultiplier(empire.cities);
+    // Happy Hour rides on the *tick count*, not the multiplier: the backlog being
+    // settled here may straddle the edges of a window (or a window that opened
+    // and closed while the player was offline), and only the ticks that fell
+    // inside it may be paid at the golden rate. See server/happyHour.ts.
+    const productionTicks = await mineTicksWithHappyHour(
+      ticks,
+      empire.lastRegularUpdateAt,
+      now,
+      tx
+    );
     for (const building of empire.buildings) {
       const meta = BUILDING_META[building.type];
       if (!meta.producedResource) continue;
       const multiplier =
         baseMultiplier * bonusMultiplier(resourceBoosts[meta.producedResource]);
       gained[meta.producedResource] +=
-        mineProductionPerTick(building.level, building.slavesAssigned) * ticks * multiplier;
+        mineProductionPerTick(building.level, building.slavesAssigned) *
+        productionTicks *
+        multiplier;
     }
     // Equipped resource items conjure a flat amount each tick — but only for
     // the specific resources their tier covers (some feed one resource, some

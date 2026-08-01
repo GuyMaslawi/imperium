@@ -348,3 +348,89 @@ export function SeasonSchedule({
     </div>
   );
 }
+
+/* ------------------------------ ending early ------------------------------ */
+
+const SHORTEN_PRESETS: DateTimePreset[] = [
+  { label: "עכשיו", value: nowLocal },
+  { label: "בעוד שעה", value: () => shiftLocal(nowLocal(), HOUR) },
+  { label: "מחר 20:00", value: () => nextAtHour(20) },
+  { label: "בעוד שבוע", value: () => shiftLocal(nowLocal(), 7 * DAY) },
+];
+
+/**
+ * The end date of a running season, for cutting it short.
+ *
+ * One field rather than the full `SeasonSchedule`, because the start of a
+ * season already under way is history and must not be editable. Its whole job
+ * beyond the picker is telling the admin what the pick *means* — a date already
+ * behind them ends the season on submit, which is a very different button from
+ * "the season now ends on Tuesday".
+ */
+export function SeasonEndPicker({
+  startISO,
+  endISO,
+}: {
+  startISO: string;
+  endISO: string;
+}) {
+  const now = useNow();
+  const [end, setEnd] = useState("");
+  const [seeded, setSeeded] = useState(false);
+
+  // Seeded once the timezone is known — see SeasonSchedule.
+  if (now !== null && !seeded) {
+    setSeeded(true);
+    setEnd(toLocalInput(new Date(endISO)));
+  }
+
+  const picked = fromLocalInput(end);
+  const startAt = new Date(startISO).getTime();
+  const currentEnd = new Date(endISO).getTime();
+  const at = picked?.getTime() ?? null;
+
+  const invalid =
+    at === null || now === null
+      ? undefined
+      : at >= currentEnd
+        ? "המועד חייב להיות מוקדם מהסיום הנוכחי — להארכה, ערוך את התאריכים למעלה"
+        : at <= startAt
+          ? "הסיום חייב להיות אחרי תחילת העונה"
+          : undefined;
+
+  const immediate = at !== null && now !== null && !invalid && at <= now;
+
+  return (
+    <div className="space-y-2">
+      <DateTimeField
+        label="סיום חדש"
+        name="endsAt"
+        value={end}
+        onChange={setEnd}
+        required
+        presets={SHORTEN_PRESETS}
+        hint="בחר מועד מוקדם יותר, או ״עכשיו״ כדי לסיים מיד"
+        invalid={invalid}
+      />
+      {immediate ? (
+        <p className="text-[11px] font-semibold text-red-300">
+          המועד כבר עבר — העונה תיסגר מיד עם השליחה: הדירוג יישמר בהיכל התהילה
+          והמשחק יינעל לכל השחקנים עד תחילת העונה הבאה.
+        </p>
+      ) : (
+        at !== null &&
+        now !== null &&
+        !invalid && (
+          <p className="text-[11px] text-zinc-500">
+            נותר לעונה:{" "}
+            <span className="font-bold text-gold-dim">{durationLabel(at - now)}</span>
+            {" · "}
+            <span className="text-zinc-600">
+              במקום {durationLabel(currentEnd - now)}
+            </span>
+          </p>
+        )
+      )}
+    </div>
+  );
+}

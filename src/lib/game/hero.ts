@@ -426,8 +426,15 @@ export const UPGRADE_COST_GROWTH = Math.pow(
   1 / 90
 );
 
-/** Round to three significant figures — 3M, 11.9M, 47M, 700B, never 46,847,113. */
-function roundCost(value: number): number {
+/**
+ * Round to three significant figures — 3M, 11.9M, 47M, 700B, never 46,847,113.
+ *
+ * Shared by the two geometric curves in this file (upgrade prices and the flat
+ * resource bonus). Both are exponentials whose raw output is a long irrational
+ * number at every rung, and both are read by players as a figure rather than a
+ * measurement. Always lands on a whole number: the magnitude is floored at 1.
+ */
+function roundSignificant(value: number): number {
   const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 2);
   return Math.round(value / magnitude) * magnitude;
 }
@@ -439,7 +446,7 @@ function roundCost(value: number): number {
 export function itemUpgradeCost(level: number): number | null {
   const target = nextTierLevel(level);
   if (target === null) return null;
-  return roundCost(
+  return roundSignificant(
     UPGRADE_COST_AT_LEVEL_10 * UPGRADE_COST_GROWTH ** (target - 10)
   );
 }
@@ -729,7 +736,7 @@ export const MAX_UPGRADE_STEP = UPGRADE_LEVELS.length; // 40
  * Percentages scale **linearly** with the rung, and they are the only stats that
  * do. They can afford to: a percentage is already relative to the army it
  * multiplies, so +1% is a small bonus to a beginner and a small bonus to a
- * veteran. The flat stats have no such property — see FLAT_CURVE_EXPONENT.
+ * veteran. The flat stats have no such property — see FLAT_CURVE.
  *
  * They are also not rounded to whole percent. An extra on a rung-1 item is
  * genuinely worth a quarter of a percent, and printing that as "+1%" (the old
@@ -739,76 +746,111 @@ export const MAX_UPGRADE_STEP = UPGRADE_LEVELS.length; // 40
 export const PCT_PER_STEP = 1;
 
 /**
- * What a **primary** flat stat is worth on the last rung. The units differ
- * wildly — a turn is not a citizen — so each stat has its own ceiling, and an
- * extra takes its weighted share of the same number.
+ * How a flat stat climbs across the 40 rungs. Two shapes, because the two
+ * things flat stats are measured against do not grow the same way — see
+ * FLAT_CURVE for which stat takes which and why.
+ *
+ * Both are stated as anchors rather than as a slope, so the numbers in the table
+ * are the numbers a player sees at the two ends of the ladder. Everything in
+ * between is filled in by the shape.
  */
-export const FLAT_AT_MAX_STEP: Record<HeroFlatStat, number> = {
-  // Sized against real mine output, not picked by feel. A played empire (hero
-  // 63, one city, 780 mine slaves, mines at L14-22) earns ~7,000 of each
-  // resource per regular update; at the old ceiling of 200 its relic paid 85 —
-  // 1.2% of a single mine. The squared curve held that ~1% at *every* level, so
-  // the shape was right and only the ceiling was wrong: the number was a
-  // rounding error for the whole game, which is why a low-weight slot like
-  // נעליים printed a literal +1. 2,000 puts a primary at ~11% of one mine and
-  // נעליים at ~2.8%, which is a slot you notice without one that decides the
-  // game. See SlotStatWeight for why the other resource slots pay percent.
-  resources: 2000,
-  turns: 40,
-  // Citizens are the largest number on the board because they are the cheapest
-  // unit of anything: one citizen buys one soldier, spy or mine slave. There is
-  // no population ceiling, so all of it lands — what bounds citizens is the
-  // update cadence, not a cap.
-  citizens: 1800,
+export type FlatCurve =
+  /**
+   * Constant *relative* growth: every rung multiplies the bonus by the same
+   * factor, derived from the two anchors. This is the same instrument the
+   * upgrade-price curve uses (see UPGRADE_COST_GROWTH) and it is the only shape
+   * under which "one upgrade" means the same thing at every point on the ladder.
+   */
+  | { shape: "geometric"; atFirstStep: number; atMaxStep: number }
+  /**
+   * A power of the rung's progress: `atMaxStep · (rung / 40) ** exponent`. The
+   * bonus starts at a rounding error and accelerates, so the whole first series
+   * stays inside single digits. Right for a stat whose *base* barely grows.
+   */
+  | { shape: "power"; atMaxStep: number; exponent: number };
+
+/**
+ * What a **primary** flat stat is worth at each end of the upgrade ladder. The
+ * units differ wildly — a turn is not a citizen — so each stat carries its own
+ * curve, and an extra takes its weighted share of the same numbers.
+ *
+ * ### resources — geometric, 1,500 → 350,000,000 per regular update
+ *
+ * The squared curve this replaced was measured against mine output and held a
+ * near-constant *share* of it, which sounded right and played wrong: a share of
+ * an economy that is itself near zero is near zero. The first six rungs paid
+ * +1, +5, +11, +20, +31, +45 — an item you win, equip, and cannot detect. A
+ * level-1 item now conjures 1,500 of its resource every five minutes, which is
+ * many times what a first-city empire's mines produce and is the point: early
+ * gear is *supposed* to change what you can afford that hour.
+ *
+ * The ceiling is set against the other end of the same complaint. A level-100
+ * empire settles resources in the billions per update, so the old 2,000 was as
+ * invisible at the top of the ladder as +1 was at the bottom.
+ *
+ * Geometric is what makes the middle honest: ×1.373 per rung, so **every**
+ * upgrade is worth the same +37% no matter where you stand. That lands within a
+ * hair of the price curve it is paid for with — the bonus rises ×3.55 per
+ * series against a price that rises ×3.95 — so gold buys roughly constant value
+ * from the first upgrade to the fortieth.
+ *
+ *   resources, as a primary:  rung 1 → 1,500 · rung 5 (a level-11 relic) →
+ *   5,330 · rung 10 → 26,000 · rung 20 → 619,000 · rung 40 → 350,000,000
+ *
+ * ### citizens — power 1.75, up to 450 per daily update
+ *
+ * Citizens do not get the same treatment, because they are the one flat stat
+ * whose base does *not* grow with the economy: the empire's growth building pays
+ * 20 + 10·level per daily update and caps at 1,020 with ten cities, full stop. A
+ * citizen is also the cheapest unit of anything — it buys a soldier, a spy or a
+ * mine slave — and nothing caps the population, so all of it lands. Gear that
+ * out-paid the building that exists for the job would retire it.
+ *
+ * So citizens keep the accelerating shape and a deliberately small ceiling: the
+ * whole first series (levels 1–10) runs 1 → 8, and the ladder ends at 450, well
+ * under the building's own 1,020.
+ *
+ *   citizens, as a primary:  rung 1 → +1 · rung 4 (a level-10 boot) → +8 ·
+ *   rung 10 → +40 · rung 20 → +134 · rung 40 → +450
+ *
+ * ### turns — power 2, up to 40 per daily update
+ *
+ * Unchanged. Turns are the one currency the game meters on purpose; the squared
+ * curve against a turn income that also scales still holds.
+ *
+ * Note what the power curves cost: on turns and citizens the first few rungs all
+ * round to +1, so those *lines* stand still early. The item as a whole never
+ * does — its percentage extras move on every single rung, and a resource item
+ * widens its coverage with every tier (see resourceItemResources).
+ */
+export const FLAT_CURVE: Record<HeroFlatStat, FlatCurve> = {
+  resources: { shape: "geometric", atFirstStep: 1_500, atMaxStep: 350_000_000 },
+  turns: { shape: "power", atMaxStep: 40, exponent: 2 },
+  citizens: { shape: "power", atMaxStep: 450, exponent: 1.75 },
 };
 
 /**
- * Flat stats climb with the **square** of the rung, not linearly.
- *
- * Linearly was wrong, and wrong at the only end that matters to a new player: a
- * level-3 boot is rung 2, so at 45 citizens per rung it paid +90 per daily
- * update against a base intake of 25 — the second-cheapest item in the game
- * quadrupling an empire's population growth. The endgame numbers were fine; the
- * curve underneath them simply started far too high.
- *
- * A flat bonus is added to an economy that itself grows by orders of magnitude
- * over a hundred levels, so to stay *proportionally* the same size it has to
- * grow superlinearly too. Raising the rung to a power keeps both ends honest:
- * the caps at rung 40 are untouched whatever the exponent, while rung 1 is a
- * rounding error, which is what a level-1 item should be.
- *
- * The exponent is **per stat**, because the thing each stat is measured against
- * grows at its own rate:
- *
- * - `resources` (2) — mine output is multiplicative and roughly quadratic in
- *   progression, and the squared curve tracks it almost exactly: a primary holds
- *   ~11% of one mine's per-tick output at rung 4 and at rung 40 alike. Do not
- *   raise this without re-measuring; the flatness of that share is the whole
- *   point, and it is what lets the ceiling be set once (see FLAT_AT_MAX_STEP).
- * - `turns` (2) — same reasoning, against a turn income that also scales.
- * - `citizens` (2.5) — citizen intake does *not* keep pace. The empire's own
- *   growth building pays 20 + 10·level per daily update and caps at 1,020 with
- *   ten cities. The exponent was set when that step was 5 rather than 10: a
- *   squared curve had a level-13 boot paying +41 against a base of 25 — one
- *   cheap item at 164% of the building that exists for the job. Doubling the
- *   step only widened the building's margin, so 2.5 stays right; the steeper
- *   exponent pushes that power to the end of the ladder where the rest of the
- *   economy has caught up, instead of lowering the ceiling.
- *
- *   citizens, as a primary:  rung 1 → +1 · rung 6 (a level-13 boot) → +16 ·
- *   rung 8 → +32 · rung 20 → +318 · rung 40 → +1,800
- *
- * Note what this costs: on the small-ceilinged stats the first few rungs all
- * round to +1, so those *lines* stand still early. The item as a whole never
- * does — its percentage extras move on every single rung, and a resource item
- * widens its coverage with every tier (see resourceItemResources). Do not "fix"
- * the stall by flooring the curve higher; that is the bug this replaced.
+ * What one upgrade multiplies a geometric flat stat by (resources ≈ ×1.373), or
+ * null for a stat on a power curve, where no such single number exists — that is
+ * the difference between the two shapes, stated as a function.
  */
-export const FLAT_CURVE_EXPONENT: Record<HeroFlatStat, number> = {
-  resources: 2,
-  turns: 2,
-  citizens: 2.5,
-};
+export function flatCurveGrowth(stat: HeroFlatStat): number | null {
+  const curve = FLAT_CURVE[stat];
+  if (curve.shape !== "geometric") return null;
+  return (curve.atMaxStep / curve.atFirstStep) ** (1 / (MAX_UPGRADE_STEP - 1));
+}
+
+/**
+ * The unweighted value of a flat stat on a given rung — the curve itself,
+ * before the slot's weight and before rounding.
+ */
+function flatCurveValue(stat: HeroFlatStat, step: number): number {
+  const curve = FLAT_CURVE[stat];
+  if (curve.shape === "power") {
+    return curve.atMaxStep * (step / MAX_UPGRADE_STEP) ** curve.exponent;
+  }
+  return curve.atFirstStep * flatCurveGrowth(stat)! ** (step - 1);
+}
 
 /**
  * How many of its slot's resources a resource-granting item feeds, by tier: a
@@ -862,8 +904,9 @@ export function roundPct(pct: number): number {
  * Percentage stats come back as a fraction of a percent where that is what they
  * are worth (a rung-1 extra is +0.25%), rounded to two decimals so the arithmetic
  * stays exact and the UI has something finite to print. Flat stats are whole
- * units on the squared curve, floored at 1 so a stat an item genuinely grants is
- * never shown as +0.
+ * units off their own curve (see FLAT_CURVE), rounded to three significant
+ * figures so a geometric bonus reads as a figure rather than a measurement, and
+ * floored at 1 so a stat an item genuinely grants is never shown as +0.
  */
 export function itemStatBonus(
   slot: HeroItemSlot,
@@ -877,11 +920,7 @@ export function itemStatBonus(
   // percentage while פרי שטן, מכנסיים and נעליים pay them in whole units.
   if (!slotStatIsFlat(slot, stat)) return roundPct(step * PCT_PER_STEP * weight);
   const flat = stat as HeroFlatStat;
-  const progress = step / MAX_UPGRADE_STEP;
-  return Math.max(
-    1,
-    Math.round(FLAT_AT_MAX_STEP[flat] * weight * progress ** FLAT_CURVE_EXPONENT[flat])
-  );
+  return Math.max(1, roundSignificant(flatCurveValue(flat, step) * weight));
 }
 
 /**

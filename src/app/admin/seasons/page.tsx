@@ -3,11 +3,12 @@ import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledBool, LabeledInput, EditorSection } from "@/components/admin/fields";
-import { LocalTime, SeasonSchedule } from "@/components/admin/DateTimeField";
+import { LocalTime, SeasonSchedule, SeasonEndPicker } from "@/components/admin/DateTimeField";
 import {
   createSeason,
   updateSeason,
   activateSeason,
+  shortenSeason,
   deleteSeason,
   resetSeason,
 } from "@/server/actions/admin";
@@ -82,9 +83,37 @@ export default async function AdminSeasonsPage() {
               />
             </ActionForm>
 
+            {/* Ending a running season early. Offered on the active season
+                only — a season nobody is playing has nothing to cut short, and
+                its dates are editable in the form above. */}
+            {s.isActive && !s.closedAt && (
+              <div className="mt-3 rounded-lg border border-border-subtle bg-panel-inset p-3">
+                <h4 className="mb-2 text-xs font-bold text-gold-dim">⏱️ קיצור העונה</h4>
+                <ActionForm
+                  action={shortenSeason}
+                  submitLabel="קצר את העונה"
+                  submitVariant="danger"
+                  submitClassName="text-xs"
+                  confirm="לקצר את העונה? אם המועד שנבחר כבר עבר, העונה תסתיים מיד: הדירוג יישמר בהיכל התהילה והמשחק יינעל עד תחילת העונה הבאה."
+                  className="sm:max-w-xs"
+                >
+                  <input type="hidden" name="id" value={s.id} />
+                  <SeasonEndPicker
+                    startISO={s.startsAt.toISOString()}
+                    endISO={s.endsAt.toISOString()}
+                  />
+                </ActionForm>
+              </div>
+            )}
+
             <div className="mt-3 flex flex-wrap gap-2">
               {!s.isActive && (
-                <ActionForm action={activateSeason} submitLabel="הפעל עונה" submitClassName="text-xs">
+                <ActionForm
+                  action={activateSeason}
+                  submitLabel="הפעל עונה"
+                  submitClassName="text-xs"
+                  confirm="להפעיל את העונה הזו? העונה הפעילה כעת תיסגר כאילו הסתיימה — הדירוג שלה יישמר בהיכל התהילה, דרך התהילה תתאפס לכל השחקנים, וכל האימפריות יעברו לעונה החדשה עם כל הרכוש שלהן."
+                >
                   <input type="hidden" name="id" value={s.id} />
                 </ActionForm>
               )}

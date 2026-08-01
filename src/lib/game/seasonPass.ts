@@ -269,6 +269,20 @@ function buildLadder(): SeasonPassTier[] {
 
 export const SEASON_PASS_TIERS: SeasonPassTier[] = buildLadder();
 
+/**
+ * Canonical display order for any per-kind reward summary — a claim's haul, the
+ * ladder's cycle total, the premium upsell. Shared so two summaries rendered
+ * side by side never list the same six kinds in two different orders.
+ */
+export const SEASON_PASS_HAUL_ORDER: SeasonPassRewardKind[] = [
+  "gold",
+  "wood",
+  "iron",
+  "stone",
+  "turns",
+  "citizens",
+];
+
 /** Hebrew label for a reward kind, used by both the UI and the claim toast. */
 export const SEASON_PASS_REWARD_LABEL: Record<SeasonPassRewardKind, string> = {
   gold: "זהב",

@@ -41,6 +41,7 @@ import {
   type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { cityAt } from "@/lib/game/cities";
+import { formatNumber } from "@/lib/game/format";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   TIERS_PER_CATEGORY,
@@ -51,7 +52,7 @@ import {
   weaponsOfCategory,
 } from "@/lib/game/weapons";
 import {
-  FLAT_CURVE_EXPONENT,
+  flatCurveGrowth,
   HERO_BAG_CAPACITY,
   HERO_CLASS_META,
   HERO_CLASS_ORDER,
@@ -1626,19 +1627,15 @@ export default async function GuidePage() {
                 </div>
 
                 <Formula
-                  label="הבונוס של חפץ — אחוזים בקו ישר, כמויות בחזקה"
+                  label="הבונוס של חפץ — משאבים בסולם גיאומטרי, אחוזים בקו ישר"
                   expr={
                     <>
-                      <V>תקרת הסטטיסטיקה</V>
+                      <V>ערך בדרגה 1</V>
+                      <O>×</O>
+                      <V>{flatCurveGrowth("resources")!.toFixed(3)}</V>
+                      <sup className="text-gold-dim">דרגה − 1</sup>
                       <O>×</O>
                       <V>משקל (ראשי / משני)</V>
-                      <O>×</O>
-                      <O>(</O>
-                      <V>דרגת שדרוג</V>
-                      <O>÷ 40)</O>
-                      <sup className="text-gold-dim">
-                        {`${FLAT_CURVE_EXPONENT.resources}–${FLAT_CURVE_EXPONENT.citizens}`}
-                      </sup>
                     </>
                   }
                   legend={[
@@ -1648,22 +1645,28 @@ export default async function GuidePage() {
                       desc: "חצי מהמשקל במשבצת מתמחה (כפפות, שריון), או 0.35 ו־0.25 במשבצת שמפצלת בין שניים.",
                     },
                     {
-                      term: "אחוזים",
-                      desc: `לא בריבוע — 1% לכל דרגה, ישר: +${itemPrimaryBonus("SWORD", HERO_MAX_LEVEL).value}% ברמה 100 כראשי, +${itemStatBonus("GAUNTLETS", HERO_MAX_LEVEL, "defense")}% כמשני. אחוז שווה חלק יחסי מהצבא שלך, ולכן הוא הגיוני באותה מידה בכל רמה.`,
+                      term: "משאבים",
+                      desc: `כל שדרוג מכפיל את הכמות פי ${flatCurveGrowth("resources")!.toFixed(3)} — אותם +${Math.round((flatCurveGrowth("resources")! - 1) * 100)}% בכל דרגה, מהראשונה ועד הארבעים. חפץ ראשי ברמה 1 נותן ${formatNumber(itemPrimaryBonus("RELIC", 1).value)} לעדכון רגיל, ברמה 50 כבר ${formatNumber(itemPrimaryBonus("RELIC", 50).value)}, וברמה 100 ${formatNumber(itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value)}. הסולם הזה עולה כמעט בדיוק בקצב שבו מחיר השדרוג עולה, ולכן הזהב קונה אותו ערך בכל נקודה בסולם.`,
                     },
                     {
-                      term: "כמויות",
-                      desc: `משאבים ותורות עולים בריבוע הדרגה, ואזרחים מהר עוד יותר (חזקת ${FLAT_CURVE_EXPONENT.citizens}) — נעליים רמה 1 נותנות ${itemStatBonus("BOOTS", 1, "citizens")} אזרחים, רמה 13 נותנות ${itemStatBonus("BOOTS", 13, "citizens")}, ורמה 100 נותנות ${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value}. כמות קבועה נבלעת בכלכלה שגדלה, ולכן היא חייבת לגדול מהר ממנה.`,
+                      term: "אחוזים",
+                      desc: `לא בחזקה — 1% לכל דרגה, ישר: +${itemPrimaryBonus("SWORD", HERO_MAX_LEVEL).value}% ברמה 100 כראשי, +${itemStatBonus("GAUNTLETS", HERO_MAX_LEVEL, "defense")}% כמשני. אחוז שווה חלק יחסי מהצבא שלך, ולכן הוא הגיוני באותה מידה בכל רמה.`,
+                    },
+                    {
+                      term: "אזרחים ותורות",
+                      desc: `אלה לא רצים עם הכלכלה — בניין הגידול משלם כמות קבועה בכל עדכון יומי — ולכן הם עולים בחזקת הדרגה ובתקרה נמוכה בכוונה: נעליים רמה 1 נותנות ${itemStatBonus("BOOTS", 1, "citizens")} אזרחים, רמה 10 נותנות ${itemStatBonus("BOOTS", 10, "citizens")}, ורמה 100 נותנות ${itemPrimaryBonus("BOOTS", HERO_MAX_LEVEL).value}. חפץ לא אמור להחליף את הבניין שקיים בשביל זה.`,
                     },
                     {
                       term: "משאבים — שני כלים",
-                      desc: `פרי שטן, מכנסיים ונעליים נותנים כמות קבועה בכל עדכון רגיל (עד +${itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value}), וככל שהדרגה גבוהה יותר סוגי משאבים. לכל משבצת סדר משלה: פרי שטן פותח בזהב, מכנסיים בברזל, נעליים באבן. חרב ומגן פועלים הפוך — הם מכפילים את תפוקת כל המכרות באחוזים (עד +${itemStatBonus("SWORD", HERO_MAX_LEVEL, "resources")}%), קטן בהתחלה ומשמעותי בסוף.`,
+                      desc: `פרי שטן, מכנסיים ונעליים נותנים כמות קבועה בכל עדכון רגיל (עד +${formatNumber(itemPrimaryBonus("RELIC", HERO_MAX_LEVEL).value)}), וככל שהדרגה גבוהה יותר סוגי משאבים. לכל משבצת סדר משלה: פרי שטן פותח בזהב, מכנסיים בברזל, נעליים באבן. חרב ומגן פועלים הפוך — הם מכפילים את תפוקת כל המכרות באחוזים (עד +${itemStatBonus("SWORD", HERO_MAX_LEVEL, "resources")}%), קטן בהתחלה ומשמעותי בסוף.`,
                     },
                   ]}
                   example={
                     <>
-                      חרב ברמה <N>50</N> = דרגה <N>20</N> מתוך <N>40</N>, כלומר{" "}
-                      <N>רבע</N> מהתקרה בכמויות אבל <N>חצי</N> באחוזים:{" "}
+                      פרי שטן ברמה <N>1</N> = דרגה <N>1</N> מתוך <N>40</N>, ובכל זאת{" "}
+                      <R>+{formatNumber(itemPrimaryBonus("RELIC", 1).value)}</R> זהב בכל
+                      עדכון רגיל — יותר ממה שמכרה של אימפריה בת עיר אחת מפיק. חרב ברמה{" "}
+                      <N>50</N> = דרגה <N>20</N>, כלומר <N>חצי</N> מהתקרה באחוזים:{" "}
                       <R>+{itemPrimaryBonus("SWORD", 50).value}%</R> התקפה, ועוד{" "}
                       <R>+{itemStatBonus("SWORD", 50, "resources")}%</R> תפוקת מכרות ו־
                       <R>+{itemStatBonus("SWORD", 50, "citizens")}</R> אזרחים כמשניים;
@@ -2360,8 +2363,10 @@ export default async function GuidePage() {
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <Note tone="purple" icon="dice" title="מיני־משחקים">
-                  אירועים שהמנהלים פותחים בזמן אמת — &quot;נחש את המספר&quot; ו&quot;מצא את
-                  הכדור&quot;. חלון האירוע קופץ מעל כל מסך, עם לוח מתחרים חי וחבילת פרסים.
+                  אירועים שהמנהלים פותחים בזמן אמת — &quot;מצא את הכדור&quot; (הרם את הכוס
+                  הנכונה) ו&quot;פריצת הכספת&quot; (פצח קוד סודי; כל ניסיון מסמן איזו ספרה
+                  נכונה במקומה, איזו נכונה במקום אחר ואיזו לא בקוד כלל). חלון האירוע קופץ
+                  מעל כל מסך, עם לוח מתחרים חי וחבילת פרסים.
                 </Note>
                 <Note tone="gold" icon="achievements" title="הישגים">
                   ציוני דרך שנפתחים מעצמם תוך כדי משחק ומחכים לאיסוף. תג זהוב בסרגל

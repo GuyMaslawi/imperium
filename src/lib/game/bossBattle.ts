@@ -867,10 +867,20 @@ export function bossKillFraction(grade: BossGrade): number {
  * plunder rather than a computed remainder; slaves round to whole captives and
  * are allowed to come out at zero — a sortie that barely scratched the gate does
  * not open the pens.
+ *
+ * `resourceBonus` is Happy Hour (see lib/game/happyHour.ts) and multiplies the
+ * four resources only. The captives are left at the plain share on purpose: a
+ * freed slave is a permanent addition to the production engine, so doubling the
+ * pens for an hour would outlive the hour by the rest of the season.
  */
-export function bossPayout(reward: BossReward, fraction: number): BossReward {
+export function bossPayout(
+  reward: BossReward,
+  fraction: number,
+  resourceBonus = 1
+): BossReward {
   const share = Math.max(0, fraction);
-  const res = (base: number) => Math.round((base * share) / 100) * 100;
+  const resShare = share * Math.max(0, resourceBonus);
+  const res = (base: number) => Math.round((base * resShare) / 100) * 100;
   return {
     gold: res(reward.gold),
     wood: res(reward.wood),

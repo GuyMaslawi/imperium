@@ -527,6 +527,34 @@ body {
   animation: sp-shake 0.4s ease-in-out both;
 }
 
+/* --- A season-pass reward that can be collected right now. Fifty rungs is far
+       too many to scan for a colour difference, so the handful that are
+       actually waiting for a click breathe. Slow (2.4s) and confined to glow +
+       border: this can be on a dozen tiles at once, and a dozen scaling boxes
+       would be a strobe. The markup also spells out "מוכן" on the same tile —
+       the pulse is emphasis, never the only signal. --- */
+@keyframes sp-ready-pulse {
+  0%,
+  100% {
+    border-color: rgba(16, 185, 129, 0.45);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    border-color: rgba(52, 211, 153, 0.95);
+    box-shadow: 0 0 13px -2px rgba(16, 185, 129, 0.6);
+  }
+}
+.sp-ready {
+  animation: sp-ready-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-ready {
+    animation: none;
+    border-color: rgba(52, 211, 153, 0.9);
+  }
+}
+
 /* --- Unspent hero points — slow gold pulse so the player can't miss it --- */
 @keyframes points-pulse {
   0%,
@@ -612,61 +640,268 @@ body {
   }
 }
 
-/* --- Wheel of Fortune spin effects --- */
-/* pulsing gold halo on the rim while the wheel spins */
-@keyframes wheel-glow {
-  0%, 100% {
-    box-shadow:
-      0 0 40px -8px rgba(0, 0, 0, 0.9),
-      0 0 26px -4px rgba(196, 160, 50, 0.4),
-      inset 0 0 20px rgba(0, 0, 0, 0.6);
-  }
-  50% {
-    box-shadow:
-      0 0 40px -8px rgba(0, 0, 0, 0.9),
-      0 0 60px 0 rgba(228, 195, 90, 0.75),
-      inset 0 0 20px rgba(0, 0, 0, 0.6);
-  }
-}
-.wheel-glow {
-  animation: wheel-glow 0.8s ease-in-out infinite;
-}
+/* =========================================================================
+   WHEEL OF FORTUNE — a machined obsidian-and-brass instrument.
+   The brief was "professional, not a cartoon", so nothing here is drawn: the
+   bezel is a conic gradient with real specular bands (that is what reads as
+   turned metal), the face is obsidian under a glass dome, the pointer is a
+   sprung steel pawl that gets kicked by every peg it passes (driven from JS
+   off the live transform, not a canned flap loop), and a win throws gold dust
+   instead of emoji confetti.
 
-/* carnival bulbs around the rim — alternate blink while spinning */
-.wheel-bulb {
-  width: 7px;
-  height: 7px;
+   Geometry is fixed at a 340px stage — the component scales the whole stage
+   down on narrow phones — so every radius below is a real pixel measurement
+   against that box. Rings, from the outside in:
+     0–15px   brass bezel        15–21px  seating groove
+     21px+    obsidian face      centre   hub medallion (78px)
+   ========================================================================= */
+
+.wheel-stage {
+  position: relative;
+  width: 340px;
+  height: 340px;
+}
+/* the light the wheel throws on the panel behind it */
+.wheel-stage::before {
+  content: "";
+  position: absolute;
+  inset: -14%;
   border-radius: 999px;
-  background: radial-gradient(circle at 35% 35%, #ffe9b0, #caa24a 70%);
-  box-shadow: 0 0 4px rgba(240, 205, 120, 0.5);
+  background: radial-gradient(
+    circle,
+    rgba(196, 160, 50, 0.16),
+    rgba(196, 160, 50, 0.05) 44%,
+    transparent 70%
+  );
+  opacity: 0.65;
+  transition: opacity 0.6s ease;
+  pointer-events: none;
 }
-@keyframes wheel-bulb-blink {
-  0%, 100% { opacity: 1; box-shadow: 0 0 8px 2px rgba(240, 205, 120, 0.9); }
-  50% { opacity: 0.25; box-shadow: none; }
-}
-.wheel-bulb-on {
-  animation: wheel-bulb-blink 0.4s ease-in-out infinite;
-}
-
-/* pointer flaps fast against the pegs while spinning */
-@keyframes wheel-pointer-tick {
-  0%, 100% { transform: rotate(0deg); }
-  30% { transform: rotate(-16deg); }
-  70% { transform: rotate(7deg); }
-}
-.wheel-pointer-tick {
-  transform-origin: 50% 0;
-  animation: wheel-pointer-tick 0.22s ease-in-out infinite;
+.wheel-stage.is-spinning::before {
+  opacity: 1;
 }
 
-/* winning wedge flashes white when the wheel stops */
-@keyframes wheel-win-flash {
+/* --- the bezel. Turned brass: bright bands where the light catches the
+   machining, deep shadow where it doesn't. A flat gold border would read as a
+   sticker, which is exactly the look we're replacing. --- */
+.wheel-bezel {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: conic-gradient(
+    from 202deg,
+    #5b4614, #b1902f 8%, #f4e6b0 14%, #c0a03c 22%, #6d5518 32%,
+    #a8862a 44%, #f7ecc0 50%, #b7942f 58%, #584512 68%,
+    #ad8b2c 80%, #efdd9f 87%, #9d7d27 94%, #5b4614
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.95),
+    0 34px 70px -24px rgba(0, 0, 0, 0.95),
+    inset 0 2px 2px rgba(255, 247, 219, 0.5),
+    inset 0 -4px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* the groove the face is seated in — a dark shadow line that separates the
+   two materials, so the face reads as sunk into the bezel rather than painted
+   on top of it */
+.wheel-groove {
+  position: absolute;
+  inset: 15px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #110f0b, #050506);
+  box-shadow:
+    inset 0 3px 7px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 1px 0 rgba(255, 240, 200, 0.16);
+}
+
+/* brass rivets seated in the bezel — hardware, deliberately NOT blinking
+   carnival bulbs. They only pick up a warm gleam while the wheel is turning. */
+.wheel-rivet {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 30%, #fff3cf, #c8a343 52%, #66501a 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.5);
+  transition: box-shadow 0.4s ease;
+}
+.is-spinning .wheel-rivet {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 0 10px 1px rgba(247, 230, 170, 0.6),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.5);
+}
+
+/* a highlight travelling around the bezel while it spins — masked to the ring
+   so it looks like light running over metal, not a glowing halo */
+.wheel-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 248, 219, 0.55) 12deg,
+    transparent 30deg,
+    transparent 175deg,
+    rgba(255, 248, 219, 0.32) 190deg,
+    transparent 208deg
+  );
+  -webkit-mask: radial-gradient(circle, transparent 0 152px, #000 154px, #000 168px, transparent 170px);
+  mask: radial-gradient(circle, transparent 0 152px, #000 154px, #000 168px, transparent 170px);
+  opacity: 0;
+  transition: opacity 0.45s ease;
+}
+.is-spinning .wheel-sheen {
+  opacity: 0.8;
+  animation: wheel-sheen 1.5s linear infinite;
+}
+@keyframes wheel-sheen {
+  to { transform: rotate(360deg); }
+}
+
+/* the rotating face. transform + filter are both driven inline: filter carries
+   a touch of motion blur that lifts off as the wheel slows. */
+.wheel-face {
+  position: absolute;
+  inset: 21px;
+  border-radius: 999px;
+  transform-origin: 50% 50%;
+  will-change: transform, filter;
+  backface-visibility: hidden;
+}
+
+/* the dome. A fixed specular sheen over a rotating face is the single cheapest
+   trick that turns a flat disc into an object sitting under glass. */
+.wheel-glass {
+  position: absolute;
+  inset: 21px;
+  border-radius: 999px;
+  pointer-events: none;
+  background:
+    radial-gradient(115% 85% at 32% 3%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.045) 26%, transparent 52%),
+    radial-gradient(75% 55% at 72% 104%, rgba(150, 190, 255, 0.07), transparent 62%);
+  box-shadow:
+    inset 0 0 36px rgba(0, 0, 0, 0.7),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65);
+}
+
+/* the winning wedge lights up from underneath and stays lit while the result
+   is on screen — a held glow, not the old three-times white strobe */
+@keyframes wheel-beam-in {
   0% { opacity: 0; }
-  25% { opacity: 1; }
-  100% { opacity: 0; }
+  18% { opacity: 1; }
+  100% { opacity: 0.62; }
 }
-.wheel-win-flash {
-  animation: wheel-win-flash 0.7s ease-out 3 both;
+.wheel-beam {
+  position: absolute;
+  inset: 21px;
+  border-radius: 999px;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: wheel-beam-in 1s ease-out both;
+}
+
+/* shockwave off the rim the instant the wheel locks */
+@keyframes wheel-shock {
+  0% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(1.22); opacity: 0; }
+}
+.wheel-shock {
+  position: absolute;
+  inset: 21px;
+  border-radius: 999px;
+  border: 2px solid rgba(247, 232, 180, 0.85);
+  pointer-events: none;
+  animation: wheel-shock 0.9s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+}
+
+/* --- the hub: a knurled medallion with a sunken face --- */
+.wheel-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 78px;
+  height: 78px;
+  margin: -39px 0 0 -39px;
+  border-radius: 999px;
+  background: conic-gradient(
+    from 0deg,
+    #6b5417, #d7b755 12%, #f7ecc0 18%, #a5842c 30%, #6b5417 44%,
+    #cbaa46 60%, #f3e4ad 70%, #937726 84%, #6b5417
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.9),
+    0 10px 20px -6px rgba(0, 0, 0, 0.9),
+    inset 0 1px 1px rgba(255, 250, 225, 0.5);
+}
+/* knurling — fine milled teeth around the collar */
+.wheel-hub::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(0, 0, 0, 0.42) 0deg 2.5deg,
+    rgba(255, 245, 215, 0.18) 2.5deg 5deg
+  );
+  opacity: 0.55;
+  pointer-events: none;
+}
+.wheel-hub-face {
+  position: absolute;
+  inset: 9px;
+  z-index: 1;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 38% 30%, #241f2b, #09080c 72%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 200, 0.2),
+    inset 0 0 16px rgba(0, 0, 0, 0.95),
+    0 0 0 1px rgba(0, 0, 0, 0.8);
+}
+
+/* the pawl's mount plate throws a hard shadow onto the bezel */
+.wheel-pawl {
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.85));
+}
+
+/* the base-screen card's badge — the same brass, shrunk to 44px, so the entry
+   point looks like the thing it opens */
+.wheel-medallion {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: conic-gradient(
+    from 210deg,
+    #5b4614, #c2a041 14%, #f4e6b0 22%, #96781f 40%,
+    #5b4614 54%, #cbaa46 70%, #f3e4ad 80%, #8a6c22 92%, #5b4614
+  );
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.85),
+    0 4px 10px -3px rgba(0, 0, 0, 0.9),
+    inset 0 1px 1px rgba(255, 248, 220, 0.5);
+}
+.wheel-medallion::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 38% 30%, #211d28, #08080c 74%);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(255, 240, 200, 0.16);
+}
+.wheel-medallion > * {
+  position: relative;
 }
 
 /* result banner pops in with an overshoot */
@@ -679,13 +914,45 @@ body {
   animation: wheel-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-/* confetti particles bursting out of the wheel hub */
-@keyframes wheel-confetti {
-  0% { transform: translate(0, 0) scale(0.6) rotate(0deg); opacity: 1; }
-  100% { transform: translate(var(--dx), var(--dy)) scale(1.15) rotate(var(--rot)); opacity: 0; }
+/* gold dust thrown off the hub on a win — struck sparks with a little gravity
+   in the tail, which is what separates them from confetti */
+@keyframes wheel-spark {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg) scale(0.35); opacity: 0; }
+  12% { opacity: 1; }
+  60% {
+    transform: translate3d(calc(var(--dx) * 0.74), calc(var(--dy) * 0.8), 0)
+      rotate(calc(var(--rot) * 0.6)) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate3d(var(--dx), calc(var(--dy) + 74px), 0) rotate(var(--rot)) scale(0.55);
+    opacity: 0;
+  }
 }
-.wheel-confetti {
-  animation: wheel-confetti 1.1s cubic-bezier(0.1, 0.7, 0.4, 1) both;
+.wheel-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 11px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fff3c8 0%, #e8c260 45%, rgba(196, 150, 46, 0.08) 100%);
+  box-shadow: 0 0 9px rgba(240, 205, 110, 0.9);
+  pointer-events: none;
+  animation: wheel-spark 1.25s cubic-bezier(0.12, 0.68, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-spinning .wheel-sheen {
+    animation: none;
+  }
+  .wheel-spark,
+  .wheel-shock {
+    display: none;
+  }
+  .wheel-face {
+    filter: none !important;
+  }
 }
 
 /* ===== war alerts — live attack/spy/message toasts (WarAlerts.tsx) ===== */
@@ -6707,4 +6974,783 @@ body {
   /* The sparks are pure decoration; with the orbit off they would sit frozen
      mid-arc, so they simply do not appear. */
   .medal-spark { display: none; }
+}
+
+/* =========================================================================
+   Mini-games — the two boards that drop into MiniGamePanel.
+
+   Unlayered like the rest of this file, so every rule here beats a Tailwind
+   utility of the same property. The call sites therefore style only what is
+   NOT claimed below (spacing around the stage, text colour on the copy) — the
+   cup and the vault own their own geometry outright.
+   ========================================================================= */
+
+/* ---------------------------- מצא את הכדור ------------------------------ */
+
+.cups-stage {
+  position: relative;
+  padding: 1.1rem 0.5rem 0;
+  perspective: 700px;
+}
+.cups-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  /* Never wraps: the table below is one strip, so a second row of cups would
+     stand on nothing. Six cups on a 390px screen shrink to fit instead. */
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(0.4rem, 2.5vw, 1.35rem);
+}
+
+/* The one-off shuffle when the player first meets the cups. Purely theatre —
+   the answer was drawn server-side at release — so it is short, and it is the
+   whole row that animates rather than each cup racing its neighbour. */
+.cups-row.is-shuffling .cup-art {
+  animation: cup-shuffle 1.5s cubic-bezier(0.45, 0, 0.55, 1) 1 both;
+  animation-delay: calc(var(--i) * 40ms);
+}
+@keyframes cup-shuffle {
+  0%, 100% { transform: translateX(0) translateY(0) rotate(0deg); }
+  18% { transform: translateX(calc(var(--dir) * 55%)) translateY(-0.55rem) rotate(calc(var(--dir) * -7deg)); }
+  40% { transform: translateX(calc(var(--dir) * -55%)) translateY(-0.35rem) rotate(calc(var(--dir) * 7deg)); }
+  62% { transform: translateX(calc(var(--dir) * 45%)) translateY(-0.55rem) rotate(calc(var(--dir) * -5deg)); }
+  84% { transform: translateX(0) translateY(-0.2rem) rotate(0deg); }
+}
+
+.cup {
+  position: relative;
+  /* Shares the row evenly and shrinks with it, capped so three cups on a wide
+     panel do not turn into three billboards. */
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 4.6rem;
+  aspect-ratio: 4 / 5;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.cup:disabled { cursor: default; }
+/* The cup art, which is what actually lifts — the ball and the shadow stay
+   behind on the table. The lift is the whole reveal, so it gets a spring rather
+   than a linear ease: a cup that rises and settles reads as a hand lifting it. */
+.cup-art {
+  position: absolute;
+  inset: 0;
+  transition: transform 0.45s cubic-bezier(0.34, 1.4, 0.64, 1), filter 0.3s ease;
+}
+.cup:not(:disabled):hover .cup-art { transform: translateY(-0.4rem); }
+.cup:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 4px;
+  border-radius: 0.5rem;
+}
+
+/* --- the cup itself: an upturned tumbler, wide at the mouth --- */
+.cup-body {
+  position: absolute;
+  inset: 12% 0 8%;
+  clip-path: polygon(19% 0, 81% 0, 100% 100%, 0 100%);
+  background:
+    linear-gradient(
+      100deg,
+      #4b3a15 0%,
+      #8d7029 12%,
+      #d9b74f 30%,
+      #f6e6ac 42%,
+      #c7a341 56%,
+      #7d6124 74%,
+      #a8873a 90%,
+      #4b3a15 100%
+    );
+  box-shadow: inset 0 -0.5rem 0.9rem rgba(0, 0, 0, 0.45);
+}
+.cup-shine {
+  position: absolute;
+  top: 8%;
+  left: 27%;
+  width: 14%;
+  height: 78%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 250, 224, 0.75), rgba(255, 250, 224, 0));
+  filter: blur(1px);
+}
+/* The closed base, now facing up. */
+.cup-base {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  width: 64%;
+  height: 0.62rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f2dfa2, #b8942f 55%, #6d5520);
+}
+/* The mouth, resting on the table — the dark ellipse the ball hides under. */
+.cup-mouth {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  width: 102%;
+  height: 0.8rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 35%, #1a1509, #060505 70%);
+  box-shadow: inset 0 0.1rem 0 rgba(228, 195, 90, 0.45);
+}
+.cup-shadow {
+  position: absolute;
+  bottom: -0.15rem;
+  left: 50%;
+  width: 108%;
+  height: 0.7rem;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.65), transparent 72%);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* --- the ball, sitting on the table under the winning cup --- */
+.cup-ball {
+  position: absolute;
+  bottom: 0.05rem;
+  left: 50%;
+  width: 44%;
+  aspect-ratio: 1;
+  transform: translateX(-50%) scale(0);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fffdf2, #ffe9a8 32%, #e0b23f 62%, #7d5f1c);
+  box-shadow: 0 0 1.4rem rgba(228, 195, 90, 0.85), 0 0.15rem 0.3rem rgba(0, 0, 0, 0.6);
+  animation: cup-ball-in 0.5s 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes cup-ball-in {
+  from { transform: translateX(-50%) scale(0); }
+  to { transform: translateX(-50%) scale(1); }
+}
+
+/* --- a lifted, empty cup --- */
+.cup[data-state="tried"] .cup-art {
+  transform: translateY(-1.5rem) rotate(-14deg);
+  filter: grayscale(0.55) brightness(0.62);
+}
+.cup[data-state="tried"] .cup-shadow {
+  opacity: 0.35;
+  transform: translateX(-50%) scale(0.82);
+}
+.cup-empty {
+  /* Sits in the gap the lifted cup left behind, not below the table it stands
+     on — the table strip starts immediately under this box. */
+  position: absolute;
+  bottom: 0.55rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #a1424b;
+  opacity: 0;
+  transition: opacity 0.3s 0.25s ease;
+}
+.cup[data-state="tried"] .cup-empty { opacity: 1; }
+
+/* --- the cup that had the ball: lifted highest, kept lit --- */
+.cup[data-state="hit"] .cup-art {
+  transform: translateY(-2.6rem) rotate(-20deg);
+  filter: drop-shadow(0 0 0.7rem rgba(228, 195, 90, 0.6));
+}
+.cup[data-state="hit"] .cup-shadow { opacity: 0.45; }
+
+/* --- the table the cups stand on --- */
+.cups-table {
+  position: relative;
+  height: 0.85rem;
+  margin-top: -0.3rem;
+  border-radius: 0.3rem;
+  background: linear-gradient(180deg, #3a2a17, #241a0e 55%, #14100a);
+  box-shadow:
+    inset 0 1px 0 rgba(228, 195, 90, 0.28),
+    0 0.5rem 1.2rem rgba(0, 0, 0, 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cups-row.is-shuffling .cup,
+  .cup-ball { animation: none; }
+  .cup-ball { transform: translateX(-50%) scale(1); }
+}
+
+/* ----------------------------- פריצת הכספת ------------------------------ */
+
+.safe-stage {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: 1rem;
+  padding-top: 0.35rem;
+}
+@media (min-width: 640px) {
+  .safe-stage {
+    /* The door is fixed-width art; the controls take whatever is left, and
+       `minmax(0,1fr)` is what stops a long attempt log from pushing the grid
+       wider than the panel. */
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    justify-items: stretch;
+  }
+}
+
+/* --- the vault door --- */
+.safe-door {
+  position: relative;
+  width: 9.5rem;
+  height: 9.5rem;
+  flex: none;
+  perspective: 620px;
+}
+/* What is behind the door — only ever seen through an opened one. */
+.safe-vault {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  background: radial-gradient(circle at 50% 45%, #6b5217, #241a08 70%, #0a0805);
+  box-shadow: inset 0 0 2.2rem rgba(0, 0, 0, 0.9);
+}
+.safe-loot {
+  font-size: 2.6rem;
+  filter: drop-shadow(0 0 1rem rgba(228, 195, 90, 0.75));
+  opacity: 0;
+  transition: opacity 0.4s 0.5s ease;
+}
+.safe-door.is-open .safe-loot { opacity: 1; }
+
+/* The door leaf. Hinged on the right, because the panel is RTL and a door that
+   swings away from the reading direction covers the log it sits beside. */
+.safe-plate {
+  position: absolute;
+  inset: 0;
+  transform-origin: right center;
+  transform: rotateY(0deg);
+  transition: transform 0.9s cubic-bezier(0.45, 0.05, 0.2, 1);
+  border-radius: 0.9rem;
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.16), transparent 55%),
+    linear-gradient(150deg, #55575d 0%, #33353a 30%, #4b4d53 52%, #26282c 78%, #3d3f45 100%);
+  box-shadow:
+    inset 0 0 0 2px rgba(228, 195, 90, 0.35),
+    inset 0 0 2.5rem rgba(0, 0, 0, 0.55),
+    0 0.7rem 1.6rem rgba(0, 0, 0, 0.6);
+}
+/* Swings AWAY from the viewer, never toward. A leaf hinged on the right and
+   pulled forward is magnified by the perspective — it grows taller than the
+   frame it lives in and spills over the panel's own edge. Sent backwards it is
+   foreshortened instead, so the whole door stays inside its box, and past 90°
+   the far edge would cross back over the hinge and start protruding again. */
+.safe-door.is-open .safe-plate {
+  transform: rotateY(-72deg);
+  filter: brightness(0.72);
+}
+
+/* Rivets, laid out as one repeating ring rather than eight elements. */
+.safe-rivets {
+  position: absolute;
+  inset: 0.45rem;
+  border-radius: 0.7rem;
+  background:
+    radial-gradient(circle at 8% 8%, #d9c99a 0 0.16rem, transparent 0.17rem),
+    radial-gradient(circle at 92% 8%, #d9c99a 0 0.16rem, transparent 0.17rem),
+    radial-gradient(circle at 8% 92%, #d9c99a 0 0.16rem, transparent 0.17rem),
+    radial-gradient(circle at 92% 92%, #d9c99a 0 0.16rem, transparent 0.17rem),
+    radial-gradient(circle at 50% 4%, #b8a778 0 0.13rem, transparent 0.14rem),
+    radial-gradient(circle at 50% 96%, #b8a778 0 0.13rem, transparent 0.14rem);
+  opacity: 0.85;
+}
+
+/* --- the dial, wound one notch per attempt --- */
+.safe-dial {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4.6rem;
+  height: 4.6rem;
+  margin: -2.3rem 0 0 -2.3rem;
+  border-radius: 50%;
+  /* 47° is deliberately not a factor of 360: successive attempts never land the
+     dial back on a position it has already shown. */
+  transform: rotate(calc(var(--turn) * 47deg));
+  transition: transform 0.7s cubic-bezier(0.34, 1.3, 0.64, 1);
+  background: conic-gradient(from 0deg, #6f7178, #babdc4 12%, #6f7178 25%, #babdc4 37%, #6f7178 50%, #babdc4 62%, #6f7178 75%, #babdc4 87%, #6f7178 100%);
+  box-shadow: 0 0.25rem 0.6rem rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+.safe-dial-face {
+  position: absolute;
+  inset: 0.55rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #f0e3b4, #c4a032 55%, #6b5217);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+}
+.safe-dial-mark {
+  position: absolute;
+  top: 0.18rem;
+  left: 50%;
+  width: 0.2rem;
+  height: 0.75rem;
+  margin-left: -0.1rem;
+  border-radius: 999px;
+  background: #ffe9a8;
+  box-shadow: 0 0 0.4rem rgba(255, 233, 168, 0.8);
+}
+.safe-handle {
+  position: absolute;
+  top: 50%;
+  left: 0.55rem;
+  width: 0.55rem;
+  height: 2.1rem;
+  margin-top: -1.05rem;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #e2d3a4, #9c8442 50%, #5d4c1d);
+  box-shadow: 0 0.2rem 0.4rem rgba(0, 0, 0, 0.6);
+}
+
+/* --- the keypad --- */
+.safe-controls {
+  width: 100%;
+  min-width: 0;
+}
+.safe-slots {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+}
+.safe-slot {
+  width: 2.75rem;
+  height: 3.4rem;
+  flex: none;
+  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: #ffe9a8;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(228, 195, 90, 0.4);
+  /* Brushed-brass wheel, so an empty slot still reads as part of the lock
+     rather than as a blank form field. */
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.55), transparent 22%, transparent 78%, rgba(0, 0, 0, 0.55)),
+    linear-gradient(100deg, #2b2519, #4a3f22 45%, #332c1c);
+  box-shadow: inset 0 0 0.9rem rgba(0, 0, 0, 0.7);
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.safe-slot:focus {
+  border-color: var(--gold-bright);
+  box-shadow: inset 0 0 0.9rem rgba(0, 0, 0, 0.7), 0 0 0.9rem rgba(228, 195, 90, 0.4);
+}
+.safe-slot:disabled { opacity: 0.55; }
+/* The wheels a solved player is left looking at: the code they cracked, lit. */
+.safe-slot.is-cracked {
+  opacity: 1;
+  color: #6ee7b7;
+  border-color: rgba(52, 211, 153, 0.7);
+  box-shadow: inset 0 0 0.9rem rgba(0, 0, 0, 0.7), 0 0 0.9rem rgba(52, 211, 153, 0.3);
+}
+
+/* --- the attempt log: the actual playing surface --- */
+.safe-log {
+  margin-top: 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 0.6rem;
+}
+.safe-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.25rem 0.85rem;
+  font-size: 0.66rem;
+  color: #8b8474;
+}
+.safe-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.safe-pip {
+  width: 0.6rem;
+  height: 0.6rem;
+  flex: none;
+  border-radius: 50%;
+}
+.safe-log-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: 0.35rem;
+}
+.safe-log-n {
+  width: 1.1rem;
+  text-align: center;
+  font-size: 0.62rem;
+  color: #5f5a50;
+}
+.safe-log-digit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+/* The three marks. Never colour alone: a hit is also ringed and a miss is also
+   faded, so the log survives a red-green colour deficiency. */
+.mark-hit {
+  background: rgba(16, 185, 129, 0.24);
+  color: #6ee7b7;
+  box-shadow: inset 0 0 0 2px rgba(52, 211, 153, 0.85);
+}
+.mark-near {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  box-shadow: inset 0 0 0 2px rgba(251, 191, 36, 0.55);
+}
+.mark-miss {
+  background: rgba(255, 255, 255, 0.045);
+  color: #6b6459;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+.safe-pip.mark-hit,
+.safe-pip.mark-near,
+.safe-pip.mark-miss { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.35); }
+.safe-pip.mark-hit { background: #34d399; }
+.safe-pip.mark-near { background: #fbbf24; }
+.safe-pip.mark-miss { background: #4b463e; }
+
+@media (prefers-reduced-motion: reduce) {
+  .safe-plate,
+  .safe-dial,
+  .safe-loot { transition: none; }
+}
+
+/* ============================================================================
+   Happy Hour — the global boost window
+   ============================================================================
+   Two pieces of theatre, deliberately unequal:
+
+   • the TAKEOVER, shown once per release, is allowed to be obnoxious — it stops
+     the game for four seconds, throws a shockwave and a rain of embers, and
+     lands one enormous number. Being missed is the only way it can fail.
+   • the BANNER, which then rides above every screen for the rest of the window,
+     has to survive being looked at for an hour: it burns and sweeps, but it
+     never moves the layout and never re-fires.
+
+   Every animation here is switched off wholesale under prefers-reduced-motion
+   at the foot of this block; the banner keeps its colour and its countdown, so
+   nothing that carries meaning is animation-only.
+   ============================================================================ */
+
+/* ------------------------------ the banner ------------------------------ */
+
+.hh-banner {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(228, 195, 90, 0.55);
+  background:
+    radial-gradient(120% 160% at 50% -40%, rgba(255, 214, 102, 0.28), transparent 62%),
+    linear-gradient(100deg, #2a1a05 0%, #4a2f08 26%, #6b4508 50%, #4a2f08 74%, #2a1a05 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 34px -8px rgba(244, 196, 74, 0.7),
+    inset 0 1px 0 rgba(255, 231, 163, 0.28);
+  animation: hh-banner-in 0.6s cubic-bezier(0.22, 1.4, 0.5, 1) both;
+}
+
+@keyframes hh-banner-in {
+  0% { opacity: 0; transform: translateY(-14px) scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* The molten glow underneath, breathing. Its own layer so the sweep above can
+   run at a different rate without the two beating against each other. */
+.hh-banner::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: radial-gradient(closest-side, rgba(255, 188, 60, 0.22), transparent 68%);
+  animation: hh-pulse 3.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Kept well below full strength on purpose. Earlier it peaked near opaque, and
+   a gold banner glowing gold behind gold text left the subtitle unreadable at
+   the top of every screen for an hour. */
+@keyframes hh-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.92); }
+  50% { opacity: 0.7; transform: scale(1.06); }
+}
+
+/* The sheen that keeps crossing it — the one thing that says "live" from the
+   corner of an eye while you are reading something else on the page. */
+.hh-banner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 45%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(255, 245, 214, 0.32) 45%,
+    rgba(255, 255, 255, 0.5) 50%,
+    rgba(255, 245, 214, 0.32) 55%,
+    transparent
+  );
+  filter: blur(2px);
+  animation: hh-sweep 2.8s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hh-sweep {
+  0% { left: -50%; }
+  100% { left: 105%; }
+}
+
+/* The multiplier itself: engraved gold, big enough to read from the doorway. */
+.hh-mult {
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #fff6d5 0%, #f7d774 38%, #c98d16 72%, #ffe9a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 2px 18px rgba(255, 190, 60, 0.45);
+  animation: hh-mult-throb 1.6s ease-in-out infinite;
+}
+
+@keyframes hh-mult-throb {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 8px rgba(255, 190, 60, 0.4)); }
+  50% { transform: scale(1.06); filter: drop-shadow(0 0 20px rgba(255, 208, 92, 0.85)); }
+}
+
+/* One boosted rule, as a chip. */
+.hh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 224, 138, 0.5);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.25rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #ffe9a8;
+  white-space: nowrap;
+}
+
+/* Embers drifting up the banner. Purely decorative, aria-hidden in the markup. */
+.hh-ember {
+  position: absolute;
+  bottom: -8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #ffd166;
+  box-shadow: 0 0 8px 2px rgba(255, 196, 70, 0.8);
+  animation: hh-ember-rise linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hh-ember-rise {
+  0% { opacity: 0; transform: translateY(0) scale(0.6); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-140px) scale(1.25); }
+}
+
+/* ------------------------------ the takeover ------------------------------ */
+
+.hh-takeover {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: radial-gradient(circle at 50% 45%, rgba(60, 34, 2, 0.9), rgba(0, 0, 0, 0.94) 70%);
+  animation: hh-takeover-in 0.35s ease-out both;
+}
+
+.hh-takeover[data-leaving="true"] {
+  animation: hh-takeover-out 0.45s ease-in both;
+}
+
+@keyframes hh-takeover-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes hh-takeover-out {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* God rays behind the number, turning slowly. A conic gradient rather than N
+   absolutely-positioned beams: one element, one compositor layer. */
+.hh-rays {
+  position: absolute;
+  /* Pinned to the middle of the screen, not to the flex line: an absolutely
+     positioned child of a flex container falls back to its *static* position,
+     which for something this much larger than the box is nowhere near centre —
+     the beams ended up fanning out of one corner. */
+  top: 50%;
+  left: 50%;
+  width: 190vmax;
+  height: 190vmax;
+  margin: -95vmax 0 0 -95vmax;
+  /* Repeating, not a plain conic: a conic-gradient holds its last stop all the
+     way round to 360°, so a hand-written sector produced beams in one quadrant
+     and dead space everywhere else. This lays the same wedge sixteen times. */
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 205, 90, 0.16) 0deg 5deg,
+    transparent 5deg 11deg,
+    rgba(255, 205, 90, 0.09) 11deg 14deg,
+    transparent 14deg 22.5deg
+  );
+  /* Hollow at the centre as well as faded at the rim: the beams converge on the
+     multiplier, and without the hole they converge *over* it and the one number
+     this whole screen exists to show competes with its own decoration. */
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent 5%,
+    #000 24%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(closest-side, transparent 5%, #000 24%, transparent 70%);
+  animation: hh-rays-spin 24s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hh-rays-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The ring that punches outward on the first frame — the "boom". */
+.hh-shock {
+  position: absolute;
+  /* Same centring rule as .hh-rays — the ring has to leave from under the
+     number, not from wherever the flex line happened to put it. */
+  top: 50%;
+  left: 50%;
+  width: min(28rem, 90vw);
+  height: min(28rem, 90vw);
+  margin: calc(min(28rem, 90vw) / -2) 0 0 calc(min(28rem, 90vw) / -2);
+  border-radius: 999px;
+  border: 3px solid rgba(255, 214, 110, 0.85);
+  animation: hh-shock-out 1.1s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+  pointer-events: none;
+}
+
+.hh-shock--second {
+  animation-delay: 0.22s;
+  border-width: 2px;
+}
+
+@keyframes hh-shock-out {
+  0% { opacity: 0.95; transform: scale(0.15); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+/* The number lands hard, then settles. */
+.hh-takeover-mult {
+  font-weight: 900;
+  line-height: 0.85;
+  font-size: clamp(5.5rem, 26vw, 15rem);
+  letter-spacing: -0.05em;
+  background: linear-gradient(180deg, #fffbe9 0%, #ffe08a 32%, #e2a715 66%, #fff2c4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 34px rgba(255, 184, 46, 0.75));
+  animation: hh-slam 0.75s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+@keyframes hh-slam {
+  0% { opacity: 0; transform: scale(2.6); filter: blur(14px); }
+  60% { opacity: 1; transform: scale(0.94); filter: blur(0); }
+  100% { transform: scale(1); }
+}
+
+/* Title, chips and the dismiss all rise in behind the number, staggered by an
+   inline --hh-delay so the eye is led down the card instead of hit at once. */
+.hh-rise {
+  animation: hh-rise-in 0.5s cubic-bezier(0.22, 1.3, 0.5, 1) both;
+  animation-delay: var(--hh-delay, 0s);
+}
+
+@keyframes hh-rise-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Falling embers over the whole takeover. */
+.hh-spark {
+  position: absolute;
+  top: -6vh;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ffd166;
+  box-shadow: 0 0 12px 3px rgba(255, 190, 60, 0.7);
+  animation: hh-spark-fall linear infinite;
+  pointer-events: none;
+}
+
+@keyframes hh-spark-fall {
+  0% { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(112vh) rotate(420deg); }
+}
+
+/* ------------------------------ the admin preview ------------------------------ */
+
+.hh-admin-preview {
+  border: 1px solid rgba(228, 195, 90, 0.45);
+  background:
+    radial-gradient(120% 150% at 50% -30%, rgba(255, 210, 96, 0.22), transparent 60%),
+    linear-gradient(160deg, #241704, #3d2606);
+}
+
+.hh-admin-mult {
+  font-size: clamp(3rem, 12vw, 5rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  background: linear-gradient(180deg, #fff6d5, #f7d774 40%, #c98d16 75%, #ffe9a8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hh-banner,
+  .hh-banner::before,
+  .hh-banner::after,
+  .hh-mult,
+  .hh-ember,
+  .hh-takeover,
+  .hh-rays,
+  .hh-shock,
+  .hh-takeover-mult,
+  .hh-rise,
+  .hh-spark {
+    animation: none;
+  }
+  /* The decorations exist only as motion; without it they are noise. */
+  .hh-ember,
+  .hh-spark,
+  .hh-shock { display: none; }
 }

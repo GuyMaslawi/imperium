@@ -6,6 +6,12 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { LabeledInput, ResourceFieldLabel } from "@/components/admin/fields";
 import { Icon } from "@/components/ui/Icon";
+import {
+  CUPS_MIN,
+  CUPS_MAX,
+  SAFE_DIGITS_MIN,
+  SAFE_DIGITS_MAX,
+} from "@/lib/game/minigame";
 import type { AdminActionState } from "@/server/actions/admin";
 
 type Action = (
@@ -14,8 +20,8 @@ type Action = (
 ) => Promise<AdminActionState>;
 
 const TYPES: { value: MiniGameType; label: string; icon: string; hint: string }[] = [
-  { value: "GUESS_NUMBER", label: "נחש את המספר", icon: "🔢", hint: "השחקנים מנחשים מספר בטווח" },
-  { value: "FIND_BALL", label: "מצא את הכדור", icon: "🔮", hint: "השחקנים בוחרים כוס אחת" },
+  { value: "FIND_BALL", label: "מצא את הכדור", icon: "🥤", hint: "מרימים כוס ומקווים לטוב" },
+  { value: "CRACK_SAFE", label: "פריצת הכספת", icon: "🔐", hint: "מפצחים קוד סודי לפי רמזים" },
 ];
 
 const PRIZE_FIELDS = [
@@ -36,7 +42,7 @@ const PRIZE_FIELDS = [
  */
 export function MiniGameCreator({ action }: { action: Action }) {
   const [state, formAction] = useActionState<AdminActionState, FormData>(action, {});
-  const [type, setType] = useState<MiniGameType>("GUESS_NUMBER");
+  const [type, setType] = useState<MiniGameType>("FIND_BALL");
   const meta = TYPES.find((t) => t.value === type)!;
 
   return (
@@ -89,14 +95,29 @@ export function MiniGameCreator({ action }: { action: Action }) {
       </div>
 
       {/* Type-specific config */}
-      {type === "GUESS_NUMBER" ? (
+      {type === "FIND_BALL" ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          <LabeledInput label="מינימום" name="min" type="number" defaultValue={1} />
-          <LabeledInput label="מקסימום" name="max" type="number" defaultValue={100} />
+          <LabeledInput
+            label="מספר כוסות"
+            name="cups"
+            type="number"
+            min={CUPS_MIN}
+            max={CUPS_MAX}
+            defaultValue={3}
+            hint={`${CUPS_MIN}–${CUPS_MAX} · יותר כוסות = סיכוי נמוך יותר`}
+          />
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
-          <LabeledInput label="מספר כוסות" name="cups" type="number" min={2} defaultValue={3} hint="2–6" />
+          <LabeledInput
+            label="אורך הקוד"
+            name="digits"
+            type="number"
+            min={SAFE_DIGITS_MIN}
+            max={SAFE_DIGITS_MAX}
+            defaultValue={3}
+            hint={`${SAFE_DIGITS_MIN}–${SAFE_DIGITS_MAX} ספרות · 4 ומעלה דורש הרבה ניסיונות`}
+          />
         </div>
       )}
 

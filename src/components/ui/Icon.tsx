@@ -7,6 +7,7 @@ import {
   GiScrollUnfurled, GiEnvelope, GiGears, GiExitDoor, GiCrown,
   GiRollingDices, GiShoppingBag, GiPresent, GiSparkles,
   GiHeartInside, GiHealthPotion, GiCompass, GiTalk,
+  GiPadlock, GiPadlockOpen, GiCheckMark, GiLaurelCrown,
 } from "react-icons/gi";
 
 /**
@@ -23,7 +24,11 @@ export type IconName =
   | "bank" | "storage" | "upgrades" | "guild" | "hero" | "rankings"
   | "achievements" | "reports" | "messages" | "settings" | "logout"
   | "crown" | "dice" | "wheel" | "shop" | "gift" | "spark" | "heart" | "potion"
-  | "quest" | "chat";
+  | "quest" | "chat"
+  /* status glyphs — these replace the 🔒 / ✅ emoji that had crept into the
+     reward ladders, which render differently on every platform and cannot take
+     a design token's color. */
+  | "lock" | "unlocked" | "check" | "laurel";
 
 /**
  * The one glyph game-icons.net doesn't carry: a carnival prize wheel — a
@@ -80,6 +85,10 @@ const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   potion: GiHealthPotion,
   quest: GiCompass,
   chat: GiTalk,
+  lock: GiPadlock,
+  unlocked: GiPadlockOpen,
+  check: GiCheckMark,
+  laurel: GiLaurelCrown,
 };
 
 export function Icon({

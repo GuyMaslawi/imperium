@@ -8,6 +8,7 @@ import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { lastDailyUpdate, nextDailyUpdate } from "@/lib/game/time";
 import {
+  SEASON_PASS_HAUL_ORDER as HAUL_ORDER,
   SEASON_PASS_PREMIUM_PRICE,
   SEASON_PASS_REWARD_LABEL,
   SEASON_PASS_TIERS,
@@ -111,11 +112,28 @@ async function loadCycle(
 
 /* ------------------------------ read model ------------------------------ */
 
+/**
+ * One rung of the ladder as the client sees it.
+ *
+ * `amount` is carried alongside the ready-made `label` on purpose: the modal
+ * has to *add rewards up* — what a claim is about to pay, what the whole cycle
+ * is worth, what the gold track would add on top — and totalling parsed-back
+ * Hebrew strings ("1,470 זהב") is not something a UI should be doing.
+ */
 export interface SeasonPassTierView {
   tier: number;
   reached: boolean;
-  free: { kind: SeasonPassRewardKind; label: string; claimed: boolean };
-  premium: { kind: SeasonPassRewardKind; label: string; claimed: boolean };
+  free: SeasonPassRewardView;
+  premium: SeasonPassRewardView;
+}
+
+export interface SeasonPassRewardView {
+  kind: SeasonPassRewardKind;
+  /** Quantity at the current season day — already grown and rounded. */
+  amount: number;
+  /** The same quantity rendered for display, e.g. "1,470 זהב". */
+  label: string;
+  claimed: boolean;
 }
 
 export interface SeasonPassState {
@@ -145,10 +163,19 @@ export interface SeasonPassState {
   tiers: SeasonPassTierView[];
 }
 
-/** Human label for a reward at a given season day, e.g. "12,500 זהב". */
-function rewardLabel(reward: SeasonPassReward, day: number): string {
+/** A reward priced at `day`, as both a number and a display string. */
+function rewardView(
+  reward: SeasonPassReward,
+  day: number,
+  claimed: boolean
+): SeasonPassRewardView {
   const amount = seasonPassRewardAmount(reward, day);
-  return `${heNum(amount)} ${SEASON_PASS_REWARD_LABEL[reward.kind]}`;
+  return {
+    kind: reward.kind,
+    amount,
+    label: `${heNum(amount)} ${SEASON_PASS_REWARD_LABEL[reward.kind]}`,
+    claimed,
+  };
 }
 
 function buildState(
@@ -165,16 +192,8 @@ function buildState(
   const tiers = SEASON_PASS_TIERS.map((t) => ({
     tier: t.tier,
     reached: t.tier <= level,
-    free: {
-      kind: t.free.kind,
-      label: rewardLabel(t.free, day),
-      claimed: claimedFree.has(t.tier),
-    },
-    premium: {
-      kind: t.premium.kind,
-      label: rewardLabel(t.premium, day),
-      claimed: claimedPremium.has(t.tier),
-    },
+    free: rewardView(t.free, day, claimedFree.has(t.tier)),
+    premium: rewardView(t.premium, day, claimedPremium.has(t.tier)),
   }));
 
   const collectable = tiers.filter(
@@ -386,16 +405,6 @@ async function grantReward(
   }
   return amount;
 }
-
-/** Canonical display order for a haul, so two claims never reshuffle the chips. */
-const HAUL_ORDER: SeasonPassRewardKind[] = [
-  "gold",
-  "wood",
-  "iron",
-  "stone",
-  "turns",
-  "citizens",
-];
 
 /**
  * Collect every unlocked, unclaimed reward on both tracks.

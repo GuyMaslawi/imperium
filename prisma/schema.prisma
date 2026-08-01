@@ -131,14 +131,14 @@ model GameConfig {
 }
 
 enum MiniGameType {
-  GUESS_NUMBER
   FIND_BALL
+  CRACK_SAFE
 }
 
-/// An admin-authored mini-game event (guess-the-number / find-the-ball). When
+/// An admin-authored mini-game event (find-the-ball / crack-the-safe). When
 /// `isActive`, it shows as a big panel at the top of every player's screen and
 /// grants the prize bundle to winners. `config` holds the secret answer +
-/// public params ({min,max,answer} or {cups,answer}) — never send answer to
+/// public params ({cups,answer} or {digits,code}) — never send answer/code to
 /// the client.
 model MiniGameEvent {
   id           String       @id @default(cuid())
@@ -186,6 +186,12 @@ model MiniGameEntry {
   solved    Boolean   @default(false)
   won       Boolean   @default(false)
   wonAt     DateTime?
+  /// This player's own attempt log, capped at the most recent few — the board
+  /// a cracked-safe player reasons over, and what keeps a lifted cup lifted
+  /// across a reload. Rows are `{kind:"cup"|"code", ...}`; see
+  /// MiniGameHistoryRow in src/lib/game/minigame.ts. Private to its owner: the
+  /// public rival board never carries it.
+  guesses   Json      @default("[]")
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -193,6 +199,46 @@ model MiniGameEntry {
 
   @@unique([eventId, empireId])
   @@index([eventId])
+}
+
+/// Happy Hour — a global, admin-released window in which the same bonus is paid
+/// to every player at once: battle XP, plunder (from raids *and* from city
+/// bosses) and mine output are each multiplied by `1 + bonusPct/100`.
+///
+/// At most one window is live at a time (releasing one closes the rest). The
+/// window is enforced on read against `startsAt`/`endsAt` — nothing runs on a
+/// schedule — so a release ends on time with nobody logged in, exactly like a
+/// potion. Rows are kept after they close: the lazy mine clock has to be able
+/// to look *back* at a window that ended while the player was away and pay the
+/// ticks that fell inside it. See src/lib/game/happyHour.ts.
+model HappyHour {
+  id       String @id @default(cuid())
+  title    String
+  /// Bonus percent on top of the ordinary figure: 100 = double, 900 = ×10.
+  bonusPct Int    @default(100)
+
+  /// Which rules the window bends. All three = "everything is doubled".
+  boostXp      Boolean @default(true)
+  boostPlunder Boolean @default(true)
+  boostMines   Boolean @default(true)
+
+  /// Length of a release in minutes (0 = until the admin stops it). Kept on the
+  /// row so re-releasing reuses the last chosen length.
+  durationMinutes Int     @default(60)
+  isActive        Boolean @default(false)
+
+  startsAt DateTime?
+  /// When the window closes (null = open-ended). Stopping by hand writes `now`
+  /// here too, so a closed window always has a real end for the mine backlog to
+  /// measure against.
+  endsAt   DateTime?
+  endedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([endsAt])
 }
 
 /// Append-only trail of every mutating admin action, for accountability.

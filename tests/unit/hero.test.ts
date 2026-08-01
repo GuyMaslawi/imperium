@@ -19,6 +19,7 @@ import {
   canEquipItem,
   canUpgradeItem,
   damagedHealth,
+  flatCurveGrowth,
   heroPointPool,
   heroPointsHeld,
   heroResetPoints,
@@ -273,13 +274,14 @@ describe("item stats", () => {
   });
 
   it("moves something on every single rung — no upgrade is ever a no-op", () => {
-    // The invariant is about the *item*, not any one line of it. Flat stats
-    // climb with the square of the rung, so on the small-ceilinged ones (turns,
-    // resources) the first few rungs all round to +1 and that line stands still
-    // — the price of not paying a beginner 90 citizens for a level-3 boot. What
-    // must never happen is an upgrade that costs gold and changes nothing, so
-    // every rung has to move at least one line: the percentage extras advance on
-    // each rung, and a resource item also widens its coverage with every tier.
+    // The invariant is about the *item*, not any one line of it. Turns and
+    // citizens climb with a power of the rung, so their first few rungs all
+    // round to +1 and those lines stand still — the price of not paying a
+    // beginner 90 citizens for a level-3 boot. What must never happen is an
+    // upgrade that costs gold and changes nothing, so every rung has to move at
+    // least one line: the percentage extras advance on each rung, the resource
+    // line advances on each rung, and a resource item also widens its coverage
+    // with every tier.
     for (const slot of SLOT_ORDER) {
       for (let i = 1; i < ITEM_LEVELS.length; i++) {
         const before = itemBonusLines(slot, ITEM_LEVELS[i - 1]);
@@ -298,23 +300,35 @@ describe("item stats", () => {
     }
   });
 
-  it("starts every flat stat small enough to make sense at level 1", () => {
-    // The bug this replaced: a level-3 boot paid +90 citizens per daily update
-    // against a base intake of 25. A first-rung item is a rounding error by
-    // design — it is the cheapest thing in the game.
+  it("pays a level-1 resource item enough to notice", () => {
+    // The bug this replaced: the first six rungs paid +1, +5, +11, +20, +31,
+    // +45 resources per regular update. Holding a constant *share* of mine
+    // output sounded principled and played as nothing at all, because a share of
+    // an economy that is itself near zero is near zero. A first-rung item now
+    // out-produces a first-city empire's mine, which is the point of finding it.
     for (const slot of SLOT_ORDER) {
-      for (const stat of ["resources", "turns", "citizens"] as const) {
+      if (!slotGrants(slot, "resources") || !slotStatIsFlat(slot, "resources")) continue;
+      // Even the shallowest extra (נעליים, weight 0.25) clears a mine's own tick.
+      expect(itemStatBonus(slot, 1, "resources")).toBeGreaterThan(300);
+    }
+    expect(itemStatBonus("RELIC", 1, "resources")).toBe(1500);
+  });
+
+  it("keeps citizens and turns small at level 1 — their base does not grow", () => {
+    // These two are measured against a *fixed* intake (the growth building pays
+    // 20 + 10·level per daily update, capped), so gear that started large would
+    // retire the building that exists for the job. They keep the accelerating
+    // power curve and the deliberately low ceiling.
+    for (const slot of SLOT_ORDER) {
+      for (const stat of ["turns", "citizens"] as const) {
         if (!slotGrants(slot, stat)) continue;
-        // Only the slots that actually *pay* flat are bound by the floor —
-        // חרב and מגן pay resources as a percentage, and a first-rung
-        // percentage is genuinely worth a fraction of one (see SlotStatWeight).
-        if (!slotStatIsFlat(slot, stat)) continue;
         expect(itemStatBonus(slot, 1, stat)).toBe(1);
       }
     }
-    // …and the whole first series (levels 1–10) stays inside the same order of
-    // magnitude as the economy a first-city empire actually runs on.
-    expect(itemStatBonus("BOOTS", 10, "citizens")).toBeLessThan(25);
+    // The whole first series (levels 1–10) stays in single digits.
+    expect(itemStatBonus("BOOTS", 10, "citizens")).toBeLessThan(10);
+    // …and the ladder never out-pays the growth building at ten cities (1,020).
+    expect(itemStatBonus("BOOTS", 100, "citizens")).toBeLessThan(1020);
   });
 
   it("grows flat stats faster than linearly, so late gear is worth its price", () => {
@@ -327,6 +341,22 @@ describe("item stats", () => {
       const full = itemStatBonus(slot, 100, stat); // rung 40
       // Four times the rung is far more than four times the bonus.
       expect(full).toBeGreaterThan(quarter * 8);
+    }
+  });
+
+  it("makes every resource upgrade worth the same relative jump", () => {
+    // The geometric curve's whole claim: one upgrade means the same thing on
+    // rung 1 as on rung 39, so gold buys constant value against a price curve
+    // that is itself geometric. Rounding to three significant figures moves each
+    // ratio by a fraction of a percent, hence the band rather than an equality.
+    const growth = flatCurveGrowth("resources")!;
+    expect(flatCurveGrowth("citizens")).toBeNull();
+    for (let i = 1; i < ITEM_LEVELS.length; i++) {
+      const ratio =
+        itemStatBonus("RELIC", ITEM_LEVELS[i], "resources") /
+        itemStatBonus("RELIC", ITEM_LEVELS[i - 1], "resources");
+      expect(ratio).toBeGreaterThan(growth * 0.99);
+      expect(ratio).toBeLessThan(growth * 1.01);
     }
   });
 

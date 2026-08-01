@@ -62,12 +62,16 @@ export function formatCompact(value: number): string {
  *
  * Percentages are no longer whole: an extra on a low-rung item is genuinely
  * worth a quarter of a percent, and it says so. Only the digits that carry
- * information are printed — "+40%", not "+40.00%" — and flat counts, which are
- * always whole, are unaffected by the decimals branch.
+ * information are printed — "+40%", not "+40.00%".
+ *
+ * Flat counts are always whole, so they take the decimals branch never and the
+ * shared number formatting always: a maxed relic pays 350,000,000 resources per
+ * update and has to read as "350M" on a tile the way every other large figure in
+ * the game does. Percentages top out at +40 and so never reach a separator.
  */
 export function formatBonus(value: number): string {
   return Number.isInteger(value)
-    ? String(value)
+    ? formatNumber(value)
     : String(Number(value.toFixed(2)));
 }
 
