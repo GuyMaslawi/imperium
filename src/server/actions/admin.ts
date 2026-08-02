@@ -36,6 +36,7 @@ import {
   CUPS_MAX,
   SAFE_DIGITS_MIN,
   SAFE_DIGITS_MAX,
+  prizeText,
 } from "@/lib/game/minigame";
 import {
   HERO_MAX_HEALTH,
@@ -2887,7 +2888,10 @@ async function activateEvent(
   const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(durationMinutes)));
   const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
 
-  await prisma.$transaction([
+  // The updated row is read back out of the transaction rather than re-fetched:
+  // the prize bundle and the attempt/winner caps live on the event, and the
+  // announcement below has to describe the window that actually went live.
+  const [, , released] = await prisma.$transaction([
     prisma.miniGameEvent.updateMany({ data: { isActive: false } }),
     prisma.miniGameEntry.deleteMany({ where: { eventId: event.id } }),
     prisma.miniGameEvent.update({
@@ -2914,6 +2918,31 @@ async function activateEvent(
   });
   revalidatePath("/admin/minigame");
   revalidatePath("/game", "layout");
+
+  // Announced for the same reason a Happy Hour is: a mini-game is a race with a
+  // deadline and a capped number of winners, and a player who hears about it
+  // afterwards never had a chance at it. Outside the transaction and after the
+  // revalidate — Discord must never be able to fail a release that has already
+  // committed. Same channel voice as the other posts: prize first, deadline
+  // second, flavour last.
+  const meta = MINIGAME_TYPE_META[event.type];
+  const limits = [
+    `${released.maxAttempts} ניסיונות לכל אחד`,
+    released.maxWinners > 0 ? `${released.maxWinners} זוכים בלבד` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  await announceToDiscord({
+    kind: "event",
+    title: `${meta.icon} ${released.title} — באוויר`,
+    body:
+      `🎁 בפרס: ${prizeText(released)}\n` +
+      `${limits}\n` +
+      (minutes > 0
+        ? `נסגר בעוד ${minutes} דק׳ — מי שראשון, לוקח.`
+        : "רץ עד שנגיד סטופ."),
+    url: gameLink("/game/base"),
+  });
 }
 
 /** Create a new mini-game with a preset prize (optionally launch it at once). */
@@ -3146,9 +3175,16 @@ async function releaseHappyHour(
     released.boostPlunder ? "לוט" : null,
     released.boostMines ? "מכרות" : null,
   ].filter(Boolean).join(" · ");
+  // The admin's own title only earns a place in the headline when it says
+  // something "HAPPY HOUR" does not. A window called plainly "Happy Hour" — the
+  // common case — otherwise posts as "HAPPY HOUR ×2 — Happy Hour".
+  const named = released.title.trim();
+  const generic = /^happy\s*hour$/i.test(named) || named === "שעת זהב" || named === "";
   await announceToDiscord({
     kind: "event",
-    title: `🔥 HAPPY HOUR ${multiplierLabel(released.bonusPct)} — ${released.title}`,
+    title:
+      `🔥 HAPPY HOUR ${multiplierLabel(released.bonusPct)}` +
+      (generic ? "" : ` — ${named}`),
     body:
       `${effects} ${multiplierLabel(released.bonusPct)} לכולם. 🚀\n` +
       (minutes > 0
