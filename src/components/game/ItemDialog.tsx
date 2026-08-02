@@ -14,6 +14,7 @@ import {
 } from "@/server/actions/hero";
 import type { ActionState } from "@/server/actions/game";
 import { FORGE_DISCOUNT_PCT, forgeDiscountedCost } from "@/lib/game/potions";
+import { itemSetForLevel } from "@/lib/game/heroSets";
 import {
   HERO_STAT_META,
   RARITY_META,
@@ -151,6 +152,9 @@ export function ItemDialog({
             {" · "}רמת פריט:{" "}
             <span className="nums text-zinc-200">{level}</span>
           </p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            סט: <span className="text-zinc-300">{itemSetForLevel(level).label}</span>
+          </p>
         </div>
         <button
           onClick={onClose}
@@ -225,6 +229,15 @@ export function ItemDialog({
               <span className="nums" dir="ltr">{upgradeToLevel}</span> · {RARITY_META[nextTier].label}
             </span>
           </div>
+          {/* the one upgrade in each decade that also changes how the piece looks */}
+          {itemSetForLevel(upgradeToLevel).index !== itemSetForLevel(level).index && (
+            <div className="mt-1 flex items-center justify-between">
+              <span className="text-zinc-500">סט חדש</span>
+              <span className="font-black text-gold-bright">
+                {itemSetForLevel(upgradeToLevel).label} ✦
+              </span>
+            </div>
+          )}
           <div className="mt-1 flex items-center justify-between">
             <span className="text-zinc-500">בונוס לאחר שדרוג</span>
             <span className="nums font-bold text-emerald-300" dir="ltr">

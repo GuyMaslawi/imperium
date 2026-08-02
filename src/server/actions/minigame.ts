@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { MiniGameEvent, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { POLL_LIMIT, POLL_WINDOW_MS, localRateLimit } from "@/lib/rateLimit";
 import { grantCitizens } from "@/lib/game/grants";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import {
@@ -161,6 +162,37 @@ export async function getMiniGameState(): Promise<MiniGameState | null> {
   } catch {
     return null;
   }
+}
+
+/** What the panel's poll gets back. Mirrors `pollBossArena`'s shape. */
+export interface MiniGamePoll {
+  state?: MiniGameState | null;
+  /** Nothing was learned this round; ask again, change nothing. */
+  retry?: boolean;
+}
+
+/**
+ * The panel's polled read — `getMiniGameState` with a ceiling on it.
+ *
+ * The panel is mounted in the game layout, so this runs on every screen for
+ * every signed-in player. Same free in-process counter the chat panes and the
+ * boss arena use, for the same reason: nothing here is secret, so the ceiling is
+ * not a security boundary — it stops a looping client turning a layout-level
+ * poll into unbounded database load (this one reads the rival board, so a round
+ * costs several queries, not one).
+ *
+ * A refused round is `retry`, never a null state: the poller must not read a
+ * throttled answer as "the event ended" and pull a live game off the screen.
+ * The layout's server-side render calls `getMiniGameState` directly and is
+ * deliberately not counted here.
+ */
+export async function pollMiniGame(): Promise<MiniGamePoll> {
+  const empireId = await ownEmpireId();
+  if (!empireId) return { retry: true };
+  if (!localRateLimit(`poll:minigame:${empireId}`, POLL_LIMIT, POLL_WINDOW_MS)) {
+    return { retry: true };
+  }
+  return { state: await getMiniGameState() };
 }
 
 /** Build the {field: {increment}} prize map for a winning empire update. */

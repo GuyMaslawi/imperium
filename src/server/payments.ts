@@ -7,6 +7,7 @@ import {
   PaypalApiError,
 } from "@/server/paypal";
 import { STORE_CURRENCY } from "@/lib/game/diamondStore";
+import { getLegalOperator, missingLegalFields } from "@/lib/legal";
 
 /**
  * Payment-provider seam for the real-money diamond store.
@@ -208,16 +209,59 @@ export function getPaymentProvider(): PaymentProvider {
 
 /**
  * Whether real-money purchases are open to all players. Off by default so no
- * play-money provider ever hands out free diamonds; flip `DIAMOND_PURCHASES_LIVE`
- * to "true" *and* point PayPal at live credentials.
+ * play-money provider ever hands out free diamonds; go-live needs all three of
+ * the interlocks below.
  */
 export function arePurchasesLive(): boolean {
   if (process.env.DIAMOND_PURCHASES_LIVE !== "true") return false;
-  // Interlock: purchases are never "live" while the active provider is running
+
+  // Interlock 1: purchases are never "live" while the active provider is running
   // on play money (mock provider, or PayPal sandbox credentials). Otherwise
   // flipping the flag ahead of a real gateway would let every player mint free
-  // diamonds through a charge that costs nothing. Go-live requires both.
-  return !getPaymentProvider().isTestMode;
+  // diamonds through a charge that costs nothing.
+  if (getPaymentProvider().isTestMode) return false;
+
+  // Interlock 2: and never while nobody has said who is selling.
+  //
+  // A distance-selling merchant in Israel has to publish its legal name, dealer
+  // number and a contact address on the page itself, and the gateways check the
+  // same fields during underwriting. Those come from the environment
+  // (LEGAL_OPERATOR_*), so a deploy that has payments configured but not the
+  // operator would be taking money from the public under a placeholder — the
+  // policy pages would name "מפעיל השירות" and nothing else.
+  //
+  // Failing closed is the whole point: the alternative is a store that quietly
+  // works while the disclosure it depends on does not exist, which is precisely
+  // the state nobody notices until a chargeback or an underwriter asks. Admins
+  // are unaffected — they bypass this gate for test purchases (see `preflight`),
+  // so the checkout can still be exercised end to end before go-live.
+  if (!getLegalOperator().complete) return false;
+
+  return true;
+}
+
+/**
+ * Why the store is not open to players, in the order it has to be fixed —
+ * empty once `arePurchasesLive()` is true.
+ *
+ * Shown to admins on the buy screen. Without it the three interlocks are
+ * invisible: an admin sees a checkout that works for *them* (they bypass the
+ * gate) and no indication that every player is looking at a chained store, or
+ * which of the three conditions is the one still missing.
+ */
+export function purchaseBlockers(): string[] {
+  const blockers: string[] = [];
+  if (process.env.DIAMOND_PURCHASES_LIVE !== "true") {
+    blockers.push('DIAMOND_PURCHASES_LIVE אינו "true"');
+  }
+  if (getPaymentProvider().isTestMode) {
+    blockers.push("ספק התשלום עובד בכסף משחק (mock או PayPal sandbox)");
+  }
+  const missing = missingLegalFields();
+  if (missing.length > 0) {
+    blockers.push(`פרטי המפעיל לא פורסמו — חסר: ${missing.join(", ")}`);
+  }
+  return blockers;
 }
 
 /** Everything the checkout UI needs to know about the active provider. */
@@ -232,6 +276,8 @@ export interface CheckoutConfig {
   /** PayPal browser-SDK client id (public by design), or null. */
   paypalClientId: string | null;
   currency: string;
+  /** Admin-facing: what is keeping the store shut. Empty when `live`. */
+  blockers: string[];
 }
 
 /** Snapshot of the checkout setup, safe to hand to a client component. */
@@ -245,5 +291,6 @@ export function getCheckoutConfig(): CheckoutConfig {
     testMode: provider.isTestMode,
     paypalClientId: cfg?.clientId ?? null,
     currency: STORE_CURRENCY,
+    blockers: purchaseBlockers(),
   };
 }

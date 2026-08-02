@@ -18,6 +18,7 @@ import {
   slotStatIsFlat,
   slotPrimaryStat,
 } from "@/lib/game/hero";
+import { HERO_ITEM_SETS } from "@/lib/game/heroSets";
 
 /** "12%" / "1.5%" — a decimal only when the odds are not a whole percent. */
 function formatDropChance(chance: number): string {
@@ -73,6 +74,22 @@ export function ItemCatalog({
             {heroLevel}
           </span>
           ) עדיין לא יכול ללבוש · ✓ = נמצא ברשותך
+        </p>
+        {/* the sets — the visible half of the ladder */}
+        <p className="mt-1">
+          ✦ כל עשר רמות מתחלף הסט וכל תשעת החפצים מקבלים מראה חדש, יקר וחזק
+          יותר:{" "}
+          {HERO_ITEM_SETS.map((s, i) => (
+            <span key={s.dir}>
+              {i > 0 && " · "}
+              <span className={i === HERO_ITEM_SETS.length - 1 ? "text-gold-bright" : "text-zinc-300"}>
+                {s.label}
+              </span>{" "}
+              <span className="nums" dir="ltr">
+                {s.from}–{s.to}
+              </span>
+            </span>
+          ))}
         </p>
       </div>
 

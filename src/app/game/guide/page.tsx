@@ -81,6 +81,7 @@ import {
   itemStatBonus,
   xpToNextLevel,
 } from "@/lib/game/hero";
+import { HERO_ITEM_SETS, heroItemArtPath } from "@/lib/game/heroSets";
 import {
   POTION_DROP_CHANCE,
   POTION_KINDS,
@@ -1549,9 +1550,10 @@ export default async function GuidePage() {
                         <span className="absolute text-2xl opacity-60" aria-hidden>
                           {meta.icon}
                         </span>
+                        {/* the top set, matching the level-100 caps quoted below */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                          src={`/hero/${meta.slug}.png`}
+                          src={heroItemArtPath(meta.slug, HERO_MAX_LEVEL)}
                           alt={meta.label}
                           loading="lazy"
                           className="relative h-full w-full object-contain"
@@ -1578,6 +1580,35 @@ export default async function GuidePage() {
                     </div>
                   );
                 })}
+              </div>
+
+              {/* the ten sets — one look per decade of item level */}
+              <div className="panel-inset rounded-xl p-4">
+                <p className="mb-2 text-sm font-black text-gold-bright">עשרת הסטים</p>
+                <p className="mb-3 text-[11px] leading-relaxed text-zinc-400">
+                  כל עשר רמות מתחלף הסט: תשעת החפצים מצוירים מחדש בחומר יקר יותר,
+                  מעור ונחושת ועד לזהב לבן זוהר. הרמה קובעת את הבונוס — הסט קובע
+                  איך זה נראה על הגיבור.
+                </p>
+                <div className="grid grid-cols-5 gap-2 lg:grid-cols-10">
+                  {HERO_ITEM_SETS.map((set) => (
+                    <div key={set.dir} className="text-center">
+                      <div className="relative mx-auto flex aspect-square w-full items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-black/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={heroItemArtPath(SLOT_META.SWORD.slug, set.to)}
+                          alt={set.label}
+                          loading="lazy"
+                          className="h-full w-full object-contain p-0.5"
+                        />
+                      </div>
+                      <p className="mt-1 text-[10px] font-black text-bone-bright">{set.label}</p>
+                      <p className="nums text-[10px] text-zinc-500" dir="ltr">
+                        {set.from}–{set.to}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">

@@ -497,7 +497,7 @@ export interface SlotStatWeight {
 export interface SlotMeta {
   label: string;
   icon: string;
-  /** Art file at /hero/<slug>.png overlays the emoji when present. */
+  /** Names the art file: see `heroItemArtPath` in `heroSets.ts` (set per decade). */
   slug: string;
   /**
    * What this slot grants: the **primary** stat first (full weight), then the

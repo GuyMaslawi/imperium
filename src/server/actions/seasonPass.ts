@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma, SeasonPassProgress } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { logError } from "@/server/errorLog";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { lastDailyUpdate, nextDailyUpdate } from "@/lib/game/time";
@@ -375,7 +376,12 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
     if (err instanceof InsufficientDiamonds) {
       return { ok: false, error: `אין מספיק יהלומים (דרושים ${SEASON_PASS_PREMIUM_PRICE})` };
     }
-    return { ok: false, error: err instanceof Error ? err.message : "שגיאה" };
+    // Never the raw message. A Prisma failure names models, fields and
+    // sometimes the statement itself, and this string is rendered straight into
+    // the browser — so it is logged where the monitor can see it and the player
+    // gets the same generic line every other action gives.
+    await logError("seasonPass.buySeasonPassPremium", err);
+    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
   }
 }
 
@@ -504,6 +510,8 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
     if (result.ok) revalidatePath("/game", "layout");
     return result;
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "שגיאה" };
+    // Generic and logged — see buySeasonPassPremium.
+    await logError("seasonPass.claimSeasonPassRewards", err);
+    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
   }
 }

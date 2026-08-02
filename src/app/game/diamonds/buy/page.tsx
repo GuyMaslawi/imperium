@@ -20,8 +20,13 @@ export default async function BuyDiamondsPage() {
   // buttons. Everyone else gets the store chained shut — the packages stay on
   // display, but the seal says so up front instead of letting a click travel all
   // the way to a "coming soon" modal.
-  const canPay = checkout.live || (await isAdmin());
+  const admin = await isAdmin();
+  const canPay = checkout.live || admin;
   const paypalClientId = canPay ? checkout.paypalClientId : null;
+  // …which is exactly why an admin needs to be told *why* it is shut: their own
+  // checkout works, so nothing on this screen would otherwise reveal that every
+  // player is looking at a locked store.
+  const blockers = admin && !checkout.live ? checkout.blockers : [];
 
   return (
     <div className="space-y-6">
@@ -35,6 +40,22 @@ export default async function BuyDiamondsPage() {
         active="buy"
         note="יהלומים פותחים האצות ייצור, קסמי חנות, חבילות תורות ועוד. ככל שהחבילה גדולה יותר — כך מקבלים יותר יהלומים לכל שקל."
       />
+
+      {blockers.length > 0 && (
+        <div className="panel-inset rounded-xl border-amber-500/40 p-4 text-sm">
+          <p className="font-bold text-amber-300">
+            🔒 החנות סגורה לשחקנים (אתה רואה אותה כאדמין)
+          </p>
+          <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+            {blockers.map((reason) => (
+              <li key={reason} className="flex gap-2">
+                <span aria-hidden className="mt-[0.4rem] size-1.5 shrink-0 rounded-full bg-amber-400/70" />
+                <span dir="auto">{reason}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <DiamondStore
         discountPct={discountPct}

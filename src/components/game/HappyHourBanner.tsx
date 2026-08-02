@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { getHappyHourState, type HappyHourState } from "@/server/actions/happyHour";
+import { pollHappyHour, type HappyHourState } from "@/server/actions/happyHour";
 import { HAPPY_HOUR_EFFECTS } from "@/lib/game/happyHour";
 
 /**
@@ -279,8 +279,12 @@ export function HappyHourBanner({ initial }: { initial: HappyHourState | null })
   }, [state]);
 
   const refresh = useCallback(async () => {
-    const next = await getHappyHourState();
-    setState(next);
+    // `retry` means the round learned nothing (throttled, or a signed-out tab);
+    // leaving the banner exactly as it is beats tearing a live window off the
+    // screen because one poll came back empty-handed.
+    const { state: next, retry } = await pollHappyHour();
+    if (retry) return;
+    setState(next ?? null);
     // The layout rendered the first copy server-side; when the window closes,
     // re-render the page so nothing else is quoting boosted numbers either.
     if (!next) router.refresh();
@@ -292,8 +296,8 @@ export function HappyHourBanner({ initial }: { initial: HappyHourState | null })
     let alive = true;
     const tick = async () => {
       if (document.visibilityState === "hidden") return;
-      const next = await getHappyHourState();
-      if (alive) setState(next);
+      const { state: next, retry } = await pollHappyHour();
+      if (alive && !retry) setState(next ?? null);
     };
     const id = setInterval(tick, live ? POLL_LIVE_MS : POLL_IDLE_MS);
     const onWake = () => {

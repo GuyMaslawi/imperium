@@ -62,6 +62,10 @@ async function poll(): Promise<void> {
   inFlight = true;
   try {
     const next = await getInboxPulse();
+    // The round learned nothing (throttled, signed out, a hiccup). Publishing
+    // its zeros would blank both badges and drop the toast stack, so the last
+    // good snapshot stands until a real answer arrives.
+    if (next.stale) return;
     if (!unchanged(snapshot, next)) {
       snapshot = next;
       emit();

@@ -65,9 +65,22 @@ export function LegalShell({
           <div className="mt-7 space-y-7">{children}</div>
 
           {/* Who you are actually contracting with. Israeli distance-selling
-              rules require this on the page itself, not only in an email. */}
+              rules require this on the page itself, not only in an email.
+
+              While the details are unset the block says so outright rather than
+              printing the placeholder as though it were the merchant: an
+              incomplete disclosure that *looks* complete is worse than a visibly
+              missing one, and this is the state the reader is entitled to know
+              about. The store is closed to players in that state anyway — see
+              the operator interlock in `arePurchasesLive`. */}
           <section className="panel-inset mt-9 rounded-xl px-4 py-4 text-sm">
             <h2 className="font-black text-gold-bright">פרטי המפעיל</h2>
+            {!operator.complete && (
+              <p className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs leading-relaxed text-amber-200">
+                פרטי המפעיל המלאים טרם פורסמו. עד לפרסומם לא מתבצעות רכישות בכסף אמיתי
+                באתר. לכל פנייה — כתובת הדוא״ל שלהלן.
+              </p>
+            )}
             <dl className="mt-2 space-y-1 text-zinc-400">
               <div className="flex gap-2">
                 <dt className="text-zinc-500">שם:</dt>

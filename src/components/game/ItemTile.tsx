@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatBonus } from "@/lib/game/format";
+import { heroItemArtPath, itemSetForLevel } from "@/lib/game/heroSets";
 import { useTip } from "@/components/ui/Tip";
 
 export type Rarity = "legendary" | "epic" | "rare" | "common";
@@ -115,8 +116,9 @@ export interface ItemTileDetails {
 }
 
 /**
- * A hero equipment / inventory tile. Renders generated art from
- * `/hero/<slug>.png` when it exists, otherwise falls back to the emoji.
+ * A hero equipment / inventory tile. Renders the generated art of the piece's
+ * *set* — gear is redrawn every ten item levels, see `heroSets.ts` — falling
+ * back to the pre-set single-look art and then to the emoji.
  * With `details`, hovering (or focusing) the tile opens a tooltip with the
  * item's stats and its equip requirement; an unmet requirement renders the
  * tile locked (dimmed + 🔒). The tooltip floats in a portal, so it survives
@@ -141,6 +143,12 @@ export function ItemTile({
 }) {
   const [imgOk, setImgOk] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
+  const art = slug ? heroItemArtPath(slug, level) : undefined;
+  // A missing set file drops to the pre-set art rather than to the bare emoji.
+  // Tracking *which* path failed (rather than a boolean) means the fallback
+  // clears itself when the tile is re-used for a different piece.
+  const [failedArt, setFailedArt] = useState<string | null>(null);
+  const src = art && failedArt === art ? `/hero/${slug}.png` : art;
   const r = RARITY[rarity];
   const iconSize =
     size === "lg" ? "text-6xl" : size === "sm" ? "text-3xl" : "text-4xl";
@@ -154,11 +162,13 @@ export function ItemTile({
   const shineDelay = `${(((level ?? 1) * 37 + (slug?.length ?? 3) * 13) % 40) / 10}s`;
 
   // On localhost the image can finish loading before React hydrates, so the
-  // onLoad event never fires — check `.complete` on mount to catch that.
+  // onLoad event never fires — check `.complete` on mount to catch that. Also
+  // re-checked whenever the art changes, e.g. when an item is upgraded into the
+  // next set while the tile stays mounted.
   useEffect(() => {
     const el = imgRef.current;
-    if (el && el.complete && el.naturalWidth > 0) setImgOk(true);
-  }, []);
+    setImgOk(!!el && el.complete && el.naturalWidth > 0);
+  }, [src]);
 
   const tip = details && (
     <>
@@ -171,6 +181,11 @@ export function ItemTile({
           </>
         )}
       </p>
+      {level != null && (
+        <p className="text-[10px] text-zinc-500">
+          סט: <span className="text-zinc-300">{itemSetForLevel(level).label}</span>
+        </p>
+      )}
 
       <div className="rule-gold my-2" />
 
@@ -263,17 +278,20 @@ export function ItemTile({
         >
           {icon}
         </span>
-        {slug && (
+        {src && (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             ref={imgRef}
-            src={`/hero/${slug}.png`}
+            src={src}
             alt={name ?? ""}
             className={`absolute inset-0 h-full w-full object-contain p-1 transition-opacity ${imgOk ? "opacity-100" : "opacity-0"} ${
               locked ? "grayscale-[0.7]" : ""
             }`}
             onLoad={() => setImgOk(true)}
-            onError={() => setImgOk(false)}
+            onError={() => {
+              setImgOk(false);
+              if (art) setFailedArt(art);
+            }}
           />
         )}
         {sparkle &&

@@ -13,7 +13,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { getMiniGameState, submitMiniGameGuess } from "@/server/actions/minigame";
+import { pollMiniGame, submitMiniGameGuess } from "@/server/actions/minigame";
 import {
   MINIGAME_TYPE_META,
   type MiniGameBoardRow,
@@ -436,8 +436,12 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
   const [pending, startTransition] = useTransition();
 
   const refresh = useCallback(async () => {
-    const next = await getMiniGameState();
-    setState(next);
+    // `retry` means the round learned nothing (throttled, or a signed-out tab).
+    // Changing nothing is the right answer: reading it as "no event" would pull
+    // a live game — and the player's own attempt log — off the screen.
+    const { state: next, retry } = await pollMiniGame();
+    if (retry) return;
+    setState(next ?? null);
     // The layout renders the first copy server-side; keep it from resurrecting
     // a game that has since ended.
     if (!next) router.refresh();
@@ -458,8 +462,8 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
       // the difference between a backgrounded tab costing six requests a minute
       // for hours and costing nothing. Same rule the chat dock already follows.
       if (document.visibilityState === "hidden") return;
-      const next = await getMiniGameState();
-      if (alive) setState(next);
+      const { state: next, retry } = await pollMiniGame();
+      if (alive && !retry) setState(next ?? null);
     };
     const id = setInterval(tick, live ? POLL_LIVE_MS : POLL_IDLE_MS);
     const onWake = () => {

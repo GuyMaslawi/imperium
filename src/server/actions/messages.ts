@@ -5,7 +5,12 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { notBannedWhere } from "@/lib/ban";
-import { rateLimit } from "@/lib/rateLimit";
+import {
+  POLL_LIMIT,
+  POLL_WINDOW_MS,
+  localRateLimit,
+  rateLimit,
+} from "@/lib/rateLimit";
 import {
   MESSAGE_BODY_MAX,
   MESSAGE_MAX_RECIPIENTS,
@@ -89,6 +94,13 @@ export type LiveAlert = {
 };
 
 export type InboxPulse = {
+  /**
+   * The round told us nothing — refused by the poll ceiling, or the caller is
+   * signed out. Explicit, because the alternative reading of an empty pulse is
+   * "everything you were waiting for is gone", which would blank both badges
+   * and drop the toast stack. The client publishes nothing when it sees this.
+   */
+  stale?: boolean;
   /** Unread inbox messages — the green badge on the messages pill. */
   unreadMessages: number;
   /**
@@ -102,7 +114,9 @@ export type InboxPulse = {
   alerts: LiveAlert[];
 };
 
-const EMPTY_PULSE: InboxPulse = {
+/** Nothing learned this round — see `InboxPulse.stale`. */
+const STALE_PULSE: InboxPulse = {
+  stale: true,
   unreadMessages: 0,
   newReports: 0,
   alerts: [],
@@ -132,10 +146,20 @@ const EMPTY_PULSE: InboxPulse = {
  * this every few seconds, so nothing that scans (the achievements snapshot, the
  * guild-war fixtures, the rankings) may migrate in here. Those ride the far
  * rarer `router.refresh()` that a genuinely new alert triggers.
+ *
+ * It is also the most expensive polled read in the game — the ban check, the
+ * assault settle, the seen-marker and four counts, on a four-second cadence, on
+ * every screen — which is why it carries the same free in-process ceiling the
+ * chat panes and the boss arena do. Not a security boundary: a caller who gets
+ * through is only reading their own inbox again. It exists so a client stuck in
+ * a loop cannot multiply the app's hottest query path without bound.
  */
 export async function getInboxPulse(): Promise<InboxPulse> {
   try {
     const empireId = await requireOwnEmpireId();
+    if (!localRateLimit(`poll:inbox:${empireId}`, POLL_LIMIT, POLL_WINDOW_MS)) {
+      return STALE_PULSE;
+    }
     if (await settleDueAssault(empireId)) {
       // The haul moved resources, the army and the hero — the resource bar and
       // the boss banner are both stale now.
@@ -146,7 +170,7 @@ export async function getInboxPulse(): Promise<InboxPulse> {
       where: { id: empireId },
       select: { reportsSeenAt: true },
     });
-    if (!empire) return EMPTY_PULSE;
+    if (!empire) return STALE_PULSE;
     const seenAt = empire.reportsSeenAt;
 
     const [messages, unreadMessages, battleReports, spyReports] =
@@ -190,7 +214,9 @@ export async function getInboxPulse(): Promise<InboxPulse> {
     };
   } catch {
     // Polling is best-effort — a missed round just retries in a few seconds.
-    return EMPTY_PULSE;
+    // Stale, not empty: a signed-out tab or a hiccup must not read as "your
+    // inbox is clear" and wipe the badges the last good round put up.
+    return STALE_PULSE;
   }
 }
 

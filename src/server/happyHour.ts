@@ -19,7 +19,12 @@ import {
  * rule, and a gameplay read must never turn into a write on the hot path.
  */
 
-const WINDOW_SELECT = {
+/**
+ * Every column a window needs to be read as gameplay, and nothing else. Exported
+ * because the player-facing poll (server/actions/happyHour.ts) reads the same
+ * row without the clock filter — see `getHappyHourState` for why.
+ */
+export const HAPPY_HOUR_SELECT = {
   id: true,
   title: true,
   bonusPct: true,
@@ -29,6 +34,8 @@ const WINDOW_SELECT = {
   startsAt: true,
   endsAt: true,
 } satisfies Prisma.HappyHourSelect;
+
+const WINDOW_SELECT = HAPPY_HOUR_SELECT;
 
 /** Rows are only ever released with a `startsAt`; this narrows the nullable column. */
 type WindowRow = Prisma.HappyHourGetPayload<{ select: typeof WINDOW_SELECT }>;

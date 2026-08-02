@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
+import { logError } from "@/server/errorLog";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import {
@@ -122,6 +123,11 @@ export async function claimAchievements(): Promise<ClaimAchievementsResult> {
     if (result.ok) revalidatePath("/game", "layout");
     return result;
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : "שגיאה" };
+    // Never the raw message: a Prisma failure names models, fields and
+    // sometimes the statement itself, and this string is rendered straight into
+    // the browser. Logged so the fault is visible in /admin/monitor instead of
+    // only in one player's toast.
+    await logError("achievements.claimAchievements", err);
+    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
   }
 }

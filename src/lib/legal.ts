@@ -26,13 +26,48 @@ export interface LegalOperator {
   email: string;
   /** City of the business, or null while unset. */
   city: string | null;
-  /** True once the operator is fully identified — gates the "coming soon" note. */
+  /**
+   * True once the operator is fully identified.
+   *
+   * This is not cosmetic. Selling to the public for real money while the
+   * merchant is unnamed is the actual exposure — the policy page merely
+   * publishes it — so `arePurchasesLive()` refuses to open the store while this
+   * is false, and the pages say the details are pending rather than presenting
+   * the placeholder below as if it were a real merchant. See
+   * `missingLegalFields`.
+   */
   complete: boolean;
 }
 
-/** Shown until the real details are configured, so the page is never broken. */
+/**
+ * Shown until the real details are configured, so the page is never broken.
+ *
+ * Deliberately a *label* rather than an invented name: a plausible-looking
+ * placeholder read as a real disclosure, which is worse than an obvious gap.
+ * The pages pair it with an explicit notice while `complete` is false.
+ */
 const FALLBACK_NAME = "מפעיל השירות";
 const FALLBACK_EMAIL = "support@kraldor.com";
+
+/**
+ * The env vars that must be set before the game may take money, and which of
+ * them are still missing.
+ *
+ * The city is not here: Israeli distance-selling rules want a place of business,
+ * and a city is enough to satisfy the page, but a policy that named no city has
+ * never been the thing that voids a sale. Name, dealer number and a contact
+ * address are the three that identify who the buyer is contracting with.
+ */
+export const REQUIRED_LEGAL_ENV = [
+  "LEGAL_OPERATOR_NAME",
+  "LEGAL_OPERATOR_TAX_ID",
+  "LEGAL_CONTACT_EMAIL",
+] as const;
+
+/** Which of REQUIRED_LEGAL_ENV are unset — empty once the operator is published. */
+export function missingLegalFields(): string[] {
+  return REQUIRED_LEGAL_ENV.filter((key) => !process.env[key]?.trim());
+}
 
 export function getLegalOperator(): LegalOperator {
   const name = process.env.LEGAL_OPERATOR_NAME?.trim() || "";
@@ -45,7 +80,7 @@ export function getLegalOperator(): LegalOperator {
     taxId: taxId || null,
     email: email || FALLBACK_EMAIL,
     city: city || null,
-    complete: Boolean(name && taxId && email),
+    complete: missingLegalFields().length === 0,
   };
 }
 
@@ -57,7 +92,7 @@ export function getLegalOperator(): LegalOperator {
 export const LEGAL_UPDATED = {
   terms: "2026-07-31",
   refund: "2026-07-31",
-  privacy: "2026-07-31",
+  privacy: "2026-08-01",
 } as const;
 
 /** "31 ביולי 2026" — the date as the policy pages print it. */
