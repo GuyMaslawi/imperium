@@ -710,6 +710,8 @@ enum DiamondEffectKind {
   /// (RESOURCES) / captures no soldiers (SOLDIERS) from this empire.
   SHIELD_RESOURCES
   SHIELD_SOLDIERS
+  /// Cooldown of the city-downgrade spell (gives up one city tier, once/hour).
+  CITY_DOWNGRADE
 }
 
 model DiamondEffect {

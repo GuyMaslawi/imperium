@@ -10,6 +10,7 @@ import {
   buyShopDiscount,
   buyTurns,
   castBankInterestSpell,
+  castCityDowngradeSpell,
   resetHeroPointsWithDiamonds,
 } from "@/server/actions/diamondShop";
 import {
@@ -17,6 +18,9 @@ import {
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
   BANK_INTEREST_SPELL_COST,
+  CITY_DOWNGRADE_COOLDOWN_HOURS,
+  CITY_DOWNGRADE_COST,
+  CITY_DOWNGRADE_MIN_CITIES,
   HERO_POINTS_RESET_COST,
   SHIELDS,
   SHIELD_RENEW_COOLDOWN_MINUTES,
@@ -25,6 +29,7 @@ import {
   TURN_PACKAGES,
   type ShieldKey,
 } from "@/lib/game/diamondShop";
+import { cityName } from "@/lib/game/cities";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
@@ -464,6 +469,77 @@ function BankInterestCard({
   );
 }
 
+/* ------------------------------ city downgrade spell ------------------------------ */
+
+/**
+ * The one card that sells a *loss*. Below CITY_DOWNGRADE_MIN_CITIES there is no
+ * button at all — an empire holding a single city has nothing to give up — and
+ * the card says so in place of the price, rather than offering a purchase the
+ * server would only refuse.
+ */
+function CityDowngradeCard({
+  cities,
+  readyAt,
+  diamonds,
+}: {
+  cities: number;
+  /** When the hourly cooldown lifts, while it is still running. */
+  readyAt: string | null;
+  diamonds: number;
+}) {
+  const [state, action] = useActionState<ActionState, FormData>(
+    castCityDowngradeSpell,
+    {}
+  );
+  const eligible = cities >= CITY_DOWNGRADE_MIN_CITIES;
+  const target = cities - 1;
+
+  return (
+    <ShopCard
+      icon={<Icon name="base" size={18} className="text-crimson" />}
+      title="קסם ירידת עיר"
+      badge={
+        <span
+          className="nums shrink-0 rounded-full border border-border-subtle bg-panel px-2.5 py-0.5 text-xs font-black text-gold-bright"
+          dir="ltr"
+        >
+          {eligible ? `${cities} → ${target}` : cities}
+        </span>
+      }
+      desc={
+        <>
+          מוריד אותך עיר אחת בלבד — מעיר {cities} לעיר {eligible ? target : cities}
+          {eligible && ` (${cityName(target)})`}. אין החזר משאבים, והדרך חזרה היא
+          ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{CITY_DOWNGRADE_COOLDOWN_HOURS}{" "}
+          שעה.
+        </>
+      }
+    >
+      <form>
+        {!eligible ? (
+          <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-[11px] font-semibold text-zinc-400">
+            זמין מעיר {CITY_DOWNGRADE_MIN_CITIES} ומעלה — אין לך עיר לוותר עליה
+          </span>
+        ) : readyAt ? (
+          <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
+            בקירור · זמין ב־{whenLabel(readyAt)}
+          </span>
+        ) : (
+          <SubmitButton
+            className="btn btn-gold w-full px-3 py-2 text-sm"
+            formAction={action}
+            disabled={diamonds < CITY_DOWNGRADE_COST}
+            pendingText="מטיל..."
+          >
+            רד לעיר {target} · <Price cost={CITY_DOWNGRADE_COST} />
+          </SubmitButton>
+        )}
+      </form>
+      <FormMessage error={state.error} success={state.success} />
+    </ShopCard>
+  );
+}
+
 /* ------------------------------ shop shell ------------------------------ */
 
 export interface DiamondShopProps {
@@ -475,6 +551,10 @@ export interface DiamondShopProps {
   pointsResetUsed: boolean;
   interestPreview: number;
   bankReadyAt: string | null;
+  /** Current city tier — the city-downgrade spell reads (and spends) it. */
+  cities: number;
+  /** When the city-downgrade spell comes off cooldown, while it is running. */
+  cityDowngradeReadyAt: string | null;
   /**
    * Per raid shield: when it expires (null where none is running) and, once it
    * has, when the renewal cooldown lifts.
@@ -491,6 +571,8 @@ export function DiamondShop({
   pointsResetUsed,
   interestPreview,
   bankReadyAt,
+  cities,
+  cityDowngradeReadyAt,
   shields,
 }: DiamondShopProps) {
   return (
@@ -563,6 +645,11 @@ export function DiamondShop({
           <HeroResetCard
             allocatedPoints={allocatedPoints}
             used={pointsResetUsed}
+            diamonds={diamonds}
+          />
+          <CityDowngradeCard
+            cities={cities}
+            readyAt={cityDowngradeReadyAt}
             diamonds={diamonds}
           />
         </div>

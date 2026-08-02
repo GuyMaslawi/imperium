@@ -48,6 +48,7 @@ const DIAMOND_EFFECT_LABEL: Record<DiamondEffectKind, string> = {
   TURN_PACK_4: "חבילת תורות 4 (צינון)",
   SHIELD_RESOURCES: "מגן משאבים",
   SHIELD_SOLDIERS: "מגן חיילים",
+  CITY_DOWNGRADE: "ירידת עיר (צינון)",
 };
 
 const DIAMOND_EFFECT_KINDS = Object.keys(DIAMOND_EFFECT_LABEL) as DiamondEffectKind[];

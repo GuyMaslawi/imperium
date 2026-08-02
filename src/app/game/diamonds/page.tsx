@@ -84,6 +84,12 @@ export default async function DiamondsPage() {
       ? bankEffect.readyAt.toISOString()
       : null;
 
+  const downgradeEffect = byKind.get("CITY_DOWNGRADE");
+  const cityDowngradeReadyAt =
+    downgradeEffect?.readyAt != null && downgradeEffect.readyAt > now
+      ? downgradeEffect.readyAt.toISOString()
+      : null;
+
   return (
     <div className="space-y-6">
       <SectionHeading
@@ -106,6 +112,8 @@ export default async function DiamondsPage() {
         pointsResetUsed={pointsResetUsed}
         interestPreview={interestPreview}
         bankReadyAt={bankReadyAt}
+        cities={empire.cities}
+        cityDowngradeReadyAt={cityDowngradeReadyAt}
         shields={shields}
       />
     </div>

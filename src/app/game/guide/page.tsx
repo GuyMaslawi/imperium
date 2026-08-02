@@ -169,6 +169,9 @@ import {
   BOOST_MAX_PCT,
   BOOST_STEP_COST,
   BOOST_STEP_PCT,
+  CITY_DOWNGRADE_COOLDOWN_HOURS,
+  CITY_DOWNGRADE_COST,
+  CITY_DOWNGRADE_MIN_CITIES,
   HERO_POINTS_RESET_COST,
   HERO_REVIVE_COST,
   SHIELDS,
@@ -2491,6 +2494,13 @@ export default async function GuidePage() {
                   value={`${GUILD_CREATION_COST_DIAMONDS}💎`}
                   hint="ואז קסמים והרחבות"
                   tone="text-purple-300"
+                />
+                <Fact
+                  icon="base"
+                  label="קסם ירידת עיר"
+                  value={`${CITY_DOWNGRADE_COST}💎`}
+                  hint={`עיר אחת בלבד למטה · מעיר ${CITY_DOWNGRADE_MIN_CITIES} ומעלה · אחת ל־${CITY_DOWNGRADE_COOLDOWN_HOURS} שעה · בלי החזר`}
+                  tone="text-crimson-bright"
                 />
                 {SHIELDS.map((shield) => (
                   <Fact

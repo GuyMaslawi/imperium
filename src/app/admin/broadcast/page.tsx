@@ -11,6 +11,7 @@ import {
 import { TargetPicker } from "@/components/admin/TargetPicker";
 import { broadcastMessage, sendGift } from "@/server/actions/admin";
 import { isDiscordAnnouncerConfigured } from "@/server/discord";
+import { BROADCAST_DEFAULTS, GIFT_DEFAULTS } from "@/lib/adminBroadcast";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +45,7 @@ export default async function AdminBroadcastPage() {
             }`}
           >
             {discordAnnouncer
-              ? "שידור לכלל השחקנים מתפרסם אוטומטית גם בערוץ הדיסקורד. שידור לעונה, לברית או לשחקן בודד — לא."
+              ? "שידור לכל השחקנים או לפעילים מתפרסם אוטומטית גם בדיסקורד — אותו נוסח בדיוק, כדי שתישלח התראה לטלפון. שידור לעונה, לברית או לשחקן בודד — לא."
               : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL לא מוגדר)."}
           </p>
           <ActionForm action={broadcastMessage} submitLabel="שדר הודעה">
@@ -59,7 +60,15 @@ export default async function AdminBroadcastPage() {
                 { value: "SPY", label: "ריגול (סגול)" },
               ]}
             />
-            <LabeledInput label="כותרת" name="title" required placeholder="📣 הודעה חשובה" />
+            {/* Pre-filled rather than placeheld: an announcement that only has
+                to say "there is news" should cost one click, and anything more
+                specific is typed over the default. */}
+            <LabeledInput
+              label="כותרת"
+              name="title"
+              required
+              defaultValue={BROADCAST_DEFAULTS.title}
+            />
             <LabeledInput label="קישור (אופציונלי)" name="href" dir="ltr" placeholder="/game/base" />
             <label className="block space-y-1">
               <span className="text-xs font-semibold text-gold-dim">תוכן</span>
@@ -67,6 +76,7 @@ export default async function AdminBroadcastPage() {
                 name="body"
                 rows={4}
                 required
+                defaultValue={BROADCAST_DEFAULTS.body}
                 className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 outline-none focus:border-gold/60"
               />
             </label>
@@ -75,10 +85,33 @@ export default async function AdminBroadcastPage() {
 
         <EditorSection title="שליחת מתנה / פרס" icon="🎁">
           <p className="mb-3 text-xs text-zinc-400">
-            הענק משאבים, יהלומים, אזרחים, תורות וסיבובי גלגל — לכולם או רק לשחקנים שהיו פעילים לאחרונה. אפשר לצרף הודעה שתישלח יחד עם המתנה.
+            הענק משאבים, יהלומים, אזרחים, תורות וסיבובי גלגל. ברירת המחדל: שחקנים שנכנסו ב-24 השעות האחרונות. אפשר לצרף הודעה שתישלח יחד עם המתנה.
+          </p>
+          {/* Same rule as the broadcast, said again next to the form that
+              obeys it — an admin attaching a note to a gift has no other way to
+              know that note is also about to be posted publicly. */}
+          <p
+            className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
+              discordAnnouncer
+                ? "border-[#5865F2]/45 bg-[#5865F2]/10 text-[#c7ccff]"
+                : "border-border-subtle bg-black/25 text-zinc-500"
+            }`}
+          >
+            {discordAnnouncer
+              ? "ההודעה המצורפת מתפרסמת אוטומטית גם בדיסקורד, באותו נוסח — אם המתנה נשלחת לכל השחקנים או לפעילים. בלי הודעה מצורפת אין פרסום."
+              : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL לא מוגדר)."}
           </p>
           <ActionForm action={sendGift} submitLabel="שלח מתנה" submitVariant="secondary">
-            <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />
+            {/* Opens on the last day's players: a gift is a reason to come
+                back tonight, and handing one to an account nobody has opened
+                in a month is inflation with no player on the other end. */}
+            <TargetPicker
+              seasons={seasons}
+              guilds={guilds}
+              empires={empires}
+              defaultScope="active"
+              defaultActiveHours={24}
+            />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} placeholder="0" />
               <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} placeholder="0" />
@@ -89,8 +122,20 @@ export default async function AdminBroadcastPage() {
               <LabeledInput label={<ResourceFieldLabel resource="turns" text="תורות" />} name="turns" type="number" min={0} max={ADMIN_INT_MAX} placeholder="0" />
               <LabeledInput label="🎡 סיבובים" name="wheelSpins" type="number" min={0} max={ADMIN_INT_MAX} placeholder="0" />
             </div>
-            <LabeledInput label="כותרת הודעה מצורפת (אופציונלי)" name="title" placeholder="🎁 מתנה מההנהלה" />
-            <LabeledInput label="תוכן ההודעה" name="body" placeholder="קבל את המתנה שלך!" />
+            <LabeledInput
+              label="כותרת הודעה מצורפת (רוקן כדי לשלוח בלי הודעה)"
+              name="title"
+              defaultValue={GIFT_DEFAULTS.title}
+            />
+            <label className="block space-y-1">
+              <span className="text-xs font-semibold text-gold-dim">תוכן ההודעה</span>
+              <textarea
+                name="body"
+                rows={3}
+                defaultValue={GIFT_DEFAULTS.body}
+                className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 outline-none focus:border-gold/60"
+              />
+            </label>
           </ActionForm>
         </EditorSection>
       </div>

@@ -7,10 +7,15 @@ import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { bankInterestRate } from "@/lib/game/constants";
+import { cityName } from "@/lib/game/cities";
 import { HERO_MAX_HEALTH, isHeroDead } from "@/lib/game/hero";
 import {
   BANK_INTEREST_COOLDOWN_MS,
   BANK_INTEREST_SPELL_COST,
+  CITY_DOWNGRADE_COOLDOWN_HOURS,
+  CITY_DOWNGRADE_COOLDOWN_MS,
+  CITY_DOWNGRADE_COST,
+  CITY_DOWNGRADE_MIN_CITIES,
   BOOST_DURATION_MS,
   BOOST_MAX_PCT,
   BOOST_STEP_COST,
@@ -489,6 +494,89 @@ export async function castBankInterestSpell(
     return result;
   } catch (err) {
     await logError("diamondShop.castBankInterestSpell", err);
+    return { error: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/* ------------------------------ city downgrade spell ------------------------------ */
+
+/**
+ * Give up exactly one city tier for diamonds — the only purchase in the shop
+ * that makes the empire smaller.
+ *
+ * Two things make it safe to sell. It is refused below
+ * CITY_DOWNGRADE_MIN_CITIES, so the last city can never be surrendered (an
+ * empire with zero cities has no production multiplier, no population ceiling
+ * and no boss tier — the value simply isn't legal). And the decrement is pinned
+ * to the exact city count the check ran against, so a cast racing a `foundCity`
+ * (which pins the same column) can only ever move the empire by one tier: the
+ * loser of the race matches zero rows and the whole transaction — diamonds
+ * included — rolls back rather than silently costing a second city.
+ *
+ * The hour-long cooldown is the other half of that guarantee at the human scale:
+ * even with the row lock serialising a player's own casts, an unthrottled spell
+ * would let ten clicks walk an empire from city 10 to city 1 in a second, which
+ * is exactly the "I only meant to drop one" support ticket this prevents.
+ *
+ * Nothing is refunded; see CITY_DOWNGRADE_COST for why. Upgrades already bought
+ * above the new tier's ceiling (CITIZEN_GROWTH is capped at 10 levels per city)
+ * are deliberately left standing — they were paid for — they simply cannot be
+ * raised again until the city is founded back.
+ */
+export async function castCityDowngradeSpell(
+  _prev: ActionState,
+  _formData: FormData
+): Promise<ActionState> {
+  try {
+    const empireId = await requireOwnEmpireId();
+    const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
+      const empire = await applyPendingUpdates(empireId, tx);
+      const now = new Date();
+
+      if (empire.cities < CITY_DOWNGRADE_MIN_CITIES) {
+        return {
+          error: `הקסם זמין רק מעיר ${CITY_DOWNGRADE_MIN_CITIES} ומעלה — אין לך עיר לוותר עליה`,
+        };
+      }
+
+      const cd = await tx.diamondEffect.findUnique({
+        where: { empireId_kind: { empireId, kind: "CITY_DOWNGRADE" } },
+      });
+      if (cd?.readyAt && cd.readyAt > now) {
+        const mins = Math.ceil((cd.readyAt.getTime() - now.getTime()) / 60_000);
+        return { error: `הקסם בקירור — זמין בעוד כ־${mins} דקות` };
+      }
+
+      if (!(await spendDiamonds(tx, empireId, CITY_DOWNGRADE_COST))) {
+        return { error: `דרושים ${CITY_DOWNGRADE_COST} יהלומים להטלת הקסם` };
+      }
+
+      // Pinned to the snapshot tier: exactly one city, and only from the tier the
+      // guards above were checked against.
+      const dropped = await tx.empire.updateMany({
+        where: { id: empireId, cities: empire.cities },
+        data: { cities: { decrement: 1 } },
+      });
+      if (dropped.count === 0) throw new Error("city downgrade conflict");
+
+      const readyAt = new Date(now.getTime() + CITY_DOWNGRADE_COOLDOWN_MS);
+      await tx.diamondEffect.upsert({
+        where: { empireId_kind: { empireId, kind: "CITY_DOWNGRADE" } },
+        create: { empireId, kind: "CITY_DOWNGRADE", readyAt },
+        update: { readyAt, activeUntil: null },
+      });
+
+      const to = empire.cities - 1;
+      return {
+        success: `ירדת לעיר ${to} — ${cityName(to)}. הקסם יהיה זמין שוב בעוד ${CITY_DOWNGRADE_COOLDOWN_HOURS} שעה.`,
+      };
+    });
+
+    revalidateGame();
+    return result;
+  } catch (err) {
+    await logError("diamondShop.castCityDowngradeSpell", err);
     return { error: "אירעה שגיאה, נסה שוב" };
   }
 }

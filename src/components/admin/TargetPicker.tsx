@@ -30,13 +30,23 @@ export function TargetPicker({
   guilds,
   empires,
   lockedEmpire,
+  defaultScope = "all",
+  defaultActiveHours = 24,
 }: {
   seasons: { id: string; name: string }[];
   guilds: { id: string; name: string }[];
   empires: { id: string; name: string }[];
   lockedEmpire?: { id: string; name: string };
+  /**
+   * Audience the form opens on. Broadcasts open on everyone; gifts open on the
+   * last day's players, because a gift is meant to bring back the people who
+   * are around, not to top up accounts nobody has logged into for a month.
+   * Either way it is only a default — the admin can pick any audience.
+   */
+  defaultScope?: Scope;
+  defaultActiveHours?: number;
 }) {
-  const [scope, setScope] = useState<Scope>(lockedEmpire ? "empire" : "all");
+  const [scope, setScope] = useState<Scope>(lockedEmpire ? "empire" : defaultScope);
 
   if (lockedEmpire) {
     return (
@@ -68,7 +78,7 @@ export function TargetPicker({
 
       {scope === "active" && (
         <>
-          <select name="scopeId" className={INPUT_CLASS} defaultValue="24">
+          <select name="scopeId" className={INPUT_CLASS} defaultValue={String(defaultActiveHours)}>
             {ACTIVE_WINDOWS.map((w) => (
               <option key={w.hours} value={w.hours}>
                 שיחקו {w.label}

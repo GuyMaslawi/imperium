@@ -177,3 +177,26 @@ export const SHIELD_RENEW_COOLDOWN_MS = SHIELD_RENEW_COOLDOWN_MINUTES * 60_000;
 export const BANK_INTEREST_SPELL_COST = 60;
 export const BANK_INTEREST_COOLDOWN_HOURS = 24;
 export const BANK_INTEREST_COOLDOWN_MS = BANK_INTEREST_COOLDOWN_HOURS * 3_600_000;
+
+/* ------------------------------ city downgrade spell ------------------------------ */
+
+/**
+ * The one spell in the shop that takes something away: it gives up **exactly
+ * one** city tier (`Empire.cities` − 1), never more, and it is refused outright
+ * below {@link CITY_DOWNGRADE_MIN_CITIES} — the first city is the empire itself
+ * and cannot be surrendered.
+ *
+ * Nothing is refunded. A city is bought with resources (`cityCost`) and gated on
+ * hero level, so a refund would turn the pair of spells into a resource pump;
+ * what the player buys here is the *tier*, with everything that hangs off it —
+ * mine multiplier, population ceiling and the bracket he is matched in — and the
+ * way back up is the ordinary price of founding the city again.
+ */
+export const CITY_DOWNGRADE_COST = 500;
+
+/** Below this city count the spell is refused: you cannot give up your last city. */
+export const CITY_DOWNGRADE_MIN_CITIES = 2;
+
+/** One cast per hour, so a tier cannot be shed in a burst of parallel clicks. */
+export const CITY_DOWNGRADE_COOLDOWN_HOURS = 1;
+export const CITY_DOWNGRADE_COOLDOWN_MS = CITY_DOWNGRADE_COOLDOWN_HOURS * 3_600_000;

@@ -28,6 +28,7 @@ import {
   type EmpireIntField,
 } from "@/lib/admin";
 import { BAN_DAYS_MAX, formatBanDate, isBanned } from "@/lib/ban";
+import { GIFT_DEFAULTS, isGameWideScope } from "@/lib/adminBroadcast";
 import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
 import {
@@ -1676,6 +1677,7 @@ const diamondEffectKindSchema = z.enum([
   "TURN_PACK_4",
   "SHIELD_RESOURCES",
   "SHIELD_SOLDIERS",
+  "CITY_DOWNGRADE",
 ]);
 
 /**
@@ -2198,20 +2200,31 @@ export async function broadcastMessage(
     });
     revalidatePath("/game", "layout");
 
-    // Mirrored to the community channel — but only a broadcast to *everyone*.
-    // A message aimed at one guild or one player is not public, and reposting
-    // it to a room its target may not even be in would leak who was told what.
+    // Mirrored to the community channel — every game-wide broadcast, whatever
+    // it says. A message aimed at one season, one guild or one player is not
+    // public, and reposting it to a room its target may not even be in would
+    // leak who was told what; see `isGameWideScope`.
     // Awaited (it is bounded and rare) and unable to fail the send: the players
     // already have the message; Discord is a second copy, not the delivery.
-    if (scope === "all") {
-      await announceToDiscord({
+    //
+    // Word for word what the inbox got — no channel voice, no added prefix, no
+    // footnote about who it went to. The Discord post exists because it pushes
+    // a phone notification and the in-game inbox does not; a player who reads
+    // one and then the other must not be able to tell them apart.
+    let posted = false;
+    if (isGameWideScope(scope)) {
+      posted = await announceToDiscord({
         kind: "announcement",
-        title: `📣 ${title}`,
+        title,
         body,
         url: gameLink("/game/messages"),
       });
     }
-    return { success: `ההודעה נשלחה ל-${empireIds.length} אימפריות` };
+    return {
+      success:
+        `ההודעה נשלחה ל-${empireIds.length} אימפריות` +
+        (posted ? " ופורסמה בדיסקורד" : ""),
+    };
   } catch (e) {
     return toErr(e);
   }
@@ -2282,7 +2295,7 @@ export async function sendGift(
               empireId,
               kind: "SYSTEM" as const,
               title,
-              body: body || "קיבלת מתנה מההנהלה!",
+              body: body || GIFT_DEFAULTS.body,
             })),
           });
         }
@@ -2296,7 +2309,33 @@ export async function sendGift(
       details: { scope, scopeId, bundle, count: empireIds.length },
     });
     revalidatePath("/game", "layout");
-    return { success: `המתנה נשלחה ל-${empireIds.length} אימפריות` };
+
+    // A gift to the whole game is announced for the same reason a broadcast is:
+    // it is news, and the only other way a player learns about it is by
+    // happening to open the game and notice a fuller treasury. Same rule on who
+    // hears it (game-wide audiences only — a guild's prize is that guild's
+    // business), same defensiveness: outside the transaction, after the
+    // revalidate, and unable to fail a gift that has already been credited.
+    //
+    // The post is the accompanying message verbatim — same title, same body,
+    // same fallback the inbox copy used. So it is conditioned on there *being*
+    // one: a silent gift (no title, hence no inbox message) stays silent in the
+    // channel too, rather than the channel announcing something no player was
+    // told about.
+    let posted = false;
+    if (isGameWideScope(scope) && title) {
+      posted = await announceToDiscord({
+        kind: "announcement",
+        title,
+        body: body || GIFT_DEFAULTS.body,
+        url: gameLink("/game/base"),
+      });
+    }
+    return {
+      success:
+        `המתנה נשלחה ל-${empireIds.length} אימפריות` +
+        (posted ? " ופורסמה בדיסקורד" : ""),
+    };
   } catch (e) {
     return toErr(e);
   }
