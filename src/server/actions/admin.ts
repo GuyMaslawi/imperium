@@ -73,6 +73,7 @@ import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
 import { repairGuildLeadership } from "@/server/guildLeadership";
 import { archiveSeasonStandings, closeSeason } from "@/server/seasonClose";
+import { announceToDiscord, gameLink } from "@/server/discord";
 
 export interface AdminActionState {
   error?: string;
@@ -753,8 +754,10 @@ export async function updateBuilding(
     const type = str(formData, "type") as BuildingType;
     const isMine = isProductionBuilding(type);
     // Mines share the player's ceiling; the barracks and the spy center are
-    // built once at level 1 and have no upgrade path at all.
-    const level = clampLevel(num(formData, "level"), 0, isMine ? MINE_MAX_LEVEL : 1);
+    // built once at level 1 and have no upgrade path at all. The floor is 1
+    // for everything: a level-0 mine produces nothing no matter how many
+    // slaves are in it, and the player has no way to see why.
+    const level = clampLevel(num(formData, "level"), 1, isMine ? MINE_MAX_LEVEL : 1);
 
     // Mine slaves are a *shared* pool: the assignment screen refuses any split
     // whose total exceeds the army's `mineSlaves`. This form edits one mine at a
@@ -2193,6 +2196,20 @@ export async function broadcastMessage(
       details: { scope, scopeId, count: empireIds.length },
     });
     revalidatePath("/game", "layout");
+
+    // Mirrored to the community channel — but only a broadcast to *everyone*.
+    // A message aimed at one guild or one player is not public, and reposting
+    // it to a room its target may not even be in would leak who was told what.
+    // Awaited (it is bounded and rare) and unable to fail the send: the players
+    // already have the message; Discord is a second copy, not the delivery.
+    if (scope === "all") {
+      await announceToDiscord({
+        kind: "announcement",
+        title: `📣 ${title}`,
+        body,
+        url: gameLink("/game/messages"),
+      });
+    }
     return { success: `ההודעה נשלחה ל-${empireIds.length} אימפריות` };
   } catch (e) {
     return toErr(e);
@@ -3113,6 +3130,27 @@ async function releaseHappyHour(
       boostMines: released.boostMines,
       minutes,
     },
+  });
+
+  // The one announcement that is genuinely time-critical: a golden hour is
+  // worthless to a player who hears about it after it closed, and most players
+  // are not looking at the game when it opens. Posted from the one function
+  // both release paths go through (createHappyHour with "activate", and
+  // startHappyHour), so a window can never go live without the channel hearing.
+  const effects = [
+    released.boostXp ? "ניסיון" : null,
+    released.boostPlunder ? "שלל" : null,
+    released.boostMines ? "תפוקת מכרות" : null,
+  ].filter(Boolean).join(" · ");
+  await announceToDiscord({
+    kind: "event",
+    title: `🔥 ${released.title} ${multiplierLabel(released.bonusPct)} באוויר`,
+    body:
+      `${effects} מוכפלים לכל השחקנים.\n` +
+      (minutes > 0
+        ? `נסגר בעוד ${minutes} דקות — כדאי להיכנס עכשיו.`
+        : "רץ עד להודעה חדשה."),
+    url: gameLink("/game/base"),
   });
   return { endsAt, minutes };
 }

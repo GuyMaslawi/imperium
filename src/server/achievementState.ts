@@ -3,7 +3,7 @@ import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getEmpireMilitaryPower } from "@/lib/game/power";
-import { PRODUCTION_BUILDING_TYPES } from "@/lib/game/constants";
+import { MINE_START_LEVEL, PRODUCTION_BUILDING_TYPES } from "@/lib/game/constants";
 import {
   ACHIEVEMENTS,
   buildAchievementsState,
@@ -168,11 +168,12 @@ async function querySnapshot(
         WHERE t."empireId" = e.id AND t.type = 'INTEREST')::int
                                                    AS interest_payments,
 
-      -- Mines are created at level 0 and only count as "built" once raised.
+      -- Mines are created at MINE_START_LEVEL, so only a mine raised *above*
+      -- that counts as one the player developed.
       (SELECT count(*) FROM "Building" bd
         WHERE bd."empireId" = e.id
           AND bd.type::text IN (${MINE_TYPES})
-          AND bd.level >= 1)::int                  AS mines_built,
+          AND bd.level > ${MINE_START_LEVEL})::int AS mines_built,
       (SELECT COALESCE(MIN(bd.level), 0) FROM "Building" bd
         WHERE bd."empireId" = e.id
           AND bd.type::text IN (${MINE_TYPES}))::int

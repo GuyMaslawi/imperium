@@ -78,11 +78,12 @@ export function RankActions({
           >
             <Icon name="attack" size={16} className="inline-block align-middle" /> תקיפה
           </ActionButton>
+          {/* No dir="ltr" here: the line is Hebrew with a number in it, and
+              forcing LTR throws the digits to the far side of the word. */}
           <p
             className={`mt-1 text-center text-[10px] ${attackBlockedReason ? "text-emerald-400/80" : "text-zinc-500 nums"}`}
-            dir={attackBlockedReason ? "rtl" : "ltr"}
           >
-            {attackBlockedReason ?? `${ATTACK_TURN_COST} תורות`}
+            {attackBlockedReason ?? <>{ATTACK_TURN_COST} תורות</>}
           </p>
         </form>
         <form action={spyAction}>
@@ -95,7 +96,7 @@ export function RankActions({
           >
             <Icon name="spy" size={16} className="inline-block align-middle" /> ריגול
           </ActionButton>
-          <p className="mt-1 text-center text-[10px] text-zinc-500 nums" dir="ltr">
+          <p className="mt-1 text-center text-[10px] text-zinc-500 nums">
             {SPY_TURN_COST} תורות
           </p>
         </form>

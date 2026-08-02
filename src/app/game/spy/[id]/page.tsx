@@ -94,10 +94,14 @@ function Tile({
         {icon && <Icon name={icon} size={14} className={iconClass} />}
         {label}
       </p>
-      <p className={`nums mt-0.5 text-lg font-black ${tone}`} dir="ltr">
+      {/* These take Hebrew phrases as often as bare digits ("שלל צפוי 1.2M"),
+          so they must NOT force LTR — a bare number renders correctly in the
+          RTL flow anyway, but a forced LTR run throws the digits to the far
+          side of their Hebrew label. */}
+      <p className={`nums mt-0.5 text-lg font-black ${tone}`}>
         {value}
       </p>
-      {sub && <p className="nums mt-0.5 text-[10px] text-zinc-500" dir="ltr">{sub}</p>}
+      {sub && <p className="nums mt-0.5 text-[10px] text-zinc-500">{sub}</p>}
     </div>
   );
 }
@@ -115,7 +119,7 @@ function Line({
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border-subtle pb-2 last:border-0">
       <dt className="text-zinc-400">{label}</dt>
-      <dd className={`nums font-bold ${tone}`} dir="ltr">
+      <dd className={`nums font-bold ${tone}`}>
         {value}
       </dd>
     </div>
@@ -308,9 +312,9 @@ export default async function SpyResultPage({
 
       {/* ------------------------------ actions ------------------------------ */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <p className="nums text-xs text-zinc-500" dir="ltr">
+        <p className="nums text-xs text-zinc-500">
           <Icon name="turns" size={13} className="inline-block align-middle" />{" "}
-          {formatDate(report.createdAt)} · {report.turnsSpent} תורות
+          <span dir="ltr">{formatDate(report.createdAt)}</span> · {report.turnsSpent} תורות
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href={`/game/empires/${foe.id}`} className="btn btn-gold px-5 py-2 text-sm">
@@ -382,8 +386,8 @@ function Verdict({
           </div>
           <DuelBar leftPct={myShare} />
           {report.guildBonus ? (
-            <p className="nums mt-2 text-[11px] text-violet-300" dir="ltr">
-              קסם ברית +{Math.round(report.guildBonus)}%
+            <p className="nums mt-2 text-[11px] text-violet-300">
+              קסם ברית <span dir="ltr">+{Math.round(report.guildBonus)}%</span>
             </p>
           ) : null}
         </div>
@@ -521,8 +525,8 @@ function FullDossier({
           title="מחסנים — מחוץ להישג יד"
           hint="מה שנמצא במחסן לא נבזז לעולם. הרמה קובעת את הקיבולת — מחסן מלא מסמן שהיעד עומד לגלוש החוצה."
           aside={
-            <span className="nums text-xs font-bold text-zinc-400" dir="ltr">
-              סה״כ {formatNumber(totalStored)}
+            <span className="nums text-xs font-bold text-zinc-400">
+              סה״כ <span dir="ltr">{formatNumber(totalStored)}</span>
             </span>
           }
         >
@@ -539,8 +543,8 @@ function FullDossier({
                     <span className="flex items-center gap-1.5 text-zinc-300">
                       <Icon name={meta.icon} size={15} className={resourceIcon(meta.resourceKey).className} />
                       {meta.label}
-                      <span className="nums text-zinc-500" dir="ltr">
-                        רמה {storage.level}
+                      <span className="nums text-zinc-500">
+                        רמה <span dir="ltr">{storage.level}</span>
                       </span>
                     </span>
                     <span className="nums font-bold text-zinc-200" dir="ltr">
@@ -714,8 +718,8 @@ function FullDossier({
                     {meta.label}
                   </span>
                   <span className="flex items-center gap-2">
-                    <span className="nums rounded-md border border-gold/40 bg-gold/10 px-1.5 text-xs font-bold text-gold-bright" dir="ltr">
-                      רמה {building.level}
+                    <span className="nums rounded-md border border-gold/40 bg-gold/10 px-1.5 text-xs font-bold text-gold-bright">
+                      רמה <span dir="ltr">{building.level}</span>
                     </span>
                     {meta.supportsSlaves && (
                       <span className="nums inline-flex items-center gap-1 text-xs text-zinc-400" dir="ltr">
@@ -769,9 +773,11 @@ function FullDossier({
           title="הגיבור"
           gold
           aside={
-            <span className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold" dir="ltr">
-              רמה {intel.hero.level}
-              {intel.hero.resets > 0 && <span className="text-purple-300">↻×{intel.hero.resets}</span>}
+            <span className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
+              רמה <span dir="ltr">{intel.hero.level}</span>
+              {intel.hero.resets > 0 && (
+                <span className="text-purple-300" dir="ltr">↻×{intel.hero.resets}</span>
+              )}
             </span>
           }
         >
@@ -917,12 +923,13 @@ function ArsenalCategory({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-sm font-bold text-gold">
           <span aria-hidden>{meta.icon}</span> {meta.label}
-          <span className="nums text-xs font-normal text-zinc-500" dir="ltr">
-            {formatNumber(totalCount)} פריטים · דרגה פתוחה {unlockedTier}
+          <span className="nums text-xs font-normal text-zinc-500">
+            <span dir="ltr">{formatNumber(totalCount)}</span> פריטים · דרגה פתוחה{" "}
+            <span dir="ltr">{unlockedTier}</span>
           </span>
         </h4>
-        <span className="nums text-sm font-black text-gold-bright" dir="ltr">
-          {meta.powerLabel} {formatNumber(totalPower)}
+        <span className="nums text-sm font-black text-gold-bright">
+          {meta.powerLabel} <span dir="ltr">{formatNumber(totalPower)}</span>
         </span>
       </div>
 

@@ -198,7 +198,6 @@ export function HeroBag({
             )}
             <span
               className={`nums ${bagFull ? "font-black text-red-400" : ""}`}
-              dir="ltr"
             >
               {selecting
                 ? `${selectedCount} נבחרו`

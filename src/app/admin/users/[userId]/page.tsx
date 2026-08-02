@@ -19,6 +19,7 @@ import {
   EMPIRE_UPGRADE_META,
   EMPIRE_UPGRADE_TYPES,
   MINE_MAX_LEVEL,
+  MINE_START_LEVEL,
   STORAGE_META,
   STORAGE_TYPES,
   empireUpgradeMaxLevel,
@@ -381,10 +382,10 @@ export default async function AdminUserDetail({
                         label="רמה"
                         name="level"
                         type="number"
-                        min={0}
+                        min={1}
                         max={isMine ? MINE_MAX_LEVEL : 1}
-                        defaultValue={b?.level ?? 0}
-                        hint={isMine ? `מקסימום ${MINE_MAX_LEVEL}` : "0 או 1"}
+                        defaultValue={b?.level ?? MINE_START_LEVEL}
+                        hint={isMine ? `${MINE_START_LEVEL}–${MINE_MAX_LEVEL}` : "תמיד 1"}
                       />
                       {meta.supportsSlaves && (
                         <LabeledInput

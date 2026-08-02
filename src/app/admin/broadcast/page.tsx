@@ -10,11 +10,13 @@ import {
 } from "@/components/admin/fields";
 import { TargetPicker } from "@/components/admin/TargetPicker";
 import { broadcastMessage, sendGift } from "@/server/actions/admin";
+import { isDiscordAnnouncerConfigured } from "@/server/discord";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminBroadcastPage() {
   await requireAdmin();
+  const discordAnnouncer = isDiscordAnnouncerConfigured();
 
   const [seasons, guilds, empires] = await Promise.all([
     prisma.gameSeason.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } }),
@@ -30,6 +32,20 @@ export default async function AdminBroadcastPage() {
         <EditorSection title="שידור הודעה" icon="📣">
           <p className="mb-3 text-xs text-zinc-400">
             שלח הודעת מערכת לכל השחקנים, לפעילים בלבד, לעונה, לברית או לשחקן בודד. ההודעה מופיעה בתיבת ההודעות ובהתראות החיות.
+          </p>
+          {/* An admin typing a broadcast has no other way to know it is about
+              to be reposted publicly — and the rule (all-players only) is not
+              guessable from the form. It is stated here, next to the field. */}
+          <p
+            className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
+              discordAnnouncer
+                ? "border-[#5865F2]/45 bg-[#5865F2]/10 text-[#c7ccff]"
+                : "border-border-subtle bg-black/25 text-zinc-500"
+            }`}
+          >
+            {discordAnnouncer
+              ? "שידור לכלל השחקנים מתפרסם אוטומטית גם בערוץ הדיסקורד. שידור לעונה, לברית או לשחקן בודד — לא."
+              : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL לא מוגדר)."}
           </p>
           <ActionForm action={broadcastMessage} submitLabel="שדר הודעה">
             <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />

@@ -82,7 +82,7 @@ export default function PrivacyPage() {
         </P>
       </Clause>
 
-      <Clause n={4} title="עוגיות (Cookies)">
+      <Clause n={4} title="עוגיות">
         <Callout>
           אנחנו משתמשים ב<T>עוגייה חיונית אחת</T> בלבד — זו ששומרת את החיבור שלך
           לחשבון. אין באתר עוגיות פרסום, אין רשתות מעקב ואין כלי אנליטיקה של צד שלישי.

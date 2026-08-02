@@ -31,6 +31,7 @@ import { getHappyHourState } from "@/server/actions/happyHour";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
 import { getCollectableAchievements } from "@/server/achievementState";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
+import { discordInviteUrl } from "@/server/discord";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
   // requireEmpire applies all pending regular/daily updates (lazy game clock).
@@ -165,7 +166,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       {/* The chat dock rides in the corner of every game screen — the public
           room and private conversations, without leaving the page you are on.
           Admins get the moderation control on each line. */}
-      <ChatDock canModerate={admin} />
+      <ChatDock canModerate={admin} discordUrl={discordInviteUrl()} />
       <ResourceBar
         resources={{
           gold: empire.gold,

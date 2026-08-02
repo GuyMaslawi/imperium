@@ -44,8 +44,8 @@ export default async function AdminBalancePage() {
                         dir="ltr"
                         className={INPUT_CLASS}
                       />
-                      <span className="block text-[11px] text-zinc-500" dir="ltr">
-                        ברירת מחדל: {defaults[field]}
+                      <span className="block text-[11px] text-zinc-500">
+                        ברירת מחדל: <span dir="ltr">{defaults[field]}</span>
                       </span>
                     </label>
                   ))}

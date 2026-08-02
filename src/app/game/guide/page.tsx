@@ -164,6 +164,7 @@ import {
   CHAT_REPEAT_WINDOW_MS,
   PRESENCE_ONLINE_MS,
 } from "@/lib/game/chat";
+import { COMMUNITY_HIGHLIGHTS, DISCORD_JOIN_DIAMONDS } from "@/lib/community";
 import {
   BOOST_MAX_PCT,
   BOOST_STEP_COST,
@@ -229,6 +230,7 @@ const SECTIONS = {
   bosses: { id: "bosses", title: "שליטי הערים", sub: "city bosses", icon: "shield" },
   guild: { id: "guild", title: "ברית", sub: "guilds", icon: "guild" },
   chat: { id: "chat", title: "צ׳אט", sub: "live chat", icon: "chat" },
+  community: { id: "community", title: "קהילה", sub: "community", icon: "discord" },
   rewards: { id: "rewards", title: "גלגל, פס עונה ואירועים", sub: "rewards", icon: "wheel" },
   diamonds: { id: "diamonds", title: "יהלומים", sub: "diamonds", icon: "diamond" },
   roadmap: { id: "roadmap", title: "מסלול התקדמות", sub: "roadmap", icon: "rankings" },
@@ -309,7 +311,6 @@ export default async function GuidePage() {
     <div className="space-y-6">
       <SectionHeading
         title="מדריך המשחק"
-        subtitle="THE KRALDOR FIELD MANUAL"
         ornament={<Icon name="reports" size={22} className="text-crimson" />}
       />
 
@@ -605,7 +606,7 @@ export default async function GuidePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {[0, 1, 2, 5, 10, 25, 50, 75, 100, 150, 200, 249].map((lvl) => (
+                      {[1, 2, 3, 5, 10, 25, 50, 75, 100, 150, 200, 249].map((lvl) => (
                         <tr key={lvl}>
                           <td className="nums font-bold text-bone-bright" dir="ltr">
                             {lvl} → {lvl + 1}
@@ -2319,7 +2320,52 @@ export default async function GuidePage() {
               </Note>
             </GuideSection>
 
-            {/* ============================ 20 rewards ============================ */}
+            {/* ============================ 20 community ============================ */}
+            <GuideSection meta={SECTIONS.community} index={INDEX.community}>
+              <Lead>
+                מחוץ למשחק יש ערוץ דיסקורד — שם יושבות ההכרזות, גיוס לבריתות, שאלות
+                טקטיקה ודיווחי באגים. אפשר לשחק בלעדיו לגמרי; פשוט תדעו על שעת זהב
+                אחרי כולם.
+              </Lead>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {COMMUNITY_HIGHLIGHTS.map((item) => (
+                  <div key={item.title} className="panel-inset rounded-xl p-4">
+                    <p className="flex items-center gap-2 font-black text-gold-bright">
+                      <Icon
+                        name={item.icon}
+                        size={17}
+                        className="shrink-0 text-crimson-bright"
+                      />
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-[0.8rem] leading-relaxed text-zinc-400">
+                      {item.body}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <Note tone="green" icon="gift" title="מתנת הצטרפות חד־פעמית">
+                אימפריה שמצטרפת לערוץ אוספת <b className="nums">{DISCORD_JOIN_DIAMONDS}</b>{" "}
+                יהלומים, פעם אחת בחיי החשבון. אין בוט שבודק — הכפתור עובד על אמון, ולכן
+                גם הסכום צנוע בכוונה. הכפתור נמצא בעמוד הקהילה.
+              </Note>
+
+              <Note tone="red" icon="shield" title="אף אחד מהצוות לא יבקש סיסמה">
+                לא בדיסקורד, לא בצ׳אט של המשחק ולא בהודעה פרטית. כל בקשה כזו — גם אם היא
+                מגיעה משם שנראה מוכר — היא ניסיון גניבת חשבון. אותו כלל חל על קודי אימות
+                ופרטי תשלום.
+              </Note>
+
+              <div className="flex justify-center">
+                <Link href="/game/community" className="btn btn-gold px-5 py-2 text-sm">
+                  <Icon name="discord" size={16} className="inline align-[-2px]" /> לעמוד הקהילה
+                </Link>
+              </div>
+            </GuideSection>
+
+            {/* ============================ 21 rewards ============================ */}
             <GuideSection meta={SECTIONS.rewards} index={INDEX.rewards}>
               <Lead>
                 שלושה מקורות פרסים שמתחדשים מעצמם — כולם על אותו שעון של העדכון היומי,
@@ -2410,7 +2456,7 @@ export default async function GuidePage() {
               </div>
             </GuideSection>
 
-            {/* ============================ 21 diamonds ============================ */}
+            {/* ============================ 22 diamonds ============================ */}
             <GuideSection meta={SECTIONS.diamonds} index={INDEX.diamonds}>
               <Lead>
                 יהלומים הם המטבע הנדיר. הם לא נופלים ממכרות, לא מהעונה ולא מחפצי
@@ -2491,7 +2537,7 @@ export default async function GuidePage() {
               </div>
             </GuideSection>
 
-            {/* ============================ 22 roadmap ============================ */}
+            {/* ============================ 23 roadmap ============================ */}
             <GuideSection meta={SECTIONS.roadmap} index={INDEX.roadmap}>
               <Lead>
                 אם אתה לא יודע מה לעשות עכשיו — זה הסדר שעובד. כל שלב פותח את הבא אחריו.

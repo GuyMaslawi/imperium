@@ -290,7 +290,7 @@ export function ReportsTabs({
                         {r.attackerIntel !== null && r.defenderIntel !== null ? (
                           <>
                             {r.isAttacker ? " · " : ""}כח מודיעין:{" "}
-                            <span className="nums" dir="ltr">
+                            <span className="nums">
                               {num(Math.round(r.isAttacker ? r.attackerIntel : r.defenderIntel))} (שלך) מול{" "}
                               {num(Math.round(r.isAttacker ? r.defenderIntel : r.attackerIntel))}
                             </span>

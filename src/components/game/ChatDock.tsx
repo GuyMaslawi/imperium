@@ -11,6 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
+import { DiscordLink } from "@/components/ui/DiscordLink";
 // The dot is shared with the rankings ladder — see components/ui/PresenceDot.
 import { PresenceDot } from "@/components/ui/PresenceDot";
 import {
@@ -123,7 +124,18 @@ function mergeLines(current: ChatLine[], incoming: ChatLine[], cap: number) {
 
 const LINE_CAP = 120;
 
-export function ChatDock({ canModerate = false }: { canModerate?: boolean }) {
+export function ChatDock({
+  canModerate = false,
+  discordUrl = null,
+}: {
+  canModerate?: boolean;
+  /**
+   * The community channel's invite, or null while it is being built. Passed
+   * down from the game layout rather than read here: the value lives in a
+   * server-only module (see server/discord.ts).
+   */
+  discordUrl?: string | null;
+}) {
   const mounted = useSyncExternalStore(
     subscribeStore,
     hydratedSnapshot,
@@ -843,6 +855,17 @@ export function ChatDock({ canModerate = false }: { canModerate?: boolean }) {
           ✕
         </button>
       </div>
+
+      {/* The public room is exactly where someone is already looking for other
+          players, so it is where the bigger room is worth mentioning — once,
+          quietly, above the log and never inside a private conversation. */}
+      {tab === "global" && !partner && (
+        <DiscordLink
+          url={discordUrl}
+          variant="strip"
+          label="הקהילה נפגשת בדיסקורד — הצטרפו"
+        />
+      )}
 
       {tab === "direct" && !partner ? threadList : messageList}
       {(tab === "global" || partner) && composer}

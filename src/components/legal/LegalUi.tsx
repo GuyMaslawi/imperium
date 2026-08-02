@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogoMark } from "@/components/ui/Logo";
 import { formatLegalDate, getLegalOperator } from "@/lib/legal";
+import { OperatorCredit } from "@/components/ui/OperatorCredit";
 
 /**
  * Shared furniture for the three public policy pages (/terms, /refund,
@@ -122,6 +123,8 @@ export function LegalShell({
             חזרה למשחק
           </Link>
         </nav>
+
+        <OperatorCredit className="mt-5" />
       </div>
     </main>
   );

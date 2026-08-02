@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { announceToDiscord, gameLink } from "@/server/discord";
 
 /**
  * The end of a season, and the gate it closes behind it.
@@ -422,21 +423,54 @@ export async function closeSeason(
         where: { id: seasonId },
         select: { id: true, name: true, startsAt: true, endsAt: true, recap: true, closedAt: true },
       });
-      if (!season || season.closedAt) return false;
+      if (!season || season.closedAt) return null;
 
       const claimed = await tx.gameSeason.updateMany({
         where: { id: seasonId, closedAt: null },
         data: { closedAt: now },
       });
-      if (claimed.count === 0) return false;
+      if (claimed.count === 0) return null;
 
       await archiveSeason(tx, season);
-      return true;
+      return season.name;
     },
     { timeout: 30_000 }
   );
 
-  return closed;
+  // Announced by the single caller that won the race above, and only after the
+  // hall has actually been written — so the post can never advertise a podium
+  // that a rolled-back transaction never archived. Read back rather than
+  // returned from inside: `archiveSeason` writes with `skipDuplicates`, so the
+  // rows in the hall are the truth, including for a season the admin archived
+  // manually before the clock ran out. Never inside the transaction: this is a
+  // network call.
+  if (closed !== null) {
+    const podium = await prisma.seasonChampion.findMany({
+      where: { seasonId },
+      orderBy: { rank: "asc" },
+      take: 3,
+      select: { rank: true, empireName: true, playerName: true },
+    });
+    const medals = ["🥇", "🥈", "🥉"];
+    await announceToDiscord({
+      kind: "season",
+      title: `🏛️ ${closed} הסתיימה`,
+      body:
+        (podium.length > 0
+          ? podium
+              .map(
+                (row) =>
+                  `${medals[row.rank - 1] ?? ""} **${row.empireName}**` +
+                  (row.playerName ? ` (${row.playerName})` : "")
+              )
+              .join("\n")
+          : "העונה נסגרה ללא פודיום.") +
+        "\n\nהשמות נחקקו בהיכל התהילה. העונה הבאה בדרך.",
+      url: gameLink("/game/rankings"),
+    });
+  }
+
+  return closed !== null;
 }
 
 /* -------------------------------- gate -------------------------------- */

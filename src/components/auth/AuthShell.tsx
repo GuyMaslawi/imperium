@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { LogoMark } from "@/components/ui/Logo";
+import { DiscordLink } from "@/components/ui/DiscordLink";
+import { OperatorCredit } from "@/components/ui/OperatorCredit";
+import { discordInviteUrl } from "@/server/discord";
 
 export function AuthShell({
   children,
@@ -10,6 +13,7 @@ export function AuthShell({
   /** Widen the shell for screens with the visual hero-class picker. */
   wide?: boolean;
 }) {
+  const discord = discordInviteUrl();
   return (
     <main className="flex min-h-screen flex-1 items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(224,35,51,0.10),transparent_60%)] px-4 py-12">
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"}`}>
@@ -28,6 +32,16 @@ export function AuthShell({
         <div className="ornate-shell rounded-2xl p-6">
           {children}
         </div>
+
+        {/* Below the form, not inside it: someone who cannot get in — a
+            forgotten password, an unverified address, a ban they want to argue
+            — has nowhere else on this screen to reach a human, and the channel
+            is that place. Hidden entirely until the invite is configured. */}
+        {discord && (
+          <div className="mt-5 flex justify-center">
+            <DiscordLink url={discord} variant="pill" label="הצטרפו לקהילה בדיסקורד" />
+          </div>
+        )}
 
         {/* The public entry point is where a payment gateway's underwriter (and
             a player looking for the refund rules) goes hunting for the
@@ -49,6 +63,8 @@ export function AuthShell({
             פרטיות
           </Link>
         </nav>
+
+        <OperatorCredit className="mt-3" />
       </div>
     </main>
   );

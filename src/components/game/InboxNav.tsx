@@ -158,6 +158,11 @@ export function InboxNav({
           <Tip key={e.href} tip={e.tip} side="bottom">
             <Link
               href={e.href}
+              // Same reasoning as the sidebar rows (see Sidebar's navItems):
+              // these pills sit in the command bar on every screen, so the
+              // default viewport prefetch renders each destination on the
+              // server again every time any page in the game is opened.
+              prefetch={false}
               aria-label={
                 e.count > 0 ? `${e.label} — ${e.count} חדשים` : e.label
               }

@@ -360,6 +360,16 @@ model Empire {
   /// the empire — a plunder, an admin gift, a settle — so presence read from it
   /// would light up players who are asleep and being raided.
   lastSeenAt          DateTime?
+  /// When the player collected the one-time welcome purse for joining the
+  /// community channel (see /game/community). The column *is* the receipt: the
+  /// claim is a single guarded UPDATE with `discordJoinedAt IS NULL` in its
+  /// WHERE, so two simultaneous clicks can never both pay out.
+  ///
+  /// It is not proof of anything. Nothing on the Discord side reports back —
+  /// there is no bot — so this records that the player pressed the button, not
+  /// that they are in the room. See DISCORD_JOIN_DIAMONDS for why the purse is
+  /// deliberately small.
+  discordJoinedAt     DateTime?
   /// New-player shield: while this is in the future the empire cannot be
   /// attacked or spied. Set at registration; cleared early the moment the
   /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).

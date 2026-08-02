@@ -128,15 +128,17 @@ export const RESOURCE_TO_MINE: Record<StorableResource, ProductionBuildingType> 
 /* ------------------------------ mines ------------------------------ */
 
 /**
- * Highest mine level. Yield per slave runs 0, 2, 4, … up to 500, so the top
+ * Highest mine level. Yield per slave runs 2, 4, … up to 500, so the top
  * level is 250 (level × 2 = 500).
  */
 export const MINE_MAX_LEVEL = 250;
 
+/** Level every mine is created at. Mines are built from the start — see newEmpireData. */
+export const MINE_START_LEVEL = 1;
+
 /**
- * Production per assigned mine slave per regular update. The yield runs
- * 0, 2, 4, … up to 500 (level × 2) — an unupgraded mine (level 0) produces
- * nothing until it is upgraded.
+ * Production per assigned mine slave per regular update: level × 2, so the
+ * starting level-1 mine already pays 2 per slave and the cap pays 500.
  */
 export function mineProductionValue(level: number): number {
   // Floored. Nothing in the game writes a negative mine level today — the
@@ -162,7 +164,7 @@ const MINE_UPGRADE_BASE: Record<StorableResource, number> = {
 
 /**
  * Cost to upgrade a mine from `level` to `level + 1`. Priced by the next
- * tier so the first upgrade (level 0 → 1) is never free. Each mine is
+ * tier, so the price rises with every rung. Each mine is
  * upgraded with its own resource only — a gold mine costs gold, a wood
  * camp costs wood, and so on; the other three resources are always 0.
  */

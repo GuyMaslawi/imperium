@@ -7754,3 +7754,95 @@ body {
   .hh-spark,
   .hh-shock { display: none; }
 }
+
+/* ============================================================================
+   מסך הקהילה — ערוץ הדיסקורד (prefix: disc-)
+   A quiet scene, on purpose: this screen is a doorway out of the game, so the
+   banner glows and drifts rather than competing with the war rooms. Blurple is
+   Discord's own colour and appears nowhere else in the app — which is exactly
+   why it reads instantly as "this is the other place".
+   ========================================================================== */
+
+.disc-scene {
+  position: relative;
+  overflow: hidden;
+}
+
+/* One soft light behind the mark. Radial rather than a box-shadow so it can
+   bleed past the panel's own edge without repainting the border. */
+.disc-glow {
+  position: absolute;
+  inset: -40% 10% auto 10%;
+  height: 150%;
+  background: radial-gradient(
+    50% 45% at 50% 30%,
+    rgba(88, 101, 242, 0.28),
+    rgba(88, 101, 242, 0.07) 45%,
+    transparent 72%
+  );
+  animation: disc-glow-breathe 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes disc-glow-breathe {
+  0%, 100% { opacity: 0.65; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.06); }
+}
+
+/* Chat bubbles rising through the panel — the only literal thing in the scene.
+   Positions and delays come from a fixed table in the page (see BUBBLES), never
+   from Math.random(), so SSR and hydration agree. */
+.disc-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.disc-bubbles > span {
+  position: absolute;
+  bottom: -2rem;
+  left: var(--x);
+  width: 14px;
+  height: 11px;
+  border-radius: 6px 6px 6px 1px;
+  background: rgba(140, 152, 255, 0.5);
+  box-shadow: 0 0 10px rgba(88, 101, 242, 0.45);
+  transform: scale(var(--s, 1));
+  animation: disc-bubble-rise var(--dur, 15s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes disc-bubble-rise {
+  0% { opacity: 0; transform: translateY(0) scale(var(--s, 1)); }
+  12% { opacity: 0.9; }
+  70% { opacity: 0.55; }
+  100% { opacity: 0; transform: translateY(-15rem) scale(var(--s, 1)); }
+}
+
+/* The mark itself: lit, and bobbing just enough to look awake. */
+.disc-mark {
+  filter: drop-shadow(0 4px 18px rgba(88, 101, 242, 0.6));
+  animation: disc-mark-bob 4.5s ease-in-out infinite;
+}
+
+@keyframes disc-mark-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+/* Content rides above every decoration — same z-index contract as every other
+   scene on the site. */
+.disc-body {
+  position: relative;
+  z-index: 2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disc-glow,
+  .disc-mark,
+  .disc-bubbles > span {
+    animation: none;
+  }
+  /* The bubbles exist only as motion; parked, they are seven dots in a panel. */
+  .disc-bubbles { display: none; }
+}

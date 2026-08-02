@@ -441,10 +441,7 @@ export function WheelOfFortune({
           </button>
         </div>
 
-        <p className="text-[10px] font-bold uppercase tracking-[0.4em] text-gold-dim">
-          Wheel of Fortune
-        </p>
-        <h2 className="mt-0.5 text-3xl font-black text-gold-bright">גלגל המזל</h2>
+        <h2 className="text-3xl font-black text-gold-bright">גלגל המזל</h2>
         <div className="rule-gold mx-auto mt-2 w-40" />
 
         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-panel-inset px-4 py-1 text-sm shadow-[inset_0_1px_0_rgba(228,195,90,0.12)]">

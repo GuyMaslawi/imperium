@@ -3,6 +3,7 @@ import type { HeroClass, Prisma } from "@prisma/client";
 import {
   BUILDING_TYPES,
   EMPIRE_UPGRADE_TYPES,
+  MINE_START_LEVEL,
   NEWBIE_PROTECTION_MS,
   STORAGE_TYPES,
   isProductionBuilding,
@@ -53,10 +54,13 @@ export function newEmpireData(
     protectedUntil: new Date(Date.now() + NEWBIE_PROTECTION_MS),
     buildings: {
       create: BUILDING_TYPES.map((type) => ({
+        // Every building — mines included — starts built at level 1. Mines used
+        // to start at level 0, which yields nothing: a new player assigned
+        // slaves, watched the rig animation stay dead and had no way to tell
+        // that the mine simply wasn't built yet. Level 1 produces from the
+        // first tick, so training and assigning slaves visibly does something.
         type,
-        // Mines start unupgraded (level 0 → 0 yield) until the player upgrades
-        // them; non-production buildings start built at level 1.
-        level: isProductionBuilding(type) ? 0 : 1,
+        level: isProductionBuilding(type) ? MINE_START_LEVEL : 1,
         slavesAssigned: isProductionBuilding(type) ? starting.slavesPerMine : 0,
       })),
     },

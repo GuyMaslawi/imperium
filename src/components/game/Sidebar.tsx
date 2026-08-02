@@ -241,6 +241,24 @@ function SidebarContent({
 }: SidebarProps & { pathname: string }) {
   // One flat list — no section headings. History lives in the top command bar
   // (see InboxNav), so it deliberately has no entry here.
+  //
+  // Every row below renders with `prefetch={false}`, which is not the usual
+  // advice and is deliberate. Next prefetches a <Link> the moment it enters the
+  // viewport, and this whole list is in the viewport on every screen of the
+  // game — so one page view asked the server to render fifteen more. None of
+  // them are static, so each prefetch is a real function invocation with real
+  // queries behind it, and a dynamic prefetch is not reused for long, so
+  // navigating re-fires the entire list.
+  //
+  // What that cost in production: during one player's evening session, 2,106 of
+  // his 2,328 requests were prefetches — a 10:1 ratio of speculative renders to
+  // pages he actually opened. Attacking is the worst case, because the action
+  // redirects to a fresh battle report and the sidebar re-mounts each time; two
+  // or three attacks in a row were enough to cross Vercel's per-IP ceiling and
+  // hand him a 429 on the report he had just earned.
+  //
+  // The navigation still feels instant without it: every /game route has a
+  // loading.tsx, so the skeleton paints immediately on click.
   const navItems: NavItem[] = [
     { href: "/game/base", label: "בסיס", icon: "base" },
     {
@@ -292,6 +310,10 @@ function SidebarContent({
     },
     { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
     { href: "/game/guide", label: "מדריך", icon: "reports" },
+    // Points at the game's own community page rather than straight out to
+    // Discord: the invite may not exist yet, the page works either way, and a
+    // player who lands there also gets the house rules and the welcome purse.
+    { href: "/game/community", label: "קהילה", icon: "discord" },
   ];
 
   const xpPct = heroXpMax > 0 ? Math.round((heroXp / heroXpMax) * 100) : 0;
@@ -449,6 +471,10 @@ function SidebarContent({
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  // Prefetch off — see the note above `navItems`. Every row here
+                  // is in the viewport at all times, so the default would fire a
+                  // request per row on every render.
+                  prefetch={false}
                   className={`group flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
                     active
                       ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"

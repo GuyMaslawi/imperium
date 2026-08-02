@@ -13,7 +13,7 @@ import "server-only";
  * Set on Vercel (and in `.env` for local work):
  *   LEGAL_OPERATOR_NAME   "ישראל ישראלי"        — the name on the dealer certificate
  *   LEGAL_OPERATOR_TAX_ID "123456789"           — מספר עוסק (for an עוסק פטור: your ת.ז.)
- *   LEGAL_CONTACT_EMAIL   "support@example.com" — where cancellation requests land
+ *   LEGAL_CONTACT_EMAIL   "kraldorsupport@gmail.com" — where cancellation requests land
  *   LEGAL_OPERATOR_CITY   "תל אביב"             — city is enough; a street address is not required
  */
 
@@ -45,9 +45,15 @@ export interface LegalOperator {
  * Deliberately a *label* rather than an invented name: a plausible-looking
  * placeholder read as a real disclosure, which is worse than an obvious gap.
  * The pages pair it with an explicit notice while `complete` is false.
+ *
+ * The address, unlike the name, is the game's real support mailbox rather than
+ * a placeholder: a page that prints an unreachable address is worse than one
+ * that prints the working one, and here the fallback only shows up when
+ * LEGAL_CONTACT_EMAIL was forgotten on a deploy — exactly when a player who
+ * needs to reach us still has to be able to.
  */
 const FALLBACK_NAME = "מפעיל השירות";
-const FALLBACK_EMAIL = "support@kraldor.com";
+const FALLBACK_EMAIL = "kraldorsupport@gmail.com";
 
 /**
  * The env vars that must be set before the game may take money, and which of

@@ -26,9 +26,13 @@ Vercel → redeploy. Nothing in the repo needs to change.
 
 ### 1.2 Publish the operator identity · **contained in code 08-01, still needs your details**
 
-`LEGAL_OPERATOR_NAME`, `LEGAL_OPERATOR_TAX_ID`, `LEGAL_CONTACT_EMAIL` and
-`LEGAL_OPERATOR_CITY` are commented out in `.env`, so unless they are set in
-Vercel the operator is unpublished.
+`LEGAL_OPERATOR_NAME` = `GM-business` (the עוסק פטור) and `LEGAL_CONTACT_EMAIL` =
+`kraldorsupport@gmail.com` are set in `.env` **and** on Vercel production.
+`LEGAL_OPERATOR_TAX_ID` is set locally but **not** on Vercel, and
+`LEGAL_OPERATOR_CITY` is still commented out — so in production the operator is
+one value short of published and the store stays shut. Adding the dealer number
+to Vercel is the last step, and it is a deliberate one: for an עוסק פטור that
+number is your ת.ז., and the policy pages print it publicly.
 
 **The exposure itself is now closed by construction** — selling without naming
 the merchant is what the law and the gateways care about, so that state can no
@@ -41,8 +45,9 @@ longer happen:
 - The buy screen tells an admin exactly which of the three go-live conditions is
   missing, by env var name.
 
-What is left is the input only you have: set the four values on Vercel (and in
-`.env` for local work) and the pages fill themselves in, the interlock opens.
+What is left is the input only you have: set the remaining values on Vercel (and
+in `.env` for local work) — the name and the dealer number are the two the
+interlock still waits on — and the pages fill themselves in, the interlock opens.
 For an עוסק פטור the dealer number is your ת.ז. See `src/lib/legal.ts`.
 
 ### 1.3 Confirm `TRUSTED_PROXY_HOPS` matches Vercel's edge

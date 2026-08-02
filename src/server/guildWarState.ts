@@ -11,6 +11,7 @@ import {
 import { weaponsPower } from "@/lib/game/weapons";
 import { guildAidPct } from "@/lib/game/guild";
 import { secureRandom } from "@/lib/game/random";
+import { announceToDiscord, gameLink } from "@/server/discord";
 import {
   applySwing,
   GUILD_WAR_DEFENDER_SHIFT,
@@ -428,15 +429,21 @@ async function messageMembers(
  * Rank one finished war and pay it out. Idempotent: the status flip is a
  * guarded update, so of two readers arriving together at 20:00 exactly one
  * settles and the other finds nothing to do.
+ *
+ * The Discord post is built inside the transaction and sent *after* it commits.
+ * A network call inside a transaction holds a database connection open for the
+ * length of somebody else's outage — and only the reader that actually won the
+ * settlement race builds a podium, so the channel gets exactly one post per
+ * war however many players happen to open the arena at 20:00.
  */
 async function settleWar(warId: string, now: Date): Promise<void> {
-  await prisma.$transaction(
+  const podium = await prisma.$transaction(
     async (tx) => {
       const war = await tx.guildWar.findUnique({
         where: { id: warId },
         select: { startsAt: true },
       });
-      if (!war) return;
+      if (!war) return null;
 
       // Entries are frozen the moment the bell rings — registration always
       // targets the *next* window (see registrationWarStart) — so reading them
@@ -452,8 +459,9 @@ async function settleWar(warId: string, now: Date): Promise<void> {
         where: { id: warId, status: "SCHEDULED" },
         data: { status: valid ? "SETTLED" : "CANCELLED", settledAt: now },
       });
-      // Someone else settled it while we were counting — their prizes stand.
-      if (claimed.count === 0) return;
+      // Someone else settled it while we were counting — their prizes stand,
+      // and their reader owns the announcement too.
+      if (claimed.count === 0) return null;
 
       /**
        * Who the war pays: the roster the guild *enrolled*, not the roster it
@@ -495,7 +503,9 @@ async function settleWar(warId: string, now: Date): Promise<void> {
             }
           );
         }
-        return;
+        // Nothing to announce: "one guild signed up and went home" is news to
+        // the guild it happened to, not to the channel.
+        return null;
       }
 
       const guildCount = entries.length;
@@ -555,11 +565,36 @@ async function settleWar(warId: string, now: Date): Promise<void> {
       // No individual purse on top: nobody played the war, so there is no
       // personal performance to single out. The guild places, the guild is
       // paid, and every member is paid the same.
+
+      return {
+        guildCount,
+        top: entries.slice(0, 3).map((entry, i) => ({
+          rank: i + 1,
+          name: entry.guildName,
+          score: entry.score,
+        })),
+      };
     },
     // Settlement writes one row plus a message batch per guild; the default
     // 5s interactive budget is too tight for a full field.
     { timeout: 20_000, maxWait: 10_000 }
   );
+
+  if (!podium) return;
+
+  const medals = ["🥇", "🥈", "🥉"];
+  await announceToDiscord({
+    kind: "war",
+    title: "⚔️ מלחמת הבריתות הסתיימה",
+    body:
+      podium.top
+        .map(
+          (row) =>
+            `${medals[row.rank - 1]} **${row.name}** — ${row.score.toLocaleString("he-IL")} נקודות`
+        )
+        .join("\n") + `\n\n${podium.guildCount} בריתות התייצבו הערב. הקרב הבא: מחר ב-19:30.`,
+    url: gameLink("/game/war"),
+  });
 }
 
 /**

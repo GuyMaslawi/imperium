@@ -160,9 +160,8 @@ function ValueBadge({ pct, className = "" }: { pct: number; className?: string }
   return (
     <span
       className={`nums rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-300 ${className}`}
-      dir="ltr"
     >
-      +{pct}% ערך
+      <span dir="ltr">+{pct}%</span> ערך
     </span>
   );
 }
@@ -246,9 +245,8 @@ function FeaturedPackage({
             {pkg.bonus > 0 && (
               <span
                 className="nums rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-300"
-                dir="ltr"
               >
-                +{formatNumber(pkg.bonus)} בונוס
+                <span dir="ltr">+{formatNumber(pkg.bonus)}</span> בונוס
               </span>
             )}
           </div>
@@ -328,8 +326,8 @@ function PackageCard({
       </div>
       <span className="relative mt-0.5 block h-4 text-[11px] font-black text-emerald-300">
         {pkg.bonus > 0 && (
-          <span className="nums" dir="ltr">
-            +{formatNumber(pkg.bonus)} בונוס
+          <span className="nums">
+            <span dir="ltr">+{formatNumber(pkg.bonus)}</span> בונוס
           </span>
         )}
       </span>

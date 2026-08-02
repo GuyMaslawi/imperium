@@ -97,8 +97,8 @@ export default async function BankPage() {
                 <Icon name="upgrades" size={18} className="text-crimson" />
                 תשואה יומית
               </h3>
-              <p className="nums text-2xl font-black text-emerald-400" dir="ltr">
-                +{formatNumber(nextInterest)}
+              <p className="nums text-2xl font-black text-emerald-400">
+                <span dir="ltr">+{formatNumber(nextInterest)}</span>
                 <span className="mr-1 text-sm font-semibold text-emerald-400/70">
                   זהב/יום
                 </span>
@@ -244,9 +244,9 @@ export default async function BankPage() {
                         {meta.sign}
                         {formatNumber(transaction.amount)}
                       </span>
-                      <span className="nums text-xs text-zinc-500" dir="ltr">
-                        {formatDate(transaction.createdAt)} · יתרה:{" "}
-                        {formatNumber(transaction.balanceAfter)}
+                      <span className="nums text-xs text-zinc-500">
+                        <span dir="ltr">{formatDate(transaction.createdAt)}</span> · יתרה:{" "}
+                        <span dir="ltr">{formatNumber(transaction.balanceAfter)}</span>
                       </span>
                     </span>
                   </li>

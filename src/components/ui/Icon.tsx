@@ -9,6 +9,11 @@ import {
   GiHeartInside, GiHealthPotion, GiCompass, GiTalk,
   GiPadlock, GiPadlockOpen, GiCheckMark, GiLaurelCrown,
 } from "react-icons/gi";
+// The one glyph that is a *brand*, not a game-art silhouette: the community
+// channel is Discord, and a hand-picked sword or scroll standing in for it
+// would read as some other game feature. It still renders in `currentColor`
+// like every other entry, so it takes the gold of the nav around it.
+import { FaDiscord } from "react-icons/fa6";
 
 /**
  * KRALDOR icon set — professional game-art silhouettes (game-icons.net via
@@ -24,7 +29,7 @@ export type IconName =
   | "bank" | "storage" | "upgrades" | "guild" | "hero" | "rankings"
   | "achievements" | "reports" | "messages" | "settings" | "logout"
   | "crown" | "dice" | "wheel" | "shop" | "gift" | "spark" | "heart" | "potion"
-  | "quest" | "chat"
+  | "quest" | "chat" | "discord"
   /* status glyphs — these replace the 🔒 / ✅ emoji that had crept into the
      reward ladders, which render differently on every platform and cannot take
      a design token's color. */
@@ -85,6 +90,7 @@ const GLYPHS: Record<IconName, ComponentType<SVGProps<SVGSVGElement>>> = {
   potion: GiHealthPotion,
   quest: GiCompass,
   chat: GiTalk,
+  discord: FaDiscord,
   lock: GiPadlock,
   unlocked: GiPadlockOpen,
   check: GiCheckMark,

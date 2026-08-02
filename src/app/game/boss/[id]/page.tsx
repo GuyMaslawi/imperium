@@ -353,8 +353,8 @@ export default async function BossFightPage({
             {fight.rounds || log.length}
           </p>
           {accuracy != null && (
-            <p className="nums mt-0.5 text-[11px] text-zinc-500" dir="ltr">
-              {Math.round(accuracy * 100)}% קריאות נכונות
+            <p className="nums mt-0.5 text-[11px] text-zinc-500">
+              <span dir="ltr">{Math.round(accuracy * 100)}%</span> קריאות נכונות
             </p>
           )}
         </div>

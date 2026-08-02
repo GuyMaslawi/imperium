@@ -2,6 +2,7 @@ import type { IconName } from "@/components/ui/Icon";
 import {
   MAX_CITIES,
   MINE_MAX_LEVEL,
+  MINE_START_LEVEL,
   citizenGrowthMaxLevel,
   citizensPerDailyUpdate,
 } from "./constants";
@@ -198,7 +199,7 @@ export interface AchievementStats {
   bankDeposits: number;
   /** Bank INTEREST payouts received. */
   interestPayments: number;
-  /** Production buildings raised above level 0 — mines start unbuilt. */
+  /** Mines raised above MINE_START_LEVEL — every mine starts built at that level. */
   minesBuilt: number;
   /** Lowest level among the four mines: the "all mines at N" measure. */
   minMineLevel: number;
@@ -607,10 +608,20 @@ const ECONOMY: AchievementDefinition[] = [
     "mine",
     (s) => s.minesBuilt,
     (g) => `${he(g)} מכרות`,
-    (g) => `העלה ${he(g)} מכרות לרמה 1 ומעלה`,
+    (g) => `שדרג ${he(g)} מכרות מעל רמה ${he(MINE_START_LEVEL)}`,
     [
-      { goal: 1, reward: ["wood", 5_000], name: "לבנות מכרה", hint: "שדרג מכרה אחד מרמה 0" },
-      { goal: 4, reward: ["wood", 40_000], name: "לבנות את כל המכרות", hint: "העלה את ארבעת המכרות לרמה 1 ומעלה" },
+      {
+        goal: 1,
+        reward: ["wood", 5_000],
+        name: "לשדרג מכרה",
+        hint: `שדרג מכרה אחד מעל רמה ${he(MINE_START_LEVEL)}`,
+      },
+      {
+        goal: 4,
+        reward: ["wood", 40_000],
+        name: "לשדרג את כל המכרות",
+        hint: `שדרג את ארבעת המכרות מעל רמה ${he(MINE_START_LEVEL)}`,
+      },
     ]
   ),
   ...chain(
