@@ -48,15 +48,25 @@ would be collectable during exactly the window before the channel exists.
 
 ## What turns on with `DISCORD_WEBHOOK_URL`
 
-Four automatic announcements, each posted **after** its database work has
+The automatic announcements, each posted **after** its database work has
 committed and none of them able to fail the thing that triggered them:
 
 | Event | Where it is posted from |
 |---|---|
 | Admin broadcast **to all players** | `broadcastMessage` — scoped broadcasts (a season, a guild, one player) are never reposted. |
+| An admin gift carrying a message | `sendGift` — same rule, and only when there is an inbox message to mirror. |
 | A Happy Hour going live | `releaseHappyHour` — the one time-critical post: the window closes whether or not anyone noticed it opened. |
+| A mini-game going live | `releaseMiniGame` — a race with a deadline and capped winners. |
 | Guild-war results (top 3) | `settleWar`, by whichever reader won the settlement race, so exactly one post per war. |
+| **A season opening** | `announceSeasonStart`, from both paths that can flip a season live: the lazy `getSeasonGate` activation (only the request that wins the guard posts) and the admin's `activateSeason`. |
 | A season closing (podium) | `closeSeason`, read back from היכל התהילה after it is written. |
+
+Both ends of a season are news, and the opening is the more urgent of the two:
+everyone starts the new season together, so a player who hears about it a week
+late has lost a week of a race that cannot be restarted. The close post leads
+with the podium line ("קבלו את שלושת השחקנים שהחזיקו מעמד כל הסיזן…") and the
+open post carries the season's deadline in **Jerusalem** wall time — the
+announcer runs on a UTC host, so the timezone is pinned rather than inherited.
 
 `allowed_mentions: { parse: [] }` is set on every post: an admin broadcast is
 free text, and a broadcast containing `@everyone` must not be able to ping an

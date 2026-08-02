@@ -187,3 +187,18 @@ export function formatGameTime(date: Date): string {
     minute: "2-digit",
   }).format(date);
 }
+
+/**
+ * Format an instant as a Jerusalem wall date and time (DD.MM.YYYY, HH:MM).
+ *
+ * The timezone is pinned rather than left to the host, because the callers that
+ * need this are server-side (the Discord announcer) and a Vercel function runs
+ * in UTC — a season deadline announced three hours early is a wrong deadline.
+ */
+export function formatGameDateTime(date: Date): string {
+  return new Intl.DateTimeFormat("he-IL", {
+    timeZone: GAME_TIMEZONE,
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}

@@ -74,7 +74,11 @@ import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
 import { repairGuildLeadership } from "@/server/guildLeadership";
-import { archiveSeasonStandings, closeSeason } from "@/server/seasonClose";
+import {
+  announceSeasonStart,
+  archiveSeasonStandings,
+  closeSeason,
+} from "@/server/seasonClose";
 import { announceToDiscord, gameLink } from "@/server/discord";
 
 export interface AdminActionState {
@@ -2504,6 +2508,13 @@ export async function activateSeason(
     });
     revalidatePath("/admin/seasons");
     revalidatePath("/game", "layout");
+
+    // The channel hears about the transition in the order it happened: the
+    // outgoing season's podium was posted by `closeSeason` above, and this is
+    // the new one opening. After the commit and after the revalidate, so a
+    // Discord outage cannot fail an activation that has already happened —
+    // the same rule every other announcement in this file follows.
+    await announceSeasonStart(target);
     return {
       success: outgoing
         ? `העונה הופעלה. ${outgoing.name} נסגרה והדירוג שלה נשמר בהיכל התהילה — ${empires} אימפריות עברו לעונה החדשה`

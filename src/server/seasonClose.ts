@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { Prisma, SeasonBoardKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { formatGameDateTime } from "@/lib/game/time";
 import { announceToDiscord, gameLink } from "@/server/discord";
 
 /**
@@ -441,6 +442,60 @@ async function buildRecap(
   };
 }
 
+/* --------------------------- announcements --------------------------- */
+
+/**
+ * The line that introduces the podium in the channel.
+ *
+ * Counted rather than hardcoded at three: a season can close with fewer empires
+ * than `PODIUM_SIZE` (an early season, a game that was just reset), and "קבלו את
+ * שלושת השחקנים" over two names is the kind of small lie players notice.
+ */
+function podiumIntro(count: number): string {
+  const who =
+    count === 1
+      ? "השחקן שהחזיק מעמד כל הסיזן והוכיח את עצמו"
+      : `${count === 2 ? "שני" : "שלושת"} השחקנים שהחזיקו מעמד כל הסיזן והוכיחו את עצמם`;
+  return `קבלו את ${who} 👑`;
+}
+
+/**
+ * A season **opening**, announced in the channel.
+ *
+ * The mirror image of the podium post below: a season is the game's longest
+ * arc, and both of its ends are news. The open is the more useful of the two —
+ * it is the only place a player is told the new deadline they are now racing,
+ * and the season pass everyone has to climb again starts the moment it fires.
+ * That is why it is posted from every path that can flip a season live, not
+ * only from the admin's own click.
+ *
+ * It deliberately does not say anybody was reset. Activating a season carries
+ * every empire into it untouched (`resetSeason` is the separate, confirmed
+ * wipe), so the only thing this may promise is what actually rolls over.
+ *
+ * Fires **after** the activation has committed, and cannot fail it —
+ * `announceToDiscord` swallows everything. Callers must have won whatever guard
+ * makes them the single activator, or the channel gets one post per racing
+ * request.
+ *
+ * The deadline goes in as Jerusalem wall time: the announcer runs on a server
+ * set to UTC, and a season end announced three hours early is simply wrong.
+ */
+export async function announceSeasonStart(season: {
+  name: string;
+  endsAt: Date;
+}): Promise<void> {
+  await announceToDiscord({
+    kind: "season",
+    title: `🚀 ${season.name} התחילה`,
+    body:
+      `סיזן חדש באוויר. 🏁\n⏳ נגמר ב-${formatGameDateTime(season.endsAt)}\n\n` +
+      "דרך התהילה מתאפסת — הסולם חוזר לאפס והפרימיום נקנה מחדש.\n" +
+      "מי שמסיים בטופ 3 כשהשעון נגמר נכנס להיכל התהילה. 🏆",
+    url: gameLink("/game/base"),
+  });
+}
+
 /* ------------------------------ closing ------------------------------ */
 
 /** A season row, as everything below needs to see it. */
@@ -598,7 +653,8 @@ export async function closeSeason(
       title: `🏆 ${closed} נגמרה — זה הפודיום`,
       body:
         (podium.length > 0
-          ? podium
+          ? `${podiumIntro(podium.length)}\n\n` +
+            podium
               .map(
                 (row) =>
                   `${medals[row.rank - 1] ?? ""} **${row.empireName}**` +
@@ -606,7 +662,13 @@ export async function closeSeason(
               )
               .join("\n")
           : "הסיזן נסגר בלי פודיום.") +
-        "\n\nהם בהיכל התהילה מעכשיו. סיזן חדש בדרך — כולם חוזרים לקו ההתחלה. 🔄",
+        "\n\n" +
+        (podium.length === 0
+          ? ""
+          : podium.length === 1
+            ? "הוא בהיכל התהילה מעכשיו. "
+            : "הם בהיכל התהילה מעכשיו. ") +
+        "סיזן חדש בדרך — כולם חוזרים לקו ההתחלה. 🔄",
       url: gameLink("/game/rankings"),
     });
   }
@@ -675,7 +737,7 @@ export const getSeasonGate = cache(async (): Promise<SeasonGate> => {
   const next = await prisma.gameSeason.findFirst({
     where: { id: { not: active.id }, startsAt: { gt: active.endsAt } },
     orderBy: { startsAt: "asc" },
-    select: { id: true, name: true, startsAt: true },
+    select: { id: true, name: true, startsAt: true, endsAt: true },
   });
 
   if (next && next.startsAt <= now) {
@@ -690,6 +752,10 @@ export const getSeasonGate = cache(async (): Promise<SeasonGate> => {
         where: { isActive: true, id: { not: next.id } },
         data: { isActive: false },
       });
+      // Only the request that won the guard above announces — everyone else
+      // crossing `startsAt` in the same second just finds the game open. Same
+      // rule as the close: after the write, never inside it.
+      await announceSeasonStart(next);
     }
     return { open: true };
   }
