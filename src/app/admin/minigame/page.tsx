@@ -4,7 +4,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { EditorSection } from "@/components/admin/fields";
 import { MiniGameCreator } from "@/components/admin/MiniGameCreator";
-import { prizeText, MINIGAME_TYPE_META } from "@/lib/game/minigame";
+import { prizeText, MINIGAME_TYPE_META, MAX_LIVE_MINIGAMES } from "@/lib/game/minigame";
 import {
   createMiniGame,
   activateMiniGame,
@@ -22,6 +22,14 @@ export default async function AdminMiniGamePage() {
     include: { _count: { select: { entries: true } } },
   });
 
+  // A game whose deadline has passed is no longer running, whatever its flag
+  // still says — the flag is flipped lazily, on the first player read after the
+  // deadline. Same arithmetic the row below does, so the two can never disagree.
+  const liveCount = games.filter(
+    (g) => g.isActive && (g.endsAt === null || g.endsAt.getTime() > now.getTime())
+  ).length;
+  const full = liveCount >= MAX_LIVE_MINIGAMES;
+
   return (
     <div className="space-y-6">
       <SectionHeading title="מיני-משחק" ornament="🎯" />
@@ -30,6 +38,31 @@ export default async function AdminMiniGamePage() {
         בחר סוג, קבע פרס — ולחץ <span className="font-bold text-gold-bright">🚀 צור והפעל מיד</span> כדי לשחרר לכולם בלחיצה אחת.
         כותרת ריקה מקבלת אוטומטית את שם המשחק. התשובה מוגרלת מחדש בכל הפעלה.
         קביעת <span className="font-bold text-gold-bright">משך בדקות</span> תסגור את המשחק לבד בתום הזמן.
+      </p>
+
+      {/* Several releases can run side by side — this is the only place the
+          ceiling is visible, and the count is what tells an admin whether the
+          next "שחרר לכולם" will be refused. */}
+      <p
+        className={`rounded-xl border p-3 text-center text-sm ${
+          full
+            ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+            : "border-border-subtle bg-panel-inset text-zinc-400"
+        }`}
+      >
+        אפשר להריץ עד{" "}
+        <span className="nums font-bold text-gold-bright" dir="ltr">
+          {MAX_LIVE_MINIGAMES}
+        </span>{" "}
+        מיני-משחקים במקביל — שחרור משחק נוסף לא עוצר את הקודמים, וכולם מופיעים
+        זה לצד זה בשורת הפיקוד של השחקנים.{" "}
+        <span className="font-bold">
+          רצים כרגע{" "}
+          <span className="nums" dir="ltr">
+            {liveCount}
+          </span>
+          {full && " — עצור אחד כדי לשחרר עוד"}
+        </span>
       </p>
 
       <EditorSection title="משחק חדש" icon="➕">

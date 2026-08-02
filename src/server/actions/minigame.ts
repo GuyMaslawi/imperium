@@ -13,6 +13,7 @@ import {
   parseHistory,
   scoreCode,
   HISTORY_LIMIT,
+  MAX_LIVE_MINIGAMES,
   PRIZE_FIELDS,
   type MiniGameState,
   type MiniGameBoardRow,
@@ -26,6 +27,9 @@ const BOARD_LIMIT = 50;
 type Board = { rows: MiniGameBoardRow[]; players: number };
 
 const EMPTY_BOARD: Board = { rows: [], players: 0 };
+
+/** The viewer's own entry in one event — what the board needs to pin their row. */
+type OwnEntry = { attempts: number; solved: boolean; won: boolean };
 
 async function ownEmpireId(): Promise<string | null> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
@@ -69,121 +73,180 @@ function isExpired(event: { endsAt: Date | null }, now = Date.now()): boolean {
 }
 
 /**
- * The event a player may currently interact with, or null. `isActive` alone is
- * not the gate: a timed release expires on the wall clock, and nothing runs on
- * a schedule here — so the first read after the deadline is what flips the
- * flag (guarded, so concurrent readers don't double-write).
+ * Every event a player may currently interact with, oldest release first.
+ *
+ * More than one can be live at a time (see MAX_LIVE_MINIGAMES), and the order is
+ * the order they were released in *on purpose*: it is what the command bar hangs
+ * the pills off, so releasing a second game appends a chip beside the first
+ * instead of reshuffling the row under a player mid-guess.
+ *
+ * `isActive` alone is not the gate: a timed release expires on the wall clock,
+ * and nothing runs on a schedule here — so the first read after the deadline is
+ * what flips the flag (guarded, so concurrent readers don't double-write).
  */
-async function loadLiveEvent(): Promise<MiniGameEvent | null> {
-  const event = await prisma.miniGameEvent.findFirst({
+async function loadLiveEvents(): Promise<MiniGameEvent[]> {
+  const events = await prisma.miniGameEvent.findMany({
     where: { isActive: true },
-    orderBy: { activatedAt: "desc" },
+    orderBy: { activatedAt: "asc" },
+    // Activation already enforces the ceiling; this is the belt to that pair of
+    // braces, so a row of stale flags can never turn one poll into N board reads.
+    take: MAX_LIVE_MINIGAMES,
   });
-  if (!event) return null;
-  if (isExpired(event)) {
+  const now = Date.now();
+  const expired = events.filter((e) => isExpired(e, now));
+  if (expired.length > 0) {
     await prisma.miniGameEvent.updateMany({
-      where: { id: event.id, isActive: true },
+      where: { id: { in: expired.map((e) => e.id) }, isActive: true },
       data: { isActive: false, endedAt: new Date() },
     });
-    return null;
   }
-  return event;
+  return events.filter((e) => !isExpired(e, now));
 }
 
 /**
- * Public progress of everyone playing the event. This is what a knocked-out
- * player keeps watching until the event ends, so it deliberately exposes only
- * attempt counts and win state — never a guess, never the answer.
+ * Public progress of everyone playing each live event. This is what a
+ * knocked-out player keeps watching until the event ends, so it deliberately
+ * exposes only attempt counts and win state — never a guess, never the answer.
+ *
+ * Batched across events rather than a call per event: this runs on every poll,
+ * on every screen, for every player, so the per-event cost has to be one query,
+ * not four. The participant counts come back in a single `groupBy` and the
+ * names in a single lookup over the union of the boards; `own` is passed in by
+ * the caller (which already read it) rather than re-fetched per event.
  */
-async function loadBoard(eventId: string, selfEmpireId: string): Promise<Board> {
-  const [entries, players] = await Promise.all([
-    prisma.miniGameEntry.findMany({
-      where: { eventId },
-      orderBy: [
-        { won: "desc" },
-        { wonAt: "asc" },
-        { solved: "desc" },
-        { attempts: "desc" },
-        { updatedAt: "asc" },
-      ],
-      take: BOARD_LIMIT,
-      select: { empireId: true, attempts: true, solved: true, won: true },
+async function loadBoards(
+  eventIds: string[],
+  selfEmpireId: string,
+  own: Map<string, OwnEntry>
+): Promise<Map<string, Board>> {
+  if (eventIds.length === 0) return new Map();
+
+  const [perEvent, counts] = await Promise.all([
+    Promise.all(
+      eventIds.map((eventId) =>
+        prisma.miniGameEntry.findMany({
+          where: { eventId },
+          orderBy: [
+            { won: "desc" },
+            { wonAt: "asc" },
+            { solved: "desc" },
+            { attempts: "desc" },
+            { updatedAt: "asc" },
+          ],
+          take: BOARD_LIMIT,
+          select: { empireId: true, attempts: true, solved: true, won: true },
+        })
+      )
+    ),
+    prisma.miniGameEntry.groupBy({
+      by: ["eventId"],
+      where: { eventId: { in: eventIds } },
+      _count: { _all: true },
     }),
-    prisma.miniGameEntry.count({ where: { eventId } }),
   ]);
+
+  const players = new Map(counts.map((c) => [c.eventId, c._count._all]));
 
   // The viewer's own row always rides along, even past the cap — the board is
   // there so a knocked-out player can follow the race they're still in.
-  if (entries.length && !entries.some((e) => e.empireId === selfEmpireId)) {
-    const own = await prisma.miniGameEntry.findUnique({
-      where: { eventId_empireId: { eventId, empireId: selfEmpireId } },
-      select: { empireId: true, attempts: true, solved: true, won: true },
-    });
-    if (own) entries.push(own);
-  }
+  const lists = perEvent.map((rows, i) => {
+    const mine = own.get(eventIds[i]);
+    if (mine && rows.length && !rows.some((r) => r.empireId === selfEmpireId)) {
+      return [...rows, { empireId: selfEmpireId, ...mine }];
+    }
+    return rows;
+  });
 
   const empires = await prisma.empire.findMany({
-    where: { id: { in: entries.map((e) => e.empireId) } },
+    where: { id: { in: [...new Set(lists.flat().map((r) => r.empireId))] } },
     select: { id: true, name: true },
   });
   const names = new Map(empires.map((e) => [e.id, e.name]));
 
-  return {
-    players,
-    rows: entries.map((e) => ({
-      empireId: e.empireId,
-      name: names.get(e.empireId) ?? "אימפריה אלמונית",
-      attempts: e.attempts,
-      solved: e.solved,
-      won: e.won,
-      isSelf: e.empireId === selfEmpireId,
-    })),
-  };
+  return new Map(
+    lists.map((rows, i) => [
+      eventIds[i],
+      {
+        players: players.get(eventIds[i]) ?? rows.length,
+        rows: rows.map((e) => ({
+          empireId: e.empireId,
+          name: names.get(e.empireId) ?? "אימפריה אלמונית",
+          attempts: e.attempts,
+          solved: e.solved,
+          won: e.won,
+          isSelf: e.empireId === selfEmpireId,
+        })),
+      },
+    ])
+  );
+}
+
+/** One event's board — the single-event door into `loadBoards`. */
+async function loadBoard(
+  eventId: string,
+  selfEmpireId: string,
+  own: OwnEntry | null
+): Promise<Board> {
+  const boards = await loadBoards(
+    [eventId],
+    selfEmpireId,
+    own ? new Map([[eventId, own]]) : new Map()
+  );
+  return boards.get(eventId) ?? EMPTY_BOARD;
 }
 
 /**
- * Live state of the active mini-game for the current player. Best-effort —
- * polled by the panel and also read once server-side by the game layout.
+ * Live per-player state of every running mini-game, oldest release first.
+ * Best-effort — polled by the command-bar pills and also read once server-side
+ * by the game layout.
  */
-export async function getMiniGameState(): Promise<MiniGameState | null> {
+export async function getMiniGameStates(): Promise<MiniGameState[]> {
   try {
     const empireId = await ownEmpireId();
-    if (!empireId) return null;
-    const event = await loadLiveEvent();
-    if (!event) return null;
-    const [entry, board] = await Promise.all([
-      prisma.miniGameEntry.findUnique({
-        where: { eventId_empireId: { eventId: event.id, empireId } },
-        select: { attempts: true, solved: true, won: true, guesses: true },
-      }),
-      loadBoard(event.id, empireId),
-    ]);
-    return toState(event, entry, board);
+    if (!empireId) return [];
+    const events = await loadLiveEvents();
+    if (events.length === 0) return [];
+
+    // One read for the viewer's own entries across every live event: the state
+    // needs the attempt log, and the boards need the row to pin.
+    const entries = await prisma.miniGameEntry.findMany({
+      where: { eventId: { in: events.map((e) => e.id) }, empireId },
+      select: { eventId: true, attempts: true, solved: true, won: true, guesses: true },
+    });
+    const mine = new Map(entries.map((e) => [e.eventId, e]));
+    const boards = await loadBoards(
+      events.map((e) => e.id),
+      empireId,
+      mine
+    );
+
+    return events.map((e) => toState(e, mine.get(e.id) ?? null, boards.get(e.id) ?? EMPTY_BOARD));
   } catch {
-    return null;
+    return [];
   }
 }
 
-/** What the panel's poll gets back. Mirrors `pollBossArena`'s shape. */
+/** What the pills' poll gets back. Mirrors `pollBossArena`'s shape. */
 export interface MiniGamePoll {
-  state?: MiniGameState | null;
+  /** Every running release. An empty array means nothing is live. */
+  states?: MiniGameState[];
   /** Nothing was learned this round; ask again, change nothing. */
   retry?: boolean;
 }
 
 /**
- * The panel's polled read — `getMiniGameState` with a ceiling on it.
+ * The pills' polled read — `getMiniGameStates` with a ceiling on it.
  *
- * The panel is mounted in the game layout, so this runs on every screen for
+ * The pills are mounted in the game layout, so this runs on every screen for
  * every signed-in player. Same free in-process counter the chat panes and the
  * boss arena use, for the same reason: nothing here is secret, so the ceiling is
  * not a security boundary — it stops a looping client turning a layout-level
- * poll into unbounded database load (this one reads the rival board, so a round
+ * poll into unbounded database load (this one reads the rival boards, so a round
  * costs several queries, not one).
  *
- * A refused round is `retry`, never a null state: the poller must not read a
- * throttled answer as "the event ended" and pull a live game off the screen.
- * The layout's server-side render calls `getMiniGameState` directly and is
+ * A refused round is `retry`, never an empty list: the poller must not read a
+ * throttled answer as "the events ended" and pull a live game off the screen.
+ * The layout's server-side render calls `getMiniGameStates` directly and is
  * deliberately not counted here.
  */
 export async function pollMiniGame(): Promise<MiniGamePoll> {
@@ -192,7 +255,7 @@ export async function pollMiniGame(): Promise<MiniGamePoll> {
   if (!localRateLimit(`poll:minigame:${empireId}`, POLL_LIMIT, POLL_WINDOW_MS)) {
     return { retry: true };
   }
-  return { state: await getMiniGameState() };
+  return { states: await getMiniGameStates() };
 }
 
 /** Build the {field: {increment}} prize map for a winning empire update. */
@@ -222,10 +285,14 @@ function prizeIncrements(event: MiniGameEvent): Prisma.EmpireUpdateInput {
 const MARK_WORD = { hit: "במקום", near: "בקוד", miss: "בחוץ" } as const;
 
 /**
- * Submit one guess to the active mini-game — a cup index for FIND_BALL, a digit
+ * Submit one guess to a running mini-game — a cup index for FIND_BALL, a digit
  * string for CRACK_SAFE. Records the attempt, checks the secret answer, and —
  * on a correct first solve — atomically claims a prize slot (respecting
  * maxWinners) and grants the bundle.
+ *
+ * The event is named by the caller (`eventId`), because several releases can be
+ * live at once: resolving it here from "whatever is active" would score a guess
+ * against a game the player was never shown the moment a second one goes up.
  */
 export async function submitMiniGameGuess(
   _prev: MiniGameGuessResult,
@@ -240,16 +307,19 @@ export async function submitMiniGameGuess(
       return { state: null, feedback: "בחר ניחוש תקין", tone: "error" };
     }
     const guess = raw.trim();
+    const rawEvent = formData.get("eventId");
+    const eventId = typeof rawEvent === "string" && rawEvent ? rawEvent : null;
 
     const result = await prisma.$transaction(async (tx) => {
-      // Ordered exactly as loadLiveEvent orders it. An unordered findFirst picks
-      // an arbitrary row, so should two events ever be live at once the panel
-      // and the guess it submits could resolve to different games — the player
-      // would be scored against a board they were never shown.
-      const event = await tx.miniGameEvent.findFirst({
-        where: { isActive: true },
-        orderBy: { activatedAt: "desc" },
-      });
+      // A named event is looked up by id and still has to be live; without one
+      // (a tab that loaded before releases could overlap) fall back to the
+      // newest release, which is what such a client was showing.
+      const event = eventId
+        ? await tx.miniGameEvent.findFirst({ where: { id: eventId, isActive: true } })
+        : await tx.miniGameEvent.findFirst({
+            where: { isActive: true },
+            orderBy: { activatedAt: "desc" },
+          });
       // A timed release stops accepting guesses the moment its deadline passes,
       // even if no read has flipped `isActive` yet (see loadLiveEvent).
       if (!event || isExpired(event)) {
@@ -442,7 +512,7 @@ export async function submitMiniGameGuess(
     // Refresh the rival board on the way out so a player who just spent their
     // last attempt lands straight on the live standings instead of a stale copy.
     if (result.state) {
-      const board = await loadBoard(result.state.id, empireId);
+      const board = await loadBoard(result.state.id, empireId, result.state);
       return { ...result, state: { ...result.state, board: board.rows, players: board.players } };
     }
     return result;

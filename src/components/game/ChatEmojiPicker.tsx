@@ -132,8 +132,9 @@ export function ChatEmojiPicker({ onPick }: { onPick: (emoji: string) => void })
       ref={trayRef}
       dir="rtl"
       style={{ left: box.left, bottom: box.bottom, width: box.width }}
-      // Above the dock's own z-[80], since it now shares the body with it.
-      className="fixed z-[90] overflow-hidden rounded-xl border border-gold/40 bg-[#12111a] shadow-[0_14px_40px_rgba(0,0,0,0.8)] print:hidden"
+      // Just above the dock's own z-50, since it now shares the body with it —
+      // and still below the drawer and the modals.
+      className="fixed z-[55] overflow-hidden rounded-xl border border-gold/40 bg-[#12111a] shadow-[0_14px_40px_rgba(0,0,0,0.8)] print:hidden"
     >
       <div className="flex border-b border-border-subtle">
         {GROUPS.map((g) => (

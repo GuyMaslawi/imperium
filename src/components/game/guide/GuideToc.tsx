@@ -60,7 +60,11 @@ export function GuideToc({ entries }: { entries: TocEntry[] }) {
         תוכן העניינים
         <span className="rule-gold flex-1" />
       </p>
-      <ul className="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {/* One column until there is room for two. Two columns on a phone leaves
+          each cell ~70px of text after the index number and the icon, which
+          truncated every entry in the index — "שעון המ…", "מכרות ו…", "מסעות
+          ה…" — and an index you cannot read is not an index. */}
+      <ul className="grid grid-cols-1 gap-1 min-[420px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {entries.map((e, i) => (
           <li key={e.id}>
             <button

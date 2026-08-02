@@ -23,7 +23,7 @@ import { HAPPY_HOUR_EFFECTS } from "@/lib/game/happyHour";
  * without ever showing twice, and a *new* release always breaks through.
  */
 
-/** Poll rates. Same reasoning as MiniGamePanel: this is mounted on every screen. */
+/** Poll rates. Same reasoning as MiniGameButton: this is mounted on every screen. */
 const POLL_LIVE_MS = 20_000;
 const POLL_IDLE_MS = 45_000;
 

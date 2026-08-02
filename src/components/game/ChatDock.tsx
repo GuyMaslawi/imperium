@@ -872,8 +872,13 @@ export function ChatDock({
     </div>
   );
 
+  // z-50 puts the dock below every overlay that covers the page — the nav
+  // drawer (60) and the modals (95–100). At its old z-[80] the launcher pill
+  // floated on top of the season-pass ladder, the mini-game board and the open
+  // nav drawer, which read as a stuck widget rather than as a dock. See the
+  // stacking order at the top of globals.css.
   return createPortal(
-    <div className="fixed bottom-3 left-3 z-[80] print:hidden">
+    <div className="fixed bottom-3 left-3 z-50 print:hidden">
       {open ? panel : launcher}
     </div>,
     document.body

@@ -144,12 +144,6 @@ export interface SeasonPassState {
   premium: boolean;
   price: number;
   diamonds: number;
-  /**
-   * Whether a season is currently active. False means the premium track cannot
-   * be sold at all (see buySeasonPassPremium), so the UI must say so up front
-   * instead of letting the player click a button that can only fail.
-   */
-  seasonActive: boolean;
   /** 1-based day of the season the payouts are priced at. */
   day: number;
   /** When the ladder resets and the next, larger one opens. */
@@ -183,8 +177,7 @@ function buildState(
   progress: SeasonPassProgress,
   diamonds: number,
   day: number,
-  now: Date,
-  seasonActive: boolean
+  now: Date
 ): SeasonPassState {
   const level = tierForXp(progress.xp);
   const claimedFree = new Set(progress.claimedFree);
@@ -209,7 +202,6 @@ function buildState(
     premium: progress.premium,
     price: SEASON_PASS_PREMIUM_PRICE,
     diamonds,
-    seasonActive,
     day,
     cycleEndsAt: nextDailyUpdate(now).getTime(),
     collectable,
@@ -266,7 +258,7 @@ export async function getSeasonPassState(): Promise<SeasonPassState | null> {
 
   const progress = await loadCycle(prisma, empireId, season?.id ?? null, now);
   const day = seasonPassDay(season, now.getTime());
-  return buildState(progress, empire.diamonds, day, now, season !== null);
+  return buildState(progress, empire.diamonds, day, now);
 }
 
 /* ------------------------------ premium purchase ------------------------------ */
@@ -320,18 +312,14 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
         where: { isActive: true },
         select: { id: true, startsAt: true, endsAt: true },
       });
-      // The pass is sold *per season*, so selling one when no season is active
-      // charges the full pass price for a row that the next activation legitimately
-      // clears as a season rollover — a silent confiscation with no refund and
-      // no ledger entry. Refuse the sale instead.
-      if (!season) {
-        return {
-          ok: false as const,
-          error: "אין עונה פעילה כרגע — לא ניתן לרכוש את מסלול הפרימיום",
-        };
-      }
-
-      const progress = await loadCycle(tx, empireId, season.id, now);
+      // The sale never depends on a season row existing. A player who is in the
+      // game is in a season as far as they are concerned, and a missing/expired
+      // `isActive` row is an operator-side gap, not something to refuse money
+      // over — a dead buy button reads as a broken game. Selling with no row is
+      // safe because `loadCycle` *adopts* a null-season row into the next season
+      // instead of treating it as a rollover, so the pass the player paid for
+      // survives the activation rather than being confiscated by it.
+      const progress = await loadCycle(tx, empireId, season?.id ?? null, now);
       if (progress.premium) {
         return { ok: false as const, error: "כבר רכשת את מסלול הפרימיום לעונה הזו" };
       }
@@ -340,7 +328,13 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
       // before touching diamonds, so a double-click never double-charges.
       const claimedFlag = await tx.seasonPassProgress.updateMany({
         where: { empireId, premium: false },
-        data: { premium: true, premiumAt: now, seasonId: season.id },
+        // Only stamp the season when there is one: writing null would throw
+        // away a season the row had already adopted.
+        data: {
+          premium: true,
+          premiumAt: now,
+          ...(season ? { seasonId: season.id } : {}),
+        },
       });
       if (claimedFlag.count === 0) {
         return { ok: false as const, error: "כבר רכשת את מסלול הפרימיום לעונה הזו" };
@@ -366,7 +360,7 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
       return {
         ok: true as const,
         message: "מסלול הפרימיום נפתח לכל העונה! 👑",
-        state: buildState(fresh, empire.diamonds, day, now, true),
+        state: buildState(fresh, empire.diamonds, day, now),
       };
     });
 
@@ -492,7 +486,7 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
         kind,
         amount: granted.get(kind)!,
       }));
-      const state = buildState(fresh, empire.diamonds, day, now, season !== null);
+      const state = buildState(fresh, empire.diamonds, day, now);
       return {
         ok: true as const,
         // Kept as a plain-text fallback for anything that only reads `message`;

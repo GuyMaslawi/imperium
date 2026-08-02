@@ -533,7 +533,10 @@ function QuestRow({
             title={blocked ?? undefined}
             className="btn btn-ghost min-w-[7.5rem] px-3 py-1.5 text-xs"
           >
-            {blocked ?? "שלח למסע"}
+            {/* A locked rung says nothing here: the chained plate over the row
+                already names the price, and on a phone the row is tall enough
+                that the two labels sit far apart and read as a duplicate. */}
+            {unlocked ? blocked ?? "שלח למסע" : "שלח למסע"}
           </button>
         </div>
       </div>

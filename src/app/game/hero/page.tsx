@@ -171,7 +171,7 @@ export default async function HeroPage() {
                 tip={
                   dead
                     ? "הגיבור מת — כל הבונוסים שלו מושבתים עד שיקום לתחייה"
-                    : `בריאות הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ${HERO_DAMAGE_PER_LOST_DEFENSE} נקודות. באפס הגיבור מת.`
+                    : `חיי הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ${HERO_DAMAGE_PER_LOST_DEFENSE} נקודות. באפס הגיבור מת.`
                 }
               >
                 <span

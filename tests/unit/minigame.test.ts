@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { scoreCode, parseHistory, HISTORY_LIMIT } from "@/lib/game/minigame";
+import {
+  scoreCode,
+  parseHistory,
+  attemptsRange,
+  clampAttempts,
+  HISTORY_LIMIT,
+  CUPS_MIN,
+  CUPS_MAX,
+  SAFE_DIGITS_MAX,
+  ATTEMPTS_CEILING,
+} from "@/lib/game/minigame";
 
 describe("scoreCode", () => {
   it("marks an exact code all hits", () => {
@@ -91,5 +101,68 @@ describe("parseHistory", () => {
     const rows = parseHistory(many);
     expect(rows).toHaveLength(HISTORY_LIMIT);
     expect(rows[rows.length - 1]).toEqual({ kind: "cup", pick: HISTORY_LIMIT + 4, hit: false });
+  });
+});
+
+describe("attemptsRange", () => {
+  // The rule that started this: with N cups, N−1 attempts wins by elimination,
+  // so the budget has to stop below that. Three cups therefore means one lift.
+  it("gives three cups exactly one attempt", () => {
+    const range = attemptsRange("FIND_BALL", { cups: 3, digits: 3 });
+    expect(range).toEqual({ min: 1, max: 1, fallback: 1 });
+  });
+
+  it("never lets a cups game be won by lifting everything", () => {
+    for (let cups = CUPS_MIN; cups <= CUPS_MAX; cups++) {
+      const { max } = attemptsRange("FIND_BALL", { cups, digits: 3 });
+      // Leaves at least two cups the player never got to look under.
+      expect(max).toBeLessThan(cups - 1);
+    }
+  });
+
+  it("defaults a cups game to a single shot however many cups there are", () => {
+    expect(attemptsRange("FIND_BALL", { cups: CUPS_MAX, digits: 3 }).fallback).toBe(1);
+  });
+
+  it("gives a three-digit safe five attempts, and scales with the code", () => {
+    expect(attemptsRange("CRACK_SAFE", { cups: 3, digits: 3 }).fallback).toBe(5);
+    expect(attemptsRange("CRACK_SAFE", { cups: 3, digits: 4 }).fallback).toBe(7);
+    expect(attemptsRange("CRACK_SAFE", { cups: 3, digits: 5 }).fallback).toBe(9);
+  });
+
+  it("clamps the shape before deriving the range", () => {
+    // An out-of-bounds shape must not widen the budget it implies.
+    expect(attemptsRange("FIND_BALL", { cups: 99, digits: 3 }).max).toBe(CUPS_MAX - 2);
+    expect(attemptsRange("CRACK_SAFE", { cups: 3, digits: 99 }).fallback).toBe(
+      SAFE_DIGITS_MAX * 2 - 1
+    );
+  });
+});
+
+describe("clampAttempts", () => {
+  it("pulls an over-generous cups budget back to what the shape allows", () => {
+    // The admin form's old flat default: five attempts at three cups was a
+    // guaranteed prize for anyone who clicked five times.
+    expect(clampAttempts("FIND_BALL", { cups: 3, digits: 3 }, 5)).toBe(1);
+    expect(clampAttempts("FIND_BALL", { cups: 6, digits: 3 }, 5)).toBe(4);
+  });
+
+  it("keeps a budget that is already in range", () => {
+    expect(clampAttempts("CRACK_SAFE", { cups: 3, digits: 3 }, 8)).toBe(8);
+    expect(clampAttempts("FIND_BALL", { cups: 6, digits: 3 }, 2)).toBe(2);
+  });
+
+  it("floors at one attempt", () => {
+    expect(clampAttempts("CRACK_SAFE", { cups: 3, digits: 3 }, 0)).toBe(1);
+    expect(clampAttempts("FIND_BALL", { cups: 5, digits: 3 }, -7)).toBe(1);
+  });
+
+  it("caps the safe at the hard ceiling", () => {
+    expect(clampAttempts("CRACK_SAFE", { cups: 3, digits: 5 }, 9999)).toBe(ATTEMPTS_CEILING);
+  });
+
+  it("falls back to the shape's default when nothing usable was submitted", () => {
+    expect(clampAttempts("FIND_BALL", { cups: 4, digits: 3 }, Number.NaN)).toBe(1);
+    expect(clampAttempts("CRACK_SAFE", { cups: 3, digits: 3 }, Number.NaN)).toBe(5);
   });
 });

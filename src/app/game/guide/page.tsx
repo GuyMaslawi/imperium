@@ -66,6 +66,9 @@ import {
   HERO_REVIVE_HOURS,
   ITEM_DROP_CHANCE,
   ITEM_DROP_CHANCE_BY_RARITY,
+  MAX_LEVEL_GAP_XP_FACTOR,
+  MIN_LEVEL_GAP_XP_FACTOR,
+  RESET_LEVEL_EQUIV,
   RARITY_META,
   RARITY_ORDER,
   SLOT_META,
@@ -1294,7 +1297,7 @@ export default async function GuidePage() {
                 </Note>
                 <Note tone="red" icon="heart" title="הגנה שנפרצת פוגעת בגיבור">
                   כל תקיפה שפורצת את ההגנה שלך מורידה{" "}
-                  <b className="nums">{HERO_DAMAGE_PER_LOST_DEFENSE}</b> נקודות בריאות
+                  <b className="nums">{HERO_DAMAGE_PER_LOST_DEFENSE}</b> נקודות חיים
                   מהגיבור. באפס — הוא מת, וכל הבונוסים שלו כבים.
                 </Note>
               </div>
@@ -1458,20 +1461,27 @@ export default async function GuidePage() {
                     <O>(</O>
                     <N>40</N>
                     <O>+</O>
-                    <V>רמת גיבור היריב</V>
+                    <V>רמת הגיבור שלך</V>
                     <O>×</O>
                     <N>10</N>
                     <O>)</O>
                     <O>×</O>
-                    <V>יחס קרב</V>
+                    <V>פער רמות</V>
                     <O>×</O>
-                    <V>יוקרת היריב</V>
+                    <V>יחס קרב</V>
                   </>
                 }
                 legend={[
+                  {
+                    term: "רמה אפקטיבית",
+                    desc: `רמה + איפוסים × ${RESET_LEVEL_EQUIV}. איפוס מחזיר לרמה 1 אך הוותק נשאר, ולכן יריב ברמה 1 אחרי איפוס אחד נחשב רמה ${RESET_LEVEL_EQUIV + 1}.`,
+                  },
+                  {
+                    term: "פער רמות",
+                    desc: `0.25 + (הרמה האפקטיבית של היריב ÷ שלך) × 0.75, חסום ב־${MIN_LEVEL_GAP_XP_FACTOR}–${MAX_LEVEL_GAP_XP_FACTOR}. יריב שקול = ×1, גבוה ממך = יותר, נמוך ממך = קצת.`,
+                  },
                   { term: "יחס קרב", desc: "0.3 + (כוח היריב ÷ כוחך) × 1.4, חסום ב־0.3–2.0." },
-                  { term: "יוקרה", desc: "+25% לכל איפוס (↻) שהיריב עבר." },
-                  { term: "הגנה מוצלחת", desc: "משלמת גם היא: 20 + רמת התוקף × 5." },
+                  { term: "הגנה מוצלחת", desc: "משלמת גם היא: (20 + הרמה שלך × 5) × אותם שני המכפילים." },
                 ]}
               />
 
@@ -1480,7 +1490,7 @@ export default async function GuidePage() {
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="panel-gold rounded-xl p-4">
                   <p className="mb-1 flex items-center gap-2 font-black text-red-300">
-                    <Icon name="heart" size={18} /> בריאות ומוות
+                    <Icon name="heart" size={18} /> חיים ומוות
                   </p>
                   <ul className="space-y-1 text-[11px] leading-relaxed text-zinc-300">
                     <li>• מתחיל ב־<b className="nums">{HERO_MAX_HEALTH}</b></li>
@@ -1515,7 +1525,10 @@ export default async function GuidePage() {
                       • הציוד הלבוש נשאר עליך וממשיך לפעול — אך חפץ שתסיר יינעל
                       בתיק עד שתחזור לרמתו
                     </li>
-                    <li>• תג ↻ קבוע — ותוקפים שמנצחים אותך מקבלים יותר ניסיון</li>
+                    <li>
+                      • תג ↻ קבוע — וכל איפוס נחשב {RESET_LEVEL_EQUIV} רמות בחישוב הניסיון,
+                      כך שגם ברמה 1 מי שמנצח אותך מקבל ניסיון של יריב ותיק
+                    </li>
                   </ul>
                 </div>
                 <div className="panel-gold rounded-xl p-4">
@@ -2445,8 +2458,10 @@ export default async function GuidePage() {
                 <Note tone="purple" icon="dice" title="מיני־משחקים">
                   אירועים שהמנהלים פותחים בזמן אמת — &quot;מצא את הכדור&quot; (הרם את הכוס
                   הנכונה) ו&quot;פריצת הכספת&quot; (פצח קוד סודי; כל ניסיון מסמן איזו ספרה
-                  נכונה במקומה, איזו נכונה במקום אחר ואיזו לא בקוד כלל). חלון האירוע קופץ
-                  מעל כל מסך, עם לוח מתחרים חי וחבילת פרסים.
+                  נכונה במקומה, איזו נכונה במקום אחר ואיזו לא בקוד כלל). כשמשחק נפתח
+                  מופיע כפתור זהוב בסרגל העליון עם שעון וספירת הניסיונות שנותרו — לחיצה
+                  פותחת את המשחק, לוח המתחרים ורשימת הזוכים. מספר הניסיונות נגזר מהמשחק:
+                  בכוסות זה כמעט תמיד ניסיון אחד, בכספת כמה וכמה — שם כל ניסיון הוא רמז.
                 </Note>
                 <Note tone="gold" icon="achievements" title="הישגים">
                   ציוני דרך שנפתחים מעצמם תוך כדי משחק ומחכים לאיסוף. תג זהוב בסרגל
@@ -2577,7 +2592,7 @@ export default async function GuidePage() {
                   },
                   {
                     title: "בחר יעדים חכם — לא חלשים",
-                    body: "הניסיון של הגיבור נגזר מיחס הכוחות: לרמוס חלש משלם מינימום. יריב שקול או חזק ממך משלם עד פי שניים.",
+                    body: "הניסיון של הגיבור נגזר מפער הרמות ומיחס הכוחות: לרמוס חלש משלם מינימום. יריב שקול משלם מלא, וחזק ממך — או כזה שכבר עבר איפוס — משלם הרבה יותר.",
                   },
                   {
                     title: "עיר, ואז שליט העיר",

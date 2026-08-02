@@ -191,14 +191,14 @@ export function WarAlerts() {
         <div
           key={vignetteKey}
           aria-hidden
-          className="war-vignette pointer-events-none fixed inset-0 z-[90]"
+          className="war-vignette pointer-events-none fixed inset-0 z-[110]"
         />
       )}
 
       <div
         dir="rtl"
         aria-live="assertive"
-        className="fixed left-1/2 top-3 z-[100] flex w-[min(92vw,26rem)] -translate-x-1/2 flex-col gap-2"
+        className="fixed left-1/2 top-3 z-[120] flex w-[min(92vw,26rem)] -translate-x-1/2 flex-col gap-2"
       >
         {toasts.map((toast) => {
           const style = KIND_STYLE[toast.kind];

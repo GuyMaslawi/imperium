@@ -81,13 +81,38 @@ export function xpToNextLevel(level: number): number {
 }
 
 /**
- * Extra XP multiplier from an opponent's prestige: every reset marks a foe who
- * has already climbed the full level curve at least once, so beating (or
- * repelling) them is worth more. +25% per reset, so a fresh hero adds nothing.
+ * A hero's standing on one scale, resets included. A reset sends the hero back
+ * to level 1, so raw level alone says nothing about a prestiged opponent: a
+ * level-1 hero with one reset has already climbed the whole ladder once and
+ * kept 25 points and his gear. Every reset is therefore worth a full ladder
+ * (`HERO_MAX_LEVEL` levels) here, which is what makes him read as the veteran
+ * he is when the two sides of a battle are compared.
  */
-export const XP_PER_RESET_BONUS = 0.25;
-export function resetXpMultiplier(resets: number): number {
-  return 1 + Math.max(0, resets) * XP_PER_RESET_BONUS;
+export const RESET_LEVEL_EQUIV = HERO_MAX_LEVEL;
+export function effectiveHeroLevel(level: number, resets: number): number {
+  return (
+    Math.max(1, Math.floor(level)) +
+    Math.max(0, Math.floor(resets)) * RESET_LEVEL_EQUIV
+  );
+}
+
+/**
+ * How far above you the opponent stands, as a reward factor. The comparison is
+ * between *effective* levels, so a foe's resets lift him just as a foe's levels
+ * do — a level-1 hero on his first reset counts as level 101 and pays like one.
+ *
+ * Equal standing pays exactly ×1; climbing pays more, up to ×2.5 for a foe
+ * three times your standing; punching down still pays a ×0.25 floor, so farming
+ * beginners is never worthless — only a small fraction of a real fight.
+ */
+export const MIN_LEVEL_GAP_XP_FACTOR = 0.25;
+export const MAX_LEVEL_GAP_XP_FACTOR = 2.5;
+export function levelGapXpFactor(ownLevel: number, foeLevel: number): number {
+  const ratio = ownLevel > 0 ? foeLevel / ownLevel : 0;
+  return Math.min(
+    MAX_LEVEL_GAP_XP_FACTOR,
+    Math.max(MIN_LEVEL_GAP_XP_FACTOR, 0.25 + ratio * 0.75)
+  );
 }
 
 /**
@@ -106,37 +131,59 @@ export function matchupXpFactor(ownPower: number, foePower: number): number {
   return Math.min(MAX_MATCHUP_XP_FACTOR, Math.max(MIN_MATCHUP_XP_FACTOR, 0.3 + ratio * 1.4));
 }
 
+/** Where a hero stands: his level and the resets behind him. */
+export type HeroStanding = { level: number; resets: number };
+
 /**
  * Battle XP: attacking is the main source; defending well also pays. Only
  * winning pays — a repelled attack and a breached defence both earn nothing, so
- * these two functions cover every XP-bearing outcome of a battle. The reward
- * scales with three things — the opponent hero's level (a higher target is
- * inherently worth more), how many times they have prestiged (+25% per reset),
- * and the power matchup (see `matchupXpFactor`). Because the matchup factor
- * folds in *your* strength relative to the target, a strong hero stomping the
- * weak no longer earns the same flat XP every time; you are paid for the fight
- * you actually picked.
+ * these two functions cover every XP-bearing outcome of a battle.
+ *
+ * Three terms, and each answers a different question:
+ *
+ * - **base** — your *own* level, so the reward keeps pace with your own curve
+ *   (`xpToNextLevel` rises with it) and one win is worth roughly the same slice
+ *   of a level at 5 as at 95. It reads your actual level, not the effective one:
+ *   a reset hero re-climbs the same ladder and must earn it at the same pace.
+ * - **level gap** — who you picked, on effective levels (see
+ *   `levelGapXpFactor`), so a target above you pays more, an equal target pays
+ *   ×1, and one far below you pays the ×0.25 floor. A foe's resets count here in
+ *   full: a level-1 hero with one reset still pays like the level-101 veteran he
+ *   effectively is.
+ * - **matchup** — how real the fight was, from the two armies' power
+ *   (`matchupXpFactor`), so the number moves with every battle rather than being
+ *   fixed by the two nameplates.
  */
 export function attackWinXp(
-  defenderHeroLevel: number,
-  defenderResets: number,
+  attacker: HeroStanding,
+  defender: HeroStanding,
   attackerPower: number,
   defenderPower: number
 ): number {
-  const base = 40 + defenderHeroLevel * 10;
+  const base = 40 + Math.max(1, attacker.level) * 10;
   return Math.round(
-    base * matchupXpFactor(attackerPower, defenderPower) * resetXpMultiplier(defenderResets)
+    base *
+      levelGapXpFactor(
+        effectiveHeroLevel(attacker.level, attacker.resets),
+        effectiveHeroLevel(defender.level, defender.resets)
+      ) *
+      matchupXpFactor(attackerPower, defenderPower)
   );
 }
 export function defenseWinXp(
-  attackerHeroLevel: number,
-  attackerResets: number,
+  defender: HeroStanding,
+  attacker: HeroStanding,
   defenderPower: number,
   attackerPower: number
 ): number {
-  const base = 20 + attackerHeroLevel * 5;
+  const base = 20 + Math.max(1, defender.level) * 5;
   return Math.round(
-    base * matchupXpFactor(defenderPower, attackerPower) * resetXpMultiplier(attackerResets)
+    base *
+      levelGapXpFactor(
+        effectiveHeroLevel(defender.level, defender.resets),
+        effectiveHeroLevel(attacker.level, attacker.resets)
+      ) *
+      matchupXpFactor(defenderPower, attackerPower)
   );
 }
 

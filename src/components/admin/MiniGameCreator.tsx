@@ -11,6 +11,7 @@ import {
   CUPS_MAX,
   SAFE_DIGITS_MIN,
   SAFE_DIGITS_MAX,
+  attemptsRange,
 } from "@/lib/game/minigame";
 import type { AdminActionState } from "@/server/actions/admin";
 
@@ -44,6 +45,32 @@ export function MiniGameCreator({ action }: { action: Action }) {
   const [state, formAction] = useActionState<AdminActionState, FormData>(action, {});
   const [type, setType] = useState<MiniGameType>("FIND_BALL");
   const meta = TYPES.find((t) => t.value === type)!;
+
+  // The shape drives the attempt budget, so these three fields are controlled
+  // together — see attemptsRange for why an attempt count only means something
+  // next to the number of cups / digits it is guessing at.
+  const [cups, setCups] = useState(String(CUPS_MIN));
+  const [digits, setDigits] = useState(String(SAFE_DIGITS_MIN));
+  const range = attemptsRange(type, { cups: Number(cups), digits: Number(digits) });
+
+  // The budget follows the shape until the admin types their own, and is pulled
+  // back into range whenever the shape moves under it. Reconciled on the *shape
+  // key* rather than every render, so a half-typed number is left alone —
+  // clamping on each keystroke fights the admin's cursor, and the server clamps
+  // the submission again regardless.
+  const [attempts, setAttempts] = useState(String(range.fallback));
+  const [pinned, setPinned] = useState(false);
+  const shapeKey = `${type}:${range.min}-${range.max}:${range.fallback}`;
+  const [lastShape, setLastShape] = useState(shapeKey);
+  if (lastShape !== shapeKey) {
+    setLastShape(shapeKey);
+    const typed = Math.round(Number(attempts));
+    setAttempts(
+      pinned && Number.isFinite(typed) && typed > 0
+        ? String(Math.min(range.max, Math.max(range.min, typed)))
+        : String(range.fallback)
+    );
+  }
 
   return (
     <form action={formAction} className="space-y-4">
@@ -82,7 +109,23 @@ export function MiniGameCreator({ action }: { action: Action }) {
           placeholder={meta.label}
           hint="ריק = שם המשחק"
         />
-        <LabeledInput label="ניסיונות לשחקן" name="maxAttempts" type="number" min={1} defaultValue={5} />
+        <LabeledInput
+          label="ניסיונות לשחקן"
+          name="maxAttempts"
+          type="number"
+          min={range.min}
+          max={range.max}
+          value={attempts}
+          onValueChange={(v) => {
+            setPinned(true);
+            setAttempts(v);
+          }}
+          hint={
+            type === "FIND_BALL"
+              ? `${range.min}–${range.max} · יותר מזה = די להרים את כל הכוסות`
+              : `${range.min}–${range.max} · מומלץ ${range.fallback} לקוד בן ${digits} ספרות`
+          }
+        />
         <LabeledInput label="מקס׳ זוכים (0=∞)" name="maxWinners" type="number" min={0} defaultValue={0} />
         <LabeledInput
           label="⏳ משך המשחק (דקות)"
@@ -103,8 +146,9 @@ export function MiniGameCreator({ action }: { action: Action }) {
             type="number"
             min={CUPS_MIN}
             max={CUPS_MAX}
-            defaultValue={3}
-            hint={`${CUPS_MIN}–${CUPS_MAX} · יותר כוסות = סיכוי נמוך יותר`}
+            value={cups}
+            onValueChange={setCups}
+            hint={`${CUPS_MIN}–${CUPS_MAX} · יותר כוסות = סיכוי נמוך, ועוד ניסיון`}
           />
         </div>
       ) : (
@@ -115,7 +159,8 @@ export function MiniGameCreator({ action }: { action: Action }) {
             type="number"
             min={SAFE_DIGITS_MIN}
             max={SAFE_DIGITS_MAX}
-            defaultValue={3}
+            value={digits}
+            onValueChange={setDigits}
             hint={`${SAFE_DIGITS_MIN}–${SAFE_DIGITS_MAX} ספרות · 4 ומעלה דורש הרבה ניסיונות`}
           />
         </div>

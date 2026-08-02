@@ -12,6 +12,7 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { pollMiniGame, submitMiniGameGuess } from "@/server/actions/minigame";
 import {
@@ -421,78 +422,75 @@ function SafeGame({
 }
 
 /* ========================================================================== */
+/*                        לוח הזוכים — the winners' rail                       */
+/* ========================================================================== */
 
 /**
- * The live mini-game, rendered big at the top of every game screen (under the
- * season pass) rather than tucked into the command bar.
+ * Who has already taken the prize, as a row of medals.
  *
- * It deliberately has no dismiss: once a player solves it or burns their last
- * attempt they stay on the panel and watch the rival board until the event
- * itself ends — that tail is the point of the event, not leftovers.
+ * This is the part of a running event that stays interesting after a player is
+ * out of it: the board below answers "how is everyone doing", this answers the
+ * only question a knocked-out player actually asks — "did anyone get it?". The
+ * rows arrive won-first from the server (see loadBoard's ordering), so the
+ * first medal is the player who cracked it first.
  */
-export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
-  const router = useRouter();
-  const [state, setState] = useState<MiniGameState | null>(initial);
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [pending, startTransition] = useTransition();
+function WinnersRail({ board }: { board: MiniGameBoardRow[] }) {
+  const winners = board.filter((r) => r.won);
+  if (winners.length === 0) return null;
+  return (
+    <div className="mg-winners" dir="rtl">
+      <span className="mg-winners-title">🏆 כבר זכו</span>
+      <ul className="mg-winners-list">
+        {winners.slice(0, 8).map((row, i) => (
+          <li key={row.empireId} className="mg-winner" style={{ "--i": i } as CSSProperties}>
+            {/* The first crack is the one worth naming — everyone after is a
+                medal in a row, and the ordinal is what tells them apart. */}
+            <span className="mg-winner-rank nums" dir="ltr">
+              {i + 1}
+            </span>
+            <span className="min-w-0 truncate">
+              <PlayerLink empireId={row.empireId} name={row.name} />
+            </span>
+          </li>
+        ))}
+        {winners.length > 8 && (
+          <li className="mg-winner mg-winner--more">
+            +<span className="nums">{winners.length - 8}</span>
+          </li>
+        )}
+      </ul>
+    </div>
+  );
+}
 
-  const refresh = useCallback(async () => {
-    // `retry` means the round learned nothing (throttled, or a signed-out tab).
-    // Changing nothing is the right answer: reading it as "no event" would pull
-    // a live game — and the player's own attempt log — off the screen.
-    const { state: next, retry } = await pollMiniGame();
-    if (retry) return;
-    setState(next ?? null);
-    // The layout renders the first copy server-side; keep it from resurrecting
-    // a game that has since ended.
-    if (!next) router.refresh();
-  }, [router]);
+/* ========================================================================== */
+/*                          The game itself, in a modal                        */
+/* ========================================================================== */
 
-  // Derived rather than read off `state` inside the effect: the poll result is a
-  // new object every tick, so depending on `state` itself would tear down and
-  // rebuild the interval on every beat. This flips only when an event starts or
-  // ends, which is exactly when the rate should change.
-  const live = state !== null;
-
-  // Poll for activation / end / rival progress.
-  useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      // Nobody is watching a hidden tab, and the wake-up listeners below poll
-      // the moment it comes back — so skipping here is not falling behind, it is
-      // the difference between a backgrounded tab costing six requests a minute
-      // for hours and costing nothing. Same rule the chat dock already follows.
-      if (document.visibilityState === "hidden") return;
-      const { state: next, retry } = await pollMiniGame();
-      if (alive && !retry) setState(next ?? null);
-    };
-    const id = setInterval(tick, live ? POLL_LIVE_MS : POLL_IDLE_MS);
-    const onWake = () => {
-      if (document.visibilityState === "visible") void tick();
-    };
-    window.addEventListener("focus", onWake);
-    document.addEventListener("visibilitychange", onWake);
-    return () => {
-      alive = false;
-      clearInterval(id);
-      window.removeEventListener("focus", onWake);
-      document.removeEventListener("visibilitychange", onWake);
-    };
-  }, [live]);
-
-  function play(eventId: string, value: string) {
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("guess", value);
-      const res = await submitMiniGameGuess({ state: null, feedback: "", tone: "info" }, fd);
-      if (res.state) setState(res.state);
-      setFeedback({ text: res.feedback, tone: res.tone, eventId });
-      if (res.tone === "win") router.refresh();
-    });
-  }
-
-  if (!state) return null;
-
+/**
+ * The full mini-game: banner, play area, winners' rail and live standings.
+ *
+ * This used to be rendered inline at the top of every `/game/*` screen, and at
+ * roughly 340px tall it pushed the page the player actually came for below the
+ * fold — on every screen, for the whole release, including for the players who
+ * had already spent their attempts. It now lives behind the command-bar pill,
+ * so the cost of a running event on a page is one chip.
+ */
+function MiniGameStage({
+  state,
+  pending,
+  feedback: fb,
+  onPlay,
+  onClose,
+  onExpire,
+}: {
+  state: MiniGameState;
+  pending: boolean;
+  feedback: Feedback | null;
+  onPlay: (value: string) => void;
+  onClose: () => void;
+  onExpire: () => void;
+}) {
   const meta = MINIGAME_TYPE_META[state.type];
   const attemptsLeft = Math.max(0, state.maxAttempts - state.attempts);
   const outOfAttempts = !state.solved && attemptsLeft === 0;
@@ -500,7 +498,6 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
   // having it swapped out for a text box: the cracked safe and the cup with the
   // ball under it ARE the payoff.
   const interactive = !state.solved && !outOfAttempts;
-  const fb = feedback && feedback.eventId === state.id ? feedback : null;
   const toneClass =
     fb?.tone === "win"
       ? "text-emerald-300"
@@ -511,10 +508,13 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
           : "text-zinc-300";
 
   return (
-    <section
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${meta.label} — ${state.title}`}
       dir="rtl"
-      className="panel-gold mb-5 rounded-xl p-4 shadow-[0_0_30px_-14px_var(--gold)]"
-      aria-label="מיני-משחק פעיל"
+      onClick={(e) => e.stopPropagation()}
+      className="panel-gold relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.85)] sm:p-5"
     >
       {/* ── Banner: what it is, what it pays, how long it lives ── */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gold/25 pb-3">
@@ -535,9 +535,6 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
             <p className="flex flex-wrap items-center gap-2 text-lg font-black leading-tight text-gold-bright">
               <span aria-hidden>{meta.icon}</span>
               <span className="truncate">{state.title}</span>
-              <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                משחק פעיל
-              </span>
             </p>
             <p className="text-xs text-gold-dim">
               {meta.label} · פרס:{" "}
@@ -576,10 +573,18 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
                 key={state.endsAt}
                 endsAt={state.endsAt}
                 serverNow={state.serverNow}
-                onExpire={refresh}
+                onExpire={onExpire}
               />
             </span>
           )}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="סגירה"
+            className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
+          >
+            ✕
+          </button>
         </div>
       </div>
 
@@ -602,7 +607,8 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
             <div className="panel-inset space-y-1 rounded-lg p-3 text-center">
               <p className="text-xl font-black text-red-300">😔 נגמרו הניסיונות</p>
               <p className="text-sm text-zinc-400">
-                יצאת מהמשחק, אבל הוא עדיין רץ — עקוב אחרי המתחרים עד שיסתיים.
+                יצאת מהמשחק, אבל הוא עדיין רץ — סגור את החלון והמשך לשחק; הכפתור
+                למעלה יעדכן אותך מי זכה.
               </p>
             </div>
           )}
@@ -615,7 +621,7 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
               solved={state.solved}
               pending={pending}
               attempts={state.attempts}
-              onSubmit={(value) => play(state.id, value)}
+              onSubmit={onPlay}
             />
           ) : (
             <CupsGame
@@ -623,7 +629,7 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
               history={state.history}
               interactive={interactive}
               pending={pending}
-              onPick={(i) => play(state.id, String(i))}
+              onPick={(i) => onPlay(String(i))}
             />
           )}
 
@@ -637,38 +643,574 @@ export function MiniGamePanel({ initial }: { initial: MiniGameState | null }) {
                 ניסיונות
               </>
             ) : (
-              "עקוב אחרי שאר השחקנים עד שהמשחק ייסגר ←"
+              "המשחק ממשיך בלעדיך — עקוב אחרי המתחרים"
             )}
           </p>
 
           {fb && <p className={`text-center text-sm font-bold ${toneClass}`}>{fb.text}</p>}
         </div>
 
-        {/* Live standings — the reason a knocked-out player stays on the panel. */}
-        <div className="panel-inset rounded-lg p-2">
-          <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">🏁 מי משחק עכשיו</p>
-          {state.board.length === 0 ? (
-            <p className="px-1 py-3 text-center text-[11px] text-zinc-500">
-              עדיין אף אחד לא ניסה — היה הראשון!
-            </p>
-          ) : (
-            <ul className="max-h-56 space-y-0.5 overflow-y-auto">
-              {state.board.map((row) => (
-                <BoardRow key={row.empireId} row={row} maxAttempts={state.maxAttempts} />
-              ))}
-            </ul>
-          )}
-          {state.players > state.board.length && (
-            <p className="px-1 pt-1.5 text-center text-[10px] text-zinc-600">
-              ועוד{" "}
-              <span className="nums" dir="ltr">
-                {state.players - state.board.length}
-              </span>{" "}
-              משתתפים
-            </p>
-          )}
+        {/* The tail of the event: who took it, then how everyone else is doing. */}
+        <div className="space-y-3">
+          <WinnersRail board={state.board} />
+
+          <div className="panel-inset rounded-lg p-2">
+            <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">🏁 מי משחק עכשיו</p>
+            {state.board.length === 0 ? (
+              <p className="px-1 py-3 text-center text-[11px] text-zinc-500">
+                עדיין אף אחד לא ניסה — היה הראשון!
+              </p>
+            ) : (
+              <ul className="max-h-56 space-y-0.5 overflow-y-auto">
+                {state.board.map((row) => (
+                  <BoardRow key={row.empireId} row={row} maxAttempts={state.maxAttempts} />
+                ))}
+              </ul>
+            )}
+            {state.players > state.board.length && (
+              <p className="px-1 pt-1.5 text-center text-[10px] text-zinc-600">
+                ועוד{" "}
+                <span className="nums" dir="ltr">
+                  {state.players - state.board.length}
+                </span>{" "}
+                משתתפים
+              </p>
+            )}
+          </div>
         </div>
       </div>
-    </section>
+    </div>
+  );
+}
+
+/* ========================================================================== */
+/*                     The corner column — herald + winners                    */
+/* ========================================================================== */
+
+/**
+ * Which events a player has already been told about.
+ *
+ * A list rather than the single id this used to hold: several releases can run
+ * at once, and remembering only the last one heralded meant the older game
+ * re-invited the player on the next load, forever. Capped, because the only
+ * question ever asked of it is "have I seen *this* release", and a player who
+ * has moved on by twenty games does not need the twenty-first answer.
+ */
+const HERALD_KEY = "kraldor.minigame.heralded";
+const HERALD_MEMORY = 12;
+
+function readHeralded(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem(HERALD_KEY);
+    if (!raw) return new Set();
+    // The pre-multi-game format was a bare id, which is not JSON — read it back
+    // as the one release it stood for rather than re-heralding it.
+    const parsed: unknown = raw.startsWith("[") ? JSON.parse(raw) : [raw];
+    return new Set(Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : []);
+  } catch {
+    // Private mode, blocked storage, a mangled value — better a repeated
+    // invitation than none.
+    return new Set();
+  }
+}
+
+function writeHeralded(ids: Set<string>): void {
+  try {
+    window.localStorage.setItem(HERALD_KEY, JSON.stringify([...ids].slice(-HERALD_MEMORY)));
+  } catch {
+    /* nothing to do: the herald simply shows again next load */
+  }
+}
+
+/** How long the invitation and each winner call stay on screen. */
+const HERALD_MS = 14_000;
+const WINNER_TOAST_MS = 7_000;
+
+/** Most notes on screen at once — a burst of wins must not become a wall. */
+const NOTE_LIMIT = 4;
+
+/**
+ * Each note carries its own deadline rather than its own timer. A per-note
+ * `setTimeout` has to be rebuilt whenever the list changes, which silently
+ * restarted the clock on every note still on screen — so a steady trickle of
+ * winners could keep the first one pinned there indefinitely.
+ */
+type CornerNote = { id: string; expiresAt: number } & (
+  | { kind: "herald"; title: string; body: string; icon: string; eventId: string }
+  // `game` is only filled while more than one release is live — with a single
+  // game on the board it would name the only thing it could possibly be.
+  | { kind: "winner"; name: string; empireId: string; eventId: string; game: string | null }
+);
+
+/**
+ * The bottom-right column: the one-time invitation when a game is released, and
+ * a call every time someone wins.
+ *
+ * This is what replaced the always-on panel. A released mini-game still has to
+ * *interrupt* — an event nobody notices is a prize nobody competes for — but it
+ * has to interrupt once and then get out of the way, and the pill in the
+ * command bar is where it lives for the rest of the window. The winner calls
+ * are the rest of the trade: pulling the standings off every screen would have
+ * made the event silent, so the standings come to the player instead, only when
+ * something actually happened.
+ *
+ * Corner chosen to miss the neighbours: WarAlerts owns top-center, the chat dock
+ * owns bottom-left.
+ */
+function CornerNotes({
+  notes,
+  onOpen,
+  onDismiss,
+}: {
+  notes: CornerNote[];
+  /** Opens the release the note is about — not "the" game; there may be several. */
+  onOpen: (eventId: string) => void;
+  onDismiss: (id: string) => void;
+}) {
+  if (typeof document === "undefined" || notes.length === 0) return null;
+
+  return createPortal(
+    <div
+      dir="rtl"
+      aria-live="polite"
+      // Lifted clear of the chat dock on a phone: at 390px a note this wide
+      // reaches the dock's corner, and being the higher layer it covered it.
+      className="pointer-events-none fixed bottom-20 right-3 z-[85] flex w-[min(88vw,20rem)] flex-col gap-2 print:hidden sm:bottom-3"
+    >
+      {notes.map((note) =>
+        note.kind === "herald" ? (
+          <button
+            key={note.id}
+            type="button"
+            onClick={() => {
+              onDismiss(note.id);
+              onOpen(note.eventId);
+            }}
+            className="mg-note mg-note--herald pointer-events-auto text-right"
+          >
+            <span className="mg-note-icon" aria-hidden>
+              {note.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-black text-gold-bright">
+                {note.title}
+              </span>
+              <span className="block truncate text-[11px] text-amber-100/80">{note.body}</span>
+            </span>
+            <span className="mg-note-cta">שחק</span>
+          </button>
+        ) : (
+          <div key={note.id} className="mg-note mg-note--winner pointer-events-auto">
+            <span className="mg-note-icon" aria-hidden>
+              🏆
+            </span>
+            <span className="min-w-0 flex-1 text-xs text-zinc-300">
+              <span className="font-black text-emerald-300">
+                <PlayerLink empireId={note.empireId} name={note.name} />
+              </span>{" "}
+              לקח את הפרס
+              {note.game && (
+                <>
+                  {" ב"}
+                  <span className="font-bold text-gold-bright">״{note.game}״</span>
+                </>
+              )}
+            </span>
+            <button
+              type="button"
+              aria-label="סגירה"
+              onClick={() => onDismiss(note.id)}
+              className="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-white/10 hover:text-zinc-300"
+            >
+              ✕
+            </button>
+          </div>
+        )
+      )}
+    </div>,
+    document.body
+  );
+}
+
+
+/* ========================================================================== */
+/*                        One release, as a command-bar chip                   */
+/* ========================================================================== */
+
+/**
+ * A single running mini-game, reduced to one pill.
+ *
+ * `crowded` is what a second live release does to this chip, and it is a trade
+ * made twice over.
+ *
+ * On its own the title is a luxury and is the first thing dropped on a narrow
+ * bar — the icon and the clock are what make the chip mean anything. Beside a
+ * sibling it stops being a luxury: two gold chips carrying the same 🥤 and no
+ * name are the same chip drawn twice, and the player cannot tell which race
+ * they are opening. So a crowded chip keeps its title at every width.
+ *
+ * Which has to be paid for, because two full chips do not fit across a phone —
+ * they wrapped into a stacked column, and a column of chips is a panel again,
+ * which is the thing this whole component exists to not be. So below `sm` a
+ * crowded chip also tightens its padding and drops the attempts badge: the row
+ * has to say *which games are running and how long is left*, and the badge is
+ * the one part of that the modal repeats the moment it is opened.
+ */
+function MiniGamePill({
+  state,
+  crowded,
+  onOpen,
+  onExpire,
+}: {
+  state: MiniGameState;
+  crowded: boolean;
+  onOpen: () => void;
+  onExpire: () => void;
+}) {
+  const meta = MINIGAME_TYPE_META[state.type];
+  const attemptsLeft = Math.max(0, state.maxAttempts - state.attempts);
+  const interactive = !state.finished;
+  const winners = state.board.filter((r) => r.won);
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-haspopup="dialog"
+      aria-label={`${state.title} — ${meta.label}`}
+      // The narrow-screen squeeze is `.mg-pill--crowded` in globals.css rather
+      // than utilities here: `.mg-pill-badge` and `.btn` are unlayered rules, so
+      // they beat any Tailwind `hidden`/`gap-*`/`text-*` this could ask for.
+      className={`mg-pill btn gap-2 px-3 py-1.5 text-sm ${crowded ? "mg-pill--crowded" : ""} ${
+        interactive ? "btn-gold mg-pill--live" : "btn-dark"
+      }`}
+      title={`${state.title} · ${meta.label} · פרס: ${state.prizeText}`}
+    >
+      <span aria-hidden className="text-base leading-none">
+        {meta.icon}
+      </span>
+      <span
+        className={`mg-pill-title ${
+          crowded
+            ? "max-w-[5rem] truncate sm:max-w-[8rem] lg:max-w-[12rem]"
+            : "hidden max-w-[9rem] truncate sm:inline"
+        }`}
+      >
+        {state.title}
+      </span>
+
+      {state.endsAt != null && (
+        <span className="mg-pill-clock nums" dir="ltr">
+          <Countdown
+            key={state.endsAt}
+            endsAt={state.endsAt}
+            serverNow={state.serverNow}
+            onExpire={onExpire}
+          />
+        </span>
+      )}
+
+      {/* The one badge that changes with the player's own standing: attempts
+          while they are in it, the medal count once they are not. This is the
+          answer to "what is this chip telling me right now" — and the piece
+          that stands down on a phone when it is sharing the row. */}
+      {interactive ? (
+        <span className="mg-pill-badge mg-pill-badge--go">
+          {attemptsLeft === 1 ? (
+            "ניסיון אחרון"
+          ) : (
+            <>
+              נותרו <span className="nums">{attemptsLeft}</span>
+            </>
+          )}
+        </span>
+      ) : (
+        <span className="mg-pill-badge mg-pill-badge--done">
+          {winners.length > 0 ? (
+            <>
+              🏆 <span className="nums">{winners.length}</span>
+            </>
+          ) : (
+            "אין עדיין זוכה"
+          )}
+        </span>
+      )}
+    </button>
+  );
+}
+
+/* ========================================================================== */
+
+/**
+ * The live mini-games as they meet a player on an ordinary screen: a row of
+ * pills in the command bar, next to the season pass.
+ *
+ * The pill is the whole point of this component. A running event is a real
+ * event — it wants attention — but it is also mounted on every `/game/*` screen
+ * for its entire window, and the version of this that sat inline above the page
+ * spent that window shoving the actual game down the screen for everybody,
+ * including the players who had already solved it or burned every attempt. So
+ * each release announces itself once (the herald), calls out each win as it
+ * happens, and otherwise costs a chip that reads at a glance:
+ *
+ *   • still in it  — gold, pulsing, showing the clock and attempts left
+ *   • done with it — quiet, showing how many have won and who took it first
+ *
+ * There can be several at once (see MAX_LIVE_MINIGAMES): an admin fielding a
+ * cups game and a safe together is two races with two prizes, so the chips sit
+ * side by side in the same row, oldest release first, and every piece of the
+ * component below — the modal, the herald, the winner calls, the guess itself —
+ * is keyed by event rather than assuming there is only ever one.
+ */
+export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
+  const router = useRouter();
+  const [states, setStates] = useState<MiniGameState[]>(initial);
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<CornerNote[]>([]);
+  const [pending, startTransition] = useTransition();
+
+  const dismissNote = useCallback((id: string) => {
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+  }, []);
+
+  const refresh = useCallback(async () => {
+    // `retry` means the round learned nothing (throttled, or a signed-out tab).
+    // Changing nothing is the right answer: reading it as "no events" would pull
+    // a live game — and the player's own attempt log — off the screen.
+    const { states: next, retry } = await pollMiniGame();
+    if (retry) return;
+    setStates(next ?? []);
+    // This only runs when a countdown hit zero, and the layout rendered the
+    // first copy server-side — so re-render the page rather than leave anything
+    // else quoting a release that has just closed.
+    router.refresh();
+  }, [router]);
+
+  // Derived rather than read off `states` inside the effect: the poll result is
+  // a new array every tick, so depending on it would tear down and rebuild the
+  // interval on every beat. This flips only when the last event ends or the
+  // first one starts, which is exactly when the rate should change.
+  const live = states.length > 0;
+
+  // Poll for activation / end / rival progress.
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      // Nobody is watching a hidden tab, and the wake-up listeners below poll
+      // the moment it comes back — so skipping here is not falling behind, it is
+      // the difference between a backgrounded tab costing six requests a minute
+      // for hours and costing nothing. Same rule the chat dock already follows.
+      if (document.visibilityState === "hidden") return;
+      const { states: next, retry } = await pollMiniGame();
+      if (alive && !retry) setStates(next ?? []);
+    };
+    const id = setInterval(tick, live ? POLL_LIVE_MS : POLL_IDLE_MS);
+    const onWake = () => {
+      if (document.visibilityState === "visible") void tick();
+    };
+    window.addEventListener("focus", onWake);
+    document.addEventListener("visibilitychange", onWake);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      window.removeEventListener("focus", onWake);
+      document.removeEventListener("visibilitychange", onWake);
+    };
+  }, [live]);
+
+  // With two games up, "someone won" is no longer self-explanatory — the note
+  // has to say which one. With one it would be naming the only thing it could.
+  const crowded = states.length > 1;
+
+  /**
+   * The winner feed.
+   *
+   * Every poll carries the rival boards, and a board already says who has won —
+   * so calling out a new winner costs nothing extra on the wire. Each event
+   * keeps its own ledger, seeded from the *first* state seen for it, so that
+   * arriving mid-event does not replay ten wins that happened before the player
+   * got here; and only ever announces other people — the player's own win is
+   * already a modal, a system message and a resource bar that just went up.
+   */
+  const announced = useRef(new Map<string, Set<string>>());
+  useEffect(() => {
+    const fresh: CornerNote[] = [];
+    for (const s of states) {
+      const seen = announced.current.get(s.id);
+      if (!seen) {
+        // First sight of this release: everyone already holding a medal is
+        // history, not news.
+        announced.current.set(s.id, new Set(s.board.filter((r) => r.won).map((r) => r.empireId)));
+        continue;
+      }
+      for (const row of s.board) {
+        if (!row.won || row.isSelf || seen.has(row.empireId)) continue;
+        seen.add(row.empireId);
+        fresh.push({
+          id: `win:${s.id}:${row.empireId}`,
+          kind: "winner",
+          name: row.name,
+          empireId: row.empireId,
+          eventId: s.id,
+          game: crowded ? s.title : null,
+          expiresAt: Date.now() + WINNER_TOAST_MS,
+        });
+      }
+    }
+    // Forget the ledger of anything that has ended — ids are per-empire, so a
+    // stale set would suppress the same player's win in the next release.
+    for (const id of [...announced.current.keys()]) {
+      if (!states.some((s) => s.id === id)) announced.current.delete(id);
+    }
+    // Reacting to an external system, not deriving state: `states` is what the
+    // poll brought back, and a win that already happened on the server is the
+    // event this turns into a toast. There is nothing to compute during render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (fresh.length > 0) setNotes((prev) => [...prev, ...fresh].slice(-NOTE_LIMIT));
+  }, [states, crowded]);
+
+  /**
+   * The one-time invitation, once per release. Only for a player who can still
+   * play it: someone who already solved a game (or spent their attempts) on
+   * another tab does not need to be invited into it, and the pill is enough.
+   *
+   * localStorage is not readable while rendering on the server, so the decision
+   * is made after mount — which also keeps the server's HTML and the client's
+   * first paint identical.
+   *
+   * The ledger is the guard, not the effect's dependencies: a poll hands down a
+   * fresh array every ten seconds, and the version of this that leaned on deps
+   * had the previous run's cleanup cancel the pending invitation while storage
+   * had already sworn it was delivered. Marking the release the moment it is
+   * scheduled makes every later pass a no-op, so this can run as often as it
+   * likes. The timers are cancelled only on unmount, never on a re-run.
+   */
+  const heralded = useRef<Set<string> | null>(null);
+  const heraldTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(
+    () => () => {
+      for (const t of heraldTimers.current) clearTimeout(t);
+    },
+    []
+  );
+  useEffect(() => {
+    heralded.current ??= readHeralded();
+    for (const s of states) {
+      if (s.finished || heralded.current.has(s.id)) continue;
+      heralded.current.add(s.id);
+      writeHeralded(heralded.current);
+      const note: CornerNote = {
+        id: `herald:${s.id}`,
+        kind: "herald",
+        icon: MINIGAME_TYPE_META[s.type].icon,
+        title: s.title,
+        body: `בפרס: ${s.prizeText}`,
+        eventId: s.id,
+        expiresAt: Date.now() + HERALD_MS,
+      };
+      // A beat of delay so the page finishes painting first — slammed into the
+      // same frame as a navigation it reads as a loading artefact, not an event.
+      heraldTimers.current.push(
+        setTimeout(() => {
+          setNotes((prev) =>
+            prev.some((n) => n.id === note.id) ? prev : [...prev, note].slice(-NOTE_LIMIT)
+          );
+        }, 600)
+      );
+    }
+  }, [states]);
+
+  // Notes expire on their own deadline. One sweep for the whole column rather
+  // than a timer per note — see CornerNote for what a per-note timer got wrong.
+  const hasNotes = notes.length > 0;
+  useEffect(() => {
+    if (!hasNotes) return;
+    const id = setInterval(() => {
+      const now = Date.now();
+      setNotes((prev) =>
+        prev.some((n) => n.expiresAt <= now) ? prev.filter((n) => n.expiresAt > now) : prev
+      );
+    }, 500);
+    return () => clearInterval(id);
+  }, [hasNotes]);
+
+  // The open game, resolved every render: a release that ends while its modal is
+  // up takes the modal with it instead of stranding the player on a dead board.
+  const openState = openId != null ? (states.find((s) => s.id === openId) ?? null) : null;
+  const modalOpen = openState !== null;
+
+  // Escape closes the game, and the page behind it stays put while it is open.
+  useEffect(() => {
+    if (!modalOpen) return;
+    // The DOM event, not React's — the synthetic type is imported above for the
+    // safe's keypad and would shadow it here.
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") setOpenId(null);
+    };
+    document.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [modalOpen]);
+
+  function play(eventId: string, value: string) {
+    startTransition(async () => {
+      const fd = new FormData();
+      // Which game this guess belongs to. Several can be live, and the server
+      // will not guess on the player's behalf.
+      fd.set("eventId", eventId);
+      fd.set("guess", value);
+      const res = await submitMiniGameGuess({ state: null, feedback: "", tone: "info" }, fd);
+      const next = res.state;
+      if (next) setStates((prev) => prev.map((s) => (s.id === next.id ? next : s)));
+      setFeedback({ text: res.feedback, tone: res.tone, eventId });
+      if (res.tone === "win") router.refresh();
+    });
+  }
+
+  if (states.length === 0) return null;
+
+  const fb =
+    feedback && openState && feedback.eventId === openState.id ? feedback : null;
+
+  return (
+    <>
+      {/* Their own group inside the command bar, so a second release lands
+          beside the first rather than being flung to the far side of the row by
+          the potions and the update timers. */}
+      <div className="mg-pills" data-count={states.length}>
+        {states.map((s) => (
+          <MiniGamePill
+            key={s.id}
+            state={s}
+            crowded={crowded}
+            onOpen={() => setOpenId(s.id)}
+            onExpire={refresh}
+          />
+        ))}
+      </div>
+
+      <CornerNotes notes={notes} onOpen={setOpenId} onDismiss={dismissNote} />
+
+      {openState && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+          onClick={() => setOpenId(null)}
+        >
+          <MiniGameStage
+            state={openState}
+            pending={pending}
+            feedback={fb}
+            onPlay={(value) => play(openState.id, value)}
+            onClose={() => setOpenId(null)}
+            onExpire={refresh}
+          />
+        </div>
+      )}
+    </>
   );
 }

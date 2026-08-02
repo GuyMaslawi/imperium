@@ -37,11 +37,88 @@ export const MINIGAME_TYPE_META: Record<MiniGameType, { label: string; icon: str
   CRACK_SAFE: { label: "פריצת הכספת", icon: "🔐" },
 };
 
-/** Bounds on the two games' shapes, shared by the admin form and the server. */
-export const CUPS_MIN = 2;
+/**
+ * How many releases may run at the same time.
+ *
+ * More than one is deliberate — an admin fielding a cups game and a safe at once
+ * is two races with two prizes, and stopping the first to start the second used
+ * to be the only option. The ceiling is what keeps that a choice rather than a
+ * pile: every live release costs a pill in the command bar (they share one row,
+ * and a phone's row is not wide) and a board read on every poll, on every screen,
+ * for every player. Four is the most that still reads as a row of chips.
+ */
+export const MAX_LIVE_MINIGAMES = 4;
+
+/**
+ * Bounds on the two games' shapes, shared by the admin form and the server.
+ *
+ * Three cups is the floor because two is not a game — it is a coin toss with a
+ * prize attached, and the row of cups on screen is meant to look like a choice.
+ */
+export const CUPS_MIN = 3;
 export const CUPS_MAX = 6;
 export const SAFE_DIGITS_MIN = 3;
 export const SAFE_DIGITS_MAX = 5;
+
+/** Hard floor/ceiling on the attempt budget, whatever the game. */
+export const ATTEMPTS_MIN = 1;
+export const ATTEMPTS_CEILING = 30;
+
+/** The shape of a game — only one of the two fields matters per type. */
+export interface MiniGameShape {
+  cups: number;
+  digits: number;
+}
+
+/**
+ * The attempt budget a given game shape can carry: what the admin form offers,
+ * and what the server clamps to.
+ *
+ * The interesting half is the cups. With N cups, N−1 attempts wins by
+ * elimination — the last cup is free — so anything at or above that hands out
+ * the prize to everyone who bothers to click, which is not a game and not a
+ * prize. The ceiling is therefore N−2, and the default is a single shot: three
+ * cups, one lift, one in three. An admin who wants a kinder game raises the cup
+ * count, not the attempts.
+ *
+ * The safe is the opposite problem. Every attempt comes back marked (right
+ * digit / right place), so attempts are the *information* the player reasons
+ * from — with one shot a three-digit code is a 1-in-1000 blind guess. Five
+ * attempts on three digits is the tuned starting point, and it scales with the
+ * code length.
+ */
+export function attemptsRange(
+  type: MiniGameType,
+  shape: MiniGameShape
+): { min: number; max: number; fallback: number } {
+  if (type === "FIND_BALL") {
+    const cups = clampCups(shape.cups);
+    return { min: ATTEMPTS_MIN, max: Math.max(ATTEMPTS_MIN, cups - 2), fallback: 1 };
+  }
+  const digits = clampDigits(shape.digits);
+  return { min: ATTEMPTS_MIN, max: ATTEMPTS_CEILING, fallback: digits * 2 - 1 };
+}
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, Math.round(value)));
+
+export function clampCups(value: number): number {
+  return Number.isFinite(value) ? clamp(value, CUPS_MIN, CUPS_MAX) : CUPS_MIN;
+}
+
+export function clampDigits(value: number): number {
+  return Number.isFinite(value) ? clamp(value, SAFE_DIGITS_MIN, SAFE_DIGITS_MAX) : SAFE_DIGITS_MIN;
+}
+
+/** Clamp an admin-supplied attempt budget into what this shape can carry. */
+export function clampAttempts(
+  type: MiniGameType,
+  shape: MiniGameShape,
+  value: number
+): number {
+  const range = attemptsRange(type, shape);
+  return Number.isFinite(value) ? clamp(value, range.min, range.max) : range.fallback;
+}
 
 /** Public (answer-free) parameters a player is allowed to see. */
 export interface MiniGamePublicConfig {

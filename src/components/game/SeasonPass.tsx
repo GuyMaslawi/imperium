@@ -572,7 +572,7 @@ function CycleClearedOverlay({
     <div
       dir="rtl"
       onClick={onClose}
-      className="fixed inset-0 z-[60] flex items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
     >
       {/* confetti rains over the whole screen, behind the card */}
       <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -761,9 +761,9 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
     setState(initial);
   }
 
-  const { premium: owned, tiers, collectable, seasonActive } = state;
+  const { premium: owned, tiers, collectable } = state;
   const canAfford = state.diamonds >= state.price;
-  const canBuy = seasonActive && canAfford;
+  const canBuy = canAfford;
   const currentTier = Math.max(1, state.level);
 
   /**
@@ -883,10 +883,6 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
 
   function handleUpgrade() {
     if (owned || unlocking || pending) return;
-    // The pass is sold per season, so the server refuses the sale outright when
-    // none is active. Say so here rather than firing a request that can only
-    // come back as an error.
-    if (!seasonActive) return reject("אין עונה פעילה כרגע — הרכישה תיפתח כשתתחיל עונה חדשה");
     if (!canAfford) return reject();
 
     startTransition(async () => {
@@ -954,12 +950,9 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
             פרימיום
           </span>
         ) : (
-          // No upsell badge while the pass is unsellable — see seasonActive.
-          seasonActive && (
-            <span className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
-              שדרג <Icon aria-hidden name="spark" size={11} />
-            </span>
-          )
+          <span className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
+            שדרג <Icon aria-hidden name="spark" size={11} />
+          </span>
         )}
       </button>
 
@@ -970,7 +963,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
           // browser felt like — the dialog drifting under the pointer while the
           // ladder crawled. The shell is height-capped instead, and the ladder
           // below is the single scroll region.
-          className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
           onClick={closePass}
         >
           <PassDialog
@@ -1079,7 +1072,7 @@ function PassDialog({
   onDismissHaul: () => void;
 }) {
   const dialogRef = useModalChrome(onClose);
-  const { premium: owned, tiers, collectable, seasonActive } = state;
+  const { premium: owned, tiers, collectable } = state;
 
   return (
     <div
@@ -1226,11 +1219,10 @@ function PassDialog({
             ratio of a number the player has never been shown; a row of
             "+27,000 🪙" chips is the offer itself.
 
-            Only rendered when the pass is actually for sale: an owner has
-            nothing to buy, and with no active season the card was a dead
-            button plus an apology taking up the top of the dialog. Either way
-            the ladder below still shows what the gold track is worth. */}
-        {!owned && seasonActive && (
+            Hidden only from an owner, who has nothing left to buy. Everyone
+            else always gets a live buy button — the offer never depends on the
+            state of a season row. */}
+        {!owned && (
           <div
             className={`mt-3 overflow-hidden rounded-xl border-2 border-gold/60 bg-gradient-to-br from-amber-900/40 via-amber-950/50 to-black p-3 text-center shadow-[0_0_30px_-8px_var(--gold)] ${
               shake ? "sp-shake" : ""

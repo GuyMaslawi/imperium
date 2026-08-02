@@ -21,7 +21,8 @@ import {
   itemPrimaryBonus,
   itemUpgradeCost,
   matchupXpFactor,
-  resetXpMultiplier,
+  effectiveHeroLevel,
+  levelGapXpFactor,
   tierForLevel,
   upgradeStep,
   xpToNextLevel,
@@ -567,6 +568,7 @@ export function BankCalc() {
 /** Mirrors `attackWinXp` + `applyHeroXp`, including the class and potion multipliers. */
 export function HeroXpCalc() {
   const [level, setLevel] = useState(20);
+  const [resets, setResets] = useState(0);
   const [foeLevel, setFoeLevel] = useState(25);
   const [foeResets, setFoeResets] = useState(0);
   const [ownPower, setOwnPower] = useState(120_000);
@@ -574,10 +576,12 @@ export function HeroXpCalc() {
   const [shadow, setShadow] = useState(false);
   const [potion, setPotion] = useState(false);
 
-  const base = 40 + foeLevel * 10;
+  const ownEff = effectiveHeroLevel(level, resets);
+  const foeEff = effectiveHeroLevel(foeLevel, foeResets);
+  const base = 40 + level * 10;
+  const gap = levelGapXpFactor(ownEff, foeEff);
   const matchup = matchupXpFactor(ownPower, foePower);
-  const prestige = resetXpMultiplier(foeResets);
-  const raw = Math.round(base * matchup * prestige);
+  const raw = Math.round(base * gap * matchup);
   const withClass = Math.round(raw * (shadow ? 1.1 : 1));
   const gain = withClass * (potion ? 2 : 1);
 
@@ -589,9 +593,11 @@ export function HeroXpCalc() {
       <div className="grid gap-x-5 gap-y-3 sm:grid-cols-2">
         <Field label="רמת הגיבור שלך" icon="hero" value={level} onChange={setLevel} min={1} max={99}
           hint={`דרושות ${int(need)} נק׳ ניסיון לרמה הבאה`} />
+        <Field label="האיפוסים שלך (↻)" icon="crown" value={resets} onChange={setResets} max={20}
+          hint={`רמה אפקטיבית ${int(ownEff)}`} />
         <Field label="רמת גיבור היריב" icon="hero" value={foeLevel} onChange={setFoeLevel} min={1} max={100} />
         <Field label="איפוסי היריב (↻)" icon="crown" value={foeResets} onChange={setFoeResets} max={20}
-          hint={`מכפיל ×${prestige.toFixed(2)}`} />
+          hint={`רמה אפקטיבית ${int(foeEff)} — פער ×${gap.toFixed(2)}`} />
         <Field label="כוח התקפה שלך" icon="attack" value={ownPower} onChange={setOwnPower} max={50_000_000} step={5000} />
         <Field label="כוח הגנת היריב" icon="shield" value={foePower} onChange={setFoePower} max={50_000_000} step={5000}
           hint={`יחס קרב ×${matchup.toFixed(2)}`} />
@@ -610,9 +616,9 @@ export function HeroXpCalc() {
 
       <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_auto]">
         <div className="panel-inset rounded-xl px-3 py-2">
-          <Step label={`בסיס — 40 + ${foeLevel}×10`} value={int(base)} />
-          <Step label={`יחס קרב ×${matchup.toFixed(2)}`} value={`= ${int(base * matchup)}`} tone="text-sky-300" />
-          <Step label={`יוקרת יריב ×${prestige.toFixed(2)}`} value={`= ${int(raw)}`} tone="text-purple-300" />
+          <Step label={`בסיס — 40 + ${level}×10`} value={int(base)} />
+          <Step label={`פער רמות ×${gap.toFixed(2)}`} value={`= ${int(base * gap)}`} tone="text-purple-300" />
+          <Step label={`יחס קרב ×${matchup.toFixed(2)}`} value={`= ${int(raw)}`} tone="text-sky-300" />
           {shadow && <Step label="מקצוע הצל ×1.1" value={`= ${int(withClass)}`} tone="text-purple-300" />}
           {potion && <Step label="שיקוי הניסיון ×2" value={`= ${int(gain)}`} tone="text-gold" />}
           <Step label="ניסיון לניצחון אחד" value={int(gain)} strong tone="text-gold-bright" />
@@ -623,9 +629,13 @@ export function HeroXpCalc() {
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-zinc-500">
-        יחס הקרב נגזר מ־<span className="nums" dir="ltr">0.3 + (כוח היריב ÷ כוחך) × 1.4</span> ונחסם
-        בטווח <span className="nums" dir="ltr">0.3–2.0</span> — לרמוס יריב חלש משתלם פחות מלנצח יריב
-        שקול, וניצחון על חזק ממך משלם הכי הרבה.
+        פער הרמות נגזר מ־<span className="nums" dir="ltr">0.25 + (רמה אפקטיבית של היריב ÷ שלך) × 0.75</span>{" "}
+        ונחסם בטווח <span className="nums" dir="ltr">0.25–2.5</span>. רמה אפקטיבית = רמה + איפוסים ×{" "}
+        <span className="nums">100</span>, ולכן יריב ברמה 1 אחרי איפוס אחד נחשב רמה{" "}
+        <span className="nums">101</span> ומשלם בהתאם. יחס הקרב נגזר מ־
+        <span className="nums" dir="ltr">0.3 + (כוח היריב ÷ כוחך) × 1.4</span> ונחסם בטווח{" "}
+        <span className="nums" dir="ltr">0.3–2.0</span> — לרמוס יריב חלש משתלם פחות מלנצח יריב שקול,
+        וניצחון על חזק ממך משלם הכי הרבה.
       </p>
     </CalcShell>
   );

@@ -6,6 +6,26 @@
    panels with corner brackets, parchment-tan CTAs, faction color accents.
    ========================================================================= */
 
+/* -------------------------------------------------------------------------
+   Stacking order for everything that floats over the page. These live as
+   Tailwind classes on the components themselves (there is no z-index scale in
+   the theme), so the ladder is written down here instead — it was drifting,
+   and a dock that outranks a modal reads as a bug, not as a layer.
+
+     40   sticky command bar          ResourceBar
+     50   chat dock                   ChatDock
+     55   chat emoji tray             ChatEmojiPicker
+     60   mobile nav drawer           Sidebar/MobileMenu
+     85   mini-game corner toast      MiniGameButton
+     95   mini-game board             MiniGameButton
+    100   modals and dialogs          Dialog, SeasonPass, HappyHourBanner
+    110   incoming-attack vignette    WarAlerts
+    120   incoming-attack toasts      WarAlerts
+
+   Anything covering the whole viewport belongs at 60 or above; anything the
+   page should be able to cover belongs below it.
+   ------------------------------------------------------------------------- */
+
 :root {
   /* ===================================================================
      KRALDOR — "Obsidian & Crimson" identity
@@ -5169,15 +5189,22 @@ body {
 }
 
 /* --- the record line: who got here first --- */
+/* Aligned to the first line, not to the box: the "still unclaimed" sentence is
+   long enough to wrap onto two lines on a phone, and centring left its icon
+   floating between them instead of beside the words it introduces. */
 .glory-record {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.3125rem;
   margin-top: 0.4375rem;
   border-top: 1px dashed rgba(43, 40, 34, 0.9);
   padding-top: 0.375rem;
   font-size: 0.6875rem;
+  line-height: 1.45;
   color: var(--gold-dim);
+}
+.glory-record > svg {
+  margin-top: 0.1875rem;
 }
 .glory-holder {
   min-width: 0;
@@ -6977,7 +7004,7 @@ body {
 }
 
 /* =========================================================================
-   Mini-games — the two boards that drop into MiniGamePanel.
+   Mini-games — the two boards that drop into the mini-game modal.
 
    Unlayered like the rest of this file, so every rule here beats a Tailwind
    utility of the same property. The call sites therefore style only what is
@@ -7435,6 +7462,235 @@ body {
   .safe-loot { transition: none; }
 }
 
+/* ---------------------- the command-bar pill + corner --------------------- */
+/* A running mini-game costs exactly this much of the page: one chip beside the
+   season pass, and a corner column that speaks only when something happened.
+   Everything below is sized to sit in a row of existing buttons without
+   changing its height — the whole reason the panel moved off the page. */
+
+/* Every live release, kept together. The command bar is a wrapping flex row, so
+   without this group a second chip could be pushed past the potions or the
+   update timers and read as an unrelated button; inside it the games are always
+   adjacent, and if the width really runs out they wrap as one block. */
+.mg-pills {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mg-pill {
+  position: relative;
+  overflow: hidden;
+}
+/* The invitation, for a player who still has attempts. A slow sweep rather than
+   a pulse on the whole chip: the command bar is looked at constantly, and a
+   throbbing button in it becomes something you learn to ignore in a minute. */
+.mg-pill--live::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgba(255, 250, 224, 0.42) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  animation: mg-pill-sweep 3.6s ease-in-out infinite;
+}
+@keyframes mg-pill-sweep {
+  0%, 62% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+.mg-pill-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.mg-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 0.3rem;
+  padding: 0 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 900;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.mg-pill-badge--go {
+  background: rgba(0, 0, 0, 0.42);
+  color: #ffe9a8;
+}
+.mg-pill-badge--done {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+}
+
+/* Two chips have to cross a phone, and at full size they don't — they wrapped
+   into a stacked column, and a column of chips is the panel this whole thing
+   exists to not be. So a chip sharing the row tightens up below `sm` and puts
+   its badge away: the row's job there is *which games are running and how long
+   is left*, and the badge is the one part of that the modal repeats the moment
+   the game is opened. In CSS rather than utilities because `.btn` and
+   `.mg-pill-badge` are unlayered and would win against them. */
+@media (max-width: 639px) {
+  .mg-pill--crowded {
+    gap: 0.3rem;
+    padding-inline: 0.45rem;
+    font-size: 0.75rem;
+  }
+  .mg-pill--crowded .mg-pill-badge {
+    display: none;
+  }
+  /* Exactly two chips split the row between them and truncate their titles to
+     whatever is left, so the pair can never be broken apart by a phone that is
+     nine pixels too narrow — or by a countdown that grows an hours field on the
+     hour. Three or more are allowed to wrap instead: at a quarter of a phone
+     each there would be nothing left of a title to read. */
+  .mg-pills[data-count="2"] {
+    flex-wrap: nowrap;
+  }
+  .mg-pills[data-count="2"] .mg-pill {
+    min-width: 0;
+    flex: 1 1 0;
+  }
+  /* Only the title gives ground — the icon, the clock and the badge are the
+     chip's meaning, and a half-drawn countdown is worse than a cut title. */
+  .mg-pills[data-count="2"] .mg-pill > * {
+    flex-shrink: 0;
+  }
+  .mg-pills[data-count="2"] .mg-pill-title {
+    min-width: 0;
+    max-width: none;
+    flex-shrink: 1;
+  }
+}
+
+/* --- the corner column: the release herald + each win as it lands --- */
+
+.mg-note {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(228, 195, 90, 0.32);
+  background: linear-gradient(140deg, rgba(28, 22, 12, 0.97), rgba(14, 12, 9, 0.97));
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.9);
+  padding: 0.55rem 0.65rem;
+  animation: mg-note-in 0.4s cubic-bezier(0.22, 1.4, 0.5, 1) both;
+}
+.mg-note--herald {
+  border-color: rgba(228, 195, 90, 0.7);
+  box-shadow:
+    0 12px 30px -10px rgba(0, 0, 0, 0.9),
+    0 0 26px -10px rgba(244, 196, 74, 0.9);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.mg-note--herald:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 16px 34px -10px rgba(0, 0, 0, 0.9),
+    0 0 32px -8px rgba(244, 196, 74, 1);
+}
+.mg-note--winner { border-color: rgba(52, 211, 153, 0.35); }
+
+.mg-note-icon {
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(228, 195, 90, 0.4);
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 1.05rem;
+}
+.mg-note-cta {
+  flex-shrink: 0;
+  border-radius: 0.35rem;
+  background: var(--gold, #e4c35a);
+  padding: 0.15rem 0.55rem;
+  font-size: 0.7rem;
+  font-weight: 900;
+  color: #1a1206;
+}
+
+@keyframes mg-note-in {
+  from { opacity: 0; transform: translateX(-1.2rem) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- the winners' rail inside the modal --- */
+
+.mg-winners {
+  border-radius: 0.6rem;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: linear-gradient(160deg, rgba(6, 40, 30, 0.6), rgba(0, 0, 0, 0.35));
+  padding: 0.5rem;
+}
+.mg-winners-title {
+  display: block;
+  padding: 0 0.25rem 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: #6ee7b7;
+}
+.mg-winners-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.mg-winner {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 0.35rem;
+  background: rgba(255, 255, 255, 0.035);
+  padding: 0.2rem 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #d4d4d8;
+  animation: mg-winner-in 0.35s ease both;
+  animation-delay: calc(var(--i) * 60ms);
+}
+.mg-winner-rank {
+  display: flex;
+  height: 1.05rem;
+  width: 1.05rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.22);
+  font-size: 0.5625rem;
+  font-weight: 900;
+  color: #6ee7b7;
+}
+.mg-winner--more {
+  justify-content: center;
+  color: #71717a;
+}
+@keyframes mg-winner-in {
+  from { opacity: 0; transform: translateX(-0.4rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mg-pill--live::after,
+  .mg-note,
+  .mg-winner { animation: none; }
+  .mg-pill--live::after { opacity: 0; }
+}
+
 /* ============================================================================
    Happy Hour — the global boost window
    ============================================================================
@@ -7575,7 +7831,9 @@ body {
 .hh-takeover {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  /* A modal, so it sits on the modal rung — see the stacking order at the top
+     of this file. An incoming-attack toast still outranks it. */
+  z-index: 100;
   display: flex;
   align-items: center;
   justify-content: center;

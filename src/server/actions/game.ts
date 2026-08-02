@@ -1120,11 +1120,21 @@ export async function attackEmpire(
         (attackerPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
       const defenderXpMultiplier =
         (defenderPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
+      // Both standings feed both formulas: the XP is a comparison now (see
+      // `levelGapXpFactor`), so a heroless side is read as a level-1 rookie.
+      const attackerStanding = {
+        level: attackerHero?.level ?? 1,
+        resets: attackerHero?.resets ?? 0,
+      };
+      const defenderStanding = {
+        level: defenderHero?.level ?? 1,
+        resets: defenderHero?.resets ?? 0,
+      };
       const attackerHeroXp = attackerWins
         ? Math.round(
             attackWinXp(
-              defenderHero?.level ?? 1,
-              defenderHero?.resets ?? 0,
+              attackerStanding,
+              defenderStanding,
               attackerPower,
               defenderPower
             ) * attackerXpMultiplier
@@ -1134,8 +1144,8 @@ export async function attackEmpire(
         ? 0
         : Math.round(
             defenseWinXp(
-              attackerHero?.level ?? 1,
-              attackerHero?.resets ?? 0,
+              defenderStanding,
+              attackerStanding,
               defenderPower,
               attackerPower
             ) * defenderXpMultiplier

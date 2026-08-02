@@ -34,10 +34,13 @@ import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild"
 import {
   MINIGAME_TYPE_META,
   CUPS_MIN,
-  CUPS_MAX,
+  MAX_LIVE_MINIGAMES,
   SAFE_DIGITS_MIN,
-  SAFE_DIGITS_MAX,
+  clampAttempts,
+  clampCups,
+  clampDigits,
   prizeText,
+  type MiniGameShape,
 } from "@/lib/game/minigame";
 import {
   HERO_MAX_HEALTH,
@@ -2895,13 +2898,10 @@ function freshConfig(
 }
 
 /** Clamp the admin-supplied shape of each game to what its UI can render. */
-function readShape(formData: FormData) {
+function readShape(formData: FormData): MiniGameShape {
   return {
-    cups: Math.min(CUPS_MAX, Math.max(CUPS_MIN, Math.round(optNum(formData, "cups", 3)))),
-    digits: Math.min(
-      SAFE_DIGITS_MAX,
-      Math.max(SAFE_DIGITS_MIN, Math.round(optNum(formData, "digits", 3)))
-    ),
+    cups: clampCups(optNum(formData, "cups", CUPS_MIN)),
+    digits: clampDigits(optNum(formData, "digits", SAFE_DIGITS_MIN)),
   };
 }
 
@@ -2922,27 +2922,70 @@ function readPrizeBundle(formData: FormData) {
 const MAX_DURATION_MINUTES = 7 * 24 * 60;
 
 /**
+ * How many *other* releases are currently running.
+ *
+ * A timed game whose deadline has passed is not one of them even while its
+ * `isActive` flag is still up: the flag is only flipped lazily, on the first
+ * player read after the deadline (see minigame.ts), so counting the flag alone
+ * would have an expired game hold a slot until somebody happened to load a page.
+ */
+async function liveMiniGameCount(exceptId?: string): Promise<number> {
+  return prisma.miniGameEvent.count({
+    where: {
+      isActive: true,
+      ...(exceptId ? { id: { not: exceptId } } : {}),
+      OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+    },
+  });
+}
+
+/**
  * Release an event to all players: fresh answer, cleared entries, live.
  * `durationMinutes` > 0 sets a deadline the event expires at on its own (no
  * scheduler involved — the deadline is enforced on read; see minigame.ts).
+ *
+ * Additive: releasing a game leaves whatever else is running alone, up to
+ * MAX_LIVE_MINIGAMES. This used to deactivate every other event on the way in,
+ * which made "run a cups game and a safe at the same time" impossible to
+ * express — the second release silently killed the first, mid-race, prize
+ * unclaimed. The cap is what stops the other extreme: the players' end of this
+ * is a row of chips in the command bar, and a row has a width.
  */
 async function activateEvent(
   admin: Awaited<ReturnType<typeof requireAdmin>>,
-  event: { id: string; type: MiniGameType; config: unknown; title: string },
+  event: {
+    id: string;
+    type: MiniGameType;
+    config: unknown;
+    title: string;
+    maxAttempts: number;
+  },
   durationMinutes: number
 ): Promise<void> {
   // Re-activating reuses the event's own shape (cup count / code length) and
-  // only rolls a new secret behind it.
+  // only rolls a new secret behind it. Both the shape and the attempt budget go
+  // back through the clamps on the way out: a row saved before the bounds
+  // changed (a two-cup game, or five attempts at three cups — which is a free
+  // prize) must not be releasable just because it is already in the table.
   const cfg = (event.config ?? {}) as Record<string, number>;
-  const params = { cups: cfg.cups ?? 3, digits: cfg.digits ?? 3 };
+  const params: MiniGameShape = {
+    cups: clampCups(cfg.cups ?? CUPS_MIN),
+    digits: clampDigits(cfg.digits ?? SAFE_DIGITS_MIN),
+  };
+  const maxAttempts = clampAttempts(event.type, params, event.maxAttempts);
   const minutes = Math.min(MAX_DURATION_MINUTES, Math.max(0, Math.round(durationMinutes)));
   const endsAt = minutes > 0 ? new Date(Date.now() + minutes * 60_000) : null;
+
+  if ((await liveMiniGameCount(event.id)) >= MAX_LIVE_MINIGAMES) {
+    throw new AdminError(
+      `כבר רצים ${MAX_LIVE_MINIGAMES} מיני-משחקים במקביל — עצור אחד מהם כדי לשחרר עוד`
+    );
+  }
 
   // The updated row is read back out of the transaction rather than re-fetched:
   // the prize bundle and the attempt/winner caps live on the event, and the
   // announcement below has to describe the window that actually went live.
-  const [, , released] = await prisma.$transaction([
-    prisma.miniGameEvent.updateMany({ data: { isActive: false } }),
+  const [, released] = await prisma.$transaction([
     prisma.miniGameEntry.deleteMany({ where: { eventId: event.id } }),
     prisma.miniGameEvent.update({
       where: { id: event.id },
@@ -2953,6 +2996,7 @@ async function activateEvent(
         durationMinutes: minutes,
         endsAt,
         endedAt: null,
+        maxAttempts,
         config: freshConfig(event.type, params),
       },
     }),
@@ -3008,15 +3052,29 @@ export async function createMiniGame(
     const title = str(formData, "title") || MINIGAME_TYPE_META[type].label;
 
     const shape = readShape(formData);
-    // Capped as well as floored: the attempt log lives in a JSON column and the
-    // panel renders every row of it, so an accidental extra zero here would
-    // otherwise mean an unbounded column and an unbounded list.
-    const maxAttempts = Math.min(30, Math.max(1, Math.round(optNum(formData, "maxAttempts", 5))));
+    // Clamped against the *shape*, not a flat 1..30: a game's attempt budget
+    // only means anything next to the thing being guessed. Three cups and five
+    // attempts is a guaranteed prize with a bit of clicking; see attemptsRange.
+    const maxAttempts = clampAttempts(
+      type,
+      shape,
+      optNum(formData, "maxAttempts", Number.NaN)
+    );
     const maxWinners = Math.max(0, Math.round(optNum(formData, "maxWinners", 0)));
     const durationMinutes = Math.min(
       MAX_DURATION_MINUTES,
       Math.max(0, Math.round(optNum(formData, "durationMinutes", 0)))
     );
+
+    // Checked before the row is written, not inside activateEvent: a one-click
+    // launch that fails the cap should leave the admin where they started, not
+    // with a saved game and an error that never mentions it.
+    const launching = str(formData, "activate") === "1";
+    if (launching && (await liveMiniGameCount()) >= MAX_LIVE_MINIGAMES) {
+      throw new AdminError(
+        `כבר רצים ${MAX_LIVE_MINIGAMES} מיני-משחקים במקביל — עצור אחד מהם כדי לשחרר עוד`
+      );
+    }
 
     const event = await prisma.miniGameEvent.create({
       data: {
@@ -3037,7 +3095,7 @@ export async function createMiniGame(
     });
 
     // One-click launch: create and immediately release to everyone.
-    if (str(formData, "activate") === "1") {
+    if (launching) {
       await activateEvent(admin, event, durationMinutes);
       return {
         success: durationMinutes

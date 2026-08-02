@@ -352,12 +352,19 @@ function SidebarContent({
       {/* History, messages and the admin control center now live in the top
           command bar — see InboxNav and AdminNav. */}
 
-      {/* hero card */}
+      {/* hero card — portrait on one side, everything that reads about him
+          stacked beside it. The gauges used to hang in a block *under* the
+          whole row, which left the width next to the portrait empty and pushed
+          the card two rows taller than it needs to be. */}
       <div className="panel-gold rounded-lg p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="relative shrink-0">
+        <div className="flex items-stretch gap-3">
+          {/* The portrait takes whatever height the text column settles on
+              rather than a fixed one — a taller frame is the only thing here
+              that wants more room, so the art absorbs the slack instead of the
+              card carrying a blank strip beside it. */}
+          <div className="relative w-[5.5rem] shrink-0">
             {/* a div, not a span: the portrait frame below is flow content */}
-            <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
+            <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg border border-crimson/50 bg-gradient-to-b from-[#2a1520] to-[#0e0b12] shadow-inner">
               {heroImage ? (
                 /* Chrome, and on screen on every page — so this one only
                    breathes, on a long cycle, with no embers or halo. */
@@ -389,73 +396,82 @@ function SidebarContent({
               )}
             </span>
           </div>
-          <div className="min-w-0 flex-1 text-right">
-            <div className="flex items-center justify-end gap-1.5">
+          {/* Name and class share one line — the class used to own a row of its
+              own and, being pushed to the far edge, read as a caption for the
+              blank space rather than for the hero. Both gauges read the same
+              way — label on the leading edge, its number on the trailing one,
+              the bar directly beneath — so health and experience line up
+              instead of scattering numbers around the card. Level lives on the
+              portrait badge only, and each number appears exactly once. */}
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="shrink-0 font-bold text-gold-bright">גיבור</p>
+              {/* On the trailing edge, on the same column as the two numbers
+                  below it: every row of the card now reads "what it is" on one
+                  side and "which one / how much" on the other. */}
               <Tip tip="מקצוע הגיבור">
-                <span className="text-[11px] text-zinc-400">{heroClass}</span>
+                <span className="truncate rounded-full border border-border-subtle bg-black/30 px-2 py-0.5 text-[10px] font-bold text-zinc-400">
+                  {heroClass}
+                </span>
               </Tip>
             </div>
-            <p className="font-bold text-gold-bright">גיבור</p>
-            {/* The one badge in the card that asks for an action, so it is the
-                only thing in the identity block besides the name. */}
-            {heroPoints > 0 && (
+
+            {/* Health, not a stat ratio: this is the bar that actually moves —
+                every breached defence takes a bite out of it, and at zero the
+                hero is out of the fight until he is raised. */}
+            {heroDead ? (
               <Tip
-                tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)"
-                className="mt-1"
+                tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
+                className="w-full"
               >
                 <Link
                   href="/game/hero"
-                  className="flex items-center gap-1 rounded-full border border-purple-400/50 bg-purple-600/25 px-2 py-0.5 text-[10px] font-black text-purple-200"
+                  className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-1 text-[10px] font-black text-red-300"
                 >
-                  <Icon name="spark" size={11} />
-                  {heroPoints} נקודות פנויות
+                  💀 הגיבור מת
                 </Link>
               </Tip>
+            ) : (
+              <HeroGauge
+                icon="heart"
+                label="חיים"
+                value={`${heroHealthPct}%`}
+                accent="text-red-300"
+                tone="health"
+                meterValue={heroHealthPct}
+                tip="חיי הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה מהם"
+              />
             )}
+            <HeroGauge
+              icon="spark"
+              label="ניסיון"
+              value={`${formatCompact(heroXp)}/${formatCompact(heroXpMax)} · ${xpPct}%`}
+              accent="text-purple-300"
+              tone="xp"
+              meterValue={heroXp}
+              meterMax={heroXpMax}
+              tip="ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה. במלוא הבר הגיבור עולה רמה"
+            />
           </div>
         </div>
-        {/* Both gauges read the same way — label on the right, its number on the
-            left, the bar directly beneath — so health and experience line up
-            instead of scattering numbers around the card. Level lives on the
-            portrait badge only, and each number appears exactly once. */}
-        <div className="mt-3 flex flex-col gap-2">
-          {/* Health, not a stat ratio: this is the bar that actually moves —
-              every breached defence takes a bite out of it, and at zero the
-              hero is out of the fight until he is raised. */}
-          {heroDead ? (
-            <Tip
-              tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
-              className="w-full"
+
+        {/* The one badge in the card that asks for an action — full width under
+            the row, where it is a target rather than a chip squeezed beside the
+            name, and only present when there is something to spend. */}
+        {heroPoints > 0 && (
+          <Tip
+            tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)"
+            className="mt-2 block w-full"
+          >
+            <Link
+              href="/game/hero"
+              className="flex w-full items-center justify-center gap-1 rounded-full border border-purple-400/50 bg-purple-600/25 px-2 py-0.5 text-[10px] font-black text-purple-200"
             >
-              <Link
-                href="/game/hero"
-                className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-1 text-[10px] font-black text-red-300"
-              >
-                💀 הגיבור מת
-              </Link>
-            </Tip>
-          ) : (
-            <HeroGauge
-              icon="heart"
-              label="בריאות"
-              value={`${heroHealthPct}%`}
-              accent="text-red-300"
-              tone="health"
-              meterValue={heroHealthPct}
-              tip="בריאות הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה ממנה"
-            />
-          )}
-          <HeroGauge
-            icon="spark"
-            label="ניסיון"
-            value={`${formatCompact(heroXp)}/${formatCompact(heroXpMax)} · ${xpPct}%`}
-            accent="text-purple-300"
-            tone="xp"
-            meterValue={heroXp}
-            meterMax={heroXpMax}
-            tip="ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה. במלוא הבר הגיבור עולה רמה"
-          />
-        </div>
+              <Icon name="spark" size={11} />
+              {heroPoints} נקודות פנויות
+            </Link>
+          </Tip>
+        )}
       </div>
 
       {/* nav sections */}

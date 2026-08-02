@@ -15,7 +15,14 @@ import {
   SLOT_ORDER,
   UPGRADE_COST_AT_LEVEL_10,
   UPGRADE_COST_AT_LEVEL_100,
+  MAX_LEVEL_GAP_XP_FACTOR,
+  MIN_LEVEL_GAP_XP_FACTOR,
+  RESET_LEVEL_EQUIV,
   applyHeroXp,
+  attackWinXp,
+  defenseWinXp,
+  effectiveHeroLevel,
+  levelGapXpFactor,
   canEquipItem,
   canUpgradeItem,
   damagedHealth,
@@ -71,6 +78,73 @@ describe("levelling", () => {
     const negative = applyHeroXp({ level: 5, xp: 10 }, -100);
     expect(negative.level).toBe(5);
     expect(negative.xp).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("battle XP", () => {
+  const even = { level: 30, resets: 0 };
+  // An even fight on both axes: same standing, same power.
+  const evenXp = attackWinXp(even, even, 100_000, 100_000);
+
+  it("pays more the higher above you the target stands", () => {
+    const below = attackWinXp(even, { level: 10, resets: 0 }, 100_000, 100_000);
+    const above = attackWinXp(even, { level: 60, resets: 0 }, 100_000, 100_000);
+    expect(below).toBeLessThan(evenXp);
+    expect(evenXp).toBeLessThan(above);
+  });
+
+  it("pays a small floor rather than nothing for stomping a beginner", () => {
+    const beginner = attackWinXp(even, { level: 1, resets: 0 }, 100_000, 1_000);
+    expect(beginner).toBeGreaterThan(0);
+    expect(beginner).toBeLessThan(evenXp / 2);
+  });
+
+  it("pays a reset level-1 foe like the veteran he is", () => {
+    const rookie = { level: 1, resets: 0 };
+    const prestiged = { level: 1, resets: 1 };
+    const power = 100_000;
+    expect(attackWinXp(even, prestiged, power, power)).toBeGreaterThan(
+      attackWinXp(even, rookie, power, power) * 4
+    );
+    // …and better than an evenly-matched foe of your own standing.
+    expect(attackWinXp(even, prestiged, power, power)).toBeGreaterThan(evenXp);
+  });
+
+  it("counts every reset on both sides through the effective level", () => {
+    expect(effectiveHeroLevel(1, 1)).toBe(1 + RESET_LEVEL_EQUIV);
+    expect(effectiveHeroLevel(50, 2)).toBe(50 + 2 * RESET_LEVEL_EQUIV);
+    // Your own prestige raises the bar: the same target is worth less to a
+    // hero who has already climbed the ladder twice.
+    const target = { level: 40, resets: 0 };
+    const veteran = { level: 40, resets: 2 };
+    expect(attackWinXp(veteran, target, 100_000, 100_000)).toBeLessThan(
+      attackWinXp(target, target, 100_000, 100_000)
+    );
+  });
+
+  it("keeps the gap factor inside its band, ×1 at equal standing", () => {
+    expect(levelGapXpFactor(50, 50)).toBeCloseTo(1);
+    expect(levelGapXpFactor(50, 1)).toBeGreaterThanOrEqual(MIN_LEVEL_GAP_XP_FACTOR);
+    expect(levelGapXpFactor(1, 5_000)).toBe(MAX_LEVEL_GAP_XP_FACTOR);
+    expect(levelGapXpFactor(0, 50)).toBe(MIN_LEVEL_GAP_XP_FACTOR);
+  });
+
+  it("still pays a successful defence, on the same two multipliers", () => {
+    const strong = { level: 80, resets: 1 };
+    const weak = { level: 20, resets: 0 };
+    expect(defenseWinXp(weak, strong, 100_000, 100_000)).toBeGreaterThan(
+      defenseWinXp(weak, weak, 100_000, 100_000)
+    );
+    expect(defenseWinXp(weak, weak, 100_000, 100_000)).toBeGreaterThan(0);
+  });
+
+  it("keeps one win worth a comparable slice of a level all the way up", () => {
+    for (const level of [5, 30, 60, 95]) {
+      const me = { level, resets: 0 };
+      const wins = xpToNextLevel(level) / attackWinXp(me, me, 100_000, 100_000);
+      expect(wins).toBeGreaterThan(1.5);
+      expect(wins).toBeLessThan(5);
+    }
   });
 });
 

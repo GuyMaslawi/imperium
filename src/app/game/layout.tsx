@@ -24,8 +24,8 @@ import { WarAlerts } from "@/components/game/WarAlerts";
 import { ChatDock } from "@/components/game/ChatDock";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
-import { MiniGamePanel } from "@/components/game/MiniGamePanel";
-import { getMiniGameState } from "@/server/actions/minigame";
+import { MiniGameButton } from "@/components/game/MiniGameButton";
+import { getMiniGameStates } from "@/server/actions/minigame";
 import { HappyHourBanner } from "@/components/game/HappyHourBanner";
 import { getHappyHourState } from "@/server/actions/happyHour";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
@@ -54,7 +54,9 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const heroXp = heroAtCap ? 1 : hero?.xp ?? 0;
 
   const admin = await isAdmin();
-  const miniGame = await getMiniGameState();
+  // Every running release, oldest first — the admin can field more than one at
+  // a time, and they share the command bar's row.
+  const miniGames = await getMiniGameStates();
   // Rendered server-side so a player who navigates during a release meets it on
   // the first paint rather than one poll later.
   const happyHour = await getHappyHourState();
@@ -190,7 +192,11 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
 
       <div
         dir="rtl"
-        className="mx-auto flex w-full max-w-[1900px] flex-1 flex-col gap-4 px-3 py-4 lg:flex-row lg:px-5"
+        // The chat dock is fixed to the bottom-left corner of every game screen,
+        // so the last thing on a page was always sitting underneath it. The
+        // trailing padding is the dock's own height plus its offset, which buys
+        // the page back its final row.
+        className="mx-auto flex w-full max-w-[1900px] flex-1 flex-col gap-4 px-3 pb-20 pt-4 lg:flex-row lg:px-5 lg:pb-16"
       >
         <Sidebar {...sidebarProps} />
 
@@ -198,6 +204,15 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           <OrnateFrame className="flex min-h-full flex-col overflow-hidden p-3 sm:p-4 md:p-6">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border-subtle pb-3">
               {seasonPass && <SeasonPassButton initial={seasonPass} />}
+              {/* Released mini-games ride in the command bar next to the season
+                  pass — one chip each, side by side in this same row, opening
+                  their game in a modal. They used to be a full-width panel
+                  above the page, which meant every screen of the game was
+                  pushed below the fold for the whole release, for players who
+                  had already finished it too. They announce themselves once on
+                  release and call out each winner from the corner instead; see
+                  MiniGameButton. */}
+              <MiniGameButton initial={miniGames} />
               <ActivePotions
                 activeUntil={potionActiveUntil}
                 serverNow={now.getTime()}
@@ -209,15 +224,12 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
                 nextDailyLabel={formatGameTime(nextDaily)}
               />
             </div>
-            {/* A released mini-game is an event, not a toolbar affordance: it
-                sits right under the season pass, full width, above the screen
-                the player came for. */}
-            {/* Happy Hour sits above even the mini-game: it is the loudest thing
-                that can be true about the game right now, and it is true for
-                every player at once. */}
+            {/* Happy Hour keeps the full-width banner: unlike a mini-game it is
+                not something a player finishes and is done with — it is true
+                for every player at once, for as long as it runs, and it changes
+                the value of every action on the screen underneath it. */}
             <div className="flex-1 pt-5">
               <HappyHourBanner initial={happyHour} />
-              <MiniGamePanel initial={miniGame} />
               {children}
             </div>
           </OrnateFrame>

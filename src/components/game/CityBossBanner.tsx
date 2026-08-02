@@ -104,7 +104,13 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_100%_at_85%_0%,rgb(var(--boss-accent)/0.26),transparent_60%)]"
       />
 
-      <div className="relative grid grid-cols-[112px_1fr] sm:grid-cols-[150px_1fr] lg:grid-cols-[180px_1fr]">
+      {/* Two columns from sm up, stacked below it. On a phone the portrait
+          column was taking 112px of a ~270px content width, which left the
+          dossier ~140px: the name truncated, every loot figure broke onto its
+          own line and the assault button was clipped. Stacked, the tyrant keeps
+          a full-width band and the dossier gets the whole width for the four
+          rows it actually has to say. */}
+      <div className="relative grid grid-cols-1 sm:grid-cols-[150px_1fr] lg:grid-cols-[180px_1fr]">
         {/* ---------------- portrait ----------------
             The tyrant is the subject of this block, so he gets the room to read
             as a character rather than as a list bullet: a wide column with a
@@ -113,7 +119,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             also finally worth the expensive tier — every boss ships a depth map
             (public/boss/*-depth.png), so `rich` buys real volume here where it
             would have been wasted on the 76px strip this used to be. */}
-        <div className="relative min-h-[200px] sm:min-h-[240px]">
+        <div className="relative h-[168px] sm:h-auto sm:min-h-[240px]">
           {/* Crest underlay: a missing portrait file still reads as deliberate art
               rather than as a broken image. */}
           <div
@@ -136,9 +142,11 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               aria-hidden
               className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25"
             />
+            {/* The seam into the dossier: a bottom fade while stacked, an edge
+                fade once the two sit side by side. */}
             <div
               aria-hidden
-              className="absolute inset-y-0 left-0 w-8 bg-gradient-to-l from-transparent to-[#0a0709] sm:w-10"
+              className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0a0709] to-transparent sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:h-auto sm:w-10 sm:bg-gradient-to-l sm:from-transparent sm:to-[#0a0709]"
             />
           </LivingPortrait>
           {myKills > 0 && (
