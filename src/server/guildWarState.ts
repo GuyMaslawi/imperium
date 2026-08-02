@@ -585,14 +585,15 @@ async function settleWar(warId: string, now: Date): Promise<void> {
   const medals = ["🥇", "🥈", "🥉"];
   await announceToDiscord({
     kind: "war",
-    title: "⚔️ מלחמת הבריתות הסתיימה",
+    title: "⚔️ נגמרה המלחמה — הנה הטבלה",
     body:
       podium.top
         .map(
           (row) =>
-            `${medals[row.rank - 1]} **${row.name}** — ${row.score.toLocaleString("he-IL")} נקודות`
+            `${medals[row.rank - 1]} **${row.name}** — ${row.score.toLocaleString("he-IL")} נק׳`
         )
-        .join("\n") + `\n\n${podium.guildCount} בריתות התייצבו הערב. הקרב הבא: מחר ב-19:30.`,
+        .join("\n") +
+      `\n\n${podium.guildCount} בריתות ירדו לזירה הערב. ריוונץ׳ מחר ב-19:30. ⏰`,
     url: gameLink("/game/war"),
   });
 }

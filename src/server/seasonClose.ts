@@ -595,7 +595,7 @@ export async function closeSeason(
     const medals = ["🥇", "🥈", "🥉"];
     await announceToDiscord({
       kind: "season",
-      title: `🏛️ ${closed} הסתיימה`,
+      title: `🏆 ${closed} נגמרה — זה הפודיום`,
       body:
         (podium.length > 0
           ? podium
@@ -605,8 +605,8 @@ export async function closeSeason(
                   (row.playerName ? ` (${row.playerName})` : "")
               )
               .join("\n")
-          : "העונה נסגרה ללא פודיום.") +
-        "\n\nהשמות נחקקו בהיכל התהילה. העונה הבאה בדרך.",
+          : "הסיזן נסגר בלי פודיום.") +
+        "\n\nהם בהיכל התהילה מעכשיו. סיזן חדש בדרך — כולם חוזרים לקו ההתחלה. 🔄",
       url: gameLink("/game/rankings"),
     });
   }

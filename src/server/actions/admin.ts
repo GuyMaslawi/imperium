@@ -3137,19 +3137,23 @@ async function releaseHappyHour(
   // are not looking at the game when it opens. Posted from the one function
   // both release paths go through (createHappyHour with "activate", and
   // startHappyHour), so a window can never go live without the channel hearing.
+  // Channel voice, not site voice: this is read on a phone, mid-scroll, by
+  // someone deciding in about two seconds whether to open the game. Short
+  // lines, the gamer loanwords players already use out loud (XP, לוט,
+  // HAPPY HOUR), and the deadline before the flavour.
   const effects = [
-    released.boostXp ? "ניסיון" : null,
-    released.boostPlunder ? "שלל" : null,
-    released.boostMines ? "תפוקת מכרות" : null,
+    released.boostXp ? "XP" : null,
+    released.boostPlunder ? "לוט" : null,
+    released.boostMines ? "מכרות" : null,
   ].filter(Boolean).join(" · ");
   await announceToDiscord({
     kind: "event",
-    title: `🔥 ${released.title} ${multiplierLabel(released.bonusPct)} באוויר`,
+    title: `🔥 HAPPY HOUR ${multiplierLabel(released.bonusPct)} — ${released.title}`,
     body:
-      `${effects} מוכפלים לכל השחקנים.\n` +
+      `${effects} ${multiplierLabel(released.bonusPct)} לכולם. 🚀\n` +
       (minutes > 0
-        ? `נסגר בעוד ${minutes} דקות — כדאי להיכנס עכשיו.`
-        : "רץ עד להודעה חדשה."),
+        ? `נסגר בעוד ${minutes} דק׳ — מי שישן מפסיד.`
+        : "רץ עד שנגיד סטופ."),
     url: gameLink("/game/base"),
   });
   return { endsAt, minutes };

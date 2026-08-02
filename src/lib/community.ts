@@ -84,7 +84,7 @@ export const COMMUNITY_HIGHLIGHTS: { icon: IconName; title: string; body: string
   {
     icon: "spark",
     title: "הכרזות ראשונות",
-    body: "שעות זהב, אירועים, עונות חדשות ועדכוני משחק מגיעים לערוץ ברגע שהם עולים — לפעמים לפני שהם באתר.",
+    body: "Happy Hour, אירועים, סיזנים חדשים ועדכונים — נוחתים בערוץ ברגע שהם עולים, לפעמים לפני שהם באתר.",
   },
   {
     icon: "guild",

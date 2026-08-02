@@ -65,7 +65,7 @@ export default async function CommunityPage() {
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-bone/85">
             הדירוג הוא רק חצי מהמשחק. החצי השני הוא מי שיושב מהצד השני של המסך —
-            בריתות שמתגבשות, טקטיקות שמתחלפות, וכל הכרזה על שעת זהב או עונה חדשה
+            בריתות שמתגבשות, טקטיקות שמתחלפות, וכל הכרזה על Happy Hour או סיזן חדש
             שנוחתת שם קודם.
           </p>
 

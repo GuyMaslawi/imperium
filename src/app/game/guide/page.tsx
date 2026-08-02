@@ -2324,7 +2324,7 @@ export default async function GuidePage() {
             <GuideSection meta={SECTIONS.community} index={INDEX.community}>
               <Lead>
                 מחוץ למשחק יש ערוץ דיסקורד — שם יושבות ההכרזות, גיוס לבריתות, שאלות
-                טקטיקה ודיווחי באגים. אפשר לשחק בלעדיו לגמרי; פשוט תדעו על שעת זהב
+                טקטיקה ודיווחי באגים. אפשר לשחק בלעדיו לגמרי; פשוט תדעו על Happy Hour
                 אחרי כולם.
               </Lead>
 
