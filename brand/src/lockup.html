@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="heebo.css">
+<style>
+  /* Horizontal KRALDOR lockup on a transparent field — for Discord embeds,
+     the server "about" card, webhook avatars for announcements, press use. */
+  html,body{margin:0;padding:0;background:transparent}
+  .wrap{
+    width:1200px;height:400px;display:flex;align-items:center;justify-content:center;gap:44px;
+    font-family:'Heebo',system-ui,sans-serif;direction:ltr;
+  }
+  .crest{filter:drop-shadow(0 10px 28px rgba(0,0,0,.55))}
+  .type{display:flex;flex-direction:column;line-height:1}
+  .word{font-weight:900;font-size:132px;letter-spacing:.19em;color:#efe6ce;padding-left:.19em}
+  .word b{color:#e4c35a}
+  .sub{margin-top:22px;direction:rtl;text-align:right;font-weight:800;font-size:34px;
+       letter-spacing:.44em;color:#a4986f;padding-right:.44em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="crest" id="crest"></div>
+  <div class="type">
+    <div class="word">KRA<b>L</b>DOR</div>
+    <div class="sub">קראלדור</div>
+  </div>
+</div>
+<script src="crest.js"></script>
+<script>document.getElementById('crest').innerHTML = crest('lk', 210);</script>
+</body>
+</html>

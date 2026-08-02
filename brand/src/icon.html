@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="he">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="heebo.css">
+<style>
+  /* KRALDOR Discord server icon — 512x512. Mark only, no wordmark: Discord
+     renders this at 48px in the guild rail, where any lettering turns to mud.
+     Everything stays inside the circular crop. */
+  html,body{margin:0;padding:0;background:#08080b}
+  .canvas{
+    position:relative;width:512px;height:512px;overflow:hidden;
+    background:
+      radial-gradient(56% 44% at 50% 30%, rgba(196,160,50,.30), transparent 62%),
+      radial-gradient(72% 56% at 50% 110%, rgba(140,105,32,.24), transparent 64%),
+      radial-gradient(100% 100% at 50% 46%, #15121c 0%, #0b0a0e 56%, #060508 100%);
+  }
+  .ring{position:absolute;border-radius:50%}
+  .ring-outer{
+    inset:12px;border:4px solid rgba(196,160,50,.62);
+    box-shadow:0 0 26px -2px rgba(196,160,50,.40), inset 0 0 60px -14px rgba(228,195,90,.34);
+  }
+  .ring-hair{inset:28px;border:1.5px solid rgba(214,201,173,.20)}
+  .ring-inner{inset:39px;border:1px solid rgba(196,160,50,.16)}
+  .stud{
+    position:absolute;left:50%;top:50%;width:13px;height:13px;margin:-6.5px 0 0 -6.5px;
+    background:#e4c35a;transform-origin:50% 50%;
+    box-shadow:0 0 14px rgba(228,195,90,.85);
+  }
+  .crest{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    filter:drop-shadow(0 14px 30px rgba(0,0,0,.95)) drop-shadow(0 0 46px rgba(196,160,50,.30));
+  }
+  .ember{position:absolute;border-radius:50%;background:#e4c35a;filter:blur(.5px)}
+</style>
+</head>
+<body>
+<div class="canvas" id="c">
+  <div class="ring ring-outer"></div>
+  <div class="ring ring-hair"></div>
+  <div class="ring ring-inner"></div>
+  <div class="crest" id="crest"></div>
+</div>
+<script src="crest.js"></script>
+<script>
+  document.getElementById('crest').innerHTML = crest('ic', 300);
+
+  const c = document.getElementById('c');
+  // four gold lozenges riding the outer ring, at the cardinal points
+  const R = 238;
+  [0, 90, 180, 270].forEach(deg => {
+    const a = deg * Math.PI / 180;
+    const s = document.createElement('i');
+    s.className = 'stud';
+    s.style.transform = `translate(${Math.cos(a) * R}px, ${Math.sin(a) * R}px) rotate(45deg)`;
+    c.appendChild(s);
+  });
+
+  // fixed ember table — no randomness, so every render is byte-identical
+  [[112,168,3,.50],[398,190,2,.40],[142,344,2,.32],[378,330,3,.36],
+   [258,84,2,.28],[92,258,2,.26],[422,266,2,.26],[256,432,2,.30]].forEach(([x,y,r,o]) => {
+    const e = document.createElement('i');
+    e.className = 'ember';
+    e.style.cssText = `left:${x-r}px;top:${y-r}px;width:${r*2}px;height:${r*2}px;opacity:${o}`;
+    c.appendChild(e);
+  });
+</script>
+</body>
+</html>
