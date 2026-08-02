@@ -1,33 +1,30 @@
 import "server-only";
 
-import {
-  capturePaypalOrder,
-  createPaypalOrder,
-  getPaypalConfig,
-  PaypalApiError,
-} from "@/server/paypal";
 import { STORE_CURRENCY } from "@/lib/game/diamondStore";
 import { getLegalOperator, missingLegalFields } from "@/lib/legal";
 
 /**
  * Payment-provider seam for the real-money diamond store.
  *
- * Two provider shapes are supported, because real gateways come in both:
+ * No real gateway is wired right now: the only implementation is the built-in
+ * `mock` provider, which approves every charge, moves no money, and exists so
+ * the checkout is exercisable end to end before a gateway exists. Grow is the
+ * provider this seam is waiting for.
+ *
+ * Two provider shapes are defined, because real gateways come in both:
  *
  * - **direct** (`DirectPaymentProvider`) — one server-side call charges and
- *   settles. The built-in `mock` provider is this shape: it always succeeds,
- *   moves no money, and exists so the store is exercisable before (and without)
- *   a live gateway.
- * - **order** (`OrderPaymentProvider`) — the buyer approves the payment in the
- *   provider's own UI, so the flow is *create order → buyer approves → capture*.
- *   PayPal is this shape, and it is the provider that runs as soon as
- *   `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` are set.
+ *   settles. The mock provider is this shape.
+ * - **order** (`OrderPaymentProvider`) — the buyer approves the payment on the
+ *   provider's own page, so the flow is *create order → buyer approves →
+ *   capture*. A hosted-checkout gateway lands here, and the settlement half is
+ *   already written and hardened: see `@/server/purchases`.
  *
- * Going live is still a two-step change, and both steps are enforced:
- *   1. Set the PayPal credentials with `PAYPAL_ENV=live`.
+ * Going live is a two-step change, and both steps are enforced:
+ *   1. Wire a provider that moves real money (`isTestMode === false`).
  *   2. Set `DIAMOND_PURCHASES_LIVE=true` so purchases open to every player.
  * Until then only admins can complete a purchase (see {@link arePurchasesLive}),
- * so no player earns free diamonds off the mock provider or a sandbox account.
+ * so no player earns free diamonds off a play-money provider.
  */
 
 export interface ChargeInput {
@@ -57,7 +54,7 @@ export type OrderResult =
 export type CaptureResult =
   | {
       ok: true;
-      /** Provider-side id of the money movement (PayPal capture id). */
+      /** Provider-side id of the money movement itself. */
       captureId: string;
       /** Amount actually captured, in `currency`. */
       amount: number;
@@ -68,11 +65,11 @@ export type CaptureResult =
   | { ok: false; reason: string; /** Buyer-facing hint, already in Hebrew. */ message?: string };
 
 interface ProviderBase {
-  /** Stable identifier stored on every purchase row ("mock", "paypal"). */
+  /** Stable identifier stored on every purchase row ("mock" today). */
   readonly name: string;
   /**
-   * True when charges are play money (mock provider, PayPal sandbox). Test
-   * charges are flagged `isTest` on the audit row and can never be "live".
+   * True when charges are play money. Test charges are flagged `isTest` on the
+   * audit row and can never be "live".
    */
   readonly isTestMode: boolean;
 }
@@ -95,7 +92,7 @@ export type PaymentProvider = DirectPaymentProvider | OrderPaymentProvider;
 
 /**
  * Placeholder provider: approves every charge instantly and returns a synthetic
- * reference. No network, no real money. Active only while PayPal is unconfigured.
+ * reference. No network, no real money. Active until a gateway is wired.
  */
 class MockPaymentProvider implements DirectPaymentProvider {
   readonly kind = "direct" as const;
@@ -110,101 +107,15 @@ class MockPaymentProvider implements DirectPaymentProvider {
   }
 }
 
-/**
- * PayPal Checkout (Orders v2). Half the flow lives in the browser — the SDK
- * buttons take the buyer through approval — so this provider owns only the two
- * server-side halves: opening the order and capturing it afterwards.
- */
-class PaypalPaymentProvider implements OrderPaymentProvider {
-  readonly kind = "order" as const;
-  readonly name = "paypal";
-
-  constructor(private readonly cfg: NonNullable<ReturnType<typeof getPaypalConfig>>) {}
-
-  /** Sandbox credentials move play money — never real revenue. */
-  get isTestMode(): boolean {
-    return this.cfg.env !== "live";
-  }
-
-  async createOrder(input: OrderInput): Promise<OrderResult> {
-    try {
-      const order = await createPaypalOrder(this.cfg, {
-        purchaseId: input.purchaseId,
-        amount: input.amountIls,
-        currency: STORE_CURRENCY,
-        description: input.description,
-      });
-      return { ok: true, orderId: order.orderId };
-    } catch (err) {
-      return { ok: false, reason: describe(err) };
-    }
-  }
-
-  async captureOrder(orderId: string): Promise<CaptureResult> {
-    try {
-      const capture = await capturePaypalOrder(this.cfg, orderId);
-      if (!capture) return { ok: false, reason: "no capture on order" };
-      if (capture.status !== "COMPLETED") {
-        return {
-          ok: false,
-          reason: `capture status ${capture.status}`,
-          message:
-            capture.status === "PENDING"
-              ? "התשלום ממתין לאישור PayPal. היהלומים ייזקפו ברגע שהתשלום יאושר."
-              : undefined,
-        };
-      }
-      return {
-        ok: true,
-        captureId: capture.captureId,
-        amount: capture.amount,
-        currency: capture.currency,
-        purchaseId: capture.purchaseId,
-      };
-    } catch (err) {
-      const declined =
-        err instanceof PaypalApiError && err.issue === "INSTRUMENT_DECLINED";
-      return {
-        ok: false,
-        reason: describe(err),
-        message: declined
-          ? "אמצעי התשלום נדחה על ידי PayPal. נסה אמצעי תשלום אחר."
-          : undefined,
-      };
-    }
-  }
-}
-
-/** Compact, loggable description of a provider failure (never buyer-facing). */
-function describe(err: unknown): string {
-  if (err instanceof PaypalApiError) {
-    return `paypal ${err.status}${err.issue ? ` ${err.issue}` : ""}${
-      err.debugId ? ` debug=${err.debugId}` : ""
-    }: ${err.message}`;
-  }
-  return err instanceof Error ? err.message : "unknown provider error";
-}
-
 const mockProvider = new MockPaymentProvider();
 
 /**
- * The active payment provider: PayPal once its credentials are configured,
- * otherwise the mock. Cached per credential set so a token cache and a provider
- * instance are not rebuilt on every checkout.
+ * The active payment provider. Only the mock exists today; a real gateway is
+ * selected here once it is wired, and everything downstream — the audit row,
+ * the interlocks, the checkout UI — reads the provider through this one call.
  */
-let paypalProvider: PaypalPaymentProvider | null = null;
-let paypalProviderKey = "";
-
 export function getPaymentProvider(): PaymentProvider {
-  const cfg = getPaypalConfig();
-  if (!cfg) return mockProvider;
-
-  const key = `${cfg.env}:${cfg.clientId}`;
-  if (!paypalProvider || paypalProviderKey !== key) {
-    paypalProvider = new PaypalPaymentProvider(cfg);
-    paypalProviderKey = key;
-  }
-  return paypalProvider;
+  return mockProvider;
 }
 
 /**
@@ -216,7 +127,7 @@ export function arePurchasesLive(): boolean {
   if (process.env.DIAMOND_PURCHASES_LIVE !== "true") return false;
 
   // Interlock 1: purchases are never "live" while the active provider is running
-  // on play money (mock provider, or PayPal sandbox credentials). Otherwise
+  // on play money (today: always, since only the mock exists). Otherwise
   // flipping the flag ahead of a real gateway would let every player mint free
   // diamonds through a charge that costs nothing.
   if (getPaymentProvider().isTestMode) return false;
@@ -255,7 +166,7 @@ export function purchaseBlockers(): string[] {
     blockers.push('DIAMOND_PURCHASES_LIVE אינו "true"');
   }
   if (getPaymentProvider().isTestMode) {
-    blockers.push("ספק התשלום עובד בכסף משחק (mock או PayPal sandbox)");
+    blockers.push("לא מחובר ספק תשלומים אמיתי — הרכישות רצות על ספק דמה");
   }
   const missing = missingLegalFields();
   if (missing.length > 0) {
@@ -271,10 +182,8 @@ export interface CheckoutConfig {
   kind: PaymentProvider["kind"];
   /** Purchases are open to every player. */
   live: boolean;
-  /** Charges are play money (mock provider / PayPal sandbox). */
+  /** Charges are play money. */
   testMode: boolean;
-  /** PayPal browser-SDK client id (public by design), or null. */
-  paypalClientId: string | null;
   currency: string;
   /** Admin-facing: what is keeping the store shut. Empty when `live`. */
   blockers: string[];
@@ -283,13 +192,11 @@ export interface CheckoutConfig {
 /** Snapshot of the checkout setup, safe to hand to a client component. */
 export function getCheckoutConfig(): CheckoutConfig {
   const provider = getPaymentProvider();
-  const cfg = provider.name === "paypal" ? getPaypalConfig() : null;
   return {
     provider: provider.name,
     kind: provider.kind,
     live: arePurchasesLive(),
     testMode: provider.isTestMode,
-    paypalClientId: cfg?.clientId ?? null,
     currency: STORE_CURRENCY,
     blockers: purchaseBlockers(),
   };

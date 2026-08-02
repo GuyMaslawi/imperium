@@ -342,9 +342,12 @@ export interface GuildWarFeedItem {
   id: string;
   round: number;
   attackerName: string;
+  /** Both fighters' ids travel so the feed can link each name to its dossier. */
+  attackerEmpireId: string;
   attackerGuildName: string;
   attackerGuildId: string;
   defenderName: string;
+  defenderEmpireId: string;
   defenderGuildName: string;
   defenderGuildId: string;
   // No per-fighter power here — see GuildWarScoreRow.power. The clash rows keep

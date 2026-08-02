@@ -16,13 +16,12 @@ export default async function BuyDiamondsPage() {
   const discountPct = Math.min(100, Math.max(0, diamondStore.purchaseDiscountPct));
 
   const checkout = getCheckoutConfig();
-  // Before go-live only admins may actually pay, so only they get the PayPal
-  // buttons. Everyone else gets the store chained shut — the packages stay on
+  // Before go-live only admins may actually pay, so only they get a working
+  // checkout. Everyone else gets the store chained shut — the packages stay on
   // display, but the seal says so up front instead of letting a click travel all
   // the way to a "coming soon" modal.
   const admin = await isAdmin();
   const canPay = checkout.live || admin;
-  const paypalClientId = canPay ? checkout.paypalClientId : null;
   // …which is exactly why an admin needs to be told *why* it is shut: their own
   // checkout works, so nothing on this screen would otherwise reveal that every
   // player is looking at a locked store.
@@ -61,7 +60,6 @@ export default async function BuyDiamondsPage() {
         discountPct={discountPct}
         purchasesLive={checkout.live}
         locked={!canPay}
-        paypalClientId={paypalClientId}
         testMode={checkout.testMode}
       />
     </div>

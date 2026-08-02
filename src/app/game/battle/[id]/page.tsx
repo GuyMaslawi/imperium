@@ -11,6 +11,7 @@ import { SLOT_META, itemDisplayName } from "@/lib/game/hero";
 import { PotionBottle } from "@/components/game/PotionBottle";
 import { POTION_META, potionDurationLabel } from "@/lib/game/potions";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import {
   battlePowerLedger,
   type BattlePowerSources,
@@ -268,7 +269,9 @@ export default async function BattleResultPage({
             <div className="flex h-20 w-20 items-center justify-center rounded-xl border-2 border-red-500/50 bg-gradient-to-b from-red-950/40 to-black text-4xl shadow-[0_0_30px_-8px_rgba(239,68,68,0.5)]">
               <Icon name="crown" size={36} className="text-red-300" />
             </div>
-            <p className="w-full break-words font-black text-red-300">{foe.name}</p>
+            <p className="w-full break-words font-black text-red-300">
+              <PlayerLink empireId={foe.id} name={foe.name} />
+            </p>
             <p className="text-[11px] text-zinc-500">{iAmAttacker ? "מגן" : "תוקף"}</p>
           </div>
         </div>

@@ -16,11 +16,11 @@ import type { NextConfig } from "next";
  * skin the button, the iframe it renders the button into, the token endpoint it
  * calls, and the avatars it shows.
  *
- * The paypal.com / paypalobjects.com entries are what PayPal Checkout needs:
- * the SDK script itself, the buttons/approval iframes it renders, the endpoints
- * those iframes call (including its `c.paypal.com` fraud-signal collector), the
- * logos served from paypalobjects, and `form-action` for the classic form POST
- * the approval window still uses on some funding sources.
+ * No payment gateway is allowlisted: none is wired, and a hosted checkout that
+ * is not in the policy fails visibly at integration time rather than silently
+ * widening it now. Whichever gateway lands adds only what it actually needs —
+ * typically `form-action`/`frame-src` for its hosted page, plus `payment=` in
+ * the Permissions-Policy below if it renders a wallet inside an iframe.
  */
 // React evaluates code via `eval` in development to rebuild server stacks for
 // the error overlay. Production builds never do, so the escape hatch is scoped
@@ -29,15 +29,15 @@ const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${devEval} https://accounts.google.com https://apis.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com`,
+  `script-src 'self' 'unsafe-inline'${devEval} https://accounts.google.com https://apis.google.com`,
   "style-src 'self' 'unsafe-inline' https://accounts.google.com",
-  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://*.paypal.com https://www.paypalobjects.com",
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://accounts.google.com https://www.paypal.com https://*.paypal.com https://www.paypalobjects.com",
-  "frame-src https://accounts.google.com https://www.paypal.com https://*.paypal.com",
+  "connect-src 'self' https://accounts.google.com",
+  "frame-src https://accounts.google.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://www.paypal.com https://*.paypal.com",
+  "form-action 'self'",
   "object-src 'none'",
   "upgrade-insecure-requests",
 ].join("; ");
@@ -64,12 +64,10 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           {
-            // `payment` is granted to PayPal's frames (and our own origin) so
-            // the wallet funding sources inside the checkout iframe work; the
-            // rest stay switched off everywhere.
+            // `payment` is granted to our own origin only — no gateway iframe
+            // to allow yet. The rest stay switched off everywhere.
             key: "Permissions-Policy",
-            value:
-              'camera=(), microphone=(), geolocation=(), payment=(self "https://www.paypal.com")',
+            value: "camera=(), microphone=(), geolocation=(), payment=(self)",
           },
         ],
       },

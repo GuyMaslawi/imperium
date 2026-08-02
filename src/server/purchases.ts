@@ -7,13 +7,18 @@ import { prisma } from "@/lib/prisma";
  * Settlement of a real-money diamond purchase — the one place diamonds are
  * credited for money.
  *
- * Two call sites reach it and they can race: the capture the buyer's browser
- * triggers on approval (`captureDiamondOrder`) and PayPal's
- * `PAYMENT.CAPTURE.COMPLETED` webhook, which can arrive first, twice, or long
- * after. Both funnel through {@link settleDiamondPurchase}, whose PENDING→PAID
- * flip is a guarded `updateMany` inside the crediting transaction: whichever
- * call wins credits the diamonds, every other one finds `count === 0` and
- * credits nothing.
+ * **Nothing calls this today**, and that is deliberate: no gateway is wired
+ * (the store runs on the mock provider, see `@/server/payments`), and this is
+ * the half that survives whichever one is. It is written for an approval-based
+ * gateway, where two call sites reach settlement and can race — the return from
+ * the hosted payment page, and the provider's server-to-server callback, which
+ * can arrive first, twice, or long after. Both funnel through
+ * {@link settleDiamondPurchase}, whose PENDING→PAID flip is a guarded
+ * `updateMany` inside the crediting transaction: whichever call wins credits
+ * the diamonds, every other one finds `count === 0` and credits nothing.
+ *
+ * That double-credit guard is the expensive part to get right, so it is kept
+ * ready rather than rewritten under time pressure when the gateway lands.
  */
 
 export type SettleOutcome =
@@ -27,11 +32,11 @@ export type SettleOutcome =
   | "mismatch";
 
 export interface SettleInput {
-  /** Our purchase row id, as echoed back by the provider (`custom_id`). */
+  /** Our purchase row id, as echoed back by the provider in its metadata. */
   purchaseId?: string | null;
   /** Provider order id stored on the row at creation time. */
   orderId?: string | null;
-  /** Provider-side id of the money movement (PayPal capture id). */
+  /** Provider-side id of the money movement itself. */
   captureId: string;
   /** Amount actually captured. */
   amount: number;
@@ -86,8 +91,8 @@ export async function settleDiamondPurchase(input: SettleInput): Promise<SettleR
   }
 
   // The amount is recomputed and stored server-side at order time, so a capture
-  // that does not cover it means the order was tampered with or PayPal charged
-  // something else entirely. Never credit on a mismatch.
+  // that does not cover it means the order was tampered with or the gateway
+  // charged something else entirely. Never credit on a mismatch.
   const underpaid = agorot(input.amount) < agorot(purchase.priceIls);
   const wrongCurrency = input.currency !== purchase.currency;
   if (underpaid || wrongCurrency) {
@@ -149,7 +154,7 @@ export async function settleDiamondPurchase(input: SettleInput): Promise<SettleR
 }
 
 /**
- * Mark a settled purchase as refunded/reversed (PayPal refund or chargeback).
+ * Mark a settled purchase as refunded/reversed (gateway refund or chargeback).
  * Deliberately does not touch the empire's balance — the diamonds may already
  * be spent, and driving a balance negative would corrupt every guarded spend.
  * The row surfaces in /admin/purchases for a manual decision.

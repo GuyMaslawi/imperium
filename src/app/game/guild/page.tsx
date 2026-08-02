@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { PresenceDot } from "@/components/ui/PresenceDot";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import { isOnline } from "@/lib/game/chat";
 import { formatNumber } from "@/lib/game/format";
 import {
@@ -169,14 +170,29 @@ async function NoGuildView({
                     {invite.guild.name}
                   </span>
                   <span className="text-[11px] text-zinc-500">
-                    מנהיג: {invite.guild.members[0]?.empire.name ?? "—"}
+                    מנהיג:{" "}
+                    {invite.guild.members[0] ? (
+                      <PlayerLink
+                        empireId={invite.guild.members[0].empireId}
+                        name={invite.guild.members[0].empire.name}
+                      />
+                    ) : (
+                      "—"
+                    )}
                   </span>
                   <span className="nums text-[11px] text-zinc-500" dir="ltr">
                     {memberCount}/{capacity}
                   </span>
                   {invite.invitedBy && (
                     <span className="text-[11px] text-zinc-500">
-                      הוזמנת ע״י {invite.invitedBy.name}
+                      הוזמנת ע״י{" "}
+                      {/* SetNull on the FK: the recruiter can be gone while the
+                          invitation still stands, and then there is nothing to
+                          open — PlayerLink falls back to plain text. */}
+                      <PlayerLink
+                        empireId={invite.invitedById}
+                        name={invite.invitedBy.name}
+                      />
                     </span>
                   )}
                   <div className="mr-auto">
@@ -237,7 +253,17 @@ async function NoGuildView({
                           </span>
                         </td>
                         <td className="py-3 text-zinc-300">
-                          {guild.members[0]?.empire.name ?? "—"}
+                          {/* Joining is by invitation only, so the leader's name
+                              is the one actionable thing on the row: his dossier
+                              is where the "send him mail" button lives. */}
+                          {guild.members[0] ? (
+                            <PlayerLink
+                              empireId={guild.members[0].empireId}
+                              name={guild.members[0].empire.name}
+                            />
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="py-3">
                           <span className="nums text-zinc-200" dir="ltr">
@@ -421,7 +447,10 @@ export default async function GuildPage() {
                     }
                   />
                   <span className="text-sm font-semibold text-zinc-100">
-                    {member.empire.name}
+                    <PlayerLink
+                      empireId={member.empireId}
+                      name={member.empire.name}
+                    />
                     {member.empireId === empire.id && (
                       <span className="mr-1 text-xs text-gold-dim">(אתה)</span>
                     )}

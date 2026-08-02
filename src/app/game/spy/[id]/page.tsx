@@ -7,6 +7,7 @@ import { requireEmpire } from "@/lib/auth";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, resourceIcon, type IconName } from "@/components/ui/Icon";
 import { DuelBar, Meter } from "@/components/ui/Meter";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import { formatNumber, formatDate } from "@/lib/game/format";
 import { getTunables } from "@/lib/game/config";
 import { readSpyIntel, type SpyIntel } from "@/lib/game/spyIntel";
@@ -291,7 +292,7 @@ export default async function SpyResultPage({
     <div className="space-y-6">
       <SectionHeading
         title="דוח ריגול"
-        subtitle={foe.name}
+        subtitle={<PlayerLink empireId={foe.id} name={foe.name} />}
         ornament={<Icon name="spy" size={22} className="text-crimson" />}
       />
 

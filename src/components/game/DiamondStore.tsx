@@ -2,9 +2,7 @@
 
 import { useActionState, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
-import { PayPalCheckout } from "@/components/game/PayPalCheckout";
 import { StoreSeal } from "@/components/game/StoreSeal";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { formatNumber } from "@/lib/game/format";
@@ -41,7 +39,6 @@ export function DiamondStore({
   discountPct,
   purchasesLive = false,
   locked = false,
-  paypalClientId = null,
   testMode = false,
 }: {
   discountPct: number;
@@ -52,12 +49,7 @@ export function DiamondStore({
    * taking a click that only ever ends in a "coming soon" modal.
    */
   locked?: boolean;
-  /**
-   * PayPal browser-SDK client id. When set, checkout runs through the PayPal
-   * buttons (approve → capture) instead of the single-call charge form.
-   */
-  paypalClientId?: string | null;
-  /** Charges are play money (mock provider / PayPal sandbox credentials). */
+  /** Charges are play money (the mock provider). */
   testMode?: boolean;
 }) {
   const hasDiscount = discountPct > 0;
@@ -143,7 +135,6 @@ export function DiamondStore({
         <CheckoutModal
           pkg={pending}
           discountPct={discountPct}
-          paypalClientId={paypalClientId}
           testMode={testMode}
           onClose={() => setPending(null)}
         />
@@ -353,30 +344,23 @@ function PackageCard({
 function CheckoutModal({
   pkg,
   discountPct,
-  paypalClientId,
   testMode,
   onClose,
 }: {
   pkg: DiamondPackage;
   discountPct: number;
-  paypalClientId: string | null;
   testMode: boolean;
   onClose: () => void;
 }) {
-  const router = useRouter();
   const [state, action] = useActionState<StoreActionState, FormData>(
     purchaseDiamondPackage,
     STORE_IDLE
   );
-  /* The PayPal path settles outside the form action, so the diamonds it
-     credited are tracked here rather than in `state`. */
-  const [paidDiamonds, setPaidDiamonds] = useState<number | null>(null);
 
   const total = packageTotal(pkg);
   const net = discountedPrice(pkg.priceIls, discountPct);
   const hasDiscount = discountPct > 0;
-  const credited =
-    paidDiamonds ?? (state.status === "success" ? (state.diamonds ?? total) : null);
+  const credited = state.status === "success" ? (state.diamonds ?? total) : null;
 
   return (
     <div
@@ -475,53 +459,23 @@ function CheckoutModal({
               </p>
             )}
 
-            {paypalClientId ? (
-              <div className="grid gap-2">
-                <PayPalCheckout
-                  clientId={paypalClientId}
-                  packageId={pkg.id}
-                  onPaid={(diamonds) => {
-                    setPaidDiamonds(diamonds);
-                    // Refresh the server-rendered diamond counters in the layout.
-                    router.refresh();
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn btn-ghost w-full text-sm"
-                >
-                  ביטול
-                </button>
-              </div>
-            ) : (
-              <form className="grid gap-2">
-                <input type="hidden" name="packageId" value={pkg.id} />
-                <SubmitButton
-                  className="btn btn-gold w-full"
-                  formAction={action}
-                  pendingText="מעבד תשלום..."
-                >
-                  שלם {formatIls(net)}
-                </SubmitButton>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn btn-ghost w-full text-sm"
-                >
-                  ביטול
-                </button>
-              </form>
-            )}
-
-            {/* Said out loud because the PayPal logo makes players assume an
-                account is required and close the modal — the card button is the
-                one most Israeli buyers actually want. */}
-            {paypalClientId && (
-              <p className="text-center text-[11px] text-zinc-500">
-                אפשר לשלם בכרטיס אשראי או חיוב גם בלי חשבון PayPal.
-              </p>
-            )}
+            <form className="grid gap-2">
+              <input type="hidden" name="packageId" value={pkg.id} />
+              <SubmitButton
+                className="btn btn-gold w-full"
+                formAction={action}
+                pendingText="מעבד תשלום..."
+              >
+                שלם {formatIls(net)}
+              </SubmitButton>
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn btn-ghost w-full text-sm"
+              >
+                ביטול
+              </button>
+            </form>
 
             <p className="text-center text-[11px] leading-relaxed text-zinc-500">
               בהשלמת הרכישה אתה מאשר את{" "}
@@ -537,9 +491,7 @@ function CheckoutModal({
 
             {testMode && (
               <p className="text-center text-[11px] text-zinc-500">
-                {paypalClientId
-                  ? "מצב בדיקה (PayPal Sandbox) — לא מתבצע חיוב אמיתי."
-                  : "מצב הדגמה — לא מתבצע חיוב אמיתי עד לחיבור ספק התשלומים."}
+                מצב הדגמה — לא מתבצע חיוב אמיתי עד לחיבור ספק התשלומים.
               </p>
             )}
           </div>

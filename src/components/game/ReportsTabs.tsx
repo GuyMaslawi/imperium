@@ -4,6 +4,7 @@ import { useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { formatNumber } from "@/lib/game/format";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 
 export type BattleRow = {
   id: string;
@@ -11,6 +12,8 @@ export type BattleRow = {
   /** Created after the player's last visit to the reports page. */
   isNew: boolean;
   rival: string;
+  /** The other empire in the fight — the "יריב" cell links to his dossier. */
+  rivalId: string;
   isAttacker: boolean;
   won: boolean;
   attackerPower: number;
@@ -35,6 +38,8 @@ export type SpyRow = {
   /** Created after the player's last visit to the reports page. */
   isNew: boolean;
   rival: string;
+  /** The other empire in the mission — the "יריב" cell links to his dossier. */
+  rivalId: string;
   /** True for missions I sent, false for enemy spies caught in my territory. */
   isAttacker: boolean;
   success: boolean;
@@ -167,7 +172,10 @@ export function ReportsTabs({
                       </span>
                     </td>
                     <td className="px-4 py-3 font-bold text-zinc-100">
-                      {r.rival}
+                      {/* Reading the history is how you find out who has been
+                          hitting you — so the name opens his dossier, where the
+                          answer (spy, raid, mail) is one more click. */}
+                      <PlayerLink empireId={r.rivalId} name={r.rival} />
                     </td>
                     <td className="px-4 py-3 text-red-400">
                       {num(r.attackerPower)}
@@ -267,7 +275,10 @@ export function ReportsTabs({
                       </span>
                     </td>
                     <td className="px-4 py-3 font-bold text-zinc-100">
-                      {r.rival}
+                      {/* Reading the history is how you find out who has been
+                          hitting you — so the name opens his dossier, where the
+                          answer (spy, raid, mail) is one more click. */}
+                      <PlayerLink empireId={r.rivalId} name={r.rival} />
                     </td>
                     <td className="px-4 py-3">
                       <span

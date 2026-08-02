@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, SeasonBoardKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { announceToDiscord, gameLink } from "@/server/discord";
 
@@ -47,6 +47,9 @@ import { announceToDiscord, gameLink } from "@/server/discord";
 
 /** Podium places kept per season in היכל התהילה. */
 export const PODIUM_SIZE = 3;
+
+/** Rows kept per board of היכל התהילה — כוח כללי, ריגול and הברית החזקה. */
+export const HALL_BOARD_SIZE = 5;
 
 /** Rows shown per category on the season recap. */
 export const RECAP_BOARD_SIZE = 5;
@@ -151,6 +154,129 @@ async function buildPodium(
       cities: e.cities,
       heroLevel: e.hero?.level ?? 1,
     }));
+}
+
+/** One archived row of one hall board, before it is given its season stamps. */
+export interface HallBoardSnapshot {
+  kind: SeasonBoardKind;
+  rank: number;
+  empireId: string | null;
+  name: string;
+  playerName: string | null;
+  note: string | null;
+  value: number;
+}
+
+/**
+ * The three boards of היכל התהילה, read at closing time: כוח כללי, ריגול and
+ * הברית החזקה.
+ *
+ * Deliberately archived rather than derived on read. The hall is the record of
+ * *finished* seasons, so its figures must be frozen the moment the season ends —
+ * a board recomputed from live tables would silently start reporting the new
+ * season the moment the next one opens, which is exactly what this must never
+ * do. It also has to survive the season reset that deletes every empire and
+ * guild these rows are read from.
+ *
+ * Ranked off the same denormalised columns the live ladders rank by
+ * (`militaryPower`, `spyPower`, and the summed member power the guild board
+ * uses), so the archive says what players actually saw all season. The power
+ * board carries the podium's hero tiebreak so its first place is the same
+ * empire as the season's champion.
+ *
+ * A row worth zero is dropped: a board nobody competed in is noise, not a
+ * ranking — the same rule the recap's `named()` applies.
+ */
+async function buildHallBoards(
+  tx: Prisma.TransactionClient
+): Promise<HallBoardSnapshot[]> {
+  const [byPower, bySpy, byGuild] = await Promise.all([
+    tx.empire.findMany({
+      orderBy: { militaryPower: "desc" },
+      // Over-read so the hero tiebreak has something to reorder, as buildPodium does.
+      take: HALL_BOARD_SIZE * 4,
+      select: {
+        id: true,
+        name: true,
+        cities: true,
+        militaryPower: true,
+        user: { select: { name: true } },
+        hero: { select: { level: true, resets: true } },
+      },
+    }),
+    tx.empire.findMany({
+      orderBy: [{ spyPower: "desc" }, { name: "asc" }],
+      take: HALL_BOARD_SIZE,
+      select: {
+        id: true,
+        name: true,
+        spyPower: true,
+        user: { select: { name: true } },
+      },
+    }),
+    // Guild strength is the sum of its members' power — there is no column for
+    // it, so it is aggregated here exactly as the recap's guild board does.
+    tx.$queryRaw<{ name: string; members: bigint; power: number | null }[]>`
+      SELECT g.name, COUNT(m.id) AS members, SUM(e."militaryPower") AS power
+      FROM "Guild" g
+      JOIN "GuildMember" m ON m."guildId" = g.id
+      JOIN "Empire" e ON e.id = m."empireId"
+      GROUP BY g.id, g.name
+      ORDER BY power DESC NULLS LAST
+      LIMIT ${HALL_BOARD_SIZE}
+    `,
+  ]);
+
+  const rows: HallBoardSnapshot[] = [];
+  const push = (kind: SeasonBoardKind, entries: Omit<HallBoardSnapshot, "kind" | "rank">[]) => {
+    entries
+      .filter((e) => e.value > 0)
+      .forEach((e, i) => rows.push({ ...e, kind, rank: i + 1 }));
+  };
+
+  push(
+    "POWER",
+    byPower
+      .sort(
+        (a, b) =>
+          b.militaryPower - a.militaryPower ||
+          (b.hero?.level ?? 1) - (a.hero?.level ?? 1) ||
+          (b.hero?.resets ?? 0) - (a.hero?.resets ?? 0)
+      )
+      .slice(0, HALL_BOARD_SIZE)
+      .map((e) => ({
+        empireId: e.id,
+        name: e.name,
+        playerName: e.user?.name ?? null,
+        note: `${e.cities} ערים`,
+        value: Math.floor(e.militaryPower),
+      }))
+  );
+
+  push(
+    "SPY",
+    bySpy.map((e) => ({
+      empireId: e.id,
+      name: e.name,
+      playerName: e.user?.name ?? null,
+      note: null,
+      value: Math.floor(e.spyPower),
+    }))
+  );
+
+  push(
+    "GUILD",
+    byGuild.map((g) => ({
+      // A guild has no dossier to open — the name stays flat text in the hall.
+      empireId: null,
+      name: g.name,
+      playerName: null,
+      note: `${Number(g.members)} חברים`,
+      value: Math.floor(g.power ?? 0),
+    }))
+  );
+
+  return rows;
 }
 
 /**
@@ -344,24 +470,39 @@ async function archiveSeason(
   tx: Prisma.TransactionClient,
   season: ArchivableSeason
 ): Promise<number> {
-  const [podium, recap] = await Promise.all([
+  const [podium, boards, recap] = await Promise.all([
     buildPodium(tx),
+    buildHallBoards(tx),
     buildRecap(tx, season.startsAt),
   ]);
+
+  // Every archived row carries the season's own name and dates, so the hall can
+  // be read without the GameSeason row ever being touched.
+  const stamp = {
+    seasonId: season.id,
+    seasonName: season.name,
+    seasonStartsAt: season.startsAt,
+    seasonEndsAt: season.endsAt,
+  };
 
   let written = 0;
   if (podium.length > 0) {
     const result = await tx.seasonChampion.createMany({
-      data: podium.map((c) => ({
-        seasonId: season.id,
-        seasonName: season.name,
-        seasonStartsAt: season.startsAt,
-        seasonEndsAt: season.endsAt,
-        ...c,
-      })),
+      data: podium.map((c) => ({ ...stamp, ...c })),
       skipDuplicates: true,
     });
     written = result.count;
+  }
+
+  // The three hall boards, under the same first-archive-wins rule as the podium:
+  // `skipDuplicates` against @@unique([seasonId, kind, rank]) means a second
+  // archiving pass (admin first, clock later) reads as a no-op instead of
+  // rewriting a hall players have already seen.
+  if (boards.length > 0) {
+    await tx.seasonBoardEntry.createMany({
+      data: boards.map((b) => ({ ...stamp, ...b })),
+      skipDuplicates: true,
+    });
   }
 
   if (!season.recap) {
@@ -565,80 +706,137 @@ export const getSeasonGate = cache(async (): Promise<SeasonGate> => {
 
 /* ------------------------------ the hall ------------------------------ */
 
-export interface HallChampion {
+export interface HallRow {
   rank: number;
-  empireName: string;
+  /**
+   * The empire's dossier, when it is still in the game. Null on guild rows,
+   * on rows archived without one, and on an empire that has since been wiped —
+   * the hall links only ids it has just seen exist, so an archived name never
+   * leads to a 404.
+   */
+  empireId: string | null;
+  name: string;
   playerName: string | null;
-  guildName: string | null;
-  power: number;
-  cities: number;
-  heroLevel: number;
+  note: string | null;
+  value: number;
 }
 
-export interface HallSeason {
-  id: string;
-  name: string;
-  startsAt: Date;
-  endsAt: Date;
-  champions: HallChampion[];
+export interface HallBoard {
+  kind: SeasonBoardKind;
+  title: string;
+  /** Icon name from components/ui/Icon. */
+  icon: string;
+  /** What the numbers column means, for the board's sub-line. */
+  unit: string;
+  rows: HallRow[];
 }
+
+/** היכל התהילה: the three boards of the last season that actually finished. */
+export interface HallOfFame {
+  seasonId: string;
+  seasonName: string;
+  endsAt: Date;
+  boards: HallBoard[];
+}
+
+/** The three boards, in the order the hall draws them. */
+const HALL_BOARD_META: Record<
+  SeasonBoardKind,
+  { title: string; icon: string; unit: string }
+> = {
+  POWER: { title: "כוח כללי", icon: "attack", unit: "כוח צבאי" },
+  SPY: { title: "ריגול", icon: "spy", unit: "כוח מודיעין" },
+  GUILD: { title: "הברית החזקה", icon: "guild", unit: "כוח חברי הברית" },
+};
+
+const HALL_BOARD_ORDER: SeasonBoardKind[] = ["POWER", "SPY", "GUILD"];
 
 /**
- * היכל התהילה — every archived season and who topped it, newest first.
+ * היכל התהילה — כוח כללי, ריגול and הברית החזקה, as they stood when the last
+ * season ended.
  *
- * Read straight off `SeasonChampion` and grouped in JS rather than joined from
- * `GameSeason`: the whole point of the archive is that it outlives the season
- * row, so a season the admin has since deleted must still appear in the hall.
- * Every field the board draws lives on the champion row for exactly that
- * reason.
+ * **The running season is not in here, by construction.** Every figure is read
+ * off `SeasonBoardEntry`, which is written once at closing time and never
+ * updated, and the query takes only seasons whose `seasonEndsAt` is already in
+ * the past. That second condition is what keeps the *current* season out even
+ * when its standings have been archived early: the admin can archive a running
+ * season before a reset (see `archiveSeasonStandings`), and those rows carry a
+ * deadline that has not arrived yet, so the hall ignores them until it has.
+ * Nothing here reads a live Empire or Guild table for a number.
  *
- * Read live, like every other board. This one is the odd case — a frozen archive
- * written three rows at a time, a handful of times a year — and it did sit behind
- * a five-minute TTL. But it is three rows per season ordered off an index, so the
- * cache was saving nothing worth the question "is this stale?", which is the one
- * question no board in this game should raise.
+ * Only the newest finished season is shown — the hall is "how last season
+ * ended", not a scrollable archive of all of them. Older seasons keep their
+ * rows in the table and their podium on the season recap page.
+ *
+ * Read live, like every other board in the game (see [[no-cached-boards]]):
+ * fifteen rows off a unique index, a handful of times a year, is not worth the
+ * question "is this stale?".
  */
-export async function getHallOfFame(): Promise<HallSeason[]> {
-  const rows = await prisma.seasonChampion.findMany({
-    orderBy: [{ seasonEndsAt: "desc" }, { rank: "asc" }],
+export async function getHallOfFame(): Promise<HallOfFame | null> {
+  const now = new Date();
+
+  // Newest *finished* season that has an archived hall. One row off the
+  // seasonEndsAt index, and it names the season the boards below belong to.
+  const newest = await prisma.seasonBoardEntry.findFirst({
+    where: { seasonEndsAt: { lte: now } },
+    orderBy: { seasonEndsAt: "desc" },
+    select: { seasonId: true, seasonName: true, seasonEndsAt: true },
+  });
+  if (!newest) return null;
+
+  const rows = await prisma.seasonBoardEntry.findMany({
+    where: { seasonId: newest.seasonId },
+    orderBy: [{ kind: "asc" }, { rank: "asc" }],
     select: {
-      seasonId: true,
-      seasonName: true,
-      seasonStartsAt: true,
-      seasonEndsAt: true,
+      kind: true,
       rank: true,
-      empireName: true,
+      empireId: true,
+      name: true,
       playerName: true,
-      guildName: true,
-      power: true,
-      cities: true,
-      heroLevel: true,
+      note: true,
+      value: true,
     },
   });
 
-  const bySeason = new Map<string, HallSeason>();
-  for (const r of rows) {
-    let season = bySeason.get(r.seasonId);
-    if (!season) {
-      season = {
-        id: r.seasonId,
-        name: r.seasonName,
-        startsAt: r.seasonStartsAt,
-        endsAt: r.seasonEndsAt,
-        champions: [],
-      };
-      bySeason.set(r.seasonId, season);
-    }
-    season.champions.push({
-      rank: r.rank,
-      empireName: r.empireName,
-      playerName: r.playerName,
-      guildName: r.guildName,
-      power: r.power,
-      cities: r.cities,
-      heroLevel: r.heroLevel,
-    });
-  }
+  // Which of the archived empires still have a dossier to open. The archive is
+  // deliberately unconstrained — it outlives the season *and* the empires it
+  // names — so an id here can point at a row a wipe has since removed. At most
+  // ten ids, looked up once on the primary key.
+  const archivedIds = [
+    ...new Set(rows.map((r) => r.empireId).filter((id): id is string => id !== null)),
+  ];
+  const alive = new Set(
+    archivedIds.length === 0
+      ? []
+      : (
+          await prisma.empire.findMany({
+            where: { id: { in: archivedIds } },
+            select: { id: true },
+          })
+        ).map((e) => e.id)
+  );
 
-  return [...bySeason.values()];
+  const boards: HallBoard[] = HALL_BOARD_ORDER.map((kind) => ({
+    kind,
+    ...HALL_BOARD_META[kind],
+    rows: rows
+      .filter((r) => r.kind === kind)
+      .map((r) => ({
+        rank: r.rank,
+        empireId: r.empireId && alive.has(r.empireId) ? r.empireId : null,
+        name: r.name,
+        playerName: r.playerName,
+        note: r.note,
+        value: r.value,
+      })),
+  })).filter((b) => b.rows.length > 0);
+
+  if (boards.length === 0) return null;
+
+  return {
+    seasonId: newest.seasonId,
+    seasonName: newest.seasonName,
+    endsAt: newest.seasonEndsAt,
+    boards,
+  };
 }

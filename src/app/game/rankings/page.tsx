@@ -14,7 +14,8 @@ import { getShieldsForEmpires } from "@/lib/game/diamondEffects";
 import { getCityBossState } from "@/server/bossState";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PresenceDot } from "@/components/ui/PresenceDot";
-import { Icon } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 
 export const metadata = { title: "דירוג | קראלדור" };
@@ -155,9 +156,9 @@ export default async function RankingsPage({
         guild: { select: { name: true } },
       },
     }),
-    // The archive: who topped every season that has already ended. Frozen data
-    // behind a five-minute TTL, unlike everything else on this page — it moves
-    // a handful of times a year, not twice a minute.
+    // The archive: the three boards of the last season that ended. Frozen data
+    // — it moves a handful of times a year, not twice a minute, and the season
+    // being played never touches it.
     getHallOfFame(),
   ]);
   const guildByEmpire = new Map(guildRows.map((row) => [row.empireId, row]));
@@ -417,60 +418,85 @@ export default async function RankingsPage({
         <Pager page={page} pageCount={pageCount} myPage={myPage} />
       </div>
 
-      {/* -------- hall of fame: the archive of finished seasons -------- */}
-      {/* Deliberately static. This board is written exactly once per season, at
-          the moment the season's clock runs out (see server/seasonClose.ts),
-          and every figure on it is a snapshot — the empires it names may not
-          even exist any more, because a season reset deletes them all. */}
+      {/* -------- hall of fame: last season's three boards -------- */}
+      {/* Deliberately static, and deliberately *not* about the season being
+          played. Every figure is read off the SeasonBoardEntry archive, written
+          once when a season's clock ran out (see server/seasonClose.ts) — the
+          live ladder above can change every minute without moving a number
+          here. The empires named may not even exist any more, because a season
+          reset deletes them all. */}
       <div>
         <h2 className="mb-1 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
           <Icon name="crown" size={20} className="text-crimson-bright" />
           היכל התהילה
         </h2>
         <p className="mb-3 text-center text-[11px] text-zinc-500">
-          אלופי כל העונות שהסתיימו. מתעדכן פעם אחת, בסיום כל עונה.
+          {hall ? (
+            <>
+              כך הסתיימה <span className="font-bold text-gold-dim">{hall.seasonName}</span>{" "}
+              ב־{formatDate(hall.endsAt)}. העונה הנוכחית אינה משפיעה על הלוחות
+              האלה — הם נחרתו ברגע שהעונה ננעלה.
+            </>
+          ) : (
+            "מתעדכן פעם אחת, בסיום כל עונה."
+          )}
         </p>
 
-        {hall.length === 0 ? (
+        {!hall ? (
           <div className="panel rounded-xl p-6 text-center">
             <p className="text-sm text-zinc-500">
-              עוד לא הסתיימה אף עונה. האלופים הראשונים ייחרתו כאן בסיום העונה
+              עוד לא הסתיימה אף עונה. הלוחות הראשונים ייחרתו כאן בסיום העונה
               הנוכחית.
             </p>
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {hall.map((season, si) => (
+            {hall.boards.map((board, bi) => (
               <div
-                key={season.id}
-                style={{ "--i": Math.min(si, 12) } as CSSProperties}
+                key={board.kind}
+                style={{ "--i": bi } as CSSProperties}
                 className="ldr-podium panel-gold rounded-xl p-4"
               >
                 <div className="mb-3 flex items-baseline justify-between gap-2 border-b border-border-subtle pb-2">
-                  <h3 className="truncate text-sm font-bold text-gold-bright">
-                    {season.name}
+                  <h3 className="flex items-center gap-1.5 truncate text-sm font-bold text-gold-bright">
+                    <Icon
+                      name={board.icon as IconName}
+                      size={16}
+                      className="shrink-0 text-crimson-bright"
+                    />
+                    {board.title}
                   </h3>
                   <span className="shrink-0 text-[10px] text-zinc-500">
-                    {formatDate(season.endsAt)}
+                    {board.unit}
                   </span>
                 </div>
                 <ol className="space-y-2 text-sm">
-                  {season.champions.map((champ) => (
+                  {board.rows.map((row) => (
                     <li
-                      key={champ.rank}
+                      key={row.rank}
                       className="flex items-center justify-between gap-2"
                     >
                       <span className="flex min-w-0 items-center gap-2">
-                        <span aria-hidden>
-                          {champ.rank === 1 ? "🥇" : champ.rank === 2 ? "🥈" : "🥉"}
+                        <span aria-hidden className="w-4 shrink-0 text-center">
+                          {row.rank === 1
+                            ? "🥇"
+                            : row.rank === 2
+                              ? "🥈"
+                              : row.rank === 3
+                                ? "🥉"
+                                : (
+                                  <span className="nums text-[11px] text-zinc-600" dir="ltr">
+                                    {row.rank}
+                                  </span>
+                                )}
                         </span>
                         <span className="min-w-0">
                           <span className="block truncate font-semibold text-zinc-100">
-                            {champ.empireName}
+                            <PlayerLink empireId={row.empireId} name={row.name} />
                           </span>
-                          {champ.playerName && (
+                          {(row.playerName || row.note) && (
                             <span className="block truncate text-[10px] text-zinc-500">
-                              {champ.playerName}
+                              {[row.playerName, row.note].filter(Boolean).join(" · ")}
                             </span>
                           )}
                         </span>
@@ -478,9 +504,9 @@ export default async function RankingsPage({
                       <span
                         className="nums shrink-0 font-bold text-gold"
                         dir="ltr"
-                        title={`${formatNumber(champ.power)} כוח · ${champ.cities} ערים · גיבור ${champ.heroLevel}`}
+                        title={formatNumber(row.value)}
                       >
-                        {formatCompact(champ.power)}
+                        {formatCompact(row.value)}
                       </span>
                     </li>
                   ))}

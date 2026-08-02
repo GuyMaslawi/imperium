@@ -328,6 +328,61 @@ model SeasonChampion {
   @@index([seasonEndsAt])
 }
 
+/// Which of היכל התהילה's three boards a row belongs to.
+enum SeasonBoardKind {
+  /// Strongest empires by military power — the same figure the ladder ranked by.
+  POWER
+  /// Best spy networks, by spy power.
+  SPY
+  /// Strongest guilds, by the summed military power of their members.
+  GUILD
+}
+
+/// One row of one board in היכל התהילה — the durable, per-season archive behind
+/// the "כוח כללי / ריגול / הברית החזקה" tables.
+///
+/// Same discipline as [SeasonChampion]: written once at closing time, never
+/// updated, and holding no relations at all. The hall must be readable long
+/// after the empires, the guilds and even the GameSeason row it names are gone,
+/// so every column is a snapshot and `empireId` is a breadcrumb the profile link
+/// only follows once the empire is confirmed to still exist.
+///
+/// It exists **because** the recap on GameSeason is not durable: that JSON dies
+/// with the season row an admin may delete, and the hall may not.
+model SeasonBoardEntry {
+  id String @id @default(cuid())
+
+  /// The GameSeason this was archived from. Unconstrained — the row it names
+  /// may be long gone.
+  seasonId       String
+  seasonName     String
+  seasonStartsAt DateTime
+  seasonEndsAt   DateTime
+
+  kind SeasonBoardKind
+  /// 1-based place within the board. The unique below is what makes archiving
+  /// idempotent when the same season is archived twice (admin, then clock).
+  rank Int
+
+  /// Empire dossier breadcrumb. Null on guild rows — a guild has no profile.
+  empireId String?
+  /// Empire name, or guild name on a GUILD row.
+  name String
+  /// Owner's display name at archiving time, for empire rows.
+  playerName String?
+  /// Secondary line: "4 ערים" for POWER, "12 חברים" for GUILD.
+  note String?
+
+  /// What the board ranks by, floored: power, spy power, summed guild power.
+  value Float
+
+  createdAt DateTime @default(now())
+
+  @@unique([seasonId, kind, rank])
+  /// The hall reads the newest finished season only.
+  @@index([seasonEndsAt])
+}
+
 model Empire {
   id                  String    @id @default(cuid())
   userId              String    @unique
@@ -558,7 +613,7 @@ enum PurchaseStatus {
   PAID
   /// Charge failed or was declined — no diamonds credited.
   FAILED
-  /// A settled charge was refunded or reversed by the provider (PayPal refund
+  /// A settled charge was refunded or reversed by the provider (gateway refund
   /// or chargeback). The diamonds are NOT clawed back automatically — a balance
   /// can already have been spent — so an admin decides what to adjust.
   REFUNDED
@@ -608,12 +663,12 @@ model DiamondPurchase {
   /// credited would otherwise settle a second row and double-credit diamonds.
   /// The future webhook handler must look the purchase up BY THIS FIELD.
   providerRef   String?        @unique
-  /// Provider-side id of the money movement itself — for PayPal the *capture*
-  /// id, which is what a refund is issued against and what refund/chargeback
-  /// webhooks identify the payment by (`providerRef` holds the order id).
+  /// Provider-side id of the money movement itself — the *capture*, which is
+  /// what a refund is issued against and what refund/chargeback callbacks
+  /// identify the payment by (`providerRef` holds the order id).
   /// Unique for the same anti-replay reason as `providerRef`.
   captureRef    String?        @unique
-  /// True when no real money moved (mock provider / PayPal sandbox).
+  /// True when no real money moved (the mock provider).
   isTest        Boolean        @default(false)
   status        PurchaseStatus @default(PENDING)
   /// Why the charge failed (only set on FAILED).

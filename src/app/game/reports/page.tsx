@@ -59,6 +59,11 @@ export default async function ReportsPage() {
     const rival = isAttacker
       ? report.defenderEmpire.name
       : report.attackerEmpire.name;
+    // The other side of the fight, so the table can link his name to his
+    // dossier — the id is a column on the report, not an extra read.
+    const rivalId = isAttacker
+      ? report.defenderEmpireId
+      : report.attackerEmpireId;
     const myLossSoldiers = isAttacker
       ? report.attackerSoldiersLost
       : report.defenderSoldiersLost;
@@ -73,6 +78,7 @@ export default async function ReportsPage() {
       createdAt: formatDate(report.createdAt),
       isNew: isIncomingNew(report.createdAt, isAttacker),
       rival,
+      rivalId,
       isAttacker,
       won,
       attackerPower: report.attackerPower,
@@ -101,6 +107,9 @@ export default async function ReportsPage() {
       rival: isAttacker
         ? report.defenderEmpire.name
         : report.attackerEmpire.name,
+      rivalId: isAttacker
+        ? report.defenderEmpireId
+        : report.attackerEmpireId,
       isAttacker,
       success: report.success,
       turnsSpent: report.turnsSpent,

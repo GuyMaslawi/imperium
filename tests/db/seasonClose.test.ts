@@ -3,7 +3,11 @@ config({ path: ".env.local", override: true });
 
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { archiveSeasonStandings, closeSeason } from "@/server/seasonClose";
+import {
+  archiveSeasonStandings,
+  closeSeason,
+  getHallOfFame,
+} from "@/server/seasonClose";
 
 /**
  * Sealing a season.
@@ -39,7 +43,9 @@ const createdSeasons: string[] = [];
 
 afterAll(async () => {
   await prisma.seasonChampion.deleteMany({ where: { seasonId: { in: createdSeasons } } });
+  await prisma.seasonBoardEntry.deleteMany({ where: { seasonId: { in: createdSeasons } } });
   await prisma.gameSeason.deleteMany({ where: { id: { in: createdSeasons } } });
+  await prisma.guild.deleteMany({ where: { name: { startsWith: TAG } } });
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
   await prisma.$disconnect();
 });
@@ -52,7 +58,7 @@ afterAll(async () => {
  * data the development database happens to be carrying, or the assertions would
  * depend on the state of someone's local seed.
  */
-async function makeEmpire(label: string, power: number, heroLevel = 1) {
+async function makeEmpire(label: string, power: number, heroLevel = 1, spyPower = 0) {
   const user = await prisma.user.create({
     data: {
       email: `${label}@${TAG}.test`,
@@ -70,10 +76,33 @@ async function makeEmpire(label: string, power: number, heroLevel = 1) {
       citizens: 0,
       cities: 3,
       militaryPower: power,
+      spyPower,
     },
   });
   await prisma.hero.create({ data: { empireId: empire.id, level: heroLevel } });
   return empire;
+}
+
+/** A guild holding the given empires — the GUILD board ranks the sum of these. */
+async function makeGuild(label: string, empireIds: string[]) {
+  return prisma.guild.create({
+    data: {
+      name: `${TAG}-guild-${label}`,
+      members: {
+        create: empireIds.map((empireId, i) => ({
+          empireId,
+          role: i === 0 ? ("LEADER" as const) : ("MEMBER" as const),
+        })),
+      },
+    },
+  });
+}
+
+async function boardsOf(id: string) {
+  return prisma.seasonBoardEntry.findMany({
+    where: { seasonId: id },
+    orderBy: [{ kind: "asc" }, { rank: "asc" }],
+  });
 }
 
 async function makeSeason(label: string) {
@@ -119,6 +148,8 @@ async function seatPodium(top: string, ...rest: string[]) {
  */
 beforeEach(async () => {
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
+  // Memberships cascade off the empires above; the guild rows themselves do not.
+  await prisma.guild.deleteMany({ where: { name: { startsWith: TAG } } });
   seasonId = await makeSeason(`s${Math.random().toString(36).slice(2, 7)}`);
 });
 
@@ -219,6 +250,137 @@ describe("archiveSeasonStandings", () => {
     const champs = await championsOf(seasonId);
     expect(champs[0].empireName).toBe(`${TAG}-early`);
     expect(champs.map((c) => c.empireName)).not.toContain(`${TAG}-late`);
+  });
+});
+
+/**
+ * היכל התהילה's three boards.
+ *
+ * The invariant that matters is the one the hall exists for: **the season being
+ * played may not reach it.** That is not a UI detail — it is the difference
+ * between a hall of fame and a second live ladder, and it is enforced by a
+ * WHERE on `seasonEndsAt`, so it belongs in the database suite.
+ */
+describe("hall boards", () => {
+  it("archives כוח כללי, ריגול and הברית החזקה when the season closes", async () => {
+    const strong = await makeEmpire("power", 9_000_000_000_000, 1, 10_000_000);
+    const spy = await makeEmpire("spy", 8_000_000_000_000, 1, 90_000_000);
+    const third = await makeEmpire("third", 7_000_000_000_000, 1, 1_000_000);
+    await makeGuild("big", [strong.id, spy.id]);
+    await makeGuild("small", [third.id]);
+
+    expect(await closeSeason(seasonId)).toBe(true);
+
+    const rows = await boardsOf(seasonId);
+    const board = (kind: "POWER" | "SPY" | "GUILD") =>
+      rows.filter((r) => r.kind === kind);
+
+    // Power ranks by the same column the ladder ranked by all season.
+    expect(board("POWER").map((r) => r.name).slice(0, 3)).toEqual([
+      `${TAG}-power`,
+      `${TAG}-spy`,
+      `${TAG}-third`,
+    ]);
+    expect(board("POWER")[0].value).toBe(9_000_000_000_000);
+    expect(board("POWER")[0].playerName).toBe("שחקן power");
+    expect(board("POWER")[0].note).toBe("3 ערים");
+
+    // Spying is its own ladder — the strongest army is not the best network.
+    expect(board("SPY")[0].name).toBe(`${TAG}-spy`);
+    expect(board("SPY")[0].value).toBe(90_000_000);
+
+    // A guild is worth the sum of its members' power, and holds no dossier.
+    const guilds = board("GUILD");
+    expect(guilds[0].name).toBe(`${TAG}-guild-big`);
+    expect(guilds[0].value).toBe(17_000_000_000_000);
+    expect(guilds[0].note).toBe("2 חברים");
+    expect(guilds[0].empireId).toBeNull();
+
+    // Every row carries the season's identity, like the podium does.
+    expect(rows.every((r) => r.seasonId === seasonId)).toBe(true);
+  });
+
+  it("serves the newest finished season through getHallOfFame", async () => {
+    const winner = await makeEmpire("hall", 9_000_000_000_000, 1, 5_000_000);
+    await seatPodium("filler-a", "filler-b");
+    await closeSeason(seasonId);
+
+    const hall = await getHallOfFame();
+    expect(hall?.seasonId).toBe(seasonId);
+
+    // Both empire boards are there (this test's empires have power and spy
+    // power), and the boards come back in a fixed order. GUILD is only present
+    // when the database holds a guild, so it is not asserted on.
+    const kinds = hall!.boards.map((b) => b.kind);
+    expect(kinds).toContain("POWER");
+    expect(kinds).toContain("SPY");
+    const order = ["POWER", "SPY", "GUILD"];
+    expect([...kinds].sort((a, b) => order.indexOf(a) - order.indexOf(b))).toEqual(kinds);
+
+    const power = hall?.boards.find((b) => b.kind === "POWER");
+    expect(power?.rows[0].name).toBe(`${TAG}-hall`);
+    // The empire is still in the game, so its name is a link.
+    expect(power?.rows[0].empireId).toBe(winner.id);
+  });
+
+  it("drops the profile link once the empire it names is wiped", async () => {
+    const doomed = await makeEmpire("wiped", 9_400_000_000_000, 1, 4_000_000);
+    await seatPodium("stay-a", "stay-b");
+    await closeSeason(seasonId);
+
+    // The next season's reset deletes every empire; the hall must survive it
+    // without pointing at a dossier that 404s.
+    await prisma.user.delete({ where: { id: doomed.userId } });
+
+    const hall = await getHallOfFame();
+    const row = hall?.boards
+      .find((b) => b.kind === "POWER")
+      ?.rows.find((r) => r.name === `${TAG}-wiped`);
+    expect(row).toBeTruthy();
+    expect(row?.empireId).toBeNull();
+  });
+
+  it("never shows a season that is still being played", async () => {
+    // A season with its deadline in the future: the game is open, and the admin
+    // archives the standings before a reset. Those rows are written…
+    const running = await prisma.gameSeason.create({
+      data: {
+        name: `${TAG}-running`,
+        startsAt: new Date(Date.now() - 86_400_000),
+        endsAt: new Date(Date.now() + 86_400_000),
+      },
+    });
+    createdSeasons.push(running.id);
+    await makeEmpire("live", 9_800_000_000_000, 1, 99_000_000);
+    await seatPodium("live-b", "live-c");
+
+    expect(await archiveSeasonStandings(running.id)).toBe(3);
+    expect(await boardsOf(running.id)).not.toHaveLength(0);
+
+    // …and the hall still refuses to read them, because that season has not
+    // ended. Whatever it returns, it is not the running one.
+    const hall = await getHallOfFame();
+    expect(hall?.seasonId).not.toBe(running.id);
+  });
+
+  it("does not let a second archiving rewrite a published hall", async () => {
+    const [winner] = await seatPodium("first");
+    await archiveSeasonStandings(seasonId);
+
+    // The ladder turns over completely before the clock runs out.
+    await prisma.empire.update({
+      where: { id: winner.id },
+      data: { militaryPower: 1 },
+    });
+    await makeEmpire("latecomer", 9_900_000_000_000);
+
+    await closeSeason(seasonId);
+
+    const power = (await boardsOf(seasonId)).filter((r) => r.kind === "POWER");
+    expect(power[0].name).toBe(`${TAG}-first`);
+    expect(power.map((r) => r.name)).not.toContain(`${TAG}-latecomer`);
+    // One row per rank, not two — the unique index is what settles the race.
+    expect(new Set(power.map((r) => r.rank)).size).toBe(power.length);
   });
 });
 

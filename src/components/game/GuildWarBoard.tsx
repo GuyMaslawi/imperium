@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import {
   GUILD_WAR_END_LABEL,
@@ -466,7 +467,7 @@ function Fighters({ state }: { state: GuildWarLiveState }) {
                   </span>
                 </td>
                 <td className="py-2 font-semibold text-zinc-100">
-                  {fighter.name}
+                  <PlayerLink empireId={fighter.empireId} name={fighter.name} />
                   {fighter.me && (
                     <span className="mr-2 text-[10px] font-black text-gold-bright">
                       (אתה)
@@ -554,16 +555,20 @@ function Feed({
               </div>
 
               <p className="mt-1 leading-relaxed text-zinc-300">
-                <span className={item.mine ? "font-bold text-gold-bright" : "font-semibold"}>
-                  {item.attackerName}
-                </span>{" "}
+                <PlayerLink
+                  empireId={item.attackerEmpireId}
+                  name={item.attackerName}
+                  className={item.mine ? "font-bold text-gold-bright" : "font-semibold"}
+                />{" "}
                 <span className="text-zinc-600">({item.attackerGuildName})</span>{" "}
                 <span aria-hidden className="text-zinc-500">
                   ⟵
                 </span>{" "}
-                <span className={item.mine ? "font-bold text-gold-bright" : "font-semibold"}>
-                  {item.defenderName}
-                </span>{" "}
+                <PlayerLink
+                  empireId={item.defenderEmpireId}
+                  name={item.defenderName}
+                  className={item.mine ? "font-bold text-gold-bright" : "font-semibold"}
+                />{" "}
                 <span className="text-zinc-600">({item.defenderGuildName})</span>
               </p>
 

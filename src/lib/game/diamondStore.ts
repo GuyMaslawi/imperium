@@ -9,9 +9,9 @@
  */
 
 /**
- * Currency every package is priced and charged in. PayPal is told this code on
- * every order, and the browser SDK is loaded with it — the two must agree or
- * PayPal rejects the order.
+ * Currency every package is priced and charged in. Whatever gateway is wired
+ * gets told this code on every charge, and the amount stored on the audit row
+ * is compared against the settled currency before any diamonds are credited.
  */
 export const STORE_CURRENCY = "ILS";
 
@@ -88,20 +88,3 @@ export interface StoreActionState {
 }
 
 export const STORE_IDLE: StoreActionState = { status: "idle" };
-
-/* ---------------------------- approval checkout ---------------------------- */
-
-/**
- * Results of the two-step approval flow (PayPal). Same reasoning as
- * `StoreActionState` for why they live here: the `"use server"` action module
- * may only export async functions, so its types are declared in this
- * client-safe module and imported by both sides.
- */
-export type CreateOrderState =
-  | { ok: true; orderId: string }
-  | { ok: false; message: string };
-
-export type CaptureOrderState =
-  | { ok: true; diamonds: number; message: string }
-  | { ok: false; message: string };
-

@@ -5,6 +5,7 @@ import { notBannedWhere } from "@/lib/ban";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { PresenceDot } from "@/components/ui/PresenceDot";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import { isOnline } from "@/lib/game/chat";
 import { formatDate } from "@/lib/game/format";
 import { markMessagesRead } from "@/server/actions/messages";
@@ -199,7 +200,17 @@ export default async function MessagesPage() {
                     {from && (
                       <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-300/90">
                         <span>
-                          מאת <span className="font-bold">{from}</span>
+                          מאת{" "}
+                          {/* The name is the way to his dossier — an inbox is
+                              where you meet a rival, and answering the letter
+                              usually means looking him up first. `senderEmpireId`
+                              is on the row itself, so this costs no extra read;
+                              a deleted author has no id and stays flat text. */}
+                          <PlayerLink
+                            empireId={m.senderEmpireId}
+                            name={from}
+                            className="font-bold"
+                          />
                         </span>
                         {/* Whether the sender is at the keyboard is what decides
                             if a reply is a conversation or a letter — so it sits

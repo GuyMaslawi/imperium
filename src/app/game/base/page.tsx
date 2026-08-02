@@ -4,6 +4,7 @@ import { requireEmpire } from "@/lib/auth";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 import {
   BUILDING_META,
   STORAGE_TYPES,
@@ -276,6 +277,7 @@ export default async function BasePage() {
               const isAttacker = r.attackerEmpireId === empire.id;
               const won = r.winnerEmpireId === empire.id;
               const rival = isAttacker ? r.defenderEmpire.name : r.attackerEmpire.name;
+              const rivalId = isAttacker ? r.defenderEmpireId : r.attackerEmpireId;
               return (
                 <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                   <span className="text-zinc-300">
@@ -284,7 +286,7 @@ export default async function BasePage() {
                     ) : (
                       <><Icon name="shield" size={16} className="inline-block align-middle" /> הותקפת על ידי</>
                     )}{" "}
-                    <span className="font-semibold">{rival}</span> —{" "}
+                    <PlayerLink empireId={rivalId} name={rival} className="font-semibold" /> —{" "}
                     <span className={won ? "text-emerald-400" : "text-red-400"}>
                       {won ? "ניצחון" : "הפסד"}
                     </span>
@@ -296,7 +298,13 @@ export default async function BasePage() {
             {recentSpies.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                 <span className="text-zinc-300">
-                  <Icon name="spy" size={16} className="inline-block align-middle" /> ריגלת אחרי <span className="font-semibold">{r.defenderEmpire.name}</span> —{" "}
+                  <Icon name="spy" size={16} className="inline-block align-middle" /> ריגלת אחרי{" "}
+                  <PlayerLink
+                    empireId={r.defenderEmpireId}
+                    name={r.defenderEmpire.name}
+                    className="font-semibold"
+                  />{" "}
+                  —{" "}
                   <span className={r.success ? "text-emerald-400" : "text-red-400"}>
                     {r.success ? "הצלחה" : "כישלון"}
                   </span>

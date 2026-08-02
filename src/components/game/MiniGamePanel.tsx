@@ -22,6 +22,7 @@ import {
   type SafeMark,
 } from "@/lib/game/minigame";
 import { Icon } from "@/components/ui/Icon";
+import { PlayerLink } from "@/components/ui/PlayerLink";
 
 /**
  * Two rates, because this panel lives in the game's layout — it is mounted on
@@ -110,7 +111,7 @@ function BoardRow({ row, maxAttempts }: { row: MiniGameBoardRow; maxAttempts: nu
           row.isSelf ? "text-gold-bright" : "text-zinc-300"
         }`}
       >
-        {row.name}
+        <PlayerLink empireId={row.empireId} name={row.name} />
         {row.isSelf && <span className="mr-1 text-[10px] font-normal text-gold-dim">(אתה)</span>}
       </span>
       <span className="nums shrink-0 text-[11px] text-zinc-500" dir="ltr">
