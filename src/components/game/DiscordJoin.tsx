@@ -54,7 +54,8 @@ export function DiscordJoin({
       <p className="text-sm leading-relaxed text-bone/90">
         פעם אחת בלבד, לכל אימפריה:{" "}
         <b className="nums text-cyan-300">{DISCORD_JOIN_DIAMONDS}</b> יהלומים על
-        הצטרפות לערוץ. אנחנו לא בודקים — סומכים עליכם, ולכן גם הסכום צנוע.
+        הצטרפות לערוץ. אנחנו לא בודקים — סומכים עליכם. מתנת פתיחה, כל עוד הערוץ
+        צעיר.
       </p>
 
       {done ? (
@@ -70,14 +71,38 @@ export function DiscordJoin({
         <>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <DiscordLink url={url} variant="pill" label="1. פתחו את הערוץ" />
-            <button
-              type="button"
-              onClick={claim}
-              disabled={pending}
-              className="btn btn-gold px-5 py-2 text-sm disabled:opacity-60"
-            >
-              {pending ? "אוסף…" : `2. אספו ${DISCORD_JOIN_DIAMONDS} יהלומים`}
-            </button>
+            {/* The gleam is the state, not decoration: it runs only while the
+                purse is actually collectable. The moment the claim is in flight
+                the sweep, the halo and the sparks all stop together, so a
+                button that is still shimmering is always one you can press.
+                The sparks live outside the button because .btn-gleam clips its
+                own sweep with overflow:hidden. */}
+            <span className="gleam-wrap">
+              <button
+                type="button"
+                onClick={claim}
+                disabled={pending}
+                className={`btn btn-gold px-5 py-2 text-sm disabled:opacity-60${
+                  pending ? "" : " btn-gleam"
+                }`}
+              >
+                {pending ? (
+                  "אוסף…"
+                ) : (
+                  <>
+                    <Icon name="diamond" size={16} />
+                    {`2. אספו ${DISCORD_JOIN_DIAMONDS} יהלומים`}
+                  </>
+                )}
+              </button>
+              {!pending && (
+                <>
+                  <i className="gleam-spark gleam-spark-a" aria-hidden />
+                  <i className="gleam-spark gleam-spark-b" aria-hidden />
+                  <i className="gleam-spark gleam-spark-c" aria-hidden />
+                </>
+              )}
+            </span>
           </div>
           {error && (
             <p className="mt-3 text-sm font-bold text-red-400">{error}</p>

@@ -56,14 +56,28 @@ export function parseDiscordInvite(raw: string | null | undefined): string | nul
 /**
  * Diamonds paid, once ever, for joining the channel.
  *
- * Deliberately small. Nothing outside Discord can verify that the player
- * actually joined — there is no bot, so the button is taken on trust — which
- * means the honest reading of this number is "what the game is willing to hand
- * to anyone who clicks a link once". A generous purse would be a standing
- * invitation to farm it from alternate accounts (see the IP signals on
- * /admin/monitor); 25 is a real welcome and a pointless heist.
+ * Raised from 25 to 500 on 2026-08-02, as a launch decision: the channel is new
+ * and empty, and the purse is the only lever the game has to push the first
+ * players into it.
+ *
+ * Read the number honestly. Nothing outside Discord verifies that the player
+ * joined — there is no bot, so the button is taken on trust — which makes this
+ * "what the game hands to anyone who clicks a link once". At store prices
+ * (`diamondStore.ts`: 400 diamonds for ₪13.90) 500 is a little over ₪17 of real
+ * value per account, where 25 was under a shekel. That is no longer a pointless
+ * heist, and the size of the purse has stopped being the anti-abuse design.
+ *
+ * What has to carry that weight instead:
+ *  - the once-per-empire guard in `claimDiscordReward` (a single
+ *    `UPDATE … WHERE "discordJoinedAt" IS NULL`), which is airtight per empire
+ *    but says nothing about one person holding several;
+ *  - the duplicate-IP and diamond-gap signals on /admin/monitor, which are now
+ *    the thing that actually notices alt farming.
+ *
+ * If this ever needs to go higher, the honest fix is verification — a bot that
+ * confirms guild membership — not a bigger number on the same honour system.
  */
-export const DISCORD_JOIN_DIAMONDS = 25;
+export const DISCORD_JOIN_DIAMONDS = 500;
 
 /** What the channel is for — the pitch, in the order it is worth reading. */
 export const COMMUNITY_HIGHLIGHTS: { icon: IconName; title: string; body: string }[] = [

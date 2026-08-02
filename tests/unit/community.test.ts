@@ -57,12 +57,18 @@ describe("parseDiscordInvite", () => {
 });
 
 describe("community copy", () => {
-  it("keeps the welcome purse small enough not to be worth farming", () => {
-    // Not a style rule: nothing verifies that the player joined (there is no
-    // bot), so the purse's size *is* the anti-abuse design. A future edit that
-    // makes this generous has to come past this test and think about alts.
+  it("keeps the welcome purse inside the ceiling the honour system can carry", () => {
+    // This test used to pin the purse at ≤50, on the reasoning that its size
+    // *was* the anti-abuse design: nothing verifies the player joined, so the
+    // number is what anyone gets for one click. That reasoning did not survive
+    // the 2026-08-02 raise to 500 — a deliberate launch decision — so the test
+    // now guards the new ceiling instead of pretending the old one held.
+    //
+    // 500 is roughly ₪17 of store value per account (diamondStore: 400 for
+    // ₪13.90). Anything past it should not arrive as a bigger number on the
+    // same honour system; it needs a bot that confirms guild membership.
     expect(DISCORD_JOIN_DIAMONDS).toBeGreaterThan(0);
-    expect(DISCORD_JOIN_DIAMONDS).toBeLessThanOrEqual(50);
+    expect(DISCORD_JOIN_DIAMONDS).toBeLessThanOrEqual(500);
   });
 
   it("keeps the anti-phishing rule in the house rules", () => {

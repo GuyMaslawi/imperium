@@ -7846,3 +7846,127 @@ body {
   /* The bubbles exist only as motion; parked, they are seven dots in a panel. */
   .disc-bubbles { display: none; }
 }
+
+/* =========================================================================
+   The welcome purse's claim button (/game/community).
+
+   Every other gold CTA on the site is a transaction — spend, build, attack.
+   This one is a gift, and it is the single button a brand-new player is most
+   likely to walk past, so it is allowed to ask for attention in a way none of
+   the others are. Three layers, all pure transform/opacity:
+
+     .btn-gleam        a bright band that sweeps across the face on a long
+                       cycle, with a long dark pause between passes — a slow
+                       glint, not a strobe
+     gleam-glow        the gold halo breathing under it, at a different period
+                       so the two never lock into a single beat
+     .gleam-spark      three four-point stars around the edge, each on its own
+                       delay so they twinkle out of sync
+
+   The sparks are siblings of the button, not children: .btn-gleam needs
+   overflow:hidden to clip its own sweep to the button's rounded face, and that
+   would clip the stars too. The wrapper is inline-flex so it takes exactly the
+   button's box inside the flex row.
+
+   Unlayered, like every component class in this file — see the note on
+   .ornate-shell. Nothing here changes the button's size, colour or hit area,
+   so the whole effect can stop dead under reduced motion and leave a perfectly
+   ordinary .btn-gold behind.
+   ========================================================================= */
+
+.gleam-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.btn-gleam {
+  position: relative;
+  overflow: hidden;
+}
+
+/* The travelling glint.
+   Narrow and near-opaque rather than wide and soft: the face underneath is
+   already bright antique gold, so a gentle wash of white has almost no headroom
+   left to brighten and simply disappears into it (measured — the first version
+   was animating correctly and still invisible). A thin hard-edged specular
+   streak is the one thing that still reads on top of gold. */
+.btn-gleam::after {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: 0;
+  width: 26%;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 14%,
+    rgba(255, 255, 255, 0.18) 36%,
+    rgba(255, 255, 255, 0.96) 50%,
+    rgba(255, 255, 255, 0.18) 64%,
+    transparent 86%
+  );
+  transform: translateX(-260%) rotate(14deg);
+}
+
+/* a four-point star, same geometry as the hero-item sparkles */
+.gleam-spark {
+  position: absolute;
+  z-index: 2;
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+  background: #fffdf2;
+  clip-path: polygon(
+    50% 0%, 60% 40%, 100% 50%, 60% 60%,
+    50% 100%, 40% 60%, 0% 50%, 40% 40%
+  );
+  filter: drop-shadow(0 0 4px #e4c35a) drop-shadow(0 0 9px rgba(228, 195, 90, 0.8));
+  opacity: 0;
+  transform: scale(0);
+}
+.gleam-spark-a { top: -7px; left: 14%; }
+.gleam-spark-b { bottom: -6px; left: 46%; width: 10px; height: 10px; }
+.gleam-spark-c { top: 22%; right: -7px; width: 15px; height: 15px; }
+
+/* Linear, and with most of the travel actually over the button.
+   `ease-in-out` here was a mistake worth naming: it parks the streak off-canvas
+   at both ends and accelerates it through the middle, so the one part anybody
+   sees is the part it crosses fastest — the glint was measurably present and
+   still read as "nothing happens". Constant speed across a shorter run, then a
+   long dark pause, is what makes it a glint instead of a flicker. */
+@keyframes gleam-sweep {
+  0% { transform: translateX(-170%) rotate(14deg); }
+  32%, 100% { transform: translateX(330%) rotate(14deg); }
+}
+@keyframes gleam-glow {
+  0%, 100% {
+    box-shadow:
+      0 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 244, 210, 0.45),
+      0 6px 20px -8px rgba(196, 160, 50, 0.5);
+  }
+  50% {
+    box-shadow:
+      0 2px 0 rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 250, 226, 0.7),
+      0 10px 30px -6px rgba(228, 195, 90, 0.9);
+  }
+}
+@keyframes gleam-twinkle {
+  0%, 100% { transform: scale(0) rotate(0deg); opacity: 0; }
+  42% { transform: scale(1) rotate(38deg); opacity: 1; }
+  60% { transform: scale(0.62) rotate(60deg); opacity: 0.4; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn-gleam::after { animation: gleam-sweep 4s linear infinite; }
+  .btn-gleam { animation: gleam-glow 2.3s ease-in-out infinite; }
+  .gleam-spark { animation: gleam-twinkle 2.8s ease-in-out infinite; }
+  .gleam-spark-b { animation-delay: 0.95s; }
+  .gleam-spark-c { animation-delay: 1.7s; }
+}
+
+/* Hovering is already an answer to "can I press this" — the glint would only
+   fight the hover lift, so it steps aside. */
+.btn-gleam:hover::after { animation-play-state: paused; opacity: 0; }

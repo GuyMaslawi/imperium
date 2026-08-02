@@ -1224,8 +1224,13 @@ function PassDialog({
 
         {/* Premium upsell, priced in the resources it actually pays. "פי 3" is a
             ratio of a number the player has never been shown; a row of
-            "+27,000 🪙" chips is the offer itself. */}
-        {!owned && (
+            "+27,000 🪙" chips is the offer itself.
+
+            Only rendered when the pass is actually for sale: an owner has
+            nothing to buy, and with no active season the card was a dead
+            button plus an apology taking up the top of the dialog. Either way
+            the ladder below still shows what the gold track is worth. */}
+        {!owned && seasonActive && (
           <div
             className={`mt-3 overflow-hidden rounded-xl border-2 border-gold/60 bg-gradient-to-br from-amber-900/40 via-amber-950/50 to-black p-3 text-center shadow-[0_0_30px_-8px_var(--gold)] ${
               shake ? "sp-shake" : ""
@@ -1244,14 +1249,12 @@ function PassDialog({
             </p>
             <button
               onClick={onUpgrade}
-              disabled={unlocking || pending || !seasonActive}
+              disabled={unlocking || pending}
               className={`btn btn-gold mt-2.5 w-full py-2.5 text-base font-black disabled:cursor-not-allowed disabled:opacity-60 ${
                 unlocking || !canBuy ? "" : "animate-pulse"
               }`}
             >
-              {!seasonActive ? (
-                "אין עונה פעילה"
-              ) : unlocking || pending ? (
+              {unlocking || pending ? (
                 "פותח..."
               ) : (
                 <span className="inline-flex items-center gap-1">
@@ -1265,11 +1268,7 @@ function PassDialog({
                 canBuy ? "text-amber-200/60" : "font-bold text-red-400"
               }`}
             >
-              {!seasonActive ? (
-                <span>
-                  מסלול הפרימיום נמכר לעונה שלמה — הוא ייפתח לרכישה כשתתחיל העונה הבאה
-                </span>
-              ) : canAfford ? (
+              {canAfford ? (
                 <span className="inline-flex items-center gap-1">
                   יש לך {state.diamonds}{" "}
                   <Icon aria-hidden name="diamond" size={12} className="text-cyan-300" /> ·
