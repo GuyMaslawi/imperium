@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/admin", label: "לוח בקרה", icon: "📊", exact: true },
   { href: "/admin/monitor", label: "ניטור", icon: "📡" },
   { href: "/admin/users", label: "שחקנים", icon: "👥" },
+  { href: "/admin/bots", label: "בוטים", icon: "🤖" },
   { href: "/admin/broadcast", label: "שידור ומתנות", icon: "📣" },
   { href: "/admin/minigame", label: "מיני-משחק", icon: "🎯" },
   { href: "/admin/happy-hour", label: "Happy Hour", icon: "🔥" },

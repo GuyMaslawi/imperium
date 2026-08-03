@@ -102,11 +102,14 @@ export async function getGloryChampions(): Promise<Map<string, GloryChampion>> {
     FROM "EmpireGloryAward" g
     JOIN "Empire" e ON e.id = g."empireId"
     WHERE g.key = ANY(${GLORY_KEYS as string[]})
-      -- Staff hold no world records (src/lib/staff.ts). Excluded on read rather
-      -- than by refusing to stamp: the stamps of an account promoted to staff
-      -- mid-season have to disappear too, and a read filter is the only thing
-      -- that covers rows already written.
+      -- Neither staff nor bots hold world records (src/lib/staff.ts,
+      -- src/lib/bot.ts). Excluded on read rather than by refusing to stamp: the
+      -- stamps of an account promoted to staff mid-season have to disappear
+      -- too, and a read filter is the only thing that covers rows already
+      -- written. A bot planted at the top of a tier would otherwise take "first
+      -- to reach" off the player who actually got there.
       AND e."isStaff" = false
+      AND e."isBot" = false
     ORDER BY g.key, g."awardedAt" ASC
   `;
 

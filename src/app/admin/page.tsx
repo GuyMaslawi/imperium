@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { bannedWhere } from "@/lib/ban";
+import { notBot } from "@/lib/bot";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { formatIls } from "@/lib/game/diamondStore";
@@ -31,6 +32,7 @@ export default async function AdminDashboard() {
     admins,
     banned,
     empires,
+    bots,
     guilds,
     seasons,
     activeSeason,
@@ -39,14 +41,19 @@ export default async function AdminDashboard() {
     resources,
     revenue,
   ] = await Promise.all([
-    prisma.user.count(),
+    // Bots hold a User row apiece so that `Empire.userId` has something to point
+    // at, but they are not people and must not be counted as players — see
+    // src/lib/bot.ts. Their own tally gets a card of its own below.
+    prisma.user.count({ where: { NOT: { empire: { is: { isBot: true } } } } }),
     prisma.user.count({ where: { role: "ADMIN" } }),
     prisma.user.count({ where: bannedWhere() }),
-    prisma.empire.count(),
+    prisma.empire.count({ where: notBot }),
+    prisma.empire.count({ where: { isBot: true } }),
     prisma.guild.count(),
     prisma.gameSeason.count(),
     prisma.gameSeason.findFirst({ where: { isActive: true }, select: { name: true } }),
     prisma.user.findMany({
+      where: { NOT: { empire: { is: { isBot: true } } } },
       orderBy: { createdAt: "desc" },
       take: 6,
       select: { id: true, name: true, email: true, createdAt: true, empire: { select: { name: true } } },
@@ -78,6 +85,9 @@ export default async function AdminDashboard() {
         <StatCard label="אימפריות" value={empires} icon="🏰" />
         <StatCard label="אדמינים" value={admins} icon="🛡️" />
         <StatCard label="בבאן" value={banned} icon="🚫" />
+        <Link href="/admin/bots" className="contents">
+          <StatCard label="בוטים" value={bots} icon="🤖" />
+        </Link>
         <StatCard label="בריתות" value={guilds} icon="🤝" />
         <StatCard label="עונות" value={seasons} icon="📅" />
         <StatCard label="עונה פעילה" value={activeSeason?.name ?? "—"} icon="⭐" />

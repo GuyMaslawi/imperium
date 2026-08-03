@@ -20,6 +20,7 @@ import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
 import { EmpireMedals } from "@/components/game/EmpireMedals";
+import { EmpireBio } from "@/components/game/EmpireBio";
 import { getEmpireMedals } from "@/server/empireMedals";
 import type { HeroItemView } from "@/components/game/heroItemView";
 import { formatNumber, formatDate } from "@/lib/game/format";
@@ -180,9 +181,10 @@ export default async function EmpireProfilePage({
   );
   const potionsRunning = Object.keys(potionActiveUntil).length > 0;
 
-  // The medal case. Two indexed receipt lookups, not an achievement snapshot —
-  // see src/server/empireMedals.ts for why the cheap read is the right one on
-  // the page every player opens about everybody else.
+  // The records case: only capstones this empire was *first in the world* to
+  // reach, which is one bounded query and no per-empire read at all — see
+  // src/server/empireMedals.ts for why the milestone wall that used to be here
+  // said nothing.
   const medals = await getEmpireMedals(empire.id);
 
   // The dossier's own history: everything the two of you ever took off each other.
@@ -249,13 +251,15 @@ export default async function EmpireProfilePage({
         ornament={<Icon name="crown" size={22} className="text-crimson" />}
       />
 
-      {/* -------- the dossier proper, and the wall of medals beside it --------
-          The case is placed *after* the hero in the DOM and lands at the start
-          of the flex line, which on this RTL screen is the left edge — the same
-          order a phone reads top-down, hero first and honours under it. The
-          feud ledger stays out of this row and spans the page below: its table
-          is four number columns wide and has nothing to gain from sharing the
-          line with a 288px column. */}
+      {/* -------- the dossier proper, and the side column beside it --------
+          The column is placed *after* the hero in the DOM and lands at the
+          start of the flex line, which on this RTL screen is the left edge —
+          the same order a phone reads top-down, hero first and the rest under
+          it. It carries the two things about the *player* rather than about
+          his army: the world records he holds, and then, under them, what he
+          says about himself. The feud ledger stays out of this row and spans
+          the page below: its table is four number columns wide and has nothing
+          to gain from sharing the line with a 288px column. */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="panel min-w-0 flex-1 rounded-xl p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -283,7 +287,11 @@ export default async function EmpireProfilePage({
             {/* The sockets carry a 54px floor, so a frame much under 240px is all
                 medallion and no hero. Read-only: dressing him stays on the hero
                 page. */}
-            <div className="w-full max-w-[320px]">
+            {/* Centred on your own dossier: there are no war actions to fill the
+                band beside the figure, and a paperdoll pinned to the start edge
+                of an otherwise empty panel is most of why this page read as
+                half-drawn. */}
+            <div className={`w-full max-w-[320px] ${isMe ? "mx-auto" : ""}`}>
               <HeroPaperdoll
                 readOnly
                 portrait={heroClassImage(heroClassKey)}
@@ -393,12 +401,14 @@ export default async function EmpireProfilePage({
           </div>
         </div>
 
-        {medals.length > 0 && (
-          <EmpireMedals
-            items={medals}
-            isMe={isMe}
-            className="w-full lg:w-[288px] lg:shrink-0"
-          />
+        {/* The side column exists when either half has something to show: a
+            visitor's dossier with no record and no blurb renders neither, and
+            the hero panel takes the full width back. */}
+        {(medals.length > 0 || isMe || empire.bio) && (
+          <div className="w-full space-y-4 lg:w-[288px] lg:shrink-0">
+            {medals.length > 0 && <EmpireMedals items={medals} isMe={isMe} />}
+            <EmpireBio bio={empire.bio} isMe={isMe} />
+          </div>
         )}
       </div>
 

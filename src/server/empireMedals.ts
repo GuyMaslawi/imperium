@@ -1,68 +1,31 @@
 import "server-only";
-import { prisma } from "@/lib/prisma";
-import { GLORY_KEYS, MEDAL_KEYS, selectMedals, type MedalView } from "@/lib/game/achievements";
+import { selectWorldMedals, type MedalView } from "@/lib/game/achievements";
 import { getGloryChampions } from "@/server/gloryBoard";
 
 /**
- * The medals one empire has earned, for the column on its profile.
+ * The world records this empire holds, for the case at the top of its profile.
  *
- * **Receipts only — no snapshot.** The obvious implementation is
- * `gatherAchievementStats(empireId)` and a filter over the built ladder, which
- * is what the achievements screen does. It is the wrong tool here: that
- * snapshot is a dozen aggregates over battle reports, spy reports, items,
- * buildings and the army, plus (for `rank_one`) a power scan of the whole city
- * bucket — and the profile is the page every player opens about somebody else,
- * repeatedly. What this reads instead is the two receipt tables, both of which
- * are indexed on `(empireId, key)` by their unique constraint, so a dossier
- * costs two bounded lookups however decorated the empire is.
+ * **World records only — not a milestone list.** This column used to show
+ * eleven "medals of honour": every capstone the empire had ever reached, read
+ * off the two receipt tables. The trouble is that a capstone reached is not a
+ * distinction — ten cities, hero 100, every weapon model, and above all rank 1
+ * of a city bucket are all things that every serious empire eventually has, and
+ * rank 1 is *occupied from the moment the second player registers*. A wall that
+ * everybody's dossier wears says nothing about the dossier you are reading. So
+ * the only thing that reaches this case now is being **first in the world** to a
+ * capstone: a fact about this empire's place among all the others, which is
+ * exactly what somebody sizing up a rival came here to learn.
  *
- * The two receipts mean different things and both count:
+ * The narrowing makes the read cheaper as well as truer. Nothing per-empire is
+ * queried at all: `getGloryChampions` is one `DISTINCT ON` that returns one row
+ * per capstone — five rows, however many people play — and holding a record is
+ * simply being named in it. The two indexed receipt lookups this used to do on
+ * the page every player opens about everybody else are gone.
  *
- *  - `EmpireGloryAward` is stamped automatically the moment the empire is
- *    observed meeting a capstone condition (see gloryBoard.ts).
- *  - `EmpireAchievement` is written when the player presses collect.
- *
- * Six of the eleven medals have no glory stamp at all — they are not on the
- * records board — so for those the claim receipt is the only evidence there is.
- * Where both exist the earlier date wins: the stamp is the arrival and the claim
- * can come days later, and a medal should be dated to when it was *earned*.
- *
- * The consequence worth knowing: a player who reached a non-capstone milestone
- * and never pressed collect wears no medal for it. That is the honest reading of
- * the data available cheaply, and the fix is one click on their own screen.
+ * Most dossiers therefore return nothing, and that is the point: a case that is
+ * *there* now means something at a glance.
  */
 export async function getEmpireMedals(empireId: string): Promise<MedalView[]> {
-  const [awards, claims] = await Promise.all([
-    prisma.empireGloryAward.findMany({
-      where: { empireId, key: { in: [...MEDAL_KEYS] } },
-      select: { key: true, awardedAt: true },
-    }),
-    prisma.empireAchievement.findMany({
-      where: { empireId, key: { in: [...MEDAL_KEYS] } },
-      select: { key: true, claimedAt: true },
-    }),
-  ]);
-
-  const earned = new Map<string, { at: Date; worldFirst: boolean }>();
-  for (const { key, awardedAt } of awards) earned.set(key, { at: awardedAt, worldFirst: false });
-  for (const { key, claimedAt } of claims) {
-    const held = earned.get(key);
-    if (!held) earned.set(key, { at: claimedAt, worldFirst: false });
-    else if (claimedAt < held.at) held.at = claimedAt;
-  }
-  if (earned.size === 0) return [];
-
-  // Being *first in the world* to a capstone is the loudest thing this column
-  // can say, so it is worth the extra read — but only when there is a capstone
-  // to be first to. Six of the eleven medals never appear on the records board,
-  // so an empire decorated only with those pays nothing for the check.
-  if (GLORY_KEYS.some((key) => earned.has(key))) {
-    const champions = await getGloryChampions();
-    for (const [key, champion] of champions) {
-      const held = earned.get(key);
-      if (held && champion.empireId === empireId) held.worldFirst = true;
-    }
-  }
-
-  return selectMedals(earned);
+  const champions = await getGloryChampions();
+  return selectWorldMedals(champions, empireId);
 }

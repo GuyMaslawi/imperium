@@ -454,6 +454,24 @@ model Empire {
   /// (the admin role editor and scripts/grant-admin.ts); a drifted flag is
   /// repaired by re-running either.
   isStaff             Boolean   @default(false)
+  /// Garrison empire: nobody owns it. An admin plants it in a city tier so the
+  /// players who live there — often one player alone in a high city — have
+  /// something to raid and spy. It is a real empire in every respect the battle
+  /// code can see: it holds a city, an army, an arsenal and a hero, it settles
+  /// its own mines on the same lazy clock, and it loses resources and soldiers
+  /// when it loses a fight.
+  ///
+  /// What it is not is a contestant. It stands in its **city ladder** (that is
+  /// the whole point — a target has to be findable), and it is filtered out of
+  /// everything that pays or immortalises: the season podium and its diamond
+  /// prizes, היכל התהילה, the world records and the cross-game boards. See
+  /// src/lib/bot.ts, which owns the `notBot` / `notStaffOrBot` where-fragments.
+  ///
+  /// A plain column rather than `bot != null` for the reason `isStaff` is one:
+  /// the boards are indexed `ORDER BY … LIMIT` and a relation filter would turn
+  /// each of them into a join. The `EmpireBot` row beside it holds the garrison
+  /// this empire is rebuilt to; deleting the empire cascades it away.
+  isBot               Boolean   @default(false)
   /// When this empire bought VIP (חותם המלוכה) — null for everyone else. The
   /// column IS the entitlement: it is bought once for VIP_COST diamonds and
   /// never expires, so there is no timer to read anywhere and `vipSince != null`
@@ -466,6 +484,21 @@ model Empire {
   /// that saves eight clicks is a different thing from a paid button that wins
   /// a battle, and only the first one is sold here.
   vipSince            DateTime?
+  /// The player's own words, shown on their dossier under the medal case. Free
+  /// text up to BIO_MAX characters, written and rewritten from the profile page
+  /// itself (see src/lib/game/profile.ts and saveEmpireBio).
+  ///
+  /// Null, never `""` — an empty submission clears the column rather than
+  /// storing a blank, so "has the player written anything" is one null check on
+  /// the page every player opens about everybody else.
+  ///
+  /// Whatever is here is public: it renders as plain text on a dossier any
+  /// player can load. It is normalised on the way in (controls, bidi overrides
+  /// and newline runs stripped — the same hygiene chat lines get), which bounds
+  /// what it can do to the layout but says nothing about what it can say. An
+  /// admin moderates an abusive one by impersonating the account and clearing
+  /// the field, the way the player would.
+  bio                 String?
   /// Denormalised power figures, kept in step by syncEmpirePower.
   ///
   /// These are pure functions of the army and the arsenal (see lib/game/power),
@@ -522,6 +555,7 @@ model Empire {
   achievements       EmpireAchievement[]
   gloryAwards        EmpireGloryAward[]
   heroQuest          HeroQuest?
+  bot                EmpireBot?
 
   // Rankings filters empires by city; admin broadcast/gift/reset scope by
   // season. Without these, both are full-table scans that grow with the player
@@ -541,6 +575,50 @@ model Empire {
   @@index([isStaff, generalPower])
   @@index([isStaff, spyPower])
   @@index([isStaff, cities, militaryPower])
+}
+
+/// The garrison a bot empire is rebuilt to — one row per `Empire.isBot`.
+///
+/// A bot exists to be attacked, and an attack takes things: a winning raid
+/// plunders its vaults and enslaves a tenth of its soldiers. Left alone that
+/// makes every bot a one-week target that decays into an empty shell, and the
+/// admin who planted it has to come back and re-arm it by hand.
+///
+/// So the garrison is stored rather than merely created: these columns are the
+/// figures the bot was *built* with, and `restoreBotGarrison` (src/server/bots.ts)
+/// sets the army and the arsenal back to them at most once per BOT_RESTORE_MS,
+/// on the same lazy clock that settles the bot's mines — which runs precisely
+/// when someone loads the bot as a target. The bot's *resources* are pointedly
+/// not restored: those come from its own mines through the ordinary economy, so
+/// a bot is never a faucet that mints gold on a timer.
+///
+/// `restoredAt` is the concurrency story as well as the clock. The refill claims
+/// it with an `updateMany` guarded on the exact timestamp that was read, so two
+/// raiders arriving at the same moment cannot both rebuild the same garrison.
+model EmpireBot {
+  id       String @id @default(cuid())
+  empireId String @unique
+
+  /// Military power the garrison below was sized for. Kept for the admin list
+  /// and for re-arming: the realised figure drifts a little from it, because
+  /// soldiers and weapons only come in whole units.
+  targetPower Float
+
+  /// The garrison itself, exactly as it is written back on a refill.
+  soldiers       Int
+  spies          Int
+  /// Weapon tier the three stacks below are bought at — the highest tier this
+  /// empire's city and hero level would legitimately unlock (weaponTierGate).
+  weaponTier     Int
+  attackWeapons  Int
+  defenseWeapons Int
+  spyWeapons     Int
+
+  /// Last time the garrison was written back. See the note above.
+  restoredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  empire Empire @relation(fields: [empireId], references: [id], onDelete: Cascade)
 }
 
 /// A single collected achievement. The row IS the receipt: nothing is written

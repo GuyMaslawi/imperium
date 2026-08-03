@@ -27,6 +27,7 @@ import { getActivePotionKinds } from "./potionEffects";
 import { POTION_DOUBLE } from "./potions";
 import { computePower } from "@/server/empirePower";
 import { mineTicksWithHappyHour } from "@/server/happyHour";
+import { restoreBotGarrison } from "@/server/bots";
 
 const FULL_EMPIRE_INCLUDE = {
   buildings: true,
@@ -52,13 +53,29 @@ export async function applyPendingUpdates(
   empireId: string,
   tx: Prisma.TransactionClient = prisma
 ): Promise<FullEmpire> {
-  const empire = await tx.empire.findUniqueOrThrow({
+  let empire = await tx.empire.findUniqueOrThrow({
     where: { id: empireId },
     include: FULL_EMPIRE_INCLUDE,
     // One JOINed query instead of ~10 (one per relation). This runs on every
     // /game page load via requireEmpire, so it's the app's hottest read.
     relationLoadStrategy: "join",
   });
+
+  const now = new Date();
+
+  // A bot's garrison grows back on the same lazy clock, before anything else
+  // reads its army — this function is what loads a target for a raid or a spy
+  // mission, so a bot is rebuilt in the breath before it is fought rather than
+  // by a scheduler nobody is running. Once an hour at most, and only for an
+  // empire actually flagged as one, so a player's settle pays a boolean check
+  // and no query at all. See server/bots.ts.
+  if (empire.isBot && (await restoreBotGarrison(tx, empireId, now))) {
+    empire = await tx.empire.findUniqueOrThrow({
+      where: { id: empireId },
+      include: FULL_EMPIRE_INCLUDE,
+      relationLoadStrategy: "join",
+    });
+  }
 
   // Empires created before the hero system get their hero lazily.
   if (!empire.hero) {
@@ -67,8 +84,6 @@ export async function applyPendingUpdates(
       items: [],
     };
   }
-
-  const now = new Date();
 
   // A fallen hero rises by himself an hour after the blow that felled him.
   // This is part of the lazy clock on purpose: it runs on every page load and

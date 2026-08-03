@@ -4,7 +4,7 @@ import type { Prisma, SeasonBoardKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatGameDateTime } from "@/lib/game/time";
 import { announceToDiscord, gameLink } from "@/server/discord";
-import { notStaff } from "@/lib/staff";
+import { notStaffOrBot } from "@/lib/bot";
 import { prizeForRank } from "@/lib/game/prizes";
 import { formatNumber } from "@/lib/game/format";
 
@@ -126,10 +126,12 @@ async function buildPodium(
   tx: Prisma.TransactionClient
 ): Promise<ChampionSnapshot[]> {
   const empires = await tx.empire.findMany({
-    // Staff are not contestants and cannot take a podium place — see
-    // src/lib/staff.ts. Excluded here rather than after the sort, so an admin
+    // Neither staff nor bots are contestants, and neither can take a podium
+    // place — see src/lib/staff.ts and src/lib/bot.ts. The podium pays 10,000
+    // diamonds for first, so this is a payout filter, not a cosmetic one.
+    // Excluded here rather than after the sort, so an admin or a garrison
     // sitting at the top of the power column does not cost the podium a rank.
-    where: notStaff,
+    where: notStaffOrBot,
     orderBy: { militaryPower: "desc" },
     // Over-read a little so the hero tiebreak has something to reorder.
     take: PODIUM_SIZE * 4,
@@ -216,7 +218,7 @@ async function buildHallBoards(
 ): Promise<HallBoardSnapshot[]> {
   const [byPower, bySpy, byGuild] = await Promise.all([
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: { militaryPower: "desc" },
       // Over-read so the hero tiebreak has something to reorder, as buildPodium does.
       take: HALL_BOARD_SIZE * 4,
@@ -230,7 +232,7 @@ async function buildHallBoards(
       },
     }),
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: [{ spyPower: "desc" }, { name: "asc" }],
       take: HALL_BOARD_SIZE,
       select: {
@@ -249,7 +251,7 @@ async function buildHallBoards(
       -- A staff member inside a guild lends it none of their power (see
       -- src/lib/staff.ts) — the join drops them, so the guild is ranked on
       -- what its actual contestants built.
-      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false
+      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false AND e."isBot" = false
       GROUP BY g.id, g.name
       ORDER BY power DESC NULLS LAST
       LIMIT ${HALL_BOARD_SIZE}
@@ -341,25 +343,25 @@ async function buildRecap(
     battleTotals,
   ] = await Promise.all([
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: { militaryPower: "desc" },
       take: RECAP_BOARD_SIZE,
       select: { name: true, militaryPower: true, cities: true },
     }),
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: { spyPower: "desc" },
       take: RECAP_BOARD_SIZE,
       select: { name: true, spyPower: true },
     }),
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: { army: { mineSlaves: "desc" } },
       take: RECAP_BOARD_SIZE,
       select: { name: true, army: { select: { mineSlaves: true } } },
     }),
     tx.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy: { bankAccount: { goldBalance: "desc" } },
       take: RECAP_BOARD_SIZE,
       select: { name: true, bankAccount: { select: { goldBalance: true } } },
@@ -368,8 +370,8 @@ async function buildRecap(
       SELECT g.name, COUNT(m.id) AS members, SUM(e."militaryPower") AS power
       FROM "Guild" g
       JOIN "GuildMember" m ON m."guildId" = g.id
-      -- Staff lend their guild no power — same rule as buildHallBoards.
-      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false
+      -- Staff and bots lend their guild no power — same rule as buildHallBoards.
+      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false AND e."isBot" = false
       GROUP BY g.id, g.name
       ORDER BY power DESC NULLS LAST
       LIMIT ${RECAP_BOARD_SIZE}
@@ -379,14 +381,15 @@ async function buildRecap(
       where: {
         createdAt: { gte: since },
         stolenGold: { gt: 0 },
-        attackerEmpire: notStaff,
+        attackerEmpire: notStaffOrBot,
       },
       _sum: { stolenGold: true },
       orderBy: { _sum: { stolenGold: "desc" } },
       take: RECAP_BOARD_SIZE,
     }),
-    // "How many played this season" — the staff empires were not playing it.
-    tx.empire.count({ where: notStaff }),
+    // "How many played this season" — neither the staff empires nor the bots
+    // were playing it.
+    tx.empire.count({ where: notStaffOrBot }),
     tx.guild.count(),
     tx.battleReport.aggregate({
       where: { createdAt: { gte: since } },

@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import Link from "next/link";
 import { requireEmpire } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { notStaff } from "@/lib/staff";
+import { notStaffOrBot } from "@/lib/bot";
 import { getLivePodium } from "@/server/seasonClose";
 import { SEASON_PRIZES, PRIZE_POOL } from "@/lib/game/prizes";
 import { formatCompact, formatDate, formatNumber } from "@/lib/game/format";
@@ -70,8 +70,11 @@ export default async function PrizesPage() {
     // split by their heroes. That costs a join on every load to fix, and the
     // line it feeds is "how far are you from the podium", where a tie is
     // already the answer: you are level with him.
+    //
+    // Bots are counted out with the staff: this is the prize ladder, and no
+    // garrison stands between a player and a diamond.
     prisma.empire.count({
-      where: { ...notStaff, militaryPower: { gt: me.militaryPower } },
+      where: { ...notStaffOrBot, militaryPower: { gt: me.militaryPower } },
     }),
   ]);
 

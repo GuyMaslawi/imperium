@@ -4,6 +4,8 @@
  * export async functions — the composer needs the length cap at render time.
  */
 
+import { clampChars, stripInvisible } from "./text";
+
 /** Longest single line. A chat line is a shout, not a letter — the inbox
  *  (MESSAGE_BODY_MAX = 1000) is where long-form belongs. */
 export const CHAT_BODY_MAX = 300;
@@ -165,20 +167,10 @@ export function isOnline(
  * the cut only ever applies to what the collapse itself could not shorten.
  */
 export function normalizeChatBody(raw: string): string {
-  const collapsed = raw
-    // Strip C0/C1 controls, the zero-width family and the bidi overrides —
-    // tabs and newlines excepted. The bidi marks matter in a right-to-left app:
-    // an unpaired RLO reverses everything rendered after it, so a single line
-    // could scramble the rest of the pane.
-    //
-    // U+200D (the zero-width JOINER) is deliberately NOT in the list, even
-    // though it is invisible: it is the glue inside every compound emoji, so
-    // stripping it turns 👨‍👩‍👧 into three separate people and 🏳️‍🌈 into a white
-    // flag. Padding a line with joiners is still bounded by the length cap.
-    .replace(
-      /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u200B\u200C\u200E\u200F\u2028\u2029\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]/g,
-      ""
-    )
+  // The invisible-character strip is shared with the profile blurb — see
+  // lib/game/text.ts for what it removes and, more interestingly, what it
+  // deliberately keeps.
+  const collapsed = stripInvisible(raw)
     .replace(/\r\n?/g, "\n")
     // Three or more breaks (with any spacing between them) become one.
     .replace(/\n[ \t]*(\n[ \t]*)+/g, "\n")
@@ -188,22 +180,12 @@ export function normalizeChatBody(raw: string): string {
 }
 
 /**
- * Cut a line to the length cap **by character, not by code unit**.
- *
- * `String.slice` counts UTF-16 units, so a cut that lands between the two
- * halves of an emoji leaves a lone surrogate — a permanent "�" in somebody's
- * message, stored that way forever. Spreading the string iterates by code
- * point, so the cut can only ever fall between whole characters.
- *
- * Multi-code-point sequences (a flag, a family, a skin tone) can still be split
- * into their parts at the very end of an over-long line; that degrades to
- * separate emoji rather than to a broken glyph.
+ * Cut a line to the chat cap, by character rather than by code unit — see
+ * `clampChars` for why that distinction is load-bearing. Kept as its own export
+ * because the composer imports it by name and calls it on every keystroke.
  */
 export function clampChatBody(text: string): string {
-  const chars = [...text];
-  return chars.length <= CHAT_BODY_MAX
-    ? text
-    : chars.slice(0, CHAT_BODY_MAX).join("");
+  return clampChars(text, CHAT_BODY_MAX);
 }
 
 /**

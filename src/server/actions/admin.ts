@@ -29,6 +29,7 @@ import {
 } from "@/lib/admin";
 import { BAN_DAYS_MAX, formatBanDate, isBanned } from "@/lib/ban";
 import { syncStaffFlag } from "@/lib/staff";
+import { notBot } from "@/lib/bot";
 import { GIFT_DEFAULTS, isGameWideScope } from "@/lib/adminBroadcast";
 import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
@@ -63,6 +64,20 @@ import {
   type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { POTION_STACK_CAP } from "@/lib/game/potions";
+import { BOT_BATCH_MAX, BOT_MIN_POWER, BOT_SPREAD_MAX_PCT } from "@/lib/game/bots";
+import { applyPendingUpdates } from "@/lib/game/updates";
+import {
+  castBankInterest,
+  castCityDowngrade,
+  castRaidShield,
+  castResourceBoost,
+  castShopDiscount,
+  castTurnPackage,
+  lockEmpire,
+  type BankInterestEmpire,
+  type CastContext,
+  type EffectResult,
+} from "@/server/diamondEffects";
 import {
   HAPPY_HOUR_DEFAULT_TITLE,
   HAPPY_HOUR_MAX_MINUTES,
@@ -82,6 +97,7 @@ import {
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
+import { createBots, deleteBot, planBots, rearmBot } from "@/server/bots";
 import { repairGuildLeadership } from "@/server/guildLeadership";
 import {
   announceSeasonStart,
@@ -347,30 +363,36 @@ async function resolveTargetEmpireIds(scope: string, scopeId: string): Promise<s
   if (scope === "empire") {
     return scopeId ? [scopeId] : [];
   }
+  // Bots are never an audience. Nobody reads their inbox, and a gift is worse
+  // than pointless: resources handed to a bot land in the purse of something
+  // whose whole purpose is to be plundered, so "1M gold to every player" would
+  // quietly become "1M gold to every player, and a fresh haul waiting in every
+  // garrison". The one scope that skips this filter is `empire`, where the
+  // admin named the target by id and meant it. See src/lib/bot.ts.
   if (scope === "active") {
     const since = new Date(Date.now() - activeWindowHours(scopeId) * 3_600_000);
     const rows = await prisma.empire.findMany({
-      where: { lastSeenAt: { gte: since } },
+      where: { ...notBot, lastSeenAt: { gte: since } },
       select: { id: true },
     });
     return rows.map((r) => r.id);
   }
   if (scope === "season") {
     const rows = await prisma.empire.findMany({
-      where: { seasonId: scopeId },
+      where: { ...notBot, seasonId: scopeId },
       select: { id: true },
     });
     return rows.map((r) => r.id);
   }
   if (scope === "guild") {
     const rows = await prisma.guildMember.findMany({
-      where: { guildId: scopeId },
+      where: { guildId: scopeId, empire: notBot },
       select: { empireId: true },
     });
     return rows.map((r) => r.empireId);
   }
   // "all"
-  const rows = await prisma.empire.findMany({ select: { id: true } });
+  const rows = await prisma.empire.findMany({ where: notBot, select: { id: true } });
   return rows.map((r) => r.id);
 }
 
@@ -1605,10 +1627,19 @@ export async function resetEmpireProgress(
         userId: true,
         seasonId: true,
         isStaff: true,
+        isBot: true,
         hero: { select: { heroClass: true } },
       },
     });
     if (!empire) return { error: "האימפריה לא נמצאה" };
+    // A bot has nothing to reset *to*. This path deletes the empire row and
+    // builds a starter one in its place, which would cascade the `EmpireBot`
+    // garrison away and leave a flagged empire with nothing to be rebuilt from —
+    // a permanently defenceless target that the refill can no longer repair.
+    // Re-arm it, or delete it and plant another. See /admin/bots.
+    if (empire.isBot) {
+      return { error: "אי אפשר לאפס בוט — חדש את חיל המצב או מחק אותו מדף הבוטים" };
+    }
 
     const tunables = await getTunables();
     // Delete and re-create in one transaction: the empire name is unique, so a
@@ -1879,6 +1910,187 @@ export async function setDiamondEffect(
   }
 }
 
+/* ------------------------- casting on a player's behalf ------------------------- */
+
+/**
+ * Route one effect kind to the real cast that produces it.
+ *
+ * Exhaustive on purpose: a new `DiamondEffectKind` should fail to compile here
+ * rather than silently become the one shop item an admin cannot cast.
+ */
+function castByKind(
+  ctx: CastContext,
+  empire: { cities: number } & BankInterestEmpire,
+  kind: DiamondEffectKind,
+  hours: number
+): Promise<EffectResult> {
+  switch (kind) {
+    case "RESOURCE_BOOST_GOLD":
+      return castResourceBoost(ctx, "gold");
+    case "RESOURCE_BOOST_WOOD":
+      return castResourceBoost(ctx, "wood");
+    case "RESOURCE_BOOST_IRON":
+      return castResourceBoost(ctx, "iron");
+    case "RESOURCE_BOOST_STONE":
+      return castResourceBoost(ctx, "stone");
+    case "SHOP_DISCOUNT":
+      return castShopDiscount(ctx);
+    case "SHIELD_RESOURCES":
+      return castRaidShield(ctx, "resources", hours);
+    case "SHIELD_SOLDIERS":
+      return castRaidShield(ctx, "soldiers", hours);
+    case "TURN_PACK_1":
+      return castTurnPackage(ctx, 0);
+    case "TURN_PACK_2":
+      return castTurnPackage(ctx, 1);
+    case "TURN_PACK_3":
+      return castTurnPackage(ctx, 2);
+    case "TURN_PACK_4":
+      return castTurnPackage(ctx, 3);
+    case "BANK_INTEREST":
+      return castBankInterest(ctx, empire);
+    case "CITY_DOWNGRADE":
+      return castCityDowngrade(ctx, empire);
+  }
+}
+
+/**
+ * Cast a diamond-shop spell **for** a player: the real effect, free of charge.
+ *
+ * This is not `setDiamondEffect` with nicer buttons. That one writes the effect
+ * row and nothing else, which is right for a buff (the row *is* the buff) and
+ * wrong for everything that pays out: casting bank interest moves gold into the
+ * bank and writes a ledger row, a turn pack adds turns, the city spell drops a
+ * tier. Support work — "his spell fired but he got nothing" — needs the payout,
+ * not the row, so this runs the same code the shop runs.
+ *
+ * The cast ignores the player's cooldown and leaves none behind
+ * (`ignoreCooldown`): being stuck behind a clock is the usual reason to ask, and
+ * the panel has a separate button for the clock itself. Guards that are
+ * legality rather than pacing still hold — the last city is still not for sale.
+ */
+export async function castDiamondSpell(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = diamondEffectKindSchema.parse(
+      formData.get("kind")
+    ) as DiamondEffectKind;
+    const hours = Math.round(optNum(formData, "hours", 24));
+
+    const result = await prisma.$transaction(async (tx) => {
+      await lockEmpire(tx, empireId);
+      const empire = await applyPendingUpdates(empireId, tx);
+      return castByKind(
+        { tx, empireId, now: new Date(), ignoreCooldown: true },
+        empire,
+        kind,
+        hours
+      );
+    });
+
+    if ("error" in result) return { error: result.error };
+
+    await logAdmin(admin, {
+      action: "empire.diamond_spell_cast",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `הוטל ${kind} בשם השחקן`,
+      details: { kind, hours, outcome: result.success },
+    });
+    revalidateEmpire(userId);
+    return { success: `הקסם הוטל: ${result.success}` };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Lift the cooldown on one spell so the player can cast it again now.
+ *
+ * Only `readyAt` is touched — an active buff on the same row (a shield still
+ * protecting the empire, a production boost still running) is left standing,
+ * because "he can cast again" and "his shield is gone" are opposite requests.
+ * A row left with nothing on it at all is deleted rather than kept as an empty
+ * clock.
+ */
+export async function clearDiamondCooldown(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = diamondEffectKindSchema.parse(
+      formData.get("kind")
+    ) as DiamondEffectKind;
+
+    const existing = await prisma.diamondEffect.findUnique({
+      where: { empireId_kind: { empireId, kind } },
+    });
+    if (!existing?.readyAt) return { error: "אין צינון פעיל לקסם הזה" };
+
+    const stillActive = existing.activeUntil !== null || existing.magnitude > 0;
+    if (stillActive) {
+      await prisma.diamondEffect.update({
+        where: { empireId_kind: { empireId, kind } },
+        data: { readyAt: null },
+      });
+    } else {
+      await prisma.diamondEffect.deleteMany({ where: { empireId, kind } });
+    }
+
+    await logAdmin(admin, {
+      action: "empire.diamond_cooldown_clear",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `צינון ${kind} בוטל`,
+      details: { kind, was: existing.readyAt.toISOString() },
+    });
+    revalidateEmpire(userId);
+    return { success: "הצינון בוטל — הקסם זמין מיד" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Cancel one diamond effect outright — buff, shield and cooldown together. */
+export async function cancelDiamondEffect(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const kind = diamondEffectKindSchema.parse(
+      formData.get("kind")
+    ) as DiamondEffectKind;
+
+    const { count } = await prisma.diamondEffect.deleteMany({ where: { empireId, kind } });
+    if (count === 0) return { error: "אין מה לבטל — הקסם לא פעיל" };
+
+    await logAdmin(admin, {
+      action: "empire.diamond_effect_clear",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `אפקט יהלומים ${kind} בוטל`,
+    });
+    revalidateEmpire(userId);
+    return { success: "הקסם בוטל" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
 const guildSpellSchema = z.enum(["ATTACK", "DEFENSE", "RESOURCES"]);
 
 /** Cast (or extend) a guild spell buff on this empire without a guild. */
@@ -1911,6 +2123,34 @@ export async function grantGuildBuff(
     });
     revalidateEmpire(userId);
     return { success: "הקסם הוענק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Cancel one guild spell on this empire, leaving the other two standing. */
+export async function clearGuildBuff(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const type = guildSpellSchema.parse(formData.get("type")) as GuildSpellType;
+
+    const { count } = await prisma.guildSpellBuff.deleteMany({ where: { empireId, type } });
+    if (count === 0) return { error: "הקסם לא פעיל" };
+
+    await logAdmin(admin, {
+      action: "empire.guild_buff_clear",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `קסם ברית ${type} בוטל`,
+    });
+    revalidateEmpire(userId);
+    return { success: "הקסם בוטל" };
   } catch (e) {
     return toErr(e);
   }
@@ -2820,10 +3060,29 @@ export async function resetSeason(
         ? await archiveSeasonStandings(activeSeason.id)
         : 0;
 
+    // Bots do not survive a world restart, and are removed rather than rebuilt.
+    //
+    // Rebuilding one is not an option: `newEmpireData` produces a starter empire
+    // with no garrison and no `EmpireBot` row (the old one cascades away with
+    // the empire), so the loop below would leave a flagged husk that the refill
+    // can never repair. Nor should they carry over on principle — a reset puts
+    // every player back on an equal footing at one city, which is the one
+    // situation where the city ladder is crowded and nobody needs a target
+    // planted for them. The admin plants fresh ones once the field spreads out.
+    //
+    // Deleting the *user* is what takes the empire with it (cascade), and it
+    // also keeps the reset from leaving accounts behind that inflate every
+    // player count in the admin.
+    const botUsers = await prisma.empire.findMany({
+      where: { isBot: true },
+      select: { userId: true },
+    });
+
     // Carry over only the identity + diamond balance of each empire — plus the
     // staff flag, which is not a game asset but a statement about whether the
     // account competes at all, and must survive a world restart.
     const empires = await prisma.empire.findMany({
+      where: notBot,
       select: { userId: true, name: true, diamonds: true, isStaff: true },
     });
 
@@ -2831,6 +3090,12 @@ export async function resetSeason(
       async (tx) => {
         // Guilds first: members, spells and treasury transactions cascade off.
         await tx.guild.deleteMany({});
+        // The bot accounts, which take their empires and garrisons with them.
+        if (botUsers.length > 0) {
+          await tx.user.deleteMany({
+            where: { id: { in: botUsers.map((b) => b.userId) } },
+          });
+        }
         // Then every empire — all per-empire records cascade, and diamond
         // purchases detach (SetNull) rather than disappear.
         await tx.empire.deleteMany({});
@@ -2860,17 +3125,23 @@ export async function resetSeason(
       action: "season.reset",
       targetType: "season",
       summary: `אופסה העונה — ${empires.length} אימפריות אותחלו, כל הגילדות נמחקו${
-        archived > 0 ? " (הדירוג נשמר)" : ""
-      }`,
-      details: { empiresReset: empires.length, archivedChampions: archived },
+        botUsers.length > 0 ? `, ${botUsers.length} בוטים הוסרו` : ""
+      }${archived > 0 ? " (הדירוג נשמר)" : ""}`,
+      details: {
+        empiresReset: empires.length,
+        botsRemoved: botUsers.length,
+        archivedChampions: archived,
+      },
     });
 
     revalidatePath("/admin/seasons");
+    revalidatePath("/admin/bots");
     revalidatePath("/game", "layout");
     return {
-      success: `העונה אופסה — ${empires.length} שחקנים התחילו מחדש${
-        archived > 0 ? ", והדירוג הסופי נשמר בהיכל התהילה" : ""
-      }`,
+      success:
+        `העונה אופסה — ${empires.length} שחקנים התחילו מחדש` +
+        (botUsers.length > 0 ? `, ${botUsers.length} בוטים הוסרו` : "") +
+        (archived > 0 ? ", והדירוג הסופי נשמר בהיכל התהילה" : ""),
     };
   } catch (e) {
     return toErr(e);
@@ -3757,6 +4028,133 @@ export async function deleteHappyHour(
     });
     revalidatePath("/admin/happy-hour");
     return { success: "ה-Happy Hour נמחק" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ============================================================= */
+/*                            BOTS                               */
+/* ============================================================= */
+
+/**
+ * Plant garrison empires in one or more city tiers.
+ *
+ * The whole reason this exists is a city with one player in it: combat is
+ * confined to your own tier, so the first player to climb into a high city can
+ * neither attack nor spy anybody until a second one arrives. A bot is a
+ * resident of that tier — raidable, spyable, worth loot, and rebuilt after it is
+ * farmed (see src/server/bots.ts).
+ *
+ * Every figure the admin supplies is clamped here rather than trusted from the
+ * form, for the reason `clampLevel` gives: the admin path is the only way around
+ * the ceilings the game itself enforces, so it has to enforce the same ones.
+ */
+export async function createBotEmpires(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+
+    // The city checkboxes. Deduplicated and clamped into 1..MAX_CITIES: a
+    // tampered value would otherwise plant an empire in a tier that does not
+    // exist, where nobody could ever reach it.
+    const cities = [
+      ...new Set(
+        formData
+          .getAll("cities")
+          .map((raw) => Math.round(Number(raw)))
+          .filter((tier) => Number.isFinite(tier) && tier >= 1 && tier <= MAX_CITIES)
+      ),
+    ].sort((a, b) => a - b);
+    if (cities.length === 0) return { error: "בחר לפחות עיר אחת" };
+
+    const perCity = clampLevel(optNum(formData, "perCity", 1), 1, BOT_BATCH_MAX);
+    const total = cities.length * perCity;
+    if (total > BOT_BATCH_MAX) {
+      return {
+        error: `אפשר ליצור עד ${BOT_BATCH_MAX} בוטים בפעולה אחת (ביקשת ${total})`,
+      };
+    }
+
+    // Blank means "match the city" — the tier's own average, resolved per city
+    // inside planBots. A typed figure is used as-is for every selected tier.
+    const requested = optNum(formData, "power", 0);
+    const power = requested > 0 ? Math.max(BOT_MIN_POWER, clampNum(requested)) : null;
+    const spreadPct = clampLevel(optNum(formData, "spreadPct", 0), 0, BOT_SPREAD_MAX_PCT);
+
+    const plans = await planBots({ cities, perCity, power, spreadPct });
+    const { created, failed } = await createBots(plans);
+    if (created === 0) return { error: "לא נוצר אף בוט — נסה שוב" };
+
+    await logAdmin(admin, {
+      action: "bots.create",
+      targetType: "bot",
+      summary: `נשתלו ${created} בוטים בערים ${cities.join(", ")}`,
+      details: { cities, perCity, power, spreadPct, created, failed },
+    });
+    revalidatePath("/admin/bots");
+    revalidatePath("/game", "layout");
+    return {
+      success:
+        `נשתלו ${created} בוטים` +
+        (failed > 0 ? ` (${failed} נכשלו על התנגשות שם — נסה שוב)` : ""),
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/** Refill one bot's army and arsenal now, without waiting out the hour. */
+export async function rearmBotEmpire(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    if (!(await rearmBot(empireId))) return { error: "הבוט לא נמצא" };
+
+    await logAdmin(admin, {
+      action: "bots.rearm",
+      targetType: "empire",
+      targetId: empireId,
+      summary: "חיל המצב של הבוט חודש",
+    });
+    revalidatePath("/admin/bots");
+    revalidatePath("/game", "layout");
+    return { success: "חיל המצב חודש" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Remove a bot — the account, the empire and the garrison together.
+ *
+ * Battle and spy reports written against it survive, as they do for any deleted
+ * empire: a player's own history must not rewrite itself because the admin
+ * cleared a city.
+ */
+export async function deleteBotEmpire(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    if (!(await deleteBot(empireId))) return { error: "הבוט לא נמצא" };
+
+    await logAdmin(admin, {
+      action: "bots.delete",
+      targetType: "empire",
+      targetId: empireId,
+      summary: "בוט נמחק",
+    });
+    revalidatePath("/admin/bots");
+    revalidatePath("/game", "layout");
+    return { success: "הבוט נמחק" };
   } catch (e) {
     return toErr(e);
   }

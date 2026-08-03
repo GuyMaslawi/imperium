@@ -2,12 +2,21 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isOnline } from "@/lib/game/chat";
-import { notStaff } from "@/lib/staff";
+import { notStaffOrBot } from "@/lib/bot";
 
 /**
- * Staff empires are not contestants and are absent from every board here — see
- * src/lib/staff.ts. The raw-SQL ladder cannot spread `notStaff`, so it carries
- * the same predicate written out; the two must stay in step.
+ * Staff empires are not contestants and are absent from every board in this
+ * file — see src/lib/staff.ts. The raw-SQL city ladder cannot spread a Prisma
+ * fragment, so it carries the same predicate written out; the two must stay in
+ * step.
+ *
+ * **Bots are the exception, and only here.** A bot is planted in a city tier
+ * precisely so the players living there have someone to raid, and a target
+ * absent from the one board that lists your own city is a target nobody can
+ * find. So the city ladder counts and ranks them like any resident, while every
+ * *global* board below — power, spy, slaves, bank, theft — filters them out
+ * with `notStaffOrBot`, because those decide who is winning the game and a
+ * garrison is not playing it. See src/lib/bot.ts.
  */
 const NOT_STAFF_SQL = Prisma.sql`e."isStaff" = false`;
 
@@ -300,7 +309,7 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
     }) => number
   ): Promise<BoardRow[]> => {
     const rows = await prisma.empire.findMany({
-      where: notStaff,
+      where: notStaffOrBot,
       orderBy,
       take: BOARD_SIZE,
       select: {
@@ -358,11 +367,12 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
     by: ["attackerEmpireId"],
     // Staff raids are excluded at the source rather than filtered out of the
     // top ten afterwards: dropping a row after `take` would silently serve a
-    // nine-row board.
+    // nine-row board. Bots never attack anyone, so they cost this board
+    // nothing — they are in the filter only so the rule stays one rule.
     where: {
       createdAt: { gte: cutoff },
       stolenGold: { gt: 0 },
-      attackerEmpire: notStaff,
+      attackerEmpire: notStaffOrBot,
     },
     _sum: { stolenGold: true },
     orderBy: { _sum: { stolenGold: "desc" } },
