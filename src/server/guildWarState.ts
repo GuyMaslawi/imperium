@@ -585,6 +585,7 @@ async function settleWar(warId: string, now: Date): Promise<void> {
   const medals = ["🥇", "🥈", "🥉"];
   await announceToDiscord({
     kind: "war",
+    channel: "events",
     title: "⚔️ נגמרה המלחמה — הנה הטבלה",
     body:
       podium.top

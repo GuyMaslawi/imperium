@@ -487,6 +487,7 @@ export async function announceSeasonStart(season: {
 }): Promise<void> {
   await announceToDiscord({
     kind: "season",
+    channel: "events",
     title: `🚀 ${season.name} התחילה`,
     body:
       `סיזן חדש באוויר. 🏁\n⏳ נגמר ב-${formatGameDateTime(season.endsAt)}\n\n` +
@@ -650,6 +651,7 @@ export async function closeSeason(
     const medals = ["🥇", "🥈", "🥉"];
     await announceToDiscord({
       kind: "season",
+      channel: "events",
       title: `🏆 ${closed} נגמרה — זה הפודיום`,
       body:
         (podium.length > 0

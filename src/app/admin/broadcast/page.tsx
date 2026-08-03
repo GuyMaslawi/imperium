@@ -17,7 +17,12 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminBroadcastPage() {
   await requireAdmin();
-  const discordAnnouncer = isDiscordAnnouncerConfigured();
+  // Two rooms, two webhooks, and either one can be missing on its own — the
+  // broadcast form talks about the updates room and the gift form about the
+  // events one, so each says whether *its* room is wired rather than whether
+  // "Discord" is.
+  const discordUpdates = isDiscordAnnouncerConfigured("updates");
+  const discordEvents = isDiscordAnnouncerConfigured("events");
 
   const [seasons, guilds, empires] = await Promise.all([
     prisma.gameSeason.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true } }),
@@ -39,17 +44,35 @@ export default async function AdminBroadcastPage() {
               guessable from the form. It is stated here, next to the field. */}
           <p
             className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
-              discordAnnouncer
+              discordUpdates || discordEvents
                 ? "border-[#5865F2]/45 bg-[#5865F2]/10 text-[#c7ccff]"
                 : "border-border-subtle bg-black/25 text-zinc-500"
             }`}
           >
-            {discordAnnouncer
-              ? "שידור לכל השחקנים או לפעילים מתפרסם אוטומטית גם בדיסקורד — אותו נוסח בדיוק, כדי שתישלח התראה לטלפון. שידור לעונה, לברית או לשחקן בודד — לא."
-              : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL לא מוגדר)."}
+            {discordUpdates || discordEvents
+              ? "שידור לכל השחקנים או לפעילים מתפרסם אוטומטית גם בדיסקורד — אותו נוסח בדיוק, כדי שתישלח התראה לטלפון — בערוץ שנבחר למטה. שידור לעונה, לברית או לשחקן בודד — לא."
+              : "פרסום אוטומטי לדיסקורד כבוי (וובהוקים לא מוגדרים)."}
           </p>
           <ActionForm action={broadcastMessage} submitLabel="שדר הודעה">
             <TargetPicker seasons={seasons} guilds={guilds} empires={empires} />
+            {/* The one thing about the post the admin actually decides. Default
+                is the updates room: a broadcast typed by hand is usually news
+                about the game, and an event releases itself. */}
+            <LabeledSelect
+              label="ערוץ דיסקורד"
+              name="discordChannel"
+              defaultValue="updates"
+              options={[
+                {
+                  value: "updates",
+                  label: `עדכונים ופיתוחים${discordUpdates ? "" : " (לא מוגדר)"}`,
+                },
+                {
+                  value: "events",
+                  label: `אירועים${discordEvents ? "" : " (לא מוגדר)"}`,
+                },
+              ]}
+            />
             <LabeledSelect
               label="סוג"
               name="kind"
@@ -92,14 +115,14 @@ export default async function AdminBroadcastPage() {
               know that note is also about to be posted publicly. */}
           <p
             className={`mb-3 rounded-lg border px-3 py-2 text-xs ${
-              discordAnnouncer
+              discordEvents
                 ? "border-[#5865F2]/45 bg-[#5865F2]/10 text-[#c7ccff]"
                 : "border-border-subtle bg-black/25 text-zinc-500"
             }`}
           >
-            {discordAnnouncer
-              ? "ההודעה המצורפת מתפרסמת אוטומטית גם בדיסקורד, באותו נוסח — אם המתנה נשלחת לכל השחקנים או לפעילים. בלי הודעה מצורפת אין פרסום."
-              : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL לא מוגדר)."}
+            {discordEvents
+              ? "ההודעה המצורפת מתפרסמת אוטומטית גם בערוץ האירועים בדיסקורד, באותו נוסח — אם המתנה נשלחת לכל השחקנים או לפעילים. בלי הודעה מצורפת אין פרסום."
+              : "פרסום אוטומטי לדיסקורד כבוי (DISCORD_WEBHOOK_URL_EVENTS לא מוגדר)."}
           </p>
           <ActionForm action={sendGift} submitLabel="שלח מתנה" submitVariant="secondary">
             {/* Opens on the last day's players: a gift is a reason to come

@@ -7,16 +7,17 @@ import { appBaseUrl } from "@/server/mailer";
  * The game's side of the Discord channel: where the invite lives, and how the
  * server speaks into the room.
  *
- * Two independent environment variables, because they are two different
- * decisions and either one may be made first:
+ * Independent environment variables, because they are separate decisions and
+ * any one of them may be made first:
  *
- *   DISCORD_URL          the public invite — https://discord.gg/xxxxxxx
- *   DISCORD_WEBHOOK_URL  a channel webhook, for automatic announcements
+ *   DISCORD_URL                   the public invite — https://discord.gg/xxxxxxx
+ *   DISCORD_WEBHOOK_URL_EVENTS    webhook for what happens *in* the game
+ *   DISCORD_WEBHOOK_URL_UPDATES   webhook for news *about* the game
  *
- * Both are optional and both fail closed. With neither set the site simply has
- * no community channel: every link is hidden, nothing is posted anywhere, and
- * no code path changes behaviour. That is deliberate — the channel is being
- * built by somebody else, and the site had to be ready before it exists.
+ * All are optional and all fail closed. With none set the site simply has no
+ * community channel: every link is hidden, nothing is posted anywhere, and no
+ * code path changes behaviour. That is deliberate — the channel is being built
+ * by somebody else, and the site had to be ready before it exists.
  *
  * Deliberately *not* `NEXT_PUBLIC_`. A NEXT_PUBLIC value is inlined into the
  * browser bundle at build time, which would make the invite a build-time
@@ -31,15 +32,41 @@ export function discordInviteUrl(): string | null {
 }
 
 /**
+ * The two rooms the game speaks into.
+ *
+ *   "events"  — what happens *inside* the game, on the clock: a Happy Hour
+ *               opening, a mini-game released, a war settling, a season
+ *               starting or ending, a game-wide gift. Time-critical: read late
+ *               is read too late.
+ *   "updates" — news *about* the game: what was built, what changed, what is
+ *               coming. Nothing in it expires.
+ *
+ * Two rooms rather than one because they are read differently. Someone who
+ * muted a channel that fires every Happy Hour must still hear that the game got
+ * a new feature, and vice versa; a single feed forces one decision on both.
+ */
+export type DiscordChannel = "events" | "updates";
+
+const CHANNEL_ENV: Record<DiscordChannel, string> = {
+  events: "DISCORD_WEBHOOK_URL_EVENTS",
+  updates: "DISCORD_WEBHOOK_URL_UPDATES",
+};
+
+/**
  * Discord's own webhook endpoints, and nothing else.
  *
  * The announcer posts game state — season podiums, war results, broadcast text
  * — so a mistyped or hostile value would be an outbound feed of the game's
  * events to an arbitrary host, chosen by whatever wrote the environment. Pinning
  * the host keeps a typo from becoming that.
+ *
+ * There is no fallback to the single `DISCORD_WEBHOOK_URL` this replaced — that
+ * webhook is retired, and a channel whose own variable is unset is simply not
+ * configured. Falling back would quietly resurrect a dead room's URL and post
+ * the game's news somewhere nobody is reading.
  */
-function webhookUrl(): string | null {
-  const raw = process.env.DISCORD_WEBHOOK_URL?.trim();
+function webhookUrl(channel: DiscordChannel): string | null {
+  const raw = process.env[CHANNEL_ENV[channel]]?.trim();
   if (!raw) return null;
   try {
     const url = new URL(raw);
@@ -55,9 +82,9 @@ function webhookUrl(): string | null {
   }
 }
 
-/** Is anything wired up at all — used by the admin screens to say so. */
-export function isDiscordAnnouncerConfigured(): boolean {
-  return webhookUrl() !== null;
+/** Is that room wired up — used by the admin screens to say so. */
+export function isDiscordAnnouncerConfigured(channel: DiscordChannel): boolean {
+  return webhookUrl(channel) !== null;
 }
 
 /** The stripe down the side of the embed, by what is being announced. */
@@ -76,6 +103,13 @@ export type AnnouncementKind = keyof typeof COLORS;
 
 export interface Announcement {
   kind: AnnouncementKind;
+  /**
+   * Which room this belongs in. Stated at every call site rather than inferred
+   * from `kind`: the colour of the stripe and the audience of the post are two
+   * different questions, and a wrong guess here puts a changelog in the room
+   * people opened for Happy Hours.
+   */
+  channel: DiscordChannel;
   title: string;
   body: string;
   /** Where to read more — a link back into the game. */
@@ -115,7 +149,7 @@ function clamp(value: string, max: number): string {
  * inside one holds a connection open for the length of someone else's outage.
  */
 export async function announceToDiscord(announcement: Announcement): Promise<boolean> {
-  const url = webhookUrl();
+  const url = webhookUrl(announcement.channel);
   if (!url) return false;
 
   try {
@@ -139,8 +173,10 @@ export async function announceToDiscord(announcement: Announcement): Promise<boo
       cache: "no-store",
     });
     if (!response.ok) {
+      // The channel goes in the log key: with two webhooks live, "the announcer
+      // is broken" is not actionable until you know which room went silent.
       await logError(
-        "discord.announce",
+        `discord.announce.${announcement.channel}`,
         new Error(`webhook responded ${response.status}`)
       );
       return false;
@@ -149,7 +185,7 @@ export async function announceToDiscord(announcement: Announcement): Promise<boo
   } catch (err) {
     // Includes the timeout: an AbortError here means Discord did not answer in
     // five seconds, which is not the game's problem to escalate.
-    await logError("discord.announce", err);
+    await logError(`discord.announce.${announcement.channel}`, err);
     return false;
   }
 }

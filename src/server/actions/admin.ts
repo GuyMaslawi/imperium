@@ -2174,6 +2174,7 @@ export async function sendMessageToEmpire(
 }
 
 const kindSchema = z.enum(["SYSTEM", "BATTLE", "SPY"]);
+const channelSchema = z.enum(["events", "updates"]);
 
 /** Broadcast a message to a target audience (all / season / guild / empire). */
 export async function broadcastMessage(
@@ -2188,6 +2189,11 @@ export async function broadcastMessage(
     const body = str(formData, "body", 4000);
     const href = optHref(formData, "href");
     const kind = (kindSchema.safeParse(formData.get("kind")).data ?? "SYSTEM") as MessageKind;
+    // Which Discord room the mirror lands in. A broadcast is free text and can
+    // be either thing — "the new hero shop is live" belongs with the updates,
+    // "the boss is up for an hour" with the events — so the admin picks, and
+    // the default is the one they type more often.
+    const channel = channelSchema.safeParse(formData.get("discordChannel")).data ?? "updates";
     if (!title || !body) return { error: "יש למלא כותרת ותוכן" };
 
     const empireIds = await resolveTargetEmpireIds(scope, scopeId);
@@ -2222,6 +2228,7 @@ export async function broadcastMessage(
     if (isGameWideScope(scope)) {
       posted = await announceToDiscord({
         kind: "announcement",
+        channel,
         title,
         body,
         url: gameLink("/game/messages"),
@@ -2333,6 +2340,10 @@ export async function sendGift(
     if (isGameWideScope(scope) && title) {
       posted = await announceToDiscord({
         kind: "announcement",
+        // The events room, not the updates one: a gift landing in every
+        // treasury is something that happened in the game today, not news
+        // about what was built.
+        channel: "events",
         title,
         body: body || GIFT_DEFAULTS.body,
         url: gameLink("/game/base"),
@@ -3028,6 +3039,7 @@ async function activateEvent(
     .join(" · ");
   await announceToDiscord({
     kind: "event",
+    channel: "events",
     title: `${meta.icon} ${released.title} — באוויר`,
     body:
       `🎁 בפרס: ${prizeText(released)}\n` +
@@ -3290,6 +3302,7 @@ async function releaseHappyHour(
   const generic = /^happy\s*hour$/i.test(named) || named === "שעת זהב" || named === "";
   await announceToDiscord({
     kind: "event",
+    channel: "events",
     title:
       `🔥 HAPPY HOUR ${multiplierLabel(released.bonusPct)}` +
       (generic ? "" : ` — ${named}`),
