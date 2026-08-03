@@ -14,14 +14,14 @@ import {
   GUILD_INVITE_TTL_MS,
   GUILD_NAME_MAX_LENGTH,
   GUILD_NAME_MIN_LENGTH,
-  GUILD_SPELL_BUFF_MS,
-  GUILD_SPELL_MAX_LEVEL,
   GUILD_SPELL_META,
   aidUpgradeCostGold,
   capacityUpgradeCostGold,
   guildAidPct,
   guildCapacity,
   guildSpellBonusPct,
+  guildSpellBuffMs,
+  guildSpellMaxLevel,
   spellCastCostDiamonds,
   spellUpgradeCostDiamonds,
 } from "@/lib/game/guild";
@@ -168,7 +168,7 @@ export async function createGuild(
         };
       }
 
-      // Founder becomes the leader; all four spells open at level 1 (=1%).
+      // Founder becomes the leader; every spell opens at level 1 (=1%).
       await tx.guild.create({
         data: {
           name,
@@ -568,7 +568,7 @@ export async function transferGuildLeadership(
 /* ------------------------------ guild shop ------------------------------ */
 
 const spellTypeSchema = z.object({
-  type: z.enum(["ATTACK", "DEFENSE", "SPY", "RESOURCES"]),
+  type: z.enum(["ATTACK", "DEFENSE", "RESOURCES"]),
 });
 
 export async function upgradeGuildSpell(
@@ -584,8 +584,11 @@ export async function upgradeGuildSpell(
       where: { guildId_type: { guildId: membership.guildId, type } },
     });
     if (!spell) return { error: "הקסם לא נמצא." };
-    if (spell.level >= GUILD_SPELL_MAX_LEVEL) {
-      return { error: `הקסם כבר ברמה המקסימלית (${GUILD_SPELL_MAX_LEVEL}%).` };
+    // Every spell has its own ceiling — attack, defence and resources stop at
+    // 10%, spying still runs to 30%.
+    const maxLevel = guildSpellMaxLevel(type);
+    if (spell.level >= maxLevel) {
+      return { error: `הקסם כבר ברמה המקסימלית (${maxLevel}%).` };
     }
 
     const cost = spellUpgradeCostDiamonds(spell.level);
@@ -603,7 +606,7 @@ export async function upgradeGuildSpell(
 
     const meta = GUILD_SPELL_META[type];
     return {
-      success: `${meta.label} שודרג ל־${guildSpellBonusPct(spell.level + 1)}% עבור כל הברית!`,
+      success: `${meta.label} שודרג ל־${guildSpellBonusPct(type, spell.level + 1)}% עבור כל הברית!`,
     };
   });
 }
@@ -698,7 +701,7 @@ export async function castGuildSpell(
     });
     if (active) return { error: "הקסם הזה כבר פעיל עליך." };
 
-    const cost = spellCastCostDiamonds(spell.level);
+    const cost = spellCastCostDiamonds(type, spell.level);
     if (!(await spendDiamonds(tx, empireId, cost))) {
       return { error: `הקסם עולה ${cost} יהלומים — אין לך מספיק.` };
     }
@@ -711,14 +714,14 @@ export async function castGuildSpell(
       data: {
         empireId,
         type,
-        bonusPct: guildSpellBonusPct(spell.level),
-        expiresAt: new Date(now.getTime() + GUILD_SPELL_BUFF_MS),
+        bonusPct: guildSpellBonusPct(type, spell.level),
+        expiresAt: new Date(now.getTime() + guildSpellBuffMs(type)),
       },
     });
 
     const meta = GUILD_SPELL_META[type];
     return {
-      success: `${meta.icon} ${meta.label} הופעל — ${meta.effectLabel(guildSpellBonusPct(spell.level))}!`,
+      success: `${meta.icon} ${meta.label} הופעל — ${meta.effectLabel(guildSpellBonusPct(type, spell.level))}!`,
     };
   });
 }

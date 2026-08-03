@@ -2,6 +2,14 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isOnline } from "@/lib/game/chat";
+import { notStaff } from "@/lib/staff";
+
+/**
+ * Staff empires are not contestants and are absent from every board here — see
+ * src/lib/staff.ts. The raw-SQL ladder cannot spread `notStaff`, so it carries
+ * the same predicate written out; the two must stay in step.
+ */
+const NOT_STAFF_SQL = Prisma.sql`e."isStaff" = false`;
 
 /**
  * The city ladder: every empire in one city tier, ranked by military power.
@@ -117,6 +125,11 @@ const AHEAD_OF_ME = Prisma.sql`
  *
  * `requestedPage` may be NaN — that is the "no page asked for" case, not an
  * error.
+ *
+ * A staff viewer is counted out of the tier like everyone else, so they will
+ * not find their own row on any page. `myRank` still comes back — it is where
+ * they *would* stand — because the caller uses it to pick a default page and a
+ * zero there would land them on nothing.
  */
 export async function getCityLadderPage(
   cities: number,
@@ -142,7 +155,7 @@ export async function getCityLadderPage(
     -- LEFT, not CROSS: an unknown viewer must still be counted a tier, not
     -- collapse it to nothing. Their comparisons go NULL and rank falls out as 1.
     LEFT JOIN me ON TRUE
-    WHERE e.cities = ${cities}
+    WHERE e.cities = ${cities} AND ${NOT_STAFF_SQL}
   `;
   const total = Number(counts?.total ?? 0);
   const myRank = Number(counts?.ahead ?? 0) + 1;
@@ -175,7 +188,7 @@ export async function getCityLadderPage(
     FROM "Empire" e
     LEFT JOIN "Army" a ON a."empireId" = e.id
     LEFT JOIN "Hero" h ON h."empireId" = e.id
-    WHERE e.cities = ${cities}
+    WHERE e.cities = ${cities} AND ${NOT_STAFF_SQL}
     ORDER BY ${LADDER_ORDER}
     LIMIT ${PAGE_SIZE} OFFSET ${firstRank - 1}
   `;
@@ -287,6 +300,7 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
     }) => number
   ): Promise<BoardRow[]> => {
     const rows = await prisma.empire.findMany({
+      where: notStaff,
       orderBy,
       take: BOARD_SIZE,
       select: {
@@ -342,7 +356,14 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
 export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   const sums = await prisma.battleReport.groupBy({
     by: ["attackerEmpireId"],
-    where: { createdAt: { gte: cutoff }, stolenGold: { gt: 0 } },
+    // Staff raids are excluded at the source rather than filtered out of the
+    // top ten afterwards: dropping a row after `take` would silently serve a
+    // nine-row board.
+    where: {
+      createdAt: { gte: cutoff },
+      stolenGold: { gt: 0 },
+      attackerEmpire: notStaff,
+    },
     _sum: { stolenGold: true },
     orderBy: { _sum: { stolenGold: "desc" } },
     take: BOARD_SIZE,

@@ -94,6 +94,7 @@ export default async function SeasonEndPage() {
         power: true,
         cities: true,
         heroLevel: true,
+        prizeDiamonds: true,
       },
     }),
   ]);
@@ -204,6 +205,17 @@ export default async function SeasonEndPage() {
                     {formatCompact(c.power)}
                   </p>
                   <p className="text-[11px] text-zinc-500">כוח צבאי</p>
+                  {/* Only when it was actually credited: a champion whose empire
+                      was already gone keeps his place and his record, but the
+                      card must not claim he collected anything. */}
+                  {c.prizeDiamonds > 0 && (
+                    <p className="mt-2 flex items-center justify-center gap-1 text-sm font-bold text-cyan-300">
+                      <Icon name="diamond" size={14} />
+                      <span className="nums" dir="ltr">
+                        {formatNumber(c.prizeDiamonds)}
+                      </span>
+                    </p>
+                  )}
                   <p className="mt-2 text-[11px] text-zinc-400">
                     {c.cities} ערים · גיבור {c.heroLevel}
                     {c.guildName ? ` · ${c.guildName}` : ""}

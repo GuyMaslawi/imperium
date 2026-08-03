@@ -102,6 +102,11 @@ export async function getGloryChampions(): Promise<Map<string, GloryChampion>> {
     FROM "EmpireGloryAward" g
     JOIN "Empire" e ON e.id = g."empireId"
     WHERE g.key = ANY(${GLORY_KEYS as string[]})
+      -- Staff hold no world records (src/lib/staff.ts). Excluded on read rather
+      -- than by refusing to stamp: the stamps of an account promoted to staff
+      -- mid-season have to disappear too, and a read filter is the only thing
+      -- that covers rows already written.
+      AND e."isStaff" = false
     ORDER BY g.key, g."awardedAt" ASC
   `;
 

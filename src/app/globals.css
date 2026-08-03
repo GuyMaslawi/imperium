@@ -5520,6 +5520,28 @@ body {
   50% { box-shadow: 0 0 18px 1px rgba(255, 235, 170, 0.95); }
 }
 
+/* --- embers off the brazier --- */
+.gd-ember {
+  position: absolute;
+  bottom: 0.4rem;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 190, 110, 0.9);
+  box-shadow: 0 0 6px 1px rgba(255, 150, 60, 0.55);
+  opacity: 0;
+  animation-name: gd-ember-rise;
+  animation-timing-function: ease-out;
+  animation-iteration-count: infinite;
+  pointer-events: none;
+}
+@keyframes gd-ember-rise {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  15% { opacity: 0.9; }
+  70% { opacity: 0.5; }
+  100% { opacity: 0; transform: translate(var(--drift), -5.5rem) scale(0.25); }
+}
+
 /* --- roster rows --- */
 .gd-row {
   animation: gd-row-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -5530,6 +5552,103 @@ body {
   to { opacity: 1; transform: none; }
 }
 
+/* --- the two gold upgrade cards: a bar that rises into its level --- */
+.gd-up {
+  animation: gd-row-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.gd-meter {
+  position: relative;
+  overflow: hidden;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(228, 195, 90, 0.14);
+}
+.gd-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
+  box-shadow: 0 0 8px -1px rgba(228, 195, 90, 0.75);
+  /* Server-rendered at its final width; the width only *travels* because the
+     card paints it at 0% for one frame first (useAfterFirstPaint). */
+  transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- the spell shop: four cards dealt in, the live one still burning --- */
+.gd-spell {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  animation: gd-spell-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 80ms);
+  transition: border-color 0.25s ease, transform 0.25s ease;
+}
+@keyframes gd-spell-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.gd-spell:hover { transform: translateY(-2px); }
+
+/* The rune circle behind the card. It is drawn for every spell but only turns
+   and glows while the buff is actually running, so "is it up right now?" is
+   answerable from the corner of the eye. */
+.gd-rune {
+  position: absolute;
+  top: -2.4rem;
+  left: -2.4rem;
+  z-index: -1;
+  width: 8rem;
+  height: 8rem;
+  border-radius: 999px;
+  border: 1px dashed rgba(228, 195, 90, 0.16);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.gd-spell.is-live .gd-rune {
+  border-color: rgba(52, 211, 153, 0.35);
+  border-style: dashed;
+  opacity: 1;
+  animation: gd-rune-turn 14s linear infinite;
+}
+@keyframes gd-rune-turn {
+  to { transform: rotate(360deg); }
+}
+.gd-spell.is-live {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+/* The spell's own sigil breathes while its buff is up. */
+.gd-spell.is-live .gd-spell-icon {
+  animation: gd-sigil-beat 2.6s ease-in-out infinite;
+}
+@keyframes gd-sigil-beat {
+  0%, 100% { transform: scale(1); filter: none; }
+  50% { transform: scale(1.14); filter: drop-shadow(0 0 5px rgba(255, 235, 170, 0.8)); }
+}
+/* A slow sweep across the "פעיל עד HH:MM" strip — the buff burning down. */
+.gd-live {
+  position: relative;
+  overflow: hidden;
+}
+.gd-live::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 35%,
+    rgba(110, 255, 200, 0.22) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  animation: gd-live-sweep 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes gd-live-sweep {
+  0%, 55% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
 /* An empty hall (no guild yet) is cold and still — the recruiting screen
    should not look like a hall that is already yours. */
 .gd-hall.is-empty .gd-hearth {
@@ -5538,14 +5657,26 @@ body {
   filter: grayscale(0.9);
 }
 .gd-hall.is-empty .gd-banner { opacity: 0.22; }
+.gd-hall.is-empty .gd-ember { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .gd-banner,
   .gd-hearth,
   .gd-seat,
   .gd-seat.is-me,
-  .gd-row {
+  .gd-row,
+  .gd-up,
+  .gd-spell,
+  .gd-spell.is-live .gd-rune,
+  .gd-spell.is-live .gd-spell-icon {
     animation: none;
+  }
+  .gd-spell:hover { transform: none; }
+  .gd-meter > span { transition: none; }
+  /* Pure decoration that would otherwise freeze mid-sweep. */
+  .gd-ember,
+  .gd-live::after {
+    display: none;
   }
 }
 
@@ -8923,3 +9054,375 @@ body {
 /* Hovering is already an answer to "can I press this" — the glint would only
    fight the hover lift, so it steps aside. */
 .btn-gleam:hover::after { animation-play-state: paused; opacity: 0; }
+
+/* =========================================================================
+   STAFF NAME — the game's own account, written so nobody mistakes it for a
+   rival.
+
+   A staff empire is out of the competition entirely (see src/lib/staff.ts):
+   it cannot be attacked or spied and it appears on no leaderboard. That
+   absence is invisible in the places it *does* still show up — chat, mail, a
+   guild roster — so the name carries the signal itself: engraved gold with a
+   highlight travelling across it, plus the "צוות" chip beside it in chat.
+
+   Built on `background-clip: text` like .mgt-title and .hh-mult, so it
+   inherits font-size and weight from whatever it decorates and can be dropped
+   onto a heading or an 11px chat line without a second variant.
+
+   TWO background layers, not one, and that is the whole trick. A single wide
+   gradient sliding under the text spends most of its cycle showing its dull
+   end — the name reads flat dark gold between glints, and a reduced-motion
+   reader (who gets no cycle at all) is stuck on whichever frame happened to be
+   first. So the base gold is its own layer at 100% width and never moves, and
+   only the white streak above it travels. The name is bright at every instant,
+   motion or none; the sweep is decoration on top rather than the thing that
+   makes it legible.
+   ========================================================================= */
+.staff-name {
+  background-image:
+    /* the glint — a narrow white band with soft shoulders, 200% wide so it can
+       be parked entirely off the text between passes */
+    linear-gradient(
+      100deg,
+      rgba(255, 255, 255, 0) 42%,
+      rgba(255, 253, 240, 0.9) 50%,
+      rgba(255, 255, 255, 0) 58%
+    ),
+    /* the base — engraved gold, the same top-lit ramp as .hh-mult */
+    linear-gradient(180deg, #fff6d5 0%, #f7d774 38%, #c98d16 72%, #ffe9a8 100%);
+  background-size: 200% 100%, 100% 100%;
+  background-position: 150% 0, 0 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* The glow has to come from a filter, not text-shadow: with the fill
+     transparent, a text-shadow draws the shadow of the *glyph* over the
+     gradient and reads as a smear. */
+  filter: drop-shadow(0 0 6px rgba(228, 195, 90, 0.45));
+  font-weight: 900;
+  /* Gold on obsidian at 11px is thin — a hair of tracking keeps the letters
+     from closing up once the fill is a gradient rather than a flat colour. */
+  letter-spacing: 0.01em;
+}
+
+/* The link states PlayerLink applies (hover:text-gold-bright) would set a
+   `color` that a transparent fill ignores, so hovering a staff name would
+   otherwise do nothing at all. Brighten the glow instead — same "this is
+   live" answer, in the one channel the gradient leaves open. */
+.staff-name:hover {
+  filter: drop-shadow(0 0 11px rgba(255, 233, 168, 0.8));
+}
+
+/* Only the glint layer moves; the base gold is pinned by the second pair. */
+@keyframes staff-name-sweep {
+  0%   { background-position: 150% 0, 0 0; }
+  /* The pass itself is over by ~45%; the rest of the cycle is the rest between
+     passes, so the name glints occasionally rather than strobing. */
+  45%  { background-position: -50% 0, 0 0; }
+  100% { background-position: -50% 0, 0 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .staff-name {
+    animation: staff-name-sweep 4.5s ease-in-out infinite;
+  }
+}
+
+/* =========================================================================
+   פרסי העונה — the prize hall (/game/prizes)
+   Prefix: prize-. The one screen whose whole subject is a reward, so it is
+   allowed to glitter: turning rays behind the pool, dust in the light, a
+   highlight travelling across each seat and gold rising off the winner's card.
+
+   Two rules it keeps with every other scene here: nothing that moves carries
+   information (the amounts, the names and the countdown all stand still), and
+   every particle's position comes from a fixed table in the page — never
+   Math.random(), or SSR and hydration disagree.
+   ========================================================================= */
+
+.prize-hall {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 0.75rem;
+}
+.prize-body {
+  position: relative;
+  z-index: 2;
+}
+
+/* The light the prize sits in. */
+.prize-glow {
+  position: absolute;
+  inset: -60% 5% auto 5%;
+  height: 200%;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 45%,
+    rgba(228, 195, 90, 0.22) 0%,
+    rgba(120, 220, 255, 0.07) 38%,
+    transparent 72%
+  );
+  animation: prize-glow-breathe 8s ease-in-out infinite;
+}
+@keyframes prize-glow-breathe {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Slow rays turning behind everything. Masked to a disc so the spokes fade out
+   long before they reach the panel's edges — an unmasked conic gradient reads
+   as a striped background, not as light. */
+.prize-rays {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 900px;
+  height: 900px;
+  margin: -450px 0 0 -450px;
+  pointer-events: none;
+  opacity: 0.3;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(228, 195, 90, 0.34) 0deg 3deg,
+    transparent 3deg 24deg
+  );
+  -webkit-mask-image: radial-gradient(circle at center, #000 0%, transparent 62%);
+  mask-image: radial-gradient(circle at center, #000 0%, transparent 62%);
+  animation: prize-rays-turn 70s linear infinite;
+}
+@keyframes prize-rays-turn {
+  to { transform: rotate(360deg); }
+}
+
+/* Dust in the beam — see MOTES in app/game/prizes/page.tsx. */
+.prize-mote {
+  position: absolute;
+  left: var(--left);
+  top: var(--top);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 999px;
+  background: rgba(255, 245, 205, 0.9);
+  box-shadow: 0 0 8px rgba(255, 220, 140, 0.8);
+  pointer-events: none;
+  opacity: 0;
+  animation: prize-twinkle var(--dur) ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+@keyframes prize-twinkle {
+  0%, 100% { opacity: 0; transform: translateY(0) scale(0.6); }
+  45% { opacity: 0.95; transform: translateY(-6px) scale(1); }
+  70% { opacity: 0.4; transform: translateY(-10px) scale(0.85); }
+}
+
+.prize-kicker {
+  animation: prize-fade-in 0.7s ease-out both;
+}
+.prize-pool {
+  animation: prize-fade-in 0.7s ease-out 0.15s both;
+}
+@keyframes prize-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* The diamond figure itself: cut-stone gradient with a highlight travelling
+   across it, built on background-clip like .staff-name so it inherits whatever
+   size and weight the markup gives it. The colour is the diamond's cyan, not
+   the page's gold — this number is a currency, and it should read as one. */
+.prize-amount {
+  background-image: linear-gradient(
+    100deg,
+    #4fb6d6 0%,
+    #9fe4f7 18%,
+    #ffffff 30%,
+    #d8f5ff 40%,
+    #5cc2de 56%,
+    #4fb6d6 100%
+  );
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  /* A text-shadow under a transparent fill draws the glyph's shadow over the
+     gradient and smears it — the glow has to come from a filter. */
+  filter: drop-shadow(0 0 10px rgba(120, 220, 255, 0.4));
+  letter-spacing: 0.01em;
+}
+@keyframes prize-amount-sweep {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* The stone beside it, catching the same light. */
+.prize-gem {
+  filter: drop-shadow(0 0 8px rgba(120, 220, 255, 0.5));
+  animation: prize-gem-pulse 4.5s ease-in-out infinite;
+}
+@keyframes prize-gem-pulse {
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(120, 220, 255, 0.35)); transform: none; }
+  50% { filter: drop-shadow(0 0 16px rgba(150, 235, 255, 0.85)); transform: scale(1.07); }
+}
+
+/* --- the three seats --- */
+.prize-seat {
+  position: relative;
+  overflow: hidden;
+  animation: prize-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--i) * 120ms);
+}
+@keyframes prize-rise {
+  from { opacity: 0; transform: translateY(22px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+.prize-seat-body {
+  position: relative;
+  z-index: 2;
+}
+.prize-seat-first {
+  box-shadow:
+    0 0 0 1px rgba(228, 195, 90, 0.4),
+    0 18px 50px -20px rgba(228, 195, 90, 0.75);
+}
+/* The viewer's own seat, marked the way every other board here marks it. */
+.prize-seat-mine {
+  outline: 1px solid rgba(228, 195, 90, 0.55);
+  outline-offset: -1px;
+}
+
+/* A highlight crossing the card, staggered so the three never flash together. */
+.prize-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 34%,
+    rgba(255, 255, 255, 0.07) 45%,
+    rgba(255, 255, 255, 0.18) 50%,
+    rgba(255, 255, 255, 0.07) 55%,
+    transparent 66%
+  );
+  transform: translateX(-130%);
+  animation: prize-shine-sweep 7s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 1.2s);
+}
+@keyframes prize-shine-sweep {
+  0%, 72%, 100% { transform: translateX(-130%); }
+  88% { transform: translateX(130%); }
+}
+
+/* A soft breath of light behind the medal. */
+.prize-halo {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 220px;
+  height: 220px;
+  margin: -110px 0 0 -110px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(228, 195, 90, 0.28) 0%, transparent 66%);
+  animation: prize-halo-breathe 5.5s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.6s);
+}
+@keyframes prize-halo-breathe {
+  0%, 100% { opacity: 0.45; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.prize-medal {
+  animation: prize-medal-glint 6s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 0.7s);
+}
+@keyframes prize-medal-glint {
+  0%, 84%, 100% { transform: rotate(0deg) scale(1); filter: none; }
+  90% { transform: rotate(-8deg) scale(1.14); filter: drop-shadow(0 0 10px rgba(255, 235, 170, 0.9)); }
+  95% { transform: rotate(6deg) scale(1.06); }
+}
+
+/* Gold dust rising off the winner's card only — see SPARKS in the page. */
+.prize-spark {
+  position: absolute;
+  bottom: -6px;
+  left: var(--left);
+  z-index: 1;
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 226, 150, 0.95);
+  box-shadow: 0 0 8px rgba(255, 200, 90, 0.85);
+  pointer-events: none;
+  opacity: 0;
+  animation: prize-spark-rise var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+@keyframes prize-spark-rise {
+  0% { opacity: 0; transform: translateY(0) translateX(0) scale(0.7); }
+  15% { opacity: 0.9; }
+  75% { opacity: 0.5; }
+  100% { opacity: 0; transform: translateY(-150px) translateX(12px) scale(1); }
+}
+
+/* --- the pedestal each seat stands on --- */
+.prize-step {
+  height: var(--h);
+  border: 1px solid rgba(196, 160, 50, 0.32);
+  border-bottom: none;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background:
+    linear-gradient(180deg, rgba(228, 195, 90, 0.28) 0%, rgba(120, 95, 25, 0.08) 100%),
+    repeating-linear-gradient(90deg, transparent 0 14px, rgba(0, 0, 0, 0.18) 14px 15px);
+  box-shadow: inset 0 1px 0 rgba(255, 235, 170, 0.35);
+}
+/* The line all three stand on, brightest under the middle step. */
+.prize-floor {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(196, 160, 50, 0.4) 14%,
+    rgba(255, 240, 190, 0.95) 50%,
+    rgba(196, 160, 50, 0.4) 86%,
+    transparent 100%
+  );
+  box-shadow: 0 0 20px rgba(228, 195, 90, 0.55);
+}
+.prize-step-num {
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: rgba(228, 195, 90, 0.5);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prize-glow,
+  .prize-rays,
+  .prize-kicker,
+  .prize-pool,
+  .prize-gem,
+  .prize-seat,
+  .prize-halo,
+  .prize-medal {
+    animation: none;
+  }
+  .prize-mote,
+  .prize-spark,
+  .prize-shine {
+    display: none;
+  }
+}
+
+/* The sweep across the amount is opt-in, so a reduced-motion reader still gets
+   the cut-stone gradient — standing still. */
+@media (prefers-reduced-motion: no-preference) {
+  .prize-amount {
+    animation: prize-amount-sweep 5s linear infinite;
+  }
+}

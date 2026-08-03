@@ -26,18 +26,25 @@ import { INITIAL_WEAPON_UNLOCKED_TIER, WEAPON_CATEGORIES } from "./weapons";
  * Used by registration and by the seed script. The starting bundle is
  * admin-tunable — pass the live tunables (defaults mirror the original
  * hard-coded values).
+ *
+ * `isStaff` must be carried by every path that *rebuilds* an existing empire
+ * (a progress reset, a season reset) — those delete the row and create a fresh
+ * one, and defaulting it to false there would quietly put an admin back into
+ * the competition. See src/lib/staff.ts.
  */
 export function newEmpireData(
   userId: string,
   name: string,
   seasonId?: string,
   starting: GameTunables["starting"] = DEFAULT_TUNABLES.starting,
-  heroClass: HeroClass = "WARLORD"
+  heroClass: HeroClass = "WARLORD",
+  isStaff: boolean = false
 ): Prisma.EmpireCreateInput {
   return {
     user: { connect: { id: userId } },
     ...(seasonId ? { season: { connect: { id: seasonId } } } : {}),
     name,
+    isStaff,
     gold: starting.gold,
     wood: starting.wood,
     iron: starting.iron,

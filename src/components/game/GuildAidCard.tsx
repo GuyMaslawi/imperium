@@ -6,6 +6,7 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useAfterFirstPaint } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import { GUILD_AID_MAX_LEVEL } from "@/lib/game/guild";
 
@@ -23,9 +24,12 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
     upgradeGuildAid,
     {}
   );
+  // The bar is server-rendered at its final width, so it can only *rise* into
+  // place if the first painted frame draws it empty.
+  const painted = useAfterFirstPaint();
 
   return (
-    <div className="panel-inset flex flex-col gap-3 rounded-lg p-3">
+    <div className="panel-inset gd-up flex flex-col gap-3 rounded-lg p-3">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name="shield" size={16} className="text-crimson" />
@@ -42,6 +46,15 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
       <p className="text-[11px] text-gold-dim">
         +{aidPct}% מסך הכוח הכולל של הברית להתקפה ולהגנה
       </p>
+
+      {/* How far the guild has walked towards the ceiling. */}
+      <div className="gd-meter" aria-hidden>
+        <span
+          style={{
+            width: painted ? `${(aidPct / GUILD_AID_MAX_LEVEL) * 100}%` : "0%",
+          }}
+        />
+      </div>
       <p className="text-[11px] text-zinc-500">
         כל חבר יכול לשדרג — משולם מהזהב הזמין שלך.
       </p>

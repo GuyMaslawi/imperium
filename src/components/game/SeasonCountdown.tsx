@@ -20,9 +20,16 @@ import { useRouter } from "next/navigation";
 export function SeasonCountdown({
   serverNow,
   startsAt,
+  arrivedLabel = "השערים נפתחים…",
 }: {
   serverNow: number;
   startsAt: number;
+  /**
+   * What to say once the deadline passes. The default is the sealed-gate
+   * screen's line; the prize hall counts the other way — down to a season
+   * *closing* — and must not promise gates opening.
+   */
+  arrivedLabel?: string;
 }) {
   const router = useRouter();
   const [now, setNow] = useState(serverNow);
@@ -55,7 +62,7 @@ export function SeasonCountdown({
   if (arrived) {
     return (
       <p className="ssn-opening text-sm font-bold text-gold-bright">
-        השערים נפתחים…
+        {arrivedLabel}
       </p>
     );
   }

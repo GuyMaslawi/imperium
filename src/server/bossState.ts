@@ -8,6 +8,7 @@ import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
 import { bonusMultiplier, heroBonuses, isHeroDead } from "@/lib/game/hero";
 import type { FullEmpire } from "@/lib/game/updates";
+import { notStaff } from "@/lib/staff";
 import {
   BOSS_REVIVE_MS,
   bossForCity,
@@ -155,8 +156,10 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
       }),
       // Newest victories in this city tier. Grouping in SQL would lose the
       // empire names, so we take a bounded recent window and fold it in JS.
+      // Staff kills are left out — the conquerors list is a ranking, and they
+      // are not in the running (src/lib/staff.ts).
       prisma.bossFight.findMany({
-        where: { victory: true, cityTier: empire.cities },
+        where: { victory: true, cityTier: empire.cities, empire: notStaff },
         orderBy: { createdAt: "desc" },
         take: 100,
         select: {

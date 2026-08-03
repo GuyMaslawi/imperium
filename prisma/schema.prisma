@@ -321,6 +321,16 @@ model SeasonChampion {
   cities    Int
   heroLevel Int
 
+  /// Diamonds credited for this place when the season was sealed — the amount
+  /// actually paid, not the amount the table says today, so a later change to
+  /// SEASON_PRIZES never rewrites what a past champion received.
+  prizeDiamonds Int @default(0)
+  /// When the prize hit the account. Null means unpaid: a row archived by the
+  /// admin's "save standings" pass (which does not end the season), a champion
+  /// whose empire was already gone, or a season that closed before prizes
+  /// existed. It is also the guard that makes the payout idempotent.
+  prizePaidAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@unique([seasonId, rank])
@@ -429,6 +439,21 @@ model Empire {
   /// attacked or spied. Set at registration; cleared early the moment the
   /// player launches their own first attack or spy (see attackEmpire/spyOnEmpire).
   protectedUntil      DateTime?
+  /// Staff account: the empire exists so an admin can walk the game as a
+  /// player, but it is NOT a contestant. While this is set the empire cannot be
+  /// attacked or spied, and it is filtered out of every ranked or archived
+  /// view — the ladders, the world records, the medal case, the guild-war
+  /// roster, the season podium and the hall of fame. See src/lib/staff.ts,
+  /// which owns both the guard and the `notStaff` where-fragment every board
+  /// spreads in.
+  ///
+  /// Denormalised from `user.role` on purpose. The boards are indexed
+  /// `ORDER BY … LIMIT`, and the exclusion has to be a plain column predicate
+  /// on the same table or every one of them grows a join to User. Kept in step
+  /// by syncStaffFlag(), which is called from the two places a role can change
+  /// (the admin role editor and scripts/grant-admin.ts); a drifted flag is
+  /// repaired by re-running either.
+  isStaff             Boolean   @default(false)
   /// Denormalised power figures, kept in step by syncEmpirePower.
   ///
   /// These are pure functions of the army and the arsenal (see lib/game/power),
@@ -498,6 +523,12 @@ model Empire {
   @@index([spyPower])
   /// The chat roster: who is online, then who was here most recently.
   @@index([lastSeenAt])
+  /// Staff are a handful of rows, but every board now carries `isStaff: false`
+  /// in its WHERE. This keeps the ladders' ORDER BY servable from an index
+  /// with the predicate already applied instead of filtered on the heap.
+  @@index([isStaff, generalPower])
+  @@index([isStaff, spyPower])
+  @@index([isStaff, cities, militaryPower])
 }
 
 /// A single collected achievement. The row IS the receipt: nothing is written
@@ -743,13 +774,16 @@ enum GuildRole {
   MEMBER
 }
 
-/// The four guild spells sold in the guild shop. Each has a per-guild level
-/// (level = bonus %, starts at 1, capped at 30) that members upgrade with
-/// diamonds; casting one grants the caster a 24h personal buff.
+/// The guild spells sold in the guild shop. Each has a per-guild level
+/// (level = bonus %, starts at 1, capped per spell — see lib/game/guild.ts)
+/// that members upgrade with diamonds; casting one grants the caster a
+/// personal buff for that spell's window.
+///
+/// `SPY` was removed on 2026-08-03 — the guild had no business tilting spy
+/// missions, which are decided by intelligence power alone.
 enum GuildSpellType {
   ATTACK
   DEFENSE
-  SPY
   RESOURCES
 }
 
@@ -822,8 +856,9 @@ model GuildSpell {
   @@unique([guildId, type])
 }
 
-/// An active (or expired, until cleaned up) 24h spell buff on an empire.
-/// The bonus % is snapshotted at cast time.
+/// An active (or expired, until cleaned up) spell buff on an empire. Both the
+/// bonus % and the expiry are snapshotted at cast time, so the buff survives
+/// the caster leaving the guild — or the shop's ceiling moving under it.
 model GuildSpellBuff {
   id        String         @id @default(cuid())
   empireId  String
@@ -1321,6 +1356,9 @@ model SpyReport {
   finalChance        Float?
   weaponsBonus       Float?
   /// Percentage points the attacker's guild spy buff added to the chance.
+  /// Historical only — the spy spell was deleted on 2026-08-03 and reports
+  /// written since leave this null. Kept so old reports still itemise the
+  /// bonus they were actually decided by.
   guildBonus         Float?
   /// Attacker's effective intelligence power at resolution (deterministic spy).
   attackerIntel      Float?

@@ -6,6 +6,7 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useAfterFirstPaint } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 
 export interface GuildCapacityCardProps {
@@ -30,9 +31,10 @@ export function GuildCapacityCard({
     upgradeGuildCapacity,
     {}
   );
+  const painted = useAfterFirstPaint();
 
   return (
-    <div className="panel-inset flex flex-col gap-3 rounded-lg p-3">
+    <div className="panel-inset gd-up flex flex-col gap-3 rounded-lg p-3">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name="base" size={16} className="text-crimson" />
@@ -49,6 +51,11 @@ export function GuildCapacityCard({
       <p className="text-[11px] text-zinc-500">
         מנהיג או סגן בלבד — משולם מהזהב הזמין שלו.
       </p>
+
+      {/* How full the hall is right now — the same bar the aid card carries. */}
+      <div className="gd-meter" aria-hidden>
+        <span style={{ width: painted ? `${(memberCount / capacity) * 100}%` : "0%" }} />
+      </div>
 
       <form action={action} className="mt-auto">
         {upgradeCost != null ? (

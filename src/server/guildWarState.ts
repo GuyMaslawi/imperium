@@ -12,6 +12,7 @@ import { weaponsPower } from "@/lib/game/weapons";
 import { guildAidPct } from "@/lib/game/guild";
 import { secureRandom } from "@/lib/game/random";
 import { announceToDiscord, gameLink } from "@/server/discord";
+import { notStaff } from "@/lib/staff";
 import {
   applySwing,
   GUILD_WAR_DEFENDER_SHIFT,
@@ -93,10 +94,14 @@ export async function ensureWarForStart(startsAt: Date): Promise<string> {
  * Used to seed the scoreboard at enrolment, so a guild deciding whether to turn
  * up can see the field before the bell. From the first round onward `advanceWar`
  * keeps the figure fresh off the rosters it already loaded.
+ *
+ * Staff members count for nothing — they do not fight the war either (see
+ * `loadSides`), so counting their army here would advertise a guild strength
+ * that never turns up.
  */
 export async function guildMilitaryPower(guildId: string): Promise<number> {
   const members = await prisma.guildMember.findMany({
-    where: { guildId },
+    where: { guildId, empire: notStaff },
     select: { empire: { select: { army: true, weapons: true } } },
   });
   return Math.round(
@@ -164,7 +169,11 @@ async function loadSides(
   const guildIds = entries.map((entry) => entry.guildId);
 
   const members = await tx.guildMember.findMany({
-    where: { guildId: { in: guildIds } },
+    // Staff never take the field: they cannot be attacked anywhere else in the
+    // game, and a fighter nobody can beat would decide the war. Dropping them
+    // from the roster also keeps the rotation honest — `memberForRound` cycles
+    // over this list, so a skipped member would leave a hole in it.
+    where: { guildId: { in: guildIds }, empire: notStaff },
     // Stable ordering is what fixes the rotation: the same roster must field
     // the same member in round N whether it is fought on time or an hour late.
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

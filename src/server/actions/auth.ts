@@ -185,19 +185,32 @@ function escapeHtml(s: string): string {
  * name unique-constraint hit (P2002) to a friendly error. Shared by the
  * password register flow and the Google onboarding flow. Returns `null` on
  * success, or an `AuthState` with the error message to surface.
+ *
+ * Unlike `register`, this runs for an account that already exists — which may
+ * already be an ADMIN naming its first empire. So the role is read here and the
+ * staff flag set from it; leaving it false would put an admin into the
+ * competition the moment they onboarded. See src/lib/staff.ts.
  */
 async function createEmpireForUser(
   userId: string,
   empireName: string,
   heroClass: HeroClass
 ): Promise<AuthState | null> {
-  const [activeSeason, tunables] = await Promise.all([
+  const [activeSeason, tunables, owner] = await Promise.all([
     prisma.gameSeason.findFirst({ where: { isActive: true }, select: { id: true } }),
     getTunables(),
+    prisma.user.findUnique({ where: { id: userId }, select: { role: true } }),
   ]);
   try {
     await prisma.empire.create({
-      data: newEmpireData(userId, empireName, activeSeason?.id, tunables.starting, heroClass),
+      data: newEmpireData(
+        userId,
+        empireName,
+        activeSeason?.id,
+        tunables.starting,
+        heroClass,
+        owner?.role === "ADMIN"
+      ),
     });
   } catch (e) {
     if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {

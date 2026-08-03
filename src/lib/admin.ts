@@ -5,6 +5,7 @@ import type { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import { isBanned } from "@/lib/ban";
+import { syncStaffFlag } from "@/lib/staff";
 
 export interface SessionUser {
   id: string;
@@ -132,7 +133,13 @@ export const requireAdmin = cache(async (): Promise<SessionUser> => {
     });
     const adminCount = await prisma.user.count({ where: { role: "ADMIN" } });
     if (adminCount === 0 && claimant?.emailVerified) {
-      await prisma.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+      // The role and the empire's staff flag move together — see
+      // src/lib/staff.ts. Bootstrapping only the role would leave the very
+      // first admin ranked on every board and open to attack.
+      await prisma.$transaction(async (tx) => {
+        await tx.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+        await syncStaffFlag(tx, user.id, "ADMIN");
+      });
       await logAdmin(user, {
         action: "admin.bootstrap",
         targetType: "user",

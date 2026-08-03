@@ -158,7 +158,10 @@ const LINE_SELECT = {
   senderName: true,
   body: true,
   createdAt: true,
-  sender: { select: { user: { select: { role: true } } } },
+  // `isStaff` rather than the owner's role: it is a column on the row already
+  // being read, where the role costs a join to User on every line of every
+  // poll. The two are kept in step by syncStaffFlag (see src/lib/staff.ts).
+  sender: { select: { isStaff: true } },
 } as const;
 
 type LineRow = {
@@ -167,7 +170,7 @@ type LineRow = {
   senderName: string;
   body: string;
   createdAt: Date;
-  sender: { user: { role: string } } | null;
+  sender: { isStaff: boolean } | null;
 };
 
 function toLine(row: LineRow, meId: string): ChatLine {
@@ -179,7 +182,7 @@ function toLine(row: LineRow, meId: string): ChatLine {
     at: row.createdAt.getTime(),
     time: formatGameTime(row.createdAt),
     mine: row.senderEmpireId === meId,
-    staff: row.sender?.user.role === "ADMIN",
+    staff: row.sender?.isStaff ?? false,
   };
 }
 

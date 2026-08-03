@@ -28,6 +28,7 @@ import {
   type EmpireIntField,
 } from "@/lib/admin";
 import { BAN_DAYS_MAX, formatBanDate, isBanned } from "@/lib/ban";
+import { syncStaffFlag } from "@/lib/staff";
 import { GIFT_DEFAULTS, isGameWideScope } from "@/lib/adminBroadcast";
 import { weaponByKey, TIERS_PER_CATEGORY } from "@/lib/game/weapons";
 import { GUILD_AID_MAX_LEVEL, GUILD_CAPACITY_MAX_LEVEL } from "@/lib/game/guild";
@@ -410,16 +411,24 @@ export async function updateUserAccount(
       select: { email: true },
     });
     const emailChanged = target != null && target.email !== email;
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        name,
-        email,
-        role,
-        ...(emailChanged
-          ? { emailVerified: null, tokenVersion: { increment: 1 } }
-          : {}),
-      },
+    // The role and the empire's `isStaff` flag must land together: the flag is
+    // what every board filters on and what makes the empire untargetable, so a
+    // promotion that wrote only the role would leave an admin still ranked and
+    // still farmable. In one transaction so a failure cannot leave the two
+    // disagreeing. See src/lib/staff.ts.
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          name,
+          email,
+          role,
+          ...(emailChanged
+            ? { emailVerified: null, tokenVersion: { increment: 1 } }
+            : {}),
+        },
+      });
+      await syncStaffFlag(tx, userId, role);
     });
     await logAdmin(admin, {
       action: "user.update",
@@ -1473,6 +1482,7 @@ export async function resetEmpireProgress(
         name: true,
         userId: true,
         seasonId: true,
+        isStaff: true,
         hero: { select: { heroClass: true } },
       },
     });
@@ -1489,7 +1499,10 @@ export async function resetEmpireProgress(
           empire.name,
           empire.seasonId ?? undefined,
           tunables.starting,
-          empire.hero?.heroClass ?? "WARLORD"
+          empire.hero?.heroClass ?? "WARLORD",
+          // Carried across the rebuild: a reset must not readmit a staff
+          // empire to the competition.
+          empire.isStaff
         ),
       });
     });
@@ -1744,7 +1757,7 @@ export async function setDiamondEffect(
   }
 }
 
-const guildSpellSchema = z.enum(["ATTACK", "DEFENSE", "SPY", "RESOURCES"]);
+const guildSpellSchema = z.enum(["ATTACK", "DEFENSE", "RESOURCES"]);
 
 /** Cast (or extend) a guild spell buff on this empire without a guild. */
 export async function grantGuildBuff(
@@ -2685,9 +2698,11 @@ export async function resetSeason(
         ? await archiveSeasonStandings(activeSeason.id)
         : 0;
 
-    // Carry over only the identity + diamond balance of each empire.
+    // Carry over only the identity + diamond balance of each empire — plus the
+    // staff flag, which is not a game asset but a statement about whether the
+    // account competes at all, and must survive a world restart.
     const empires = await prisma.empire.findMany({
-      select: { userId: true, name: true, diamonds: true },
+      select: { userId: true, name: true, diamonds: true, isStaff: true },
     });
 
     await prisma.$transaction(
@@ -2704,7 +2719,9 @@ export async function resetSeason(
             e.userId,
             e.name,
             activeSeason?.id,
-            tunables.starting
+            tunables.starting,
+            undefined,
+            e.isStaff
           );
           data.diamonds = e.diamonds;
           // No new-player shield on a season reset: everyone restarts equal and

@@ -3,6 +3,7 @@ import { cache } from "react";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getEmpireMilitaryPower } from "@/lib/game/power";
+import { notStaff } from "@/lib/staff";
 import { MINE_START_LEVEL, PRODUCTION_BUILDING_TYPES } from "@/lib/game/constants";
 import {
   ACHIEVEMENTS,
@@ -247,9 +248,11 @@ async function querySnapshot(
  *
  * Mirrors /game/rankings exactly — same bucket, same power figure, same
  * tie-break — because "first in the ranking" has to mean the row the player
- * sees at the top of that page. It is also the only O(bucket) query here,
- * which is why `needsRankScan` gates it: once the reward is collected the
- * question never has to be asked again.
+ * sees at the top of that page. That includes the staff exclusion: an admin
+ * empire is absent from the ladder, so it must be absent here too, or a player
+ * standing visibly first on the page would be told they are not. It is also the
+ * only O(bucket) query here, which is why `needsRankScan` gates it: once the
+ * reward is collected the question never has to be asked again.
  */
 async function computeIsRankOne(
   tx: Prisma.TransactionClient,
@@ -257,7 +260,7 @@ async function computeIsRankOne(
   cities: number
 ): Promise<boolean> {
   const bucket = await tx.empire.findMany({
-    where: { cities },
+    where: { ...notStaff, cities },
     select: {
       id: true,
       army: { select: { soldiers: true } },

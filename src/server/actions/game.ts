@@ -12,6 +12,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { isBanned } from "@/lib/ban";
+import { isStaffEmpire, STAFF_TARGET_REFUSAL } from "@/lib/staff";
 import { awardSeasonPassXp } from "@/server/seasonPassXp";
 import { captureSpyIntel } from "@/server/spyIntelCapture";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
@@ -598,15 +599,20 @@ async function spendTurns(
 }
 
 /**
- * Why a target may not be attacked or spied: it still holds a new-player shield,
- * or its owner is banned (a banned/dormant account must not be farmable). Returns
- * a user-facing reason, or null when the target is fair game.
+ * Why a target may not be attacked or spied: it belongs to the game's staff, it
+ * still holds a new-player shield, or its owner is banned (a banned/dormant
+ * account must not be farmable). Returns a user-facing reason, or null when the
+ * target is fair game.
+ *
+ * This is the single choke point both offensive actions pass through, which is
+ * why the staff check lives here and not in each of them.
  */
 async function targetBlockedReason(
   tx: Prisma.TransactionClient,
-  target: { id: string; protectedUntil: Date | null },
+  target: { id: string; protectedUntil: Date | null; isStaff: boolean },
   now: Date
 ): Promise<string | null> {
+  if (isStaffEmpire(target)) return STAFF_TARGET_REFUSAL;
   if (target.protectedUntil && target.protectedUntil > now) {
     return "האימפריה הזו מוגנת (שחקן חדש) — לא ניתן לתקוף או לרגל אותה עדיין.";
   }
@@ -696,20 +702,25 @@ export async function spyOnEmpire(
 
       // Spy missions resolve deterministically: the attacker's intelligence
       // power against the defender's. Both sides scale their raw spy power
-      // (spies + spy weapons) by their own intelligence upgrade (+10%/level).
-      // The attacker additionally gets its hero spy % and active guild spy
-      // spell as percentage-point bonuses. Strictly-greater wins — a tie fails.
+      // (spies + spy weapons) by their own intelligence upgrade (+10%/level),
+      // and the attacker adds its hero spy % on top. Strictly-greater wins —
+      // a tie fails.
+      //
+      // The guild spy spell used to add a flat percentage here and was deleted
+      // on 2026-08-03: it made the mission a question of what the guild had
+      // bought rather than of intelligence power. `SpyReport.guildBonus` is
+      // kept so old reports still itemise the bonus they were decided by; new
+      // ones leave it null.
       const attackerIntelLevel =
         attacker.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
       const defenderIntelLevel =
         defender.upgrades.find((u) => u.type === "INTELLIGENCE")?.level ?? 1;
-      const guildSpyBonusPct = await getActiveGuildBuffPct(empireId, "SPY", tx);
       const heroSpyBonusPct = heroBonuses(attacker.hero).totalPct.spy;
       const attackerIntel = getEmpireIntelPower(
         attacker.army,
         attacker.weapons,
         attackerIntelLevel,
-        guildSpyBonusPct + heroSpyBonusPct
+        heroSpyBonusPct
       );
       const defenderIntel = getEmpireIntelPower(
         defender.army,
@@ -734,7 +745,6 @@ export async function spyOnEmpire(
           success,
           attackerIntel,
           defenderIntel,
-          guildBonus: guildSpyBonusPct,
           turnsSpent: SPY_TURN_COST,
           ...(success
             ? {

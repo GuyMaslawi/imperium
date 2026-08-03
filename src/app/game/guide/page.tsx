@@ -136,8 +136,6 @@ import {
 import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CREATION_COST_DIAMONDS,
-  GUILD_SPELL_BUFF_HOURS,
-  GUILD_SPELL_MAX_LEVEL,
   GUILD_SPELL_META,
   GUILD_SPELL_TYPES,
   aidUpgradeCostGold,
@@ -1337,12 +1335,12 @@ export default async function GuidePage() {
                     <O>×</O>
                     <N>0.1</N>
                     <O>+</O>
-                    <V>גיבור% + ברית%</V>
+                    <V>גיבור%</V>
                     <O>)</O>
                   </>
                 }
                 legend={[
-                  { term: "התוקף בלבד", desc: "בונוס הגיבור וקסם הברית נספרים רק לתוקף." },
+                  { term: "התוקף בלבד", desc: "בונוס הגיבור נספר רק לתוקף." },
                   { term: "תיקו נכשל", desc: "צריך להיות גדול ממש מכוח המודיעין של היעד." },
                 ]}
                 example={
@@ -2151,11 +2149,11 @@ export default async function GuidePage() {
               <Lead>
                 ברית היא כוח משותף. הקמה עולה{" "}
                 <b className="nums">{GUILD_CREATION_COST_DIAMONDS}</b> יהלומים, והיא נותנת
-                שני דברים שונים לגמרי: <b>קסמים</b> אישיים ל־{GUILD_SPELL_BUFF_HOURS} שעות,
-                ו<b>עזרה פסיבית</b> שמחזקת כל חבר בכל קרב.
+                שני דברים שונים לגמרי: <b>קסמים</b> אישיים שנמשכים שעות ספורות, ו
+                <b>עזרה פסיבית</b> שמחזקת כל חבר בכל קרב.
               </Lead>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {GUILD_SPELL_TYPES.map((type) => {
                   const meta = GUILD_SPELL_META[type];
                   return (
@@ -2168,7 +2166,7 @@ export default async function GuidePage() {
                         {meta.description}
                       </p>
                       <p className="mt-2 text-[11px] text-emerald-300">
-                        {meta.effectLabel(GUILD_SPELL_MAX_LEVEL)} (בשיא)
+                        {meta.effectLabel(meta.maxLevel)} (בשיא)
                       </p>
                     </div>
                   );
@@ -2195,9 +2193,15 @@ export default async function GuidePage() {
                     </>
                   }
                   legend={[
-                    { term: "תקרה", desc: `${GUILD_SPELL_MAX_LEVEL}% — רמת הקסם היא הבונוס עצמו.` },
+                    {
+                      term: "תקרה",
+                      desc: `${GUILD_SPELL_META.ATTACK.maxLevel}% — רמת הקסם היא הבונוס עצמו.`,
+                    },
                     { term: "שדרוג", desc: `${nf(spellUpgradeCostDiamonds(1))} יהלומים לרמה 2, וכן הלאה (40 × הרמה הבאה).` },
-                    { term: "הטלה בשיא", desc: `${spellCastCostDiamonds(GUILD_SPELL_MAX_LEVEL)} יהלומים ל־${GUILD_SPELL_BUFF_HOURS} שעות.` },
+                    {
+                      term: "הטלה בשיא",
+                      desc: `${spellCastCostDiamonds("ATTACK", GUILD_SPELL_META.ATTACK.maxLevel)} יהלומים ל־${GUILD_SPELL_META.ATTACK.buffHours} שעות.`,
+                    },
                   ]}
                 />
                 <Formula

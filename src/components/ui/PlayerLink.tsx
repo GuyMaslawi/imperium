@@ -21,19 +21,35 @@ export function PlayerLink({
   name,
   className = "",
   title,
+  staff = false,
 }: {
   empireId: string | null | undefined;
   name: string;
   className?: string;
   /** Tooltip; defaults to naming what the link opens. */
   title?: string;
+  /**
+   * Render as the game's own account: molten gold with a highlight travelling
+   * across it (`.staff-name` in globals.css).
+   *
+   * Off by default and passed explicitly, rather than looked up in here. This
+   * component is deliberately hook-free and query-free so client tables and
+   * server pages can both render it, and every caller that can actually *show*
+   * a staff empire — chat, mail, a guild roster, the dossier itself — already
+   * has the flag in the row it is drawing. Everywhere else a staff empire is
+   * simply absent (see src/lib/staff.ts), so there is nothing to decorate.
+   */
+  staff?: boolean;
 }) {
-  if (!empireId) return <span className={className}>{name}</span>;
+  // The gradient fill replaces the colour utilities a caller passes, so the
+  // staff class goes last and the two are never both meaningful.
+  const cls = `${className} ${staff ? "staff-name" : ""}`.trim();
+  if (!empireId) return <span className={cls}>{name}</span>;
   return (
     <Link
       href={`/game/empires/${empireId}`}
-      title={title ?? `הפרופיל של ${name}`}
-      className={`underline-offset-4 hover:text-gold-bright hover:underline ${className}`}
+      title={title ?? (staff ? `הנהלת המשחק — ${name}` : `הפרופיל של ${name}`)}
+      className={`underline-offset-4 hover:text-gold-bright hover:underline ${cls}`}
     >
       {name}
     </Link>

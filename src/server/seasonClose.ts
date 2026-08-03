@@ -4,6 +4,9 @@ import type { Prisma, SeasonBoardKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { formatGameDateTime } from "@/lib/game/time";
 import { announceToDiscord, gameLink } from "@/server/discord";
+import { notStaff } from "@/lib/staff";
+import { prizeForRank } from "@/lib/game/prizes";
+import { formatNumber } from "@/lib/game/format";
 
 /**
  * The end of a season, and the gate it closes behind it.
@@ -123,6 +126,10 @@ async function buildPodium(
   tx: Prisma.TransactionClient
 ): Promise<ChampionSnapshot[]> {
   const empires = await tx.empire.findMany({
+    // Staff are not contestants and cannot take a podium place — see
+    // src/lib/staff.ts. Excluded here rather than after the sort, so an admin
+    // sitting at the top of the power column does not cost the podium a rank.
+    where: notStaff,
     orderBy: { militaryPower: "desc" },
     // Over-read a little so the hero tiebreak has something to reorder.
     take: PODIUM_SIZE * 4,
@@ -155,6 +162,22 @@ async function buildPodium(
       cities: e.cities,
       heroLevel: e.hero?.level ?? 1,
     }));
+}
+
+/**
+ * The podium **as it stands right now**, outside any transaction.
+ *
+ * Same function the close runs, deliberately: the prize screen promises
+ * diamonds to three specific seats, so it must rank exactly the way the archive
+ * will — same power column, same hero tiebreak, same exclusion of staff. Two
+ * queries that merely look alike would drift, and the drift would only show up
+ * on the one night it matters.
+ *
+ * Nothing here is cached: a podium seat can change hands with a single attack,
+ * and the read is bounded (twelve rows) — see server/rankingsLadder.ts.
+ */
+export async function getLivePodium(): Promise<ChampionSnapshot[]> {
+  return buildPodium(prisma);
 }
 
 /** One archived row of one hall board, before it is given its season stamps. */
@@ -193,6 +216,7 @@ async function buildHallBoards(
 ): Promise<HallBoardSnapshot[]> {
   const [byPower, bySpy, byGuild] = await Promise.all([
     tx.empire.findMany({
+      where: notStaff,
       orderBy: { militaryPower: "desc" },
       // Over-read so the hero tiebreak has something to reorder, as buildPodium does.
       take: HALL_BOARD_SIZE * 4,
@@ -206,6 +230,7 @@ async function buildHallBoards(
       },
     }),
     tx.empire.findMany({
+      where: notStaff,
       orderBy: [{ spyPower: "desc" }, { name: "asc" }],
       take: HALL_BOARD_SIZE,
       select: {
@@ -221,7 +246,10 @@ async function buildHallBoards(
       SELECT g.name, COUNT(m.id) AS members, SUM(e."militaryPower") AS power
       FROM "Guild" g
       JOIN "GuildMember" m ON m."guildId" = g.id
-      JOIN "Empire" e ON e.id = m."empireId"
+      -- A staff member inside a guild lends it none of their power (see
+      -- src/lib/staff.ts) — the join drops them, so the guild is ranked on
+      -- what its actual contestants built.
+      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false
       GROUP BY g.id, g.name
       ORDER BY power DESC NULLS LAST
       LIMIT ${HALL_BOARD_SIZE}
@@ -313,21 +341,25 @@ async function buildRecap(
     battleTotals,
   ] = await Promise.all([
     tx.empire.findMany({
+      where: notStaff,
       orderBy: { militaryPower: "desc" },
       take: RECAP_BOARD_SIZE,
       select: { name: true, militaryPower: true, cities: true },
     }),
     tx.empire.findMany({
+      where: notStaff,
       orderBy: { spyPower: "desc" },
       take: RECAP_BOARD_SIZE,
       select: { name: true, spyPower: true },
     }),
     tx.empire.findMany({
+      where: notStaff,
       orderBy: { army: { mineSlaves: "desc" } },
       take: RECAP_BOARD_SIZE,
       select: { name: true, army: { select: { mineSlaves: true } } },
     }),
     tx.empire.findMany({
+      where: notStaff,
       orderBy: { bankAccount: { goldBalance: "desc" } },
       take: RECAP_BOARD_SIZE,
       select: { name: true, bankAccount: { select: { goldBalance: true } } },
@@ -336,19 +368,25 @@ async function buildRecap(
       SELECT g.name, COUNT(m.id) AS members, SUM(e."militaryPower") AS power
       FROM "Guild" g
       JOIN "GuildMember" m ON m."guildId" = g.id
-      JOIN "Empire" e ON e.id = m."empireId"
+      -- Staff lend their guild no power — same rule as buildHallBoards.
+      JOIN "Empire" e ON e.id = m."empireId" AND e."isStaff" = false
       GROUP BY g.id, g.name
       ORDER BY power DESC NULLS LAST
       LIMIT ${RECAP_BOARD_SIZE}
     `,
     tx.battleReport.groupBy({
       by: ["attackerEmpireId"],
-      where: { createdAt: { gte: since }, stolenGold: { gt: 0 } },
+      where: {
+        createdAt: { gte: since },
+        stolenGold: { gt: 0 },
+        attackerEmpire: notStaff,
+      },
       _sum: { stolenGold: true },
       orderBy: { _sum: { stolenGold: "desc" } },
       take: RECAP_BOARD_SIZE,
     }),
-    tx.empire.count(),
+    // "How many played this season" — the staff empires were not playing it.
+    tx.empire.count({ where: notStaff }),
     tx.guild.count(),
     tx.battleReport.aggregate({
       where: { createdAt: { gte: since } },
@@ -571,6 +609,100 @@ async function archiveSeason(
   return written;
 }
 
+/** One champion who was actually paid, for the announcement afterwards. */
+export interface PrizePayment {
+  rank: number;
+  empireId: string;
+  empireName: string;
+  diamonds: number;
+}
+
+/**
+ * Credit the podium its diamonds — the season's prizes, paid by the game.
+ *
+ * Runs inside the closing transaction, so the three facts are one fact: the
+ * season is sealed, the podium is in the hall, and the winners have been paid.
+ * There is no cron and no admin step in the middle; the first request to cross
+ * `endsAt` pays for all of it, exactly like the archive above.
+ *
+ * Idempotent twice over. The close is already behind the `closedAt` mutex, so
+ * this normally runs once per season; on top of that every credit is a guarded
+ * `updateMany` on `prizePaidAt: null`, so a champion cannot be paid twice even
+ * if a future path calls this again.
+ *
+ * Three deliberate choices:
+ *  - It reads the **archived rows**, not `buildPodium`'s return value. Those
+ *    rows are what the hall publishes (a season the admin archived early keeps
+ *    its original podium under `skipDuplicates`), and paying anyone else would
+ *    mean the game pays a player it does not name as champion.
+ *  - The credit is `updateMany`, not `update`: a champion whose empire was
+ *    deleted between archiving and paying must be a no-op, not a P2025 that
+ *    rolls back the entire close and leaves the game unsealed.
+ *  - The amount is written onto the champion row. `SEASON_PRIZES` is a balance
+ *    constant that will change; what a past champion was actually paid must not
+ *    change with it.
+ */
+async function payPodiumPrizes(
+  tx: Prisma.TransactionClient,
+  seasonId: string,
+  seasonName: string,
+  now: Date
+): Promise<PrizePayment[]> {
+  const champions = await tx.seasonChampion.findMany({
+    where: { seasonId, prizePaidAt: null, empireId: { not: null } },
+    orderBy: { rank: "asc" },
+    select: { id: true, rank: true, empireId: true, empireName: true },
+  });
+
+  const paid: PrizePayment[] = [];
+  for (const champ of champions) {
+    const diamonds = prizeForRank(champ.rank);
+    // A podium deeper than the prize table pays nothing — the rank is still a
+    // record, it simply carries no purse.
+    if (diamonds <= 0 || !champ.empireId) continue;
+
+    const credited = await tx.empire.updateMany({
+      where: { id: champ.empireId },
+      data: { diamonds: { increment: diamonds } },
+    });
+    // The empire is gone. Leave the row unpaid rather than stamping it: the
+    // record then tells the truth about what happened, and an admin who
+    // restores the account can still settle it.
+    if (credited.count === 0) continue;
+
+    const claimed = await tx.seasonChampion.updateMany({
+      where: { id: champ.id, prizePaidAt: null },
+      data: { prizeDiamonds: diamonds, prizePaidAt: now },
+    });
+    if (claimed.count === 0) continue;
+
+    // The receipt, in the winner's own inbox. `createdAt` is set explicitly —
+    // the column default writes local time, three hours off Prisma's UTC (see
+    // the note on Message in the schema).
+    await tx.message.create({
+      data: {
+        empireId: champ.empireId,
+        kind: "SYSTEM",
+        title: `🏆 פרס העונה — מקום ${champ.rank}`,
+        body:
+          `סיימת את ${seasonName} במקום ${champ.rank}. ` +
+          `${formatNumber(diamonds)} יהלומים נכנסו לחשבונך אוטומטית. כל הכבוד!`,
+        href: "/game/prizes",
+        createdAt: now,
+      },
+    });
+
+    paid.push({
+      rank: champ.rank,
+      empireId: champ.empireId,
+      empireName: champ.empireName,
+      diamonds,
+    });
+  }
+
+  return paid;
+}
+
 /**
  * Archive a season's standings **without ending it** — the admin path.
  *
@@ -605,8 +737,9 @@ export async function archiveSeasonStandings(seasonId: string): Promise<number> 
  * microsecond apart would both pass a read-then-write check and both go on to
  * archive. The loser does no work and returns `false`.
  *
- * Archiving happens *inside* the same transaction as the stamp, so a season can
- * never end up sealed with an empty hall of fame.
+ * Archiving *and paying the podium* happen inside the same transaction as the
+ * stamp, so a season can never end up sealed with an empty hall of fame, nor
+ * with a published podium whose winners were never paid.
  *
  * Returns whether *this* call was the one that closed it.
  */
@@ -629,6 +762,8 @@ export async function closeSeason(
       if (claimed.count === 0) return null;
 
       await archiveSeason(tx, season);
+      // The prizes, in the same breath as the seal — see payPodiumPrizes.
+      await payPodiumPrizes(tx, season.id, season.name, now);
       return season.name;
     },
     { timeout: 30_000 }
@@ -646,7 +781,7 @@ export async function closeSeason(
       where: { seasonId },
       orderBy: { rank: "asc" },
       take: 3,
-      select: { rank: true, empireName: true, playerName: true },
+      select: { rank: true, empireName: true, playerName: true, prizeDiamonds: true },
     });
     const medals = ["🥇", "🥈", "🥉"];
     await announceToDiscord({
@@ -660,7 +795,12 @@ export async function closeSeason(
               .map(
                 (row) =>
                   `${medals[row.rank - 1] ?? ""} **${row.empireName}**` +
-                  (row.playerName ? ` (${row.playerName})` : "")
+                  (row.playerName ? ` (${row.playerName})` : "") +
+                  // Only if it was actually credited — an unpaid row (a deleted
+                  // empire) must not be announced as having collected.
+                  (row.prizeDiamonds > 0
+                    ? ` — ${formatNumber(row.prizeDiamonds)} 💎`
+                    : "")
               )
               .join("\n")
           : "הסיזן נסגר בלי פודיום.") +

@@ -104,8 +104,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { role: target } });
+  // The role and the empire's `isStaff` flag are one decision, written
+  // together: the flag is what keeps an admin off every leaderboard and out of
+  // reach of attacks and spies (see src/lib/staff.ts). `updateMany` on the
+  // empire because an admin need not have one yet.
+  await prisma.$transaction([
+    prisma.user.update({ where: { id: user.id }, data: { role: target } }),
+    prisma.empire.updateMany({
+      where: { userId: user.id },
+      data: { isStaff: target === "ADMIN" },
+    }),
+  ]);
   console.log(`\n✅ ${email} is now ${target}.`);
+  console.log(
+    target === "ADMIN"
+      ? "   Their empire is now out of the game: unattackable, unspyable, unranked."
+      : "   Their empire is back in the game and will be ranked again."
+  );
 }
 
 main()

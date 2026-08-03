@@ -30,6 +30,8 @@ import { TIERS_PER_CATEGORY } from "../src/lib/game/weapons";
 import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
+  GUILD_SPELL_META,
+  guildSpellMaxLevel,
 } from "../src/lib/game/guild";
 import {
   HERO_MAX_HEALTH,
@@ -245,6 +247,22 @@ async function main() {
     await fix(
       `ברית ${g.name}: קיבולת ${g.capacityLevel}→${capacityLevel}, עזרה ${g.aidLevel}→${aidLevel}`,
       () => prisma.guild.update({ where: { id: g.id }, data: { capacityLevel, aidLevel } })
+    );
+  }
+
+  // Spell ceilings are per spell and were lowered on 2026-08-03, so guilds that
+  // had bought past the new cap still hold the old level. `guildSpellBonusPct`
+  // clamps what they actually receive; this settles the stored number so the
+  // shop and the ledger agree.
+  const spells = await prisma.guildSpell.findMany({
+    select: { id: true, type: true, level: true, guild: { select: { name: true } } },
+  });
+  for (const s of spells) {
+    const level = Math.min(guildSpellMaxLevel(s.type), s.level);
+    if (level === s.level) continue;
+    await fix(
+      `ברית ${s.guild.name}: ${GUILD_SPELL_META[s.type].label} ${s.level}→${level}`,
+      () => prisma.guildSpell.update({ where: { id: s.id }, data: { level } })
     );
   }
 

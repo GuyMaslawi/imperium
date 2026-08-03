@@ -591,8 +591,17 @@ export function ChatDock({
                 line.mine ? "" : "flex-row-reverse"
               }`}
             >
+              {/* A staff line wears the molten-gold name in all three shapes —
+                  the chip beside it says *what* the speaker is, the name says
+                  it at a glance while scrolling. `.staff-name` sets its own
+                  colour (a gradient fill), so it overrides the text-* utility
+                  rather than sitting alongside it. */}
               {line.mine ? (
-                <span className="text-[11px] font-black text-gold">
+                <span
+                  className={`text-[11px] font-black text-gold ${
+                    line.staff ? "staff-name" : ""
+                  }`}
+                >
                   {line.name}
                 </span>
               ) : line.empireId ? (
@@ -600,12 +609,18 @@ export function ChatDock({
                   type="button"
                   onClick={() => openThread(line.empireId!, line.name)}
                   title="פתיחת שיחה פרטית"
-                  className="text-[11px] font-black text-gold-bright hover:underline"
+                  className={`text-[11px] font-black text-gold-bright hover:underline ${
+                    line.staff ? "staff-name" : ""
+                  }`}
                 >
                   {line.name}
                 </button>
               ) : (
-                <span className="text-[11px] font-black text-bone-dim">
+                <span
+                  className={`text-[11px] font-black text-bone-dim ${
+                    line.staff ? "staff-name" : ""
+                  }`}
+                >
                   {line.name}
                 </span>
               )}

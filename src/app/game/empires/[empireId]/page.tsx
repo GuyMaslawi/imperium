@@ -15,6 +15,7 @@ import { ShieldBadges } from "@/components/game/ShieldBadges";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActiveShields } from "@/lib/game/diamondEffects";
 import { sharedGuild } from "@/lib/game/guildAllies";
+import { isStaffEmpire } from "@/lib/staff";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { SHIELDS } from "@/lib/game/diamondShop";
 import { HeroPaperdoll } from "@/components/game/HeroPaperdoll";
@@ -143,7 +144,11 @@ export default async function EmpireProfilePage({
   // Espionage and combat are confined to your own city — an empire is "in your
   // city" when it holds the same number of cities as you.
   const sameCity = empire.cities === myEmpire.cities;
-  const canEngage = !isMe && sameCity;
+  // Staff are not targets at all (src/lib/staff.ts). The server refuses the
+  // action either way — this only keeps the buttons from being offered, so the
+  // page says why instead of spending the click to find out.
+  const staffTarget = isStaffEmpire(empire);
+  const canEngage = !isMe && sameCity && !staffTarget;
   // Guildmates never raid each other (see lib/game/guildAllies.ts). Only the
   // attack half is off — a spy mission against an ally still runs.
   const allied = isMe ? null : await sharedGuild(myEmpire.id, empire.id);
@@ -196,10 +201,21 @@ export default async function EmpireProfilePage({
           keyboard decides whether the raid below finds a bank account or an empty
           treasury. */}
       <SectionHeading
-        title={empire.name}
+        title={
+          // The staff dossier is the one place a player lands after clicking a
+          // shimmering name in chat, so the name has to still be shimmering
+          // when they get here — otherwise the treatment reads as a chat badge
+          // rather than as who this account is.
+          staffTarget ? <span className="staff-name">{empire.name}</span> : empire.name
+        }
         subtitle={
           <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
             <span>{empire.user.name}</span>
+            {staffTarget && (
+              <span className="shrink-0 rounded-full border border-gold/40 bg-gold/15 px-2 py-0.5 text-xs font-black text-gold-bright">
+                הנהלת המשחק
+              </span>
+            )}
             {/* The city used to ride here as a bare name after a middot —
                 "דן · תדמור" — which reads as part of the player's name unless
                 you already know the catalog. It is labelled and tiered now,
@@ -354,6 +370,13 @@ export default async function EmpireProfilePage({
                     currentTurns={myEmpire.turns}
                     attackBlockedReason={allied ? "בן ברית — אין תקיפה" : null}
                   />
+                ) : staffTarget ? (
+                  <p className="text-sm text-zinc-400">
+                    אין כאן פעולות מלחמה — האימפריה הזו שייכת להנהלת המשחק ואינה
+                    משתתפת בו: אי אפשר לתקוף אותה או לרגל אחריה, והיא אינה נספרת
+                    בשום טבלת מובילים. דואר, לעומת זאת, עובר: אפשר לכתוב להנהלה
+                    מכאן.
+                  </p>
                 ) : (
                   <p className="text-sm text-zinc-400">
                     אין כאן פעולות מלחמה — האימפריה הזו יושבת בעיר אחרת. דואר, לעומת

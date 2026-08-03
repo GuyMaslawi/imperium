@@ -39,12 +39,14 @@ import {
 import {
   GUILD_AID_MAX_LEVEL,
   GUILD_CAPACITY_MAX_LEVEL,
-  GUILD_SPELL_MAX_LEVEL,
+  GUILD_SPELL_TYPES,
   aidUpgradeCostGold,
   capacityUpgradeCostGold,
   guildAidPct,
   guildCapacity,
   guildSpellBonusPct,
+  guildSpellBuffHours,
+  guildSpellMaxLevel,
   spellUpgradeCostDiamonds,
 } from "@/lib/game/guild";
 import {
@@ -283,7 +285,7 @@ describe("guild economy", () => {
     for (let l = 1; l < GUILD_AID_MAX_LEVEL; l++) {
       expect(aidUpgradeCostGold(l + 1)).toBeGreaterThan(aidUpgradeCostGold(l));
     }
-    for (let l = 1; l < GUILD_SPELL_MAX_LEVEL; l++) {
+    for (let l = 1; l < 30; l++) {
       expect(spellUpgradeCostDiamonds(l + 1)).toBeGreaterThan(
         spellUpgradeCostDiamonds(l)
       );
@@ -292,10 +294,26 @@ describe("guild economy", () => {
 
   it("keeps every bonus inside its advertised ceiling", () => {
     expect(guildAidPct(GUILD_AID_MAX_LEVEL)).toBeLessThanOrEqual(GUILD_AID_MAX_LEVEL);
-    expect(guildSpellBonusPct(GUILD_SPELL_MAX_LEVEL)).toBeLessThanOrEqual(
-      GUILD_SPELL_MAX_LEVEL
-    );
     expect(guildCapacity(GUILD_CAPACITY_MAX_LEVEL)).toBeGreaterThan(guildCapacity(1));
+  });
+
+  // Ceilings are per spell, and a row bought before a ceiling was lowered is
+  // still in the database at its old level — the clamp is what keeps it from
+  // paying out the bonus it was sold at.
+  it("clamps every spell to its own ceiling, however high the stored level", () => {
+    for (const type of GUILD_SPELL_TYPES) {
+      const max = guildSpellMaxLevel(type);
+      expect(guildSpellBonusPct(type, max)).toBe(max);
+      expect(guildSpellBonusPct(type, max + 25)).toBe(max);
+      expect(guildSpellBonusPct(type, -3)).toBe(0);
+    }
+  });
+
+  it("caps attack, defence and resources at 10% for 6 hours", () => {
+    for (const type of ["ATTACK", "DEFENSE", "RESOURCES"] as const) {
+      expect(guildSpellMaxLevel(type)).toBe(10);
+      expect(guildSpellBuffHours(type)).toBe(6);
+    }
   });
 });
 

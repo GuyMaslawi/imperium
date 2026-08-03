@@ -203,7 +203,12 @@ function collectEffects(intel: SpyIntel, now: number): EffectRow[] {
   }
 
   for (const spell of intel.spells) {
+    // Reports are frozen snapshots, so one written before a spell was retired
+    // still names it — the spy spell, deleted on 2026-08-03, is the case that
+    // exists. An unknown type has no meta to draw, so drop the row rather than
+    // crash the whole dossier on it.
     const meta = GUILD_SPELL_META[spell.type];
+    if (!meta) continue;
     rows.push({
       id: `spell-${spell.type}`,
       icon: meta.icon,
@@ -211,7 +216,7 @@ function collectEffects(intel: SpyIntel, now: number): EffectRow[] {
       effect: meta.effectLabel(Math.round(spell.pct)),
       expiresAt: Date.parse(spell.expiresAt),
       tone: "border-violet-400/40 bg-violet-500/10 text-violet-300",
-      critical: spell.type === "DEFENSE" || spell.type === "SPY",
+      critical: spell.type === "DEFENSE",
     });
   }
 

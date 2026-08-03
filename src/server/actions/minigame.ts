@@ -344,6 +344,23 @@ export async function submitMiniGameGuess(
         return { state: null, feedback: "בחר ניחוש תקין", tone: "error" as const };
       }
 
+      // Staff may watch a release but never enter it: the board is a race for a
+      // real prize, and an account that can be gifted the diamonds anyway has no
+      // business on it. Refusing the entry is also what keeps them off the
+      // board — `loadBoards` ranks MiniGameEntry rows, so an empire that never
+      // gets one can never appear there. See src/lib/staff.ts.
+      const player = await tx.empire.findUnique({
+        where: { id: empireId },
+        select: { isStaff: true },
+      });
+      if (!player || player.isStaff) {
+        return {
+          state: null,
+          feedback: "חשבון הנהלה אינו משתתף במשחקי הצד",
+          tone: "info" as const,
+        };
+      }
+
       const entry = await tx.miniGameEntry.upsert({
         where: { eventId_empireId: { eventId: event.id, empireId } },
         create: { eventId: event.id, empireId },

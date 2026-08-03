@@ -33,6 +33,7 @@ const SOLO_TIER = 91;
 const TIE_TIER = 92;
 const PAGED_TIER = 93;
 const PRESENCE_TIER = 94;
+const STAFF_TIER = 95;
 
 afterAll(async () => {
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
@@ -50,7 +51,8 @@ async function makeEmpire(
   power: number,
   hero: { level: number; resets: number } | null = { level: 1, resets: 0 },
   soldiers = 0,
-  lastSeenAt: Date | null = null
+  lastSeenAt: Date | null = null,
+  isStaff = false
 ): Promise<Fixture> {
   const user = await prisma.user.create({
     data: {
@@ -72,6 +74,7 @@ async function makeEmpire(
       // what keeps it true is tests/db/empirePower.test.ts, not this file.
       militaryPower: power,
       lastSeenAt,
+      isStaff,
     },
   });
   await prisma.army.create({ data: { empireId: empire.id, soldiers } });
@@ -212,6 +215,34 @@ describe("getCityLadderPage", () => {
     const mine = await getCityLadderPage(PRESENCE_TIER, away.id, NaN);
     expect(mine.rows.find((r) => r.id === away.id)?.online).toBe(true);
     expect(mine.rows.find((r) => r.id === never.id)?.online).toBe(false);
+  });
+
+  it("leaves staff empires out of the tier entirely", async () => {
+    // The staff empire is the strongest thing in the tier — the case that
+    // matters, because if the exclusion were applied *after* the ORDER BY it
+    // would still eat the top row and the page would come back one short.
+    const staff = await makeEmpire("staff", STAFF_TIER, 9_000, null, 0, null, true);
+    const first = await makeEmpire("staff-first", STAFF_TIER, 5_000, null, 0, null);
+    const second = await makeEmpire("staff-second", STAFF_TIER, 1_000, null, 0, null);
+
+    const seen = await getCityLadderPage(STAFF_TIER, "nobody", NaN);
+
+    // Absent from the rows, and not counted in the size of the tier — a player
+    // reading "3 empires" and seeing two would be reading a broken page.
+    expect(seen.rows.map((r) => r.id)).toEqual([first.id, second.id]);
+    expect(seen.total).toBe(2);
+
+    // And the exclusion moves the ranks up rather than leaving a hole: the
+    // strongest real empire is rank 1, not rank 2 behind an invisible row.
+    expect((await pageFor(STAFF_TIER, first)).myRank).toBe(1);
+    expect((await pageFor(STAFF_TIER, second)).myRank).toBe(2);
+
+    // The staff empire reading its own tier still gets a page (its `myRank` is
+    // hypothetical, but a zero there would land it on nothing) — it simply
+    // never finds itself on it.
+    const theirs = await pageFor(STAFF_TIER, staff);
+    expect(theirs.rows.map((r) => r.id)).not.toContain(staff.id);
+    expect(theirs.page).toBeGreaterThanOrEqual(1);
   });
 
   it("reads an empty tier without pretending it has a page of rows", async () => {

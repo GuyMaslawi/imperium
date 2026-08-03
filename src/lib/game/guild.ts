@@ -33,10 +33,10 @@ export function capacityUpgradeCostGold(level: number): number {
 /**
  * Guild aid pools the whole guild's strength: every member fights with a flat
  * power bonus equal to `aidLevel`% of the guild's total military power — both
- * when attacking and when being attacked — up to a 10% cap. Level starts at 0
+ * when attacking and when being attacked — up to a 15% cap. Level starts at 0
  * (no aid) and any member can raise it by paying from their own gold.
  */
-export const GUILD_AID_MAX_LEVEL = 10;
+export const GUILD_AID_MAX_LEVEL = 15;
 
 export function guildAidPct(level: number): number {
   return Math.min(GUILD_AID_MAX_LEVEL, Math.max(0, level));
@@ -54,32 +54,29 @@ export function aidUpgradeCostGold(level: number): number {
 
 /**
  * Guild help is measured in power: each spell's level IS its bonus percent.
- * It starts at 1% and the shop upgrades it up to the 30% help cap.
+ * It starts at 1% and the shop upgrades it up to that spell's own ceiling.
+ *
+ * The ceiling and the window are **per spell**, not one global pair. All three
+ * were cut to +10% for 6 hours on 2026-08-03: at the old 30% for 24 hours a
+ * guild that had bought the shop out simply lived with a third of its power for
+ * free, all day, on every member at once — the buff had stopped being a play
+ * and become a passive stat. Six hours makes casting a decision about *when*,
+ * and 10% keeps it a nudge rather than the battle.
+ *
+ * A fourth spell, `SPY`, was deleted the same day: spy missions are settled by
+ * intelligence power, and a guild-bought flat percentage on top of that made
+ * the mission about the shop instead. The enum value is gone from the schema.
  */
-export const GUILD_SPELL_MAX_LEVEL = 30;
-
-export function guildSpellBonusPct(level: number): number {
-  return Math.min(GUILD_SPELL_MAX_LEVEL, Math.max(0, level));
-}
-
-/** Diamond cost to upgrade a spell from `level` to `level + 1`. */
-export function spellUpgradeCostDiamonds(level: number): number {
-  return 40 * (level + 1);
-}
-
-/** Casting a spell grants the caster a personal buff for 24 hours. */
-export const GUILD_SPELL_BUFF_HOURS = 24;
-export const GUILD_SPELL_BUFF_MS = GUILD_SPELL_BUFF_HOURS * 60 * 60 * 1000;
-
-/** Diamond cost to cast a spell at the guild's current level. */
-export function spellCastCostDiamonds(level: number): number {
-  return 10 + guildSpellBonusPct(level) * 2;
-}
+const SPELL_HOURS = 6;
 
 export interface GuildSpellMeta {
   label: string;
   icon: IconName;
   description: string;
+  /** Highest level (= bonus percent) the shop will sell for this spell. */
+  maxLevel: number;
+  /** How long one cast holds on the caster. */
+  buffHours: number;
   /** Human-readable effect for a given bonus percent. */
   effectLabel: (pct: number) => string;
 }
@@ -89,29 +86,62 @@ export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
     label: "קסם התקפה",
     icon: "attack",
     description: "מגביר את כוח ההתקפה שלך בקרבות.",
-    effectLabel: (pct) => `+${pct}% לכוח ההתקפה למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
+    maxLevel: 10,
+    buffHours: SPELL_HOURS,
+    effectLabel: (pct) => `+${pct}% לכוח ההתקפה למשך ${SPELL_HOURS} שעות`,
   },
   DEFENSE: {
     label: "קסם הגנה",
     icon: "shield",
     description: "מגביר את כוח ההגנה שלך כשמתקיפים אותך.",
-    effectLabel: (pct) => `+${pct}% לכוח ההגנה למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
-  },
-  SPY: {
-    label: "קסם ריגול",
-    icon: "spy",
-    description: "משפר את סיכויי ההצלחה של משימות הריגול שלך.",
-    effectLabel: (pct) => `+${pct}% לסיכויי הריגול למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
+    maxLevel: 10,
+    buffHours: SPELL_HOURS,
+    effectLabel: (pct) => `+${pct}% לכוח ההגנה למשך ${SPELL_HOURS} שעות`,
   },
   RESOURCES: {
     label: "קסם משאבים",
     icon: "mine",
     description: "מאיץ את תפוקת המכרות של האימפריה שלך.",
-    effectLabel: (pct) => `+${pct}% לתפוקת המכרות למשך ${GUILD_SPELL_BUFF_HOURS} שעות`,
+    maxLevel: 10,
+    buffHours: SPELL_HOURS,
+    effectLabel: (pct) => `+${pct}% לתפוקת המכרות למשך ${SPELL_HOURS} שעות`,
   },
 };
 
 export const GUILD_SPELL_TYPES = Object.keys(GUILD_SPELL_META) as GuildSpellType[];
+
+/** This spell's ceiling — the level the shop refuses to upgrade past. */
+export function guildSpellMaxLevel(type: GuildSpellType): number {
+  return GUILD_SPELL_META[type].maxLevel;
+}
+
+/**
+ * The bonus a spell of `type` at `level` grants, clamped to that spell's
+ * ceiling. Rows bought before a ceiling was lowered stay in the database at
+ * their old level; clamping here is what makes them harmless.
+ */
+export function guildSpellBonusPct(type: GuildSpellType, level: number): number {
+  return Math.min(guildSpellMaxLevel(type), Math.max(0, level));
+}
+
+/** Diamond cost to upgrade a spell from `level` to `level + 1`. */
+export function spellUpgradeCostDiamonds(level: number): number {
+  return 40 * (level + 1);
+}
+
+/** How long one cast of `type` holds, in hours and in milliseconds. */
+export function guildSpellBuffHours(type: GuildSpellType): number {
+  return GUILD_SPELL_META[type].buffHours;
+}
+
+export function guildSpellBuffMs(type: GuildSpellType): number {
+  return guildSpellBuffHours(type) * 60 * 60 * 1000;
+}
+
+/** Diamond cost to cast a spell at the guild's current level. */
+export function spellCastCostDiamonds(type: GuildSpellType, level: number): number {
+  return 10 + guildSpellBonusPct(type, level) * 2;
+}
 
 /* ------------------------------ invitations ------------------------------ */
 

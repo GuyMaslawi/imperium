@@ -8,6 +8,7 @@ import {
   closeSeason,
   getHallOfFame,
 } from "@/server/seasonClose";
+import { SEASON_PRIZES } from "@/lib/game/prizes";
 
 /**
  * Sealing a season.
@@ -381,6 +382,92 @@ describe("hall boards", () => {
     expect(power.map((r) => r.name)).not.toContain(`${TAG}-latecomer`);
     // One row per rank, not two — the unique index is what settles the race.
     expect(new Set(power.map((r) => r.rank)).size).toBe(power.length);
+  });
+});
+
+describe("the podium's prizes", () => {
+  /** The account's balance, and what the archive says it was paid. */
+  async function purse(empireId: string) {
+    const empire = await prisma.empire.findUnique({
+      where: { id: empireId },
+      select: { diamonds: true },
+    });
+    return empire!.diamonds;
+  }
+
+  it("credits every place its diamonds the moment the season is sealed", async () => {
+    const [first, second, third] = await seatPodium("champ", "runner", "bronze");
+    const before = await purse(first.id);
+
+    await closeSeason(seasonId);
+
+    // The whole point: no admin step, no collect button — the balance moved.
+    expect(await purse(first.id)).toBe(before + SEASON_PRIZES[0].diamonds);
+    expect(await purse(second.id)).toBe(before + SEASON_PRIZES[1].diamonds);
+    expect(await purse(third.id)).toBe(before + SEASON_PRIZES[2].diamonds);
+
+    const champs = await championsOf(seasonId);
+    expect(champs.map((c) => c.prizeDiamonds)).toEqual(
+      SEASON_PRIZES.map((p) => p.diamonds)
+    );
+    expect(champs.every((c) => c.prizePaidAt instanceof Date)).toBe(true);
+
+    // And each winner is told, in his own inbox.
+    const receipt = await prisma.message.findFirst({
+      where: { empireId: first.id, kind: "SYSTEM", href: "/game/prizes" },
+    });
+    expect(receipt?.title).toContain("מקום 1");
+  });
+
+  it("pays exactly once under a simultaneous burst", async () => {
+    const [first] = await seatPodium("once", "b", "c");
+    const before = await purse(first.id);
+
+    // The same twelve page loads that race for the close race for the purse.
+    await Promise.all(Array.from({ length: 12 }, () => closeSeason(seasonId)));
+
+    expect(await purse(first.id)).toBe(before + SEASON_PRIZES[0].diamonds);
+  });
+
+  it("pays nothing when the admin only saves the standings", async () => {
+    const [first] = await seatPodium("saved", "b", "c");
+    const before = await purse(first.id);
+
+    // Recording a podium is not declaring the season over, so no money moves.
+    await archiveSeasonStandings(seasonId);
+
+    expect(await purse(first.id)).toBe(before);
+    const champs = await championsOf(seasonId);
+    expect(champs.every((c) => c.prizePaidAt === null)).toBe(true);
+    expect(champs.every((c) => c.prizeDiamonds === 0)).toBe(true);
+  });
+
+  it("pays the saved standings when the clock later closes the season", async () => {
+    const [first] = await seatPodium("later", "b", "c");
+    const before = await purse(first.id);
+
+    await archiveSeasonStandings(seasonId);
+    await closeSeason(seasonId);
+
+    expect(await purse(first.id)).toBe(before + SEASON_PRIZES[0].diamonds);
+  });
+
+  it("leaves a champion whose empire is gone unpaid, and still closes", async () => {
+    const [first] = await seatPodium("vanished", "b", "c");
+
+    // Archived while he existed, wiped before the season was sealed.
+    await archiveSeasonStandings(seasonId);
+    await prisma.user.deleteMany({ where: { email: `vanished@${TAG}.test` } });
+
+    expect(await closeSeason(seasonId)).toBe(true);
+
+    const champs = await championsOf(seasonId);
+    const ghost = champs.find((c) => c.empireId === first.id);
+    // His place is history; the purse never left the game.
+    expect(ghost?.prizePaidAt).toBeNull();
+    expect(ghost?.prizeDiamonds).toBe(0);
+    // The rest of the podium was still paid.
+    expect(champs.filter((c) => c.prizePaidAt !== null)).toHaveLength(2);
   });
 });
 

@@ -13,13 +13,14 @@ import {
   GUILD_CREATION_COST_DIAMONDS,
   GUILD_INVITE_TTL_HOURS,
   GUILD_ROLE_META,
-  GUILD_SPELL_MAX_LEVEL,
+  GUILD_SPELL_META,
   GUILD_SPELL_TYPES,
   aidUpgradeCostGold,
   capacityUpgradeCostGold,
   guildAidPct,
   guildCapacity,
   guildSpellBonusPct,
+  guildSpellMaxLevel,
   spellCastCostDiamonds,
   spellUpgradeCostDiamonds,
 } from "@/lib/game/guild";
@@ -36,6 +37,20 @@ export const metadata = { title: "הברית שלי | KRALDOR" };
 
 /** How many guilds the recruitment browser lists. */
 const GUILD_BROWSE_LIMIT = 100;
+
+/**
+ * Embers rising off the brazier: `[left %, delay s, duration s, drift px]`.
+ * A fixed table, never `Math.random()` — the server and the first client render
+ * have to agree on every one of these numbers.
+ */
+const EMBERS: [number, number, number, number][] = [
+  [38, 0, 5.4, -14],
+  [46, 1.7, 6.2, 9],
+  [54, 3.1, 5.8, -7],
+  [61, 0.9, 6.6, 13],
+  [44, 4.3, 5.1, 16],
+  [57, 2.4, 6.9, -11],
+];
 
 /**
  * The hall at the top of both guild views: war banners on the wall, a hearth
@@ -64,6 +79,22 @@ function GuildHall({
       <span className="gd-banner gd-banner-r" aria-hidden />
       <span className="gd-banner gd-banner-l" aria-hidden />
       <span className="gd-hearth" aria-hidden />
+      {/* Sparks off the brazier — they only rise once someone is seated. */}
+      {EMBERS.map(([left, delay, duration, drift], i) => (
+        <span
+          key={i}
+          className="gd-ember"
+          aria-hidden
+          style={
+            {
+              left: `${left}%`,
+              animationDelay: `${delay}s`,
+              animationDuration: `${duration}s`,
+              "--drift": `${drift}px`,
+            } as CSSProperties
+          }
+        />
+      ))}
 
       <div className="gd-body text-center">
         {children}
@@ -158,13 +189,14 @@ async function NoGuildView({
           </p>
 
           <ul className="space-y-2">
-            {invites.map((invite) => {
+            {invites.map((invite, index) => {
               const capacity = guildCapacity(invite.guild.capacityLevel);
               const memberCount = invite.guild._count.members;
               return (
                 <li
                   key={invite.id}
-                  className="panel-inset flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-3 py-2.5"
+                  className="panel-inset gd-row flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-3 py-2.5"
+                  style={{ "--i": index } as CSSProperties}
                 >
                   <span className="text-sm font-bold text-gold-bright">
                     {invite.guild.name}
@@ -239,13 +271,16 @@ async function NoGuildView({
                   </tr>
                 </thead>
                 <tbody>
-                  {guilds.map((guild) => {
+                  {guilds.map((guild, index) => {
                     const capacity = guildCapacity(guild.capacityLevel);
                     const memberCount = guild._count.members;
                     return (
                       <tr
                         key={guild.id}
-                        className="border-b border-border-subtle last:border-0"
+                        className="gd-row border-b border-border-subtle last:border-0"
+                        // Capped: this browser lists up to 100 guilds and a
+                        // linear delay would leave the tail sitting blank.
+                        style={{ "--i": Math.min(index, 12) } as CSSProperties}
                       >
                         <td className="py-3 pr-2">
                           <span className="font-semibold text-zinc-100">
@@ -329,6 +364,11 @@ export default async function GuildPage() {
                 select: {
                   id: true,
                   name: true,
+                  // A staff member in the guild is named in molten gold on the
+                  // roster — they lend it no power and never take the field in
+                  // the war (see src/lib/staff.ts), so the roster has to say so
+                  // rather than count them as a fighter.
+                  isStaff: true,
                   // Collapsed to a boolean before it reaches the roster below —
                   // the raw heartbeat never becomes a prop.
                   lastSeenAt: true,
@@ -450,6 +490,7 @@ export default async function GuildPage() {
                     <PlayerLink
                       empireId={member.empireId}
                       name={member.empire.name}
+                      staff={member.empire.isStaff}
                     />
                     {member.empireId === empire.id && (
                       <span className="mr-1 text-xs text-gold-dim">(אתה)</span>
@@ -538,13 +579,17 @@ export default async function GuildPage() {
           </span>
         </div>
         <p className="mb-4 text-xs text-zinc-500">
-          קסמי התקפה, הגנה, משאבים וריגול נקנים ב
-          <span className="font-semibold text-cyan-300">יהלומים</span> אישיים. שדרוג קסם מעלה את עזרת הקסם לכל החברים —
-          כל אחד עד {GUILD_SPELL_MAX_LEVEL}% — והטלה מעניקה לך באפ אישי ל־24 שעות.
+          קסמי התקפה, הגנה ומשאבים נקנים ב
+          <span className="font-semibold text-cyan-300">יהלומים</span> אישיים. שדרוג קסם
+          מעלה את עזרת הקסם לכל החברים, והטלה מעניקה לך באפ אישי של עד{" "}
+          <span className="font-semibold text-gold-dim">
+            {GUILD_SPELL_META.ATTACK.maxLevel}% ל־{GUILD_SPELL_META.ATTACK.buffHours} שעות
+          </span>
+          .
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {GUILD_SPELL_TYPES.map((type) => {
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {GUILD_SPELL_TYPES.map((type, index) => {
             const level = spellLevelByType.get(type) ?? 1;
             // Resolve the "active until HH:MM" label here (server-side) so the
             // client card never reads the clock during render.
@@ -560,13 +605,15 @@ export default async function GuildPage() {
               <GuildShopCard
                 key={type}
                 type={type}
-                bonusPct={guildSpellBonusPct(level)}
+                index={index}
+                bonusPct={guildSpellBonusPct(type, level)}
+                maxPct={guildSpellMaxLevel(type)}
                 upgradeCost={
-                  level >= GUILD_SPELL_MAX_LEVEL
+                  level >= guildSpellMaxLevel(type)
                     ? null
                     : spellUpgradeCostDiamonds(level)
                 }
-                castCost={spellCastCostDiamonds(level)}
+                castCost={spellCastCostDiamonds(type, level)}
                 activeLabel={activeLabel}
                 diamonds={diamonds}
               />
