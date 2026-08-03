@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { BossMove, BossTactic } from "@prisma/client";
 import {
+  BOSS_CASUALTIES,
   BOSS_CHIP_SHARE,
   BOSS_FURY_MAX,
   BOSS_FURY_ON_MISREAD,
@@ -185,7 +186,11 @@ describe("resolving a round", () => {
     expect(r.routed).toBe(true);
   });
 
-  it("routs an army wiped to the last soldier", () => {
+  // Every assertion about blood from here on is gated on the mechanic being on.
+  // The assault is bloodless (BOSS_ROUND_LOSS_BASE = 0) and these tests hold its
+  // balance, so they wait rather than being deleted — re-deriving it from scratch
+  // is the alternative. "a bloodless assault" below asserts what is true *now*.
+  it.runIf(BOSS_CASUALTIES)("routs an army wiped to the last soldier", () => {
     const r = resolveBossRound(
       baseInput({ soldiers: 1, soldiersAtStart: 1, bossHp: 1e9, move: "SMASH", tactic: "ASSAULT" }),
       noJitter
@@ -344,7 +349,7 @@ describe("the balance the whole fight rests on", () => {
     expect(bossSortiesToKill(0, maxHp, 1, true)).toBe(Infinity);
   });
 
-  it("routs an army that misreads everything", () => {
+  it.runIf(BOSS_CASUALTIES)("routs an army that misreads everything", () => {
     // Misreads pick the wrong cell; the worst of them, over a full assault, has to
     // reach the rout line or the rout rule would be unreachable.
     const worstPerRound = MOVES.reduce(
@@ -390,23 +395,26 @@ describe("pricing the blood against the wall", () => {
     expect(bossLossScale(1_000, 0)).toBe(1);
   });
 
-  it("keeps the blood-per-loot ratio the same for a small empire as for a big one", () => {
-    // The whole point. Loot is pro-rata against the pool, so the price has to be
-    // pro-rata against the wall or being small is a punishment on its own.
-    const priced = (power: number) => {
-      const loot = bossChipFraction(bossExpectedSortieDamage(power, 1, true), maxHp);
-      const blood =
-        bossExpectedSortieLosses(1_000, 1, true, bossLossScale(power, wall)) / 1_000;
-      return blood / loot;
-    };
-    // A third of the wall against parity: the same deal, to the decimal.
-    expect(priced(wall / 3) / priced(wall)).toBeCloseTo(1, 6);
-    // Under the floor the deal does get worse — that is what the floor is for —
-    // but by a fraction rather than by the order of magnitude it used to be.
-    expect(priced(wall / 20) / priced(wall)).toBeLessThan(6);
-  });
+  it.runIf(BOSS_CASUALTIES)(
+    "keeps the blood-per-loot ratio the same for a small empire as for a big one",
+    () => {
+      // The whole point. Loot is pro-rata against the pool, so the price has to be
+      // pro-rata against the wall or being small is a punishment on its own.
+      const priced = (power: number) => {
+        const loot = bossChipFraction(bossExpectedSortieDamage(power, 1, true), maxHp);
+        const blood =
+          bossExpectedSortieLosses(1_000, 1, true, bossLossScale(power, wall)) / 1_000;
+        return blood / loot;
+      };
+      // A third of the wall against parity: the same deal, to the decimal.
+      expect(priced(wall / 3) / priced(wall)).toBeCloseTo(1, 6);
+      // Under the floor the deal does get worse — that is what the floor is for —
+      // but by a fraction rather than by the order of magnitude it used to be.
+      expect(priced(wall / 20) / priced(wall)).toBeLessThan(6);
+    }
+  );
 
-  it("takes a real bite out of what a small empire used to bleed", () => {
+  it.runIf(BOSS_CASUALTIES)("takes a real bite out of what a small empire used to bleed", () => {
     // The case that prompted this: 350 soldiers marching at the first tyrant with
     // under a third of its power, losing ~45 of them for a sliver of the haul.
     const soldiers = 350;
@@ -419,7 +427,7 @@ describe("pricing the blood against the wall", () => {
     expect(after / soldiers).toBeLessThan(BOSS_ROUT_LOSS_FRACTION / 3);
   });
 
-  it("bleeds a scaled army less over a whole simulated assault", () => {
+  it.runIf(BOSS_CASUALTIES)("bleeds a scaled army less over a whole simulated assault", () => {
     const small = { attackPower: 3_500, soldiers: 350, bossHp: maxHp, heroLevel: 1, heroAlive: true };
     const unscaled = simulateBossSortie(small, () => 0.5);
     const scaled = simulateBossSortie({ ...small, bossPower: wall }, () => 0.5);
@@ -445,13 +453,16 @@ describe("pricing the blood against the wall", () => {
 describe("projecting what an assault costs", () => {
   // The banner prints this number *before* the turns are paid, so it has to be
   // the same trade the simulation actually makes.
-  it("prices a full assault in the tenth-to-quarter band, never the whole army", () => {
-    const green = bossExpectedSortieLosses(1_000, 1, true);
-    expect(green).toBeGreaterThan(1_000 * 0.05);
-    expect(green).toBeLessThan(1_000 * BOSS_ROUT_LOSS_FRACTION);
-  });
+  it.runIf(BOSS_CASUALTIES)(
+    "prices a full assault in the tenth-to-quarter band, never the whole army",
+    () => {
+      const green = bossExpectedSortieLosses(1_000, 1, true);
+      expect(green).toBeGreaterThan(1_000 * 0.05);
+      expect(green).toBeLessThan(1_000 * BOSS_ROUT_LOSS_FRACTION);
+    }
+  );
 
-  it("makes the hero the defensive stat: a better read bleeds less", () => {
+  it.runIf(BOSS_CASUALTIES)("makes the hero the defensive stat: a better read bleeds less", () => {
     const rookie = bossExpectedSortieLosses(1_000, 1, true);
     const veteran = bossExpectedSortieLosses(1_000, 60, true);
     const corpse = bossExpectedSortieLosses(1_000, 60, false);
@@ -463,6 +474,72 @@ describe("projecting what an assault costs", () => {
   it("never projects more casualties than the army that marched", () => {
     expect(bossExpectedSortieLosses(3, 1, false)).toBeLessThanOrEqual(3);
     expect(bossExpectedSortieLosses(0, 1, true)).toBe(0);
+  });
+});
+
+/**
+ * The promise as it stands: marching on the tyrant costs turns and nothing else.
+ *
+ * Asserted through the public surface rather than by reading the constant, so it
+ * covers the whole path a player meets — one round, a whole assault, and the
+ * figure the banner quotes before any of it is paid for.
+ */
+describe.runIf(!BOSS_CASUALTIES)("a bloodless assault", () => {
+  it("agrees with itself about whether blood is on", () => {
+    expect(BOSS_CASUALTIES).toBe(BOSS_ROUND_LOSS_BASE > 0);
+  });
+
+  it("costs nothing even in the worst cell of the matrix", () => {
+    // ASSAULT into a SMASH — 1.8x casualties, the most expensive round there is.
+    const r = resolveBossRound(
+      baseInput({
+        move: "SMASH",
+        tactic: "ASSAULT",
+        soldiers: 1_000,
+        soldiersAtStart: 1_000,
+        bossHp: 1e9,
+      }),
+      () => 0.99
+    );
+    expect(r.soldiersLost).toBe(0);
+    expect(r.routed).toBe(false);
+    // The damage side is untouched — this is a change to the price, not the fight.
+    expect(r.damage).toBeGreaterThan(0);
+  });
+
+  it("brings the whole army home from an assault that goes badly", () => {
+    // A tiny army against a bottomless pool with a dead hero: the run that used
+    // to break the formation before round three.
+    const plan = simulateBossSortie(
+      {
+        attackPower: 1,
+        soldiers: 10,
+        bossHp: 1e9,
+        bossPower: bossPower(1),
+        heroLevel: 1,
+        heroAlive: false,
+      },
+      () => 0.99
+    );
+    expect(plan.soldiersLost).toBe(0);
+    expect(plan.routed).toBe(false);
+    expect(plan.outcome).toBe("SPENT");
+    expect(plan.rounds).toHaveLength(BOSS_SORTIE_ROUNDS);
+    expect(plan.rounds.every((r) => r.soldiersLost === 0)).toBe(true);
+  });
+
+  it("quotes no price on the banner either", () => {
+    expect(bossExpectedSortieLosses(1_000, 1, true)).toBe(0);
+    expect(bossExpectedSortieLosses(1_000, 1, false, bossLossScale(1, bossPower(1)))).toBe(0);
+  });
+
+  it("hands every sortie the preservation quarter of the grade", () => {
+    // With nothing lost the grade is the reads alone, on the ladder the
+    // BOSS_GRADE_MIN_DECISIONS note describes for a clean army: one good read in
+    // a one-round kill is a B, three are an S.
+    expect(bossGrade(1, 1, 0)).toBe("B");
+    expect(bossGrade(2, 2, 0)).toBe("A");
+    expect(bossGrade(3, 3, 0)).toBe("S");
   });
 });
 
@@ -503,7 +580,7 @@ describe("simulating a whole assault", () => {
     expect(plan.bossHpAfter).toBe(0);
   });
 
-  it("stops at a rout and reports it", () => {
+  it.runIf(BOSS_CASUALTIES)("stops at a rout and reports it", () => {
     // A tiny army against a huge pool: casualties reach the rout line long before
     // the health does.
     const plan = simulateBossSortie(

@@ -4,6 +4,7 @@ import { Tip } from "@/components/ui/Tip";
 import { formatNumber } from "@/lib/game/format";
 import { BOSS_REWARD_RESOURCES, bossImage } from "@/lib/game/bosses";
 import {
+  BOSS_CASUALTIES,
   BOSS_CHIP_SHARE,
   BOSS_GRADE_BONUS,
   BOSS_KILL_SHARE,
@@ -228,9 +229,17 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               until the report — you marched, lost a fifth of the army and found
               out afterwards, which is exactly how a fight starts reading as a
               scam. Damage, loot and casualties are all projections from the same
-              formulas the assault resolves with (see bossExpectedSortie*). */}
+              formulas the assault resolves with (see bossExpectedSortie*).
+
+              The casualty column only exists while casualties do: with the
+              assault bloodless it would quote a permanent "~0 ⚔", which reads as
+              a mechanic that might yet bite rather than one that is gone. */}
           {!dead && !activeBattleId && soldiers > 0 && (
-            <div className="grid gap-x-3 gap-y-1.5 rounded-lg border border-border-subtle bg-black/40 px-2.5 py-2 text-[11px] sm:grid-cols-3">
+            <div
+              className={`grid gap-x-3 gap-y-1.5 rounded-lg border border-border-subtle bg-black/40 px-2.5 py-2 text-[11px] ${
+                BOSS_CASUALTIES ? "sm:grid-cols-3" : "sm:grid-cols-2"
+              }`}
+            >
               <div>
                 <p className="font-bold text-gold-dim">תקיפה אחת תוריד לו</p>
                 <p className="nums mt-0.5 text-right font-black text-gold-bright" dir="ltr">
@@ -262,13 +271,15 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                   )}
                 </div>
               </div>
-              <div>
-                <p className="font-bold text-gold-dim">ותעלה לך</p>
-                <p className="nums mt-0.5 text-right font-black text-red-300" dir="ltr">
-                  ~{formatNumber(Math.round(expectedSortieLosses))} ⚔
-                  <span className="font-normal text-zinc-500"> ({Math.round(lossPct)}%)</span>
-                </p>
-              </div>
+              {BOSS_CASUALTIES && (
+                <div>
+                  <p className="font-bold text-gold-dim">ותעלה לך</p>
+                  <p className="nums mt-0.5 text-right font-black text-red-300" dir="ltr">
+                    ~{formatNumber(Math.round(expectedSortieLosses))} ⚔
+                    <span className="font-normal text-zinc-500"> ({Math.round(lossPct)}%)</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -284,11 +295,18 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               <span className="nums" dir="ltr">
                 {formatNumber(turnCost)}
               </span>{" "}
-              תורות ובערך{" "}
-              <span className="nums" dir="ltr">
-                {formatNumber(Math.round(expectedSortieLosses))}
-              </span>{" "}
-              חיילים. השלל הגדול (
+              תורות
+              {BOSS_CASUALTIES && (
+                <>
+                  {" "}
+                  ובערך{" "}
+                  <span className="nums" dir="ltr">
+                    {formatNumber(Math.round(expectedSortieLosses))}
+                  </span>{" "}
+                  חיילים
+                </>
+              )}
+              . השלל הגדול (
               <span className="nums" dir="ltr">
                 {Math.round(BOSS_KILL_SHARE * 100)}%
               </span>{" "}
@@ -356,16 +374,25 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                   לוחצים תקיפה פעם אחת. הצבא יוצא ל־
                   <b className="nums">{roundsPerSortie}</b> סבבים לאורך כדקה, ובכל סבב הקצינים
                   מנסים לקרוא את המהלך של {boss.name} ולענות עליו. קריאה נכונה מכפילה את הנזק
-                  ומבטלת כמעט את האבדות; קריאה שגויה עושה את ההפוך. הסיכוי לקרוא נכון תלוי{" "}
-                  <b>ברמת הגיבור שלך</b> — כרגע{" "}
+                  {BOSS_CASUALTIES && " ומבטלת כמעט את האבדות"}; קריאה שגויה עושה את ההפוך.
+                  הסיכוי לקרוא נכון תלוי <b>ברמת הגיבור שלך</b> — כרגע{" "}
                   <b className="nums text-gold-bright" dir="ltr">
                     {Math.round(readChance * 100)}%
                   </b>
-                  . אבדות של{" "}
-                  <span className="nums" dir="ltr">
-                    {Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}%
-                  </span>{" "}
-                  מבריחות את הצבא באמצע הקרב.
+                  .{" "}
+                  {BOSS_CASUALTIES ? (
+                    <>
+                      אבדות של{" "}
+                      <span className="nums" dir="ltr">
+                        {Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}%
+                      </span>{" "}
+                      מבריחות את הצבא באמצע הקרב.
+                    </>
+                  ) : (
+                    <b className="text-emerald-300">
+                      הקרב לא עולה לך אף חייל — הצבא חוזר שלם תמיד, והמחיר היחיד הוא התורות.
+                    </b>
+                  )}
                 </p>
                 <ul className="mt-2 space-y-1">
                   {(["SMASH", "SWEEP", "EXPOSED"] as const).map((move) => {
@@ -419,8 +446,10 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               {/* -------- the two levers, and where the player stands on each --------
                   "What do I do to win?" had no answer anywhere in the game. It
                   has exactly two, and they are not interchangeable: attack power
-                  is the whole damage side, and the hero is the whole casualty
-                  side — nothing else in the empire touches the blood price. */}
+                  is how hard a round can hit, and the hero is how often it hits
+                  that hard — the reads, and the fury they charge. (While the
+                  assault drew blood the hero was also the whole casualty side;
+                  with it bloodless, both levers now point at damage.) */}
               <div className="border-t border-border-subtle pt-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
                   <Icon name="spark" size={13} /> איך מגדילים את הסיכויים
@@ -473,19 +502,21 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                       <span className="nums" dir="ltr">
                         1,000
                       </span>{" "}
-                      כוח, ונשקי תקיפה מוסיפים בלי לעלות בדם. שיקוי כוח, באפ גילדה וציוד גיבור
-                      נספרים גם הם.
+                      כוח, ונשקי תקיפה מוסיפים כוח{BOSS_CASUALTIES ? " בלי לעלות בדם" : " בלי לאמן אף חייל"}.
+                      שיקוי כוח, באפ גילדה וציוד גיבור נספרים גם הם.
                     </p>
                   </div>
 
-                  {/* casualty side */}
+                  {/* the reads — the hero's whole contribution to the fight */}
                   <div className="rounded-lg border border-border-subtle bg-panel-inset p-2.5">
                     <p className="text-[11px] font-bold text-sky-300">
-                      <Icon name="hero" size={12} className="inline-block align-middle" /> כדי לספוג
-                      פחות — הגיבור
+                      <Icon name="hero" size={12} className="inline-block align-middle" />{" "}
+                      {BOSS_CASUALTIES ? "כדי לספוג פחות — הגיבור" : "כדי לפגוע בכל סבב — הגיבור"}
                     </p>
                     <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
-                      אבדות נקבעות רק לפי אם הקצינים קראו את המהלך נכון. גיבור רמה{" "}
+                      {BOSS_CASUALTIES
+                        ? "אבדות נקבעות רק לפי אם הקצינים קראו את המהלך נכון. גיבור רמה "
+                        : "כמה נזק ייצא מהסבב נקבע לפי אם הקצינים קראו את המהלך נכון. גיבור רמה "}
                       <b className="nums text-zinc-200" dir="ltr">
                         {heroLevel}
                       </b>{" "}
@@ -493,12 +524,15 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                       <b className="nums text-gold-bright" dir="ltr">
                         {Math.round(readChance * 100)}%
                       </b>{" "}
-                      מהמהלכים, וסבב שנקרא נכון עולה כשליש מהדם של סבב שגוי — ומכפיל את הנזק.
+                      מהמהלכים
+                      {BOSS_CASUALTIES
+                        ? ", וסבב שנקרא נכון עולה כשליש מהדם של סבב שגוי — ומכפיל את הנזק."
+                        : ", וסבב שנקרא נכון מכפיל את הנזק מול סבב שנקרא לא נכון."}
                     </p>
                     {!heroAlive ? (
                       <p className="mt-1.5 rounded border border-red-500/40 bg-red-950/30 px-2 py-1 text-[11px] font-bold text-red-300">
-                        הגיבור שלך מת — הקצינים מנחשים, אין זעם, והאבדות כמעט מוכפלות. החייה אותו
-                        לפני שתתקוף.
+                        הגיבור שלך מת — הקצינים מנחשים ואין זעם
+                        {BOSS_CASUALTIES && ", והאבדות כמעט מוכפלות"}. החייה אותו לפני שתתקוף.
                       </p>
                     ) : (
                       <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">

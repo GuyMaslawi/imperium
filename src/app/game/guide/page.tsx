@@ -128,6 +128,7 @@ import {
   BOSS_MOVE_COUNTER,
   BOSS_READ_CHANCE_BASE,
   BOSS_READ_CHANCE_MAX,
+  BOSS_CASUALTIES,
   BOSS_READ_CHANCE_NO_HERO,
   BOSS_LOSS_ENGAGEMENT_FLOOR,
   BOSS_ROUT_LOOT_PENALTY,
@@ -919,9 +920,17 @@ export default async function GuidePage() {
                 })}
               </div>
 
-              <Note tone="purple" icon="army" title="חיילים לא מתים בקרב שחקנים">
-                בקרב מול שחקן אחר אף צד לא מאבד חיילים — הסיכון היחיד הוא התורות, ולמגן
-                גם הביזה והשבויים. חיילים <b>כן</b> מתים בקרב מול שליט עיר.
+              <Note tone="purple" icon="army" title="חיילים לא מתים בקרב">
+                אף צד לא מאבד חיילים — לא בקרב מול שחקן
+                {BOSS_CASUALTIES ? "" : " ולא בקרב מול שליט עיר"}. הסיכון היחיד הוא התורות, ולמגן
+                גם הביזה והשבויים.
+                {BOSS_CASUALTIES && (
+                  <>
+                    {" "}
+                    חיילים <b>כן</b> מתים בקרב מול שליט עיר.
+                  </>
+                )}{" "}
+                חייל שנלקח בשעבוד לא מת — הוא עובר להיות עבד מכרות אצל התוקף.
               </Note>
             </GuideSection>
 
@@ -2124,16 +2133,28 @@ export default async function GuidePage() {
                   },
                   {
                     term: "אוצר ההפלה",
-                    desc: `${Math.round(BOSS_KILL_SHARE * 100)}% נשמרים למכה שמפילה אותו, וגדלים עד ×${BOSS_GRADE_BONUS.S} בדירוג S — שנקבע לפי הקריאות הנכונות והצבא ששרד, ודורש לפחות ${BOSS_GRADE_MIN_DECISIONS} סבבים: הפלה במכה אחת לא מגיעה ל־S.`,
+                    desc: `${Math.round(BOSS_KILL_SHARE * 100)}% נשמרים למכה שמפילה אותו, וגדלים עד ×${BOSS_GRADE_BONUS.S} בדירוג S — שנקבע לפי הקריאות הנכונות${BOSS_CASUALTIES ? " והצבא ששרד" : ""}, ודורש לפחות ${BOSS_GRADE_MIN_DECISIONS} סבבים: הפלה במכה אחת לא מגיעה ל־S.`,
                   },
-                  {
-                    term: "אבדות לפי הכוח",
-                    desc: `האבדות נגבות ביחס לכוח שלך מול כוח הבוס: צבא בחצי מהכוח משלם חצי מהמחיר בדם, בדיוק כמו שהוא מקבל בערך חצי מהשלל. מתחת ל־${Math.round(BOSS_LOSS_ENGAGEMENT_FLOOR * 100)}% מכוח הבוס המחיר נעצר ולא יורד יותר — אבל אף פעם לא תשלם מחיר מלא על נגיסה קטנה.`,
-                  },
-                  {
-                    term: "שבירת הצבא",
-                    desc: `אם הצבא מאבד ${Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}% מכוחו הוא נסוג באמצע הקרב, ו-${Math.round((1 - BOSS_ROUT_LOOT_PENALTY) * 100)}% מהשלל שנצבר אובד. בפועל זה מאיים רק על צבא שנלחם מול בוס בסדר הגודל שלו.`,
-                  },
+                  // Both casualty entries stand or fall with the mechanic itself:
+                  // put blood back in BOSS_ROUND_LOSS_BASE and the guide grows
+                  // its price-of-blood section back on the same deploy.
+                  ...(BOSS_CASUALTIES
+                    ? [
+                        {
+                          term: "אבדות לפי הכוח",
+                          desc: `האבדות נגבות ביחס לכוח שלך מול כוח הבוס: צבא בחצי מהכוח משלם חצי מהמחיר בדם, בדיוק כמו שהוא מקבל בערך חצי מהשלל. מתחת ל־${Math.round(BOSS_LOSS_ENGAGEMENT_FLOOR * 100)}% מכוח הבוס המחיר נעצר ולא יורד יותר — אבל אף פעם לא תשלם מחיר מלא על נגיסה קטנה.`,
+                        },
+                        {
+                          term: "שבירת הצבא",
+                          desc: `אם הצבא מאבד ${Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}% מכוחו הוא נסוג באמצע הקרב, ו-${Math.round((1 - BOSS_ROUT_LOOT_PENALTY) * 100)}% מהשלל שנצבר אובד. בפועל זה מאיים רק על צבא שנלחם מול בוס בסדר הגודל שלו.`,
+                        },
+                      ]
+                    : [
+                        {
+                          term: "בלי אבדות",
+                          desc: "הקרב מול השליט לא עולה באף חייל — הצבא חוזר שלם מכל תקיפה, מוצלחת או לא. המחיר היחיד הוא התורות, ולכן תמיד שולחים את כל הצבא.",
+                        },
+                      ]),
                   {
                     term: "אין מכסה",
                     desc: `אפשר לתקוף שוב ושוב — התורות הן הגבול היחיד. השלל חסום ע\"י מאגר החיים, כך שתקיפות נוספות קונות התקדמות, לא כפל שלל. בוס שנופל חוזר אחרי ${Math.round(BOSS_REVIVE_MS / 60000)} דקות עם מאגר חדש.`,
@@ -2169,8 +2190,9 @@ export default async function GuidePage() {
                 {Math.round(BOSS_READ_CHANCE_BASE * 100)}–{Math.round(BOSS_READ_CHANCE_MAX * 100)}%
                 לניחוש עיוור של{" "}
                 <b className="nums">{Math.round(BOSS_READ_CHANCE_NO_HERO * 100)}%</b> — אחד
-                משלושה — וכל סבב שנקרא לא נכון גם מכפיל את האבדות. תחייה לפני התקיפה, לא
-                אחריה.
+                משלושה — וכל סבב שנקרא לא נכון{" "}
+                {BOSS_CASUALTIES ? "גם מכפיל את האבדות" : "מוריד את הנזק לשליש"}. תחייה לפני
+                התקיפה, לא אחריה.
               </Note>
             </GuideSection>
 

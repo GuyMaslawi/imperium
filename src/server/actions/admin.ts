@@ -652,7 +652,14 @@ export async function deleteUser(
 /*                       EMPIRE STATE EDIT                       */
 /* ============================================================= */
 
-/** Set the empire core scalars (resources, level, name, wheel spins). */
+/**
+ * Set the empire core scalars (resources, name, turns, wheel spins, cities).
+ *
+ * Deliberately does **not** touch `Empire.level`: that column is vestigial and
+ * no screen in the game reads it, so an editable "רמה" here was a trap — it
+ * saved happily and changed nothing the player could see. The level a player
+ * has is the hero's, and it is edited in the גיבור panel (`updateHero`).
+ */
 export async function updateEmpireCore(
   _prev: AdminActionState,
   formData: FormData
@@ -675,7 +682,6 @@ export async function updateEmpireCore(
       where: { id: empireId },
       data: {
         name,
-        level: Math.max(1, intNum(formData, "level")),
         gold: Math.max(0, num(formData, "gold")),
         wood: Math.max(0, num(formData, "wood")),
         iron: Math.max(0, num(formData, "iron")),

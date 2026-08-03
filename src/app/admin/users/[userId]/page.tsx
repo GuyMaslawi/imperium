@@ -292,7 +292,19 @@ export default async function AdminUserDetail({
               <input type="hidden" name="userId" value={user.id} />
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 <LabeledInput label="שם אימפריה" name="name" defaultValue={empire.name} required />
-                <LabeledInput label="רמה" name="level" type="number" min={1} max={ADMIN_INT_MAX} defaultValue={empire.level} />
+                {/* The empire's own "level" column is vestigial — nothing in the
+                    game reads it — so it is shown here, not edited: an editable
+                    field saved happily and changed nothing the player saw. The
+                    level a player has is the hero's, in the גיבור panel below. */}
+                <div className="block space-y-1">
+                  <span className="text-xs font-semibold text-gold-dim">רמה</span>
+                  <p className="rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-300">
+                    {empire.hero?.level ?? 1}
+                  </p>
+                  <span className="block text-[11px] text-zinc-500">
+                    רמת הגיבור — נערכת בפאנל &quot;גיבור&quot;
+                  </span>
+                </div>
                 <LabeledInput label={<ResourceFieldLabel resource="gold" text="זהב" />} name="gold" type="number" min={0} defaultValue={Math.round(empire.gold)} />
                 <LabeledInput label={<ResourceFieldLabel resource="wood" text="עץ" />} name="wood" type="number" min={0} defaultValue={Math.round(empire.wood)} />
                 <LabeledInput label={<ResourceFieldLabel resource="iron" text="ברזל" />} name="iron" type="number" min={0} defaultValue={Math.round(empire.iron)} />

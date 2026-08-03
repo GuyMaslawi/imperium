@@ -953,9 +953,11 @@ export async function attackEmpire(
       const winnerEmpireId = attackerWins ? attacker.id : defender.id;
 
       // Player-vs-player battles cost no lives: neither side loses soldiers,
-      // win or lose. Armies only die marching on a city boss (bossFight.ts),
-      // so the whole risk of a raid is the turns — and, for the defender, the
-      // plunder and the enslavement below.
+      // win or lose. Nothing in the game kills soldiers any more — the city
+      // boss stopped drawing blood too (see BOSS_ROUND_LOSS_BASE) — so the
+      // whole risk of a raid is the turns, and for the defender the plunder and
+      // the enslavement below. Enslaved soldiers are not casualties: they leave
+      // the defender's army and arrive alive in the attacker's slave pool.
       const attackerSoldiersLost = 0;
       const defenderSoldiersLost = 0;
 

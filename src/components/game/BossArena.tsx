@@ -9,6 +9,7 @@ import { formatNumber } from "@/lib/game/format";
 import { cityName } from "@/lib/game/cities";
 import { BOSS_REWARD_RESOURCES, bossImage } from "@/lib/game/bosses";
 import {
+  BOSS_CASUALTIES,
   BOSS_CHIP_SHARE,
   BOSS_KILL_SHARE,
   BOSS_MOVE_COUNTER,
@@ -421,28 +422,40 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             — הקצינים ענו ב{BOSS_TACTIC_META[last.tactic]?.label}
             {last.correct ? (
               <>
-                , וזו התשובה הנכונה: נזק כפול ובקושי אבדות (
+                , וזו התשובה הנכונה: נזק כפול{BOSS_CASUALTIES && " ובקושי אבדות"} (
                 <span className="nums" dir="ltr">
                   −{formatNumber(last.damage)}
                 </span>{" "}
-                חיים,{" "}
-                <span className="nums" dir="ltr">
-                  −{formatNumber(last.soldiersLost)}
-                </span>{" "}
-                חיילים).
+                חיים
+                {BOSS_CASUALTIES && (
+                  <>
+                    ,{" "}
+                    <span className="nums" dir="ltr">
+                      −{formatNumber(last.soldiersLost)}
+                    </span>{" "}
+                    חיילים
+                  </>
+                )}
+                ).
               </>
             ) : (
               <>
                 , וזו התשובה הלא נכונה — היה צריך{" "}
-                {BOSS_TACTIC_META[BOSS_MOVE_COUNTER[last.move]]?.label}. הנזק נחלש והמכה נכנסה (
+                {BOSS_TACTIC_META[BOSS_MOVE_COUNTER[last.move]]?.label}. הנזק נחלש (
                 <span className="nums" dir="ltr">
                   −{formatNumber(last.damage)}
                 </span>{" "}
-                חיים,{" "}
-                <span className="nums" dir="ltr">
-                  −{formatNumber(last.soldiersLost)}
-                </span>{" "}
-                חיילים).
+                חיים
+                {BOSS_CASUALTIES && (
+                  <>
+                    , והמכה נכנסה:{" "}
+                    <span className="nums" dir="ltr">
+                      −{formatNumber(last.soldiersLost)}
+                    </span>{" "}
+                    חיילים
+                  </>
+                )}
+                ).
               </>
             )}
           </>
@@ -481,31 +494,44 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             </span>
             <span className="nums text-sm font-black text-zinc-100" dir="ltr">
               {formatNumber(state.soldiersAtStart - state.soldiersLostSoFar)}
-              <span className="text-xs font-normal text-zinc-500">
-                {" "}
-                / {formatNumber(state.soldiersAtStart)}
-              </span>
+              {BOSS_CASUALTIES && (
+                <span className="text-xs font-normal text-zinc-500">
+                  {" "}
+                  / {formatNumber(state.soldiersAtStart)}
+                </span>
+              )}
             </span>
           </div>
-          <div className="h-2.5 overflow-hidden rounded-full border border-black/60 bg-white/5">
-            <span
-              className="block h-full rounded-full bg-gradient-to-l from-amber-400 to-amber-700 transition-[width] duration-500"
-              style={{
-                width: `${Math.min(100, (lossPct / (state.routLine * 100)) * 100)}%`,
-              }}
-            />
-          </div>
-          <p className="mt-1.5 text-[11px] text-zinc-500">
-            אבדות עד כה:{" "}
-            <span className="nums text-red-300" dir="ltr">
-              {formatNumber(state.soldiersLostSoFar)}
-            </span>{" "}
-            ({Math.round(lossPct)}%). הצבא נסוג אם יאבד{" "}
-            <span className="nums" dir="ltr">
-              {Math.round(state.routLine * 100)}%
-            </span>
-            .
-          </p>
+          {/* The attrition bar is the casualty mechanic's readout — with the
+              assault bloodless it would sit empty for the whole minute, which
+              reads as "not yet" rather than "never". */}
+          {BOSS_CASUALTIES ? (
+            <>
+              <div className="h-2.5 overflow-hidden rounded-full border border-black/60 bg-white/5">
+                <span
+                  className="block h-full rounded-full bg-gradient-to-l from-amber-400 to-amber-700 transition-[width] duration-500"
+                  style={{
+                    width: `${Math.min(100, (lossPct / (state.routLine * 100)) * 100)}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-1.5 text-[11px] text-zinc-500">
+                אבדות עד כה:{" "}
+                <span className="nums text-red-300" dir="ltr">
+                  {formatNumber(state.soldiersLostSoFar)}
+                </span>{" "}
+                ({Math.round(lossPct)}%). הצבא נסוג אם יאבד{" "}
+                <span className="nums" dir="ltr">
+                  {Math.round(state.routLine * 100)}%
+                </span>
+                .
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-emerald-300/80">
+              כל החיילים חוזרים הביתה — קרב מול הבוס לא עולה באף חייל.
+            </p>
+          )}
           <div className="mt-2">
             <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
               <span className="font-bold text-gold-dim">זעם הגיבור</span>
@@ -574,7 +600,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
               </span>
               <span className="shrink-0">התשובה שלנו</span>
               <span className="mr-auto shrink-0">נזק</span>
-              <span className="shrink-0">אבדות</span>
+              {BOSS_CASUALTIES && <span className="shrink-0">אבדות</span>}
             </div>
             <ul className="space-y-1">
               {[...state.revealed].reverse().map((entry) => (
@@ -611,9 +637,11 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                   <span className="nums mr-auto shrink-0 font-bold text-gold-bright" dir="ltr">
                     −{formatNumber(entry.damage)}
                   </span>
-                  <span className="nums shrink-0 text-red-300" dir="ltr">
-                    −{formatNumber(entry.soldiersLost)} ⚔
-                  </span>
+                  {BOSS_CASUALTIES && (
+                    <span className="nums shrink-0 text-red-300" dir="ltr">
+                      −{formatNumber(entry.soldiersLost)} ⚔
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -659,8 +687,9 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
               — הוא נקבע ברמת הגיבור.
             </li>
             <li>
-              <b className="text-zinc-200">3.</b> כשהמונה נגמר משולם השלל, נכנסות האבדות, ונשלחת
-              אליך הודעה עם הסיכום — גם אם עברת בינתיים למסך אחר.
+              <b className="text-zinc-200">3.</b> כשהמונה נגמר משולם השלל
+              {BOSS_CASUALTIES && ", נכנסות האבדות"}, ונשלחת אליך הודעה עם הסיכום — גם אם עברת
+              בינתיים למסך אחר.
             </li>
           </ol>
 
@@ -698,9 +727,18 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
               הזה.
             </p>
             <p className="rounded-lg border border-border-subtle bg-panel-inset p-2.5 text-[11px] leading-relaxed text-zinc-400">
-              <b className="text-sky-300">כדי לאבד פחות חיילים:</b> הגיבור. רמה גבוהה יותר = קריאות
-              נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם. גיבור מת מוריד את הקריאה לניחוש ומבטל את
-              הזעם.
+              {BOSS_CASUALTIES ? (
+                <>
+                  <b className="text-sky-300">כדי לאבד פחות חיילים:</b> הגיבור. רמה גבוהה יותר =
+                  קריאות נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם.
+                </>
+              ) : (
+                <>
+                  <b className="text-sky-300">כדי לקרוא אותו נכון יותר:</b> הגיבור. רמה גבוהה יותר =
+                  יותר סבבים שנקראים נכון, וכל אחד מהם מכפיל את הנזק.
+                </>
+              )}{" "}
+              גיבור מת מוריד את הקריאה לניחוש ומבטל את הזעם.
             </p>
           </div>
 

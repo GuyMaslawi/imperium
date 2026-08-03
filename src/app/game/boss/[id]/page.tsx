@@ -18,6 +18,7 @@ import {
 import { RESOURCE_META } from "@/lib/game/constants";
 import { BOSS_REWARD_RESOURCES, bossByKey, bossImage } from "@/lib/game/bosses";
 import {
+  BOSS_CASUALTIES,
   BOSS_GRADE_BONUS,
   BOSS_GRADE_LABEL,
   BOSS_GRADE_MIN_DECISIONS,
@@ -338,15 +339,24 @@ export default async function BossFightPage({
         </div>
       )}
 
-      {/* -------- aftermath -------- */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">אבדות שלך</p>
-          <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">
-            −{formatNumber(fight.soldiersLost)}{" "}
-            <Icon name="army" size={18} className="inline-block align-middle" />
-          </p>
-        </div>
+      {/* -------- aftermath --------
+          The casualty tile only appears while assaults draw blood; an old report
+          from when they did still shows it, so a player reading their history is
+          not told a fight that cost them 200 soldiers was free. */}
+      <div
+        className={`grid gap-4 sm:grid-cols-2 ${
+          BOSS_CASUALTIES || fight.soldiersLost > 0 ? "lg:grid-cols-4" : "lg:grid-cols-3"
+        }`}
+      >
+        {(BOSS_CASUALTIES || fight.soldiersLost > 0) && (
+          <div className="panel-inset rounded-xl p-4 text-center">
+            <p className="text-xs text-zinc-400">אבדות שלך</p>
+            <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">
+              −{formatNumber(fight.soldiersLost)}{" "}
+              <Icon name="army" size={18} className="inline-block align-middle" />
+            </p>
+          </div>
+        )}
         <div className="panel-inset rounded-xl p-4 text-center">
           <p className="text-xs text-zinc-400">סבבים שנלחמו</p>
           <p className="nums mt-1 text-xl font-black text-gold" dir="ltr">
@@ -417,10 +427,12 @@ export default async function BossFightPage({
                   <span className="nums mr-auto shrink-0 font-bold text-gold-bright" dir="ltr">
                     −{formatNumber(entry.damage)}
                   </span>
-                  <span className="nums shrink-0 text-red-300" dir="ltr">
-                    −{formatNumber(entry.soldiersLost)}{" "}
-                    <Icon name="army" size={12} className="inline-block align-middle" />
-                  </span>
+                  {(BOSS_CASUALTIES || entry.soldiersLost > 0) && (
+                    <span className="nums shrink-0 text-red-300" dir="ltr">
+                      −{formatNumber(entry.soldiersLost)}{" "}
+                      <Icon name="army" size={12} className="inline-block align-middle" />
+                    </span>
+                  )}
                 </li>
               );
             })}

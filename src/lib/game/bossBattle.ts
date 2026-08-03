@@ -99,8 +99,9 @@ export function bossAssaultDuration(rounds: number): number {
  *    to ~98% of the pool over six rounds including the fury: agonisingly short,
  *    and finished by a second assault.
  *  - a mid-level hero (~30) reads it 60% of the time and fells it in one.
- *  - misreads cost ~37% of the army against a 40% rout line, so an unlucky
- *    assault does not merely underperform — it risks breaking the formation.
+ *  - an unlucky assault underperforms and nothing more: since
+ *    {@link BOSS_ROUND_LOSS_BASE} went to zero it cannot break the formation, so
+ *    what a bad run costs is the turns and another march.
  *
  * These figures are asserted in tests/unit/bossBattle.test.ts, because every
  * multiplier below moves them and "can an army at the printed power fell this
@@ -135,26 +136,43 @@ export const BOSS_ROUND_DAMAGE_BASE = 0.8;
 
 /**
  * Soldiers one round costs, as a fraction of the army that marched, before the
- * matrix (~0.2–1.8). Six rounds of correct reads costs ~6% of the army; six
- * rounds at a level-1 hero's read rate ~13%; six rounds of pure misreads ~25%.
+ * matrix (~0.2–1.8).
  *
- * Measured against the army *at launch*, not the survivors, so the rout line
- * below is a straight cumulative fraction and the losses do not quietly taper as
- * the army shrinks.
+ * **Zero since 2026-08-03: the boss no longer kills soldiers.** Player raids
+ * stopped costing lives first (see the casualty note in server/actions/game.ts),
+ * which left the tyrant as the last place in the game where an army could
+ * actually shrink — and it was the wrong place for it. An army is the slowest
+ * thing in the empire to rebuild, so a bad run of misreads did not cost a fight,
+ * it cost the evening, and the honest response to that was to stop marching. A
+ * bloodless assault prices a sortie in turns alone: you always send everyone,
+ * and what varies is only how much of the tyrant you take off.
  *
- * **Retuned down from 0.045 (2026-07-31)**, because the price was being paid by
- * the wrong player. Casualties are a fraction of the *army*, while chip loot is a
- * fraction of the *boss's pool* — so an empire under the wall bled the same
- * percentage as one at parity while earning a sliver of the haul, and had to do
- * it a dozen times over to see a kill. A third off the blood is the part of that
- * gap this constant can close; the rest is honesty, and lives in the banner's
- * pre-attack projection (see `bossExpectedSortieLosses`).
+ * Nothing else here was deleted — the matrix's `taken` column, `bossLossScale`,
+ * the rout line and the projections are all intact and simply resolve to zero
+ * through this one number. Raising it above zero restores the whole casualty
+ * side, including the UI, which reads {@link BOSS_CASUALTIES}.
  *
- * A flat cut could only ever soften that, never fix it — the gap was a *ratio*, so
- * `bossLossScale` closes the rest of it by charging each army its own share of
- * this price. Read the two together: this is the full price, at the wall.
+ * The tuning it carried, for whoever brings it back: it was 0.03, retuned down
+ * from 0.045 on 2026-07-31 because casualties are a fraction of the *army* while
+ * chip loot is a fraction of the *boss's pool*, so an empire under the wall bled
+ * what one at parity bled for a sliver of the haul. `bossLossScale` closes the
+ * rest of that gap by charging each army its own share. At 0.03, six rounds of
+ * correct reads cost ~6% of the army, a level-1 hero's read rate ~13%, and six
+ * straight misreads ~25% — measured against the army *at launch*, not the
+ * survivors, so the rout line stays a straight cumulative fraction.
  */
-export const BOSS_ROUND_LOSS_BASE = 0.03;
+export const BOSS_ROUND_LOSS_BASE = 0;
+
+/**
+ * Whether an assault costs soldiers at all — the single switch every screen
+ * reads before it renders a casualty figure, a rout warning or the hero's
+ * survivability pitch.
+ *
+ * Derived rather than declared so the mechanic and the copy that explains it can
+ * never disagree: put blood back in {@link BOSS_ROUND_LOSS_BASE} and the banner,
+ * the arena and the report grow their casualty columns back on the same deploy.
+ */
+export const BOSS_CASUALTIES: boolean = BOSS_ROUND_LOSS_BASE > 0;
 
 /**
  * Cumulative losses that break the army. Reaching it ends the assault early as a
@@ -763,6 +781,13 @@ export const BOSS_GRADE_LABEL: Record<BossGrade, string> = {
  * The split is 0.75/0.25 rather than 0.7/0.3 because at the softer weighting the
  * preservation term alone floated a third of the reads correct up into a B: an
  * army strong enough to shrug off the casualties could guess its way to a bonus.
+ *
+ * While {@link BOSS_CASUALTIES} is off, `lossFraction` is always 0 and the
+ * preservation quarter is a constant every sortie collects — which is exactly the
+ * ladder the `BOSS_GRADE_MIN_DECISIONS` note below describes for "a clean army",
+ * so the grades land where they were designed to. It is left in the formula
+ * rather than folded into the thresholds so that restoring the blood restores the
+ * grade too.
  */
 export const BOSS_SCORE_ACCURACY_WEIGHT = 0.75;
 
