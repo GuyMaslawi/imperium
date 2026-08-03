@@ -4091,8 +4091,12 @@ export async function createBotEmpires(
     const spreadPct = clampLevel(optNum(formData, "spreadPct", 0), 0, BOT_SPREAD_MAX_PCT);
 
     const plans = await planBots({ cities, perCity, power, spreadPct });
-    const { created, failed } = await createBots(plans);
-    if (created === 0) return { error: "לא נוצר אף בוט — נסה שוב" };
+    const { created, failed, reason } = await createBots(plans);
+    if (created === 0) {
+      // The reason travels because "try again" was the wrong advice: a batch
+      // that failed on every bot failed for something a retry will not change.
+      return { error: `לא נוצר אף בוט${reason ? ` — ${reason}` : " — נסה שוב"}` };
+    }
 
     await logAdmin(admin, {
       action: "bots.create",

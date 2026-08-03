@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOT_MAX_STACK,
   BOT_NAME_SPACE,
   BOT_POWER_OF_BOSS,
   botDefaultPower,
@@ -128,6 +129,44 @@ describe("bot garrison", () => {
   it("carries an intelligence rating, so scouting it is a real check", () => {
     const garrison = botGarrison(100_000, 3, botHeroLevel(3));
     expect(garrison.spies * SPY_POWER).toBeGreaterThan(0);
+  });
+
+  it("keeps every stack inside an Int column, however rich the city it copies", () => {
+    // The figure that broke it: the lone tier-4 resident this feature exists for
+    // holds 4.4 trillion power, almost all of it in weapons. "Match the city"
+    // handed that to the garrison, a third of it went to soldiers at 10 power a
+    // head, and the insert died on int4 — every attempt, in that one city.
+    for (const asked of [4.4e12, 1e12, 1e15]) {
+      for (const tier of TIERS) {
+        const garrison = botGarrison(asked, tier, botHeroLevel(tier));
+        for (const stack of [
+          garrison.soldiers,
+          garrison.spies,
+          garrison.attackWeapons,
+          garrison.defenseWeapons,
+          garrison.spyWeapons,
+        ]) {
+          expect(stack).toBeLessThanOrEqual(BOT_MAX_STACK);
+          expect(Number.isSafeInteger(stack)).toBe(true);
+        }
+        // And the slaves that follow from the army, which land in one too.
+        expect(botMineSetup(tier, garrison.soldiers).slavesPerMine).toBeLessThanOrEqual(
+          BOT_MAX_STACK
+        );
+      }
+    }
+  });
+
+  it("holds a plausible body count and spends the rest on weapons", () => {
+    const rich = botGarrison(4.4e12, 4, botHeroLevel(4));
+    const plain = botGarrison(botDefaultPower(4), 4, botHeroLevel(4));
+    // Bodies do not scale with the request — a tier-4 empire fields a tier-4
+    // army whatever its arsenal is worth.
+    expect(rich.soldiers).toBe(plain.soldiers);
+    expect(rich.spies).toBe(plain.spies);
+    // The power still arrives, out of the arsenal.
+    expect(rich.attackWeapons).toBeGreaterThan(plain.attackWeapons);
+    expect(Math.abs(botRealisedPower(rich) - 4.4e12) / 4.4e12).toBeLessThan(0.05);
   });
 
   it("survives a zero or negative budget without inventing units", () => {

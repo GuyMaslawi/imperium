@@ -53,6 +53,21 @@ export const BOT_MIN_POWER = 1_000;
 /** Widest random spread (±%) around the requested power the admin may ask for. */
 export const BOT_SPREAD_MAX_PCT = 90;
 
+/**
+ * Hard ceiling on any single stack a garrison is built with.
+ *
+ * Every count a bot is stored as — soldiers, spies, each weapon quantity — lands
+ * in an `Int` column, and Postgres `int4` stops at 2,147,483,647. A stack past
+ * that is not a large bot, it is a failed insert: the whole plant throws and
+ * `createBots` reports the city as "nothing created", which is what a tier whose
+ * only resident is rich enough to size a bot past the column did.
+ *
+ * Kept an order of magnitude clear of the limit so the derived figures — the
+ * mine slaves that follow from the soldiers, a raider's share of them — have
+ * room of their own.
+ */
+export const BOT_MAX_STACK = 2_000_000_000;
+
 /** Bots an admin may create in one submit, across all selected cities. */
 export const BOT_BATCH_MAX = 50;
 
@@ -160,10 +175,34 @@ export interface BotGarrison {
   spyWeapons: number;
 }
 
-/** Whole units, never negative — a stack of 0.4 catapults is a stack of none. */
+/**
+ * Whole units, never negative — a stack of 0.4 catapults is a stack of none —
+ * and never past what the column holds (see {@link BOT_MAX_STACK}).
+ */
 function units(power: number, each: number): number {
   if (each <= 0) return 0;
-  return Math.max(0, Math.round(power / each));
+  return Math.min(BOT_MAX_STACK, Math.max(0, Math.round(power / each)));
+}
+
+/**
+ * The most power a bot spends on *bodies*, however much it is asked to field.
+ *
+ * A soldier is worth a flat {@link SOLDIER_POWER} while the weapon table pays
+ * ×2.5 a tier, so power at the top of the game lives in arsenals and not in men:
+ * the tier-4 resident this cap was written for carries 4.4 *trillion* power
+ * behind 1,890 soldiers. "Match the city" hands that whole figure here, and a
+ * third of it spent at 10 power a head asks for 150 billion soldiers — which is
+ * not a big garrison but a failed insert, and would be an economy-ending one if
+ * it landed: a won attack enslaves a share of the defender's soldiers, and that
+ * share of 150 billion is a purse no game recovers from.
+ *
+ * So the bodies are capped at what the tier's own yardstick buys — the boss
+ * curve, the game's statement of what an empire of this tier holds — and every
+ * point of power past it goes to the arsenal, which is exactly where the
+ * neighbour the bot is imitating keeps its own.
+ */
+function bodyBudget(power: number, cities: number): number {
+  return Math.min(power, botDefaultPower(cities));
 }
 
 /**
@@ -175,24 +214,33 @@ function units(power: number, each: number): number {
  */
 export function botGarrison(power: number, cities: number, heroLevel: number): BotGarrison {
   const budget = Math.max(0, power);
+  const bodies = bodyBudget(budget, cities);
+
+  // Whatever the soldier share could not spend on men rides on the arsenal
+  // instead, split between attack and defence in their own ratio — so the bot
+  // still fields the power it was asked for, out of the weapons a resident of
+  // this city would have bought it with.
+  const arms = POWER_SPLIT.attack + POWER_SPLIT.defense;
+  const surplus = (budget - bodies) * POWER_SPLIT.soldiers;
+  const attackPower = budget * POWER_SPLIT.attack + (surplus * POWER_SPLIT.attack) / arms;
+  const defensePower = budget * POWER_SPLIT.defense + (surplus * POWER_SPLIT.defense) / arms;
+  const spyWeaponPower = budget * SPY_SHARE * (1 - SPY_FROM_BODIES);
+
   // Sized off the smallest of the three shares, so no stack is the one that
   // rounds away at the tier the other two can afford.
   const weaponTier = botWeaponTier(
     cities,
     heroLevel,
-    budget * Math.min(POWER_SPLIT.attack, POWER_SPLIT.defense, SPY_SHARE * (1 - SPY_FROM_BODIES))
+    Math.min(attackPower, defensePower, spyWeaponPower)
   );
 
   return {
-    soldiers: units(budget * POWER_SPLIT.soldiers, SOLDIER_POWER),
-    spies: units(budget * SPY_SHARE * SPY_FROM_BODIES, SPY_POWER),
+    soldiers: units(bodies * POWER_SPLIT.soldiers, SOLDIER_POWER),
+    spies: units(bodies * SPY_SHARE * SPY_FROM_BODIES, SPY_POWER),
     weaponTier,
-    attackWeapons: units(budget * POWER_SPLIT.attack, weaponPowerAt("ATTACK", weaponTier)),
-    defenseWeapons: units(budget * POWER_SPLIT.defense, weaponPowerAt("DEFENSE", weaponTier)),
-    spyWeapons: units(
-      budget * SPY_SHARE * (1 - SPY_FROM_BODIES),
-      weaponPowerAt("SPY", weaponTier)
-    ),
+    attackWeapons: units(attackPower, weaponPowerAt("ATTACK", weaponTier)),
+    defenseWeapons: units(defensePower, weaponPowerAt("DEFENSE", weaponTier)),
+    spyWeapons: units(spyWeaponPower, weaponPowerAt("SPY", weaponTier)),
   };
 }
 

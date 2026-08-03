@@ -298,7 +298,9 @@ async function plantBot(
  * nineteen — and a batch of fifty in a single transaction would hold locks
  * across fifty empire creations while the game is being played around it.
  */
-export async function createBots(plans: BotPlan[]): Promise<{ created: number; failed: number }> {
+export async function createBots(
+  plans: BotPlan[]
+): Promise<{ created: number; failed: number; reason?: string }> {
   const { starting } = await getTunables();
   const season = await prisma.gameSeason.findFirst({
     where: { isActive: true },
@@ -307,6 +309,7 @@ export async function createBots(plans: BotPlan[]): Promise<{ created: number; f
 
   let created = 0;
   let failed = 0;
+  let reason: string | undefined;
   for (const plan of plans) {
     try {
       await prisma.$transaction((tx) => plantBot(tx, plan, season?.id, starting));
@@ -316,9 +319,14 @@ export async function createBots(plans: BotPlan[]): Promise<{ created: number; f
       // worth aborting the batch for; anything else is worth the log line.
       console.error("[bots] failed to plant", plan.name, e);
       failed++;
+      // Kept for the admin, because "try again" is the wrong advice for most of
+      // these: a batch that fails on every bot fails for a reason that will not
+      // change on a retry, and the admin had no way to see it. First failure
+      // only — fifty copies of one message is not more informative than one.
+      reason ??= e instanceof Error ? e.message.split("\n").slice(-1)[0].trim() : String(e);
     }
   }
-  return { created, failed };
+  return { created, failed, reason };
 }
 
 /* ------------------------------ refilling ------------------------------ */
