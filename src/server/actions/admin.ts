@@ -44,11 +44,16 @@ import {
   type MiniGameShape,
 } from "@/lib/game/minigame";
 import {
+  HERO_BAG_CAPACITY,
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
+  RARITY_META,
+  SLOT_ORDER,
   heroPointPool,
+  tierForLevel,
   xpToNextLevel,
 } from "@/lib/game/hero";
+import { itemSetForLevel } from "@/lib/game/heroSets";
 import {
   EMPIRE_UPGRADE_META,
   MAX_CITIES,
@@ -1103,6 +1108,85 @@ export async function grantHeroItem(
   }
 }
 
+/**
+ * Hand a hero a **whole set** in one click: the nine slots, all at one item
+ * level, worn on the spot unless the form says otherwise.
+ *
+ * This is the shortcut `grantHeroItem` isn't — dressing a tester or compensating
+ * a player used to mean nine trips through that form, each one a slot/rarity/level
+ * triple that had to be kept consistent by hand. Here the level is the *only*
+ * choice: rarity follows from `tierForLevel`, so the piece and its band always
+ * agree exactly as a drop's would, and the level itself is a rung of the set
+ * ladder, so the gear is a real set with real art rather than nine odd levels.
+ *
+ * Worn gear that gets displaced is moved to the bag, never destroyed — the old
+ * pieces may well outrank the gift. That can push the bag past HERO_BAG_CAPACITY,
+ * which is a state the game already tolerates (every add-to-bag path checks the
+ * cap before it writes, so an over-full bag simply blocks new loot until the
+ * player throws something away). The success message says so when it happens.
+ */
+export async function grantHeroSet(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const level = clampLevel(num(formData, "level"), 1, HERO_MAX_LEVEL);
+    const rarity = tierForLevel(level);
+    const equip = flag(formData, "equip");
+
+    const hero = await prisma.hero.upsert({
+      where: { empireId },
+      create: { empireId },
+      update: {},
+      select: { id: true },
+    });
+
+    const bagCount = await prisma.$transaction(async (tx) => {
+      // One worn item per slot, exactly as the paperdoll enforces: the whole
+      // set is going on, so everything currently worn comes off first.
+      if (equip) {
+        await tx.heroItem.updateMany({
+          where: { heroId: hero.id, equipped: true },
+          data: { equipped: false },
+        });
+      }
+      await tx.heroItem.createMany({
+        data: SLOT_ORDER.map((slot) => ({
+          heroId: hero.id,
+          slot,
+          level,
+          rarity,
+          equipped: equip,
+        })),
+      });
+      return tx.heroItem.count({ where: { heroId: hero.id, equipped: false } });
+    });
+
+    const setLabel = itemSetForLevel(level).label;
+    await logAdmin(admin, {
+      action: "empire.hero_set",
+      targetType: "empire",
+      targetId: empireId,
+      summary: `סט גיבור הוענק: ${setLabel} רמה ${level} (${rarity})${equip ? " וחובש" : ""}`,
+    });
+    revalidateEmpire(userId);
+    return {
+      success:
+        `הוענק סט מלא — ${setLabel}, ${SLOT_ORDER.length} פריטים ברמה ${level} ` +
+        `(${RARITY_META[rarity].label})${equip ? ", חבושים על הגיבור" : ""}` +
+        (bagCount > HERO_BAG_CAPACITY
+          ? ` — שים לב: התיק חורג מהקיבולת (${bagCount}/${HERO_BAG_CAPACITY}), השחקן יצטרך להשליך פריטים`
+          : ""),
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
 /** Delete a hero item. */
 export async function deleteHeroItem(
   _prev: AdminActionState,
@@ -1336,6 +1420,44 @@ export async function updateEmpireProtection(
     });
     revalidateEmpire(userId);
     return { success: protectedUntil ? "ההגנה עודכנה" : "ההגנה הוסרה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Grant or revoke VIP (חותם המלוכה).
+ *
+ * A paid entitlement needs a hand on it: a purchase that failed halfway, a
+ * refund, a compensation. The stamp is the entitlement (see src/lib/game/vip.ts),
+ * so granting is writing `now` and revoking is writing null — nothing else in
+ * the game reads a second column for it. Diamonds are deliberately **not**
+ * touched either way: a comp is not a sale, and a revocation after a refund
+ * must not also hand the player the price back.
+ */
+export async function setEmpireVip(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const empireId = str(formData, "empireId");
+    const userId = str(formData, "userId");
+    await assertTargetEditable(admin, { userId, empireId });
+    const grant = formData.get("grant") === "1";
+
+    await prisma.empire.update({
+      where: { id: empireId },
+      data: { vipSince: grant ? new Date() : null },
+    });
+    await logAdmin(admin, {
+      action: "empire.vip",
+      targetType: "empire",
+      targetId: empireId,
+      summary: grant ? "הוענק חותם המלוכה (VIP)" : "בוטל חותם המלוכה (VIP)",
+    });
+    revalidateEmpire(userId);
+    return { success: grant ? "חותם המלוכה הוענק" : "חותם המלוכה בוטל" };
   } catch (e) {
     return toErr(e);
   }

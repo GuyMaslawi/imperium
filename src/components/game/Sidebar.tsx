@@ -344,9 +344,9 @@ function SidebarContent({
       badgeTone: "attention",
     },
     { href: "/game/rankings", label: "דירוג", icon: "rankings" },
-    // Directly under the ladder, because it is the ladder's stakes: the same
-    // ranking, priced in diamonds.
-    { href: "/game/prizes", label: "פרסים", icon: "gift" },
+    // The prize hall is deliberately absent: it rides in the top command bar
+    // beside the inbox (see InboxNav), where the season's stakes are visible
+    // from every screen rather than only from an open nav list.
     { href: "/game/weapons", label: "מפעל", icon: "factory" },
     { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
     // Idle mine slaves read exactly like waiting recruits on the row above:

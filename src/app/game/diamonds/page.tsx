@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import { bankInterestRate } from "@/lib/game/constants";
 import { DiamondShop } from "@/components/game/DiamondShop";
 import { DiamondsHeader } from "@/components/game/DiamondsHeader";
+import { VipCard } from "@/components/game/VipCard";
 import {
   BOOSTABLE_RESOURCES,
   RESOURCE_BOOST_KIND,
@@ -101,6 +102,14 @@ export default async function DiamondsPage() {
         diamonds={diamonds}
         active="spend"
         note="הוצא יהלומים על האצות ייצור, מגני תקיפה, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה."
+      />
+
+      {/* Above the shop grid on purpose: it is the one permanent purchase on
+          the page, and it changes how every other screen is operated rather
+          than what it produces. */}
+      <VipCard
+        diamonds={diamonds}
+        vipSince={empire.vipSince?.toISOString() ?? null}
       />
 
       <DiamondShop

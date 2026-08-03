@@ -454,6 +454,18 @@ model Empire {
   /// (the admin role editor and scripts/grant-admin.ts); a drifted flag is
   /// repaired by re-running either.
   isStaff             Boolean   @default(false)
+  /// When this empire bought VIP (חותם המלוכה) — null for everyone else. The
+  /// column IS the entitlement: it is bought once for VIP_COST diamonds and
+  /// never expires, so there is no timer to read anywhere and `vipSince != null`
+  /// is the whole check (see src/lib/game/vip.ts).
+  ///
+  /// VIP buys **convenience only** — bulk versions of things the game already
+  /// lets every player do one click at a time (store/release all four
+  /// warehouses, train every free citizen, raise every warehouse a level). It
+  /// deliberately grants no resource, no power and no protection: a paid button
+  /// that saves eight clicks is a different thing from a paid button that wins
+  /// a battle, and only the first one is sold here.
+  vipSince            DateTime?
   /// Denormalised power figures, kept in step by syncEmpirePower.
   ///
   /// These are pure functions of the army and the arsenal (see lib/game/power),

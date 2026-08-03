@@ -37,10 +37,14 @@ import {
   HERO_CLASS_ORDER,
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
+  RARITY_META,
+  UPGRADE_LEVELS,
   heroPointPool,
+  tierForLevel,
   SLOT_META,
   SLOT_ORDER,
 } from "@/lib/game/hero";
+import { itemSetForLevel } from "@/lib/game/heroSets";
 import {
   updateUserAccount,
   resetUserPassword,
@@ -55,6 +59,7 @@ import {
   setWeaponQuantity,
   updateHero,
   grantHeroItem,
+  grantHeroSet,
   deleteHeroItem,
   updateHeroItem,
   setGuildMembership,
@@ -79,6 +84,19 @@ const RARITY_OPTIONS = [
   { value: "EPIC", label: "אפי" },
   { value: "LEGENDARY", label: "אגדי" },
 ];
+
+/**
+ * Every rung a piece of gear can sit on (UPGRADE_LEVELS — the band starts drops
+ * land on), named the way the player sees it: set, tier, level. This is the only
+ * field the whole-set grant asks for, since the rarity follows from the level.
+ */
+const ITEM_LEVEL_OPTIONS = UPGRADE_LEVELS.map((level) => ({
+  value: String(level),
+  label: `${itemSetForLevel(level).label} · ${RARITY_META[tierForLevel(level)].label} · רמה ${level}`,
+}));
+
+/** Default the set picker to the אגדי of the second set — a solid starter gift. */
+const DEFAULT_SET_LEVEL = "20";
 
 /** Totals for the mail/history panel — counts only, never the rows. */
 async function empireCounts(empireId: string) {
@@ -303,6 +321,7 @@ export default async function AdminUserDetail({
               id: empire.id,
               seasonId: empire.seasonId,
               protectedUntil: empire.protectedUntil,
+              vipSince: empire.vipSince,
               lastRegularUpdateAt: empire.lastRegularUpdateAt,
               lastDailyUpdateAt: empire.lastDailyUpdateAt,
               reportsSeenAt: empire.reportsSeenAt,
@@ -654,6 +673,37 @@ export default async function AdminUserDetail({
                 ))}
               </div>
             )}
+
+            {/* The one-click gift: nine pieces of one set, rarity derived from
+                the level so the grant always matches what a drop would look
+                like. The per-slot form below stays for surgical fixes. */}
+            <ActionForm
+              action={grantHeroSet}
+              submitLabel={`⚔️ הענק סט מלא (${SLOT_ORDER.length} פריטים)`}
+              className="panel mb-3 rounded-lg p-3"
+            >
+              <input type="hidden" name="empireId" value={empire.id} />
+              <input type="hidden" name="userId" value={user.id} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <LabeledSelect
+                  label="סט ורמה"
+                  name="level"
+                  defaultValue={DEFAULT_SET_LEVEL}
+                  options={ITEM_LEVEL_OPTIONS}
+                />
+                <LabeledBool
+                  label="לחבוש מיד"
+                  name="equip"
+                  defaultValue
+                  trueLabel="כן — הציוד הישן יעבור לתיק"
+                  falseLabel="לא — הכל לתיק"
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-zinc-500">
+                נוצרים {SLOT_ORDER.length} פריטים באותה רמה — הנדירות נגזרת מהרמה
+                שנבחרה. ציוד קיים לא נמחק, רק מוסר לתיק.
+              </p>
+            </ActionForm>
 
             <ActionForm action={grantHeroItem} submitLabel="הענק פריט גיבור" className="panel rounded-lg p-3">
               <input type="hidden" name="empireId" value={empire.id} />

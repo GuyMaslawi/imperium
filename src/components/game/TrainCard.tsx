@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect } from "react";
 import { trainUnits, type ActionState } from "@/server/actions/game";
+import { trainMaxUnits } from "@/server/actions/vip";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -17,6 +18,8 @@ export interface TrainCardProps {
   owned: number;
   power: number;
   availableCitizens: number;
+  /** VIP holders get the one-click "train every free citizen" button. */
+  isVip: boolean;
 }
 
 export function TrainCard({
@@ -27,8 +30,13 @@ export function TrainCard({
   owned,
   power,
   availableCitizens,
+  isVip,
 }: TrainCardProps) {
   const [state, action] = useActionState<ActionState, FormData>(trainUnits, {});
+  const [maxState, maxAction] = useActionState<ActionState, FormData>(
+    trainMaxUnits,
+    {}
+  );
 
   // Every settled training order marches the recruits into the yard. The
   // action state is a fresh object per submit, so an identical repeat still
@@ -37,6 +45,9 @@ export function TrainCard({
   useEffect(() => {
     if (state.success) fire("train");
   }, [state, fire]);
+  useEffect(() => {
+    if (maxState.success) fire("train");
+  }, [maxState, fire]);
 
   return (
     <div className="panel-inset rounded-xl p-4 flex flex-col gap-4">
@@ -98,7 +109,31 @@ export function TrainCard({
         </SubmitButton>
       </form>
 
-      <FormMessage error={state.error} success={state.success} />
+      {/* VIP: the same order with the quantity read off the empire. Its own
+          form, not another button in the one above — that one's quantity field
+          is `required`, so a submit from inside it would be blocked by the
+          browser before the action ever ran. */}
+      {isVip && (
+        <form action={maxAction}>
+          <input type="hidden" name="unit" value={unit} />
+          <SubmitButton
+            variant="secondary"
+            className="btn btn-ghost w-full"
+            disabled={availableCitizens < 1}
+            pendingText="מאמן..."
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <Icon name="crown" size={14} className="text-gold-bright" />
+              אמן הכל ({formatNumber(availableCitizens)})
+            </span>
+          </SubmitButton>
+        </form>
+      )}
+
+      <FormMessage
+        error={state.error ?? maxState.error}
+        success={state.success ?? maxState.success}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { requireEmpire } from "@/lib/auth";
 import { UNIT_META, UNIT_KEYS } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
+import { isVip } from "@/lib/game/vip";
 import { TrainCard } from "@/components/game/TrainCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
@@ -10,6 +11,7 @@ export const metadata = { title: "צבא | קראלדור" };
 export default async function ArmyPage() {
   const empire = await requireEmpire();
   const army = empire.army;
+  const vip = isVip(empire);
 
   return (
     <div className="space-y-6">
@@ -42,6 +44,7 @@ export default async function ArmyPage() {
                 owned={army?.[key] ?? 0}
                 power={meta.power}
                 availableCitizens={empire.citizens}
+                isVip={vip}
               />
             );
           })}

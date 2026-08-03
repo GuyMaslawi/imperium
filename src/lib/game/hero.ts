@@ -135,9 +135,13 @@ export function matchupXpFactor(ownPower: number, foePower: number): number {
 export type HeroStanding = { level: number; resets: number };
 
 /**
- * Battle XP: attacking is the main source; defending well also pays. Only
- * winning pays — a repelled attack and a breached defence both earn nothing, so
- * these two functions cover every XP-bearing outcome of a battle.
+ * Battle XP, and the only source of it in a player battle: a winning attack.
+ * Nothing else in a raid pays — not a repelled attacker, and deliberately not
+ * the defender who repelled him. Defending is already rewarded by keeping what
+ * you have (no plunder, no enslavement, no hero damage), and hero progress is
+ * meant to be the prize for going out and taking a fight, not for sitting in a
+ * city that someone else picked. A defender cannot choose his battles, so
+ * paying him XP handed levels to whoever happened to be attractive to attack.
  *
  * Three terms, and each answers a different question:
  *
@@ -168,22 +172,6 @@ export function attackWinXp(
         effectiveHeroLevel(defender.level, defender.resets)
       ) *
       matchupXpFactor(attackerPower, defenderPower)
-  );
-}
-export function defenseWinXp(
-  defender: HeroStanding,
-  attacker: HeroStanding,
-  defenderPower: number,
-  attackerPower: number
-): number {
-  const base = 20 + Math.max(1, defender.level) * 5;
-  return Math.round(
-    base *
-      levelGapXpFactor(
-        effectiveHeroLevel(defender.level, defender.resets),
-        effectiveHeroLevel(attacker.level, attacker.resets)
-      ) *
-      matchupXpFactor(defenderPower, attackerPower)
   );
 }
 

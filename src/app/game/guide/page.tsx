@@ -184,6 +184,7 @@ import {
   SHIELD_RENEW_COOLDOWN_MINUTES,
   TURN_PACKAGES,
 } from "@/lib/game/diamondShop";
+import { VIP_COST, VIP_LABEL } from "@/lib/game/vip";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, resourceIcon, type IconName } from "@/components/ui/Icon";
 import { BackToTop, GuideToc, type TocEntry } from "@/components/game/guide/GuideToc";
@@ -1512,7 +1513,10 @@ export default async function GuidePage() {
                     desc: `0.25 + (הרמה האפקטיבית של היריב ÷ שלך) × 0.75, חסום ב־${MIN_LEVEL_GAP_XP_FACTOR}–${MAX_LEVEL_GAP_XP_FACTOR}. יריב שקול = ×1, גבוה ממך = יותר, נמוך ממך = קצת.`,
                   },
                   { term: "יחס קרב", desc: "0.3 + (כוח היריב ÷ כוחך) × 1.4, חסום ב־0.3–2.0." },
-                  { term: "הגנה מוצלחת", desc: "משלמת גם היא: (20 + הרמה שלך × 5) × אותם שני המכפילים." },
+                  {
+                    term: "רק תקיפה משלמת",
+                    desc: "הדיפת התקפה לא מזכה בניסיון כלל — הפרס על הגנה הוא שלא נלקח ממך דבר. הגיבור מתקדם רק כשיוצאים לקרב.",
+                  },
                 ]}
               />
 
@@ -2571,6 +2575,13 @@ export default async function GuidePage() {
                     tone="text-emerald-300"
                   />
                 ))}
+                <Fact
+                  icon="crown"
+                  label={`${VIP_LABEL} (VIP)`}
+                  value={`${VIP_COST}💎`}
+                  hint="רכישה חד־פעמית · לא פג תוקף · פעולות גורפות בלחיצה אחת"
+                  tone="text-gold-bright"
+                />
               </div>
 
               <Note tone="green" icon="shield" title="מה מגן באמת קונה לך">
@@ -2588,6 +2599,15 @@ export default async function GuidePage() {
                 היו הופכים שחקן משלם לבלתי ניתן לתקיפה לצמיתות, וחלון החשיפה הזה הוא
                 ההזדמנות של שאר העיר. אם אתה מתכנן להיות מוגן — שים לב מתי המגן נגמר,
                 כי בדיוק אז תוקפים ממתינים.
+              </Note>
+
+              <Note tone="gold" icon="crown" title={`מה ${VIP_LABEL} קונה — ומה לא`}>
+                הוא קונה זמן בלבד: אחסון וריקון של ארבעת המחסנים בלחיצה, אימון של כל
+                האזרחים הפנויים בלחיצה, העלאת רמה בכל מחסן שאתה יכול לממן, וכפתור
+                ״מפקדה״ בסרגל העליון שפותח את כולן מכל מסך. כל אחת מהן היא בדיוק אותה
+                פעולה שכל שחקן עושה חינם, רק בלי הלחיצות. הוא לא נותן משאב אחד, לא נקודת
+                עוצמה אחת, לא מקצר קירור ולא מגן על האימפריה — שחקן סבלני מסיים סשן
+                באותו מצב בדיוק.
               </Note>
 
               <Note tone="green" icon="diamond" title="למה יש רק ווג׳ אחד של יהלומים">

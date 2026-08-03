@@ -30,6 +30,10 @@ const RES = [
   { key: "stolenStone", icon: <Icon name="stone" size={14} className="inline-block align-middle text-stone-400" />, label: "אבן" },
 ] as const;
 
+/** Explains the number in the banner's XP badge. */
+const HERO_XP_TIP =
+  "ניסיון לגיבור מהקרב הזה. רק תקיפה מנצחת מזכה בניסיון — הדפת התקפה לא, הפרס עליה הוא שלא נלקח ממך דבר. הכמות תלויה בפער הרמות (כל איפוס של היריב נחשב 100 רמות, ולכן גם יריב ברמה 1 אחרי איפוס משלם יפה) ובעד כמה הקרב היה צמוד: מחיקת יריב חלש ונמוך ממך מזכה במעט, ניצחון מול יריב שווה או גבוה ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה.";
+
 /**
  * One fact from the aftermath — icon, label, number — sized to sit inline with
  * its siblings in a single strip rather than owning a panel.
@@ -195,7 +199,10 @@ export default async function BattleResultPage({
   const mySide = ledger(iAmAttacker ? attackerLedgerInput : defenderLedgerInput);
   const foeSide = ledger(iAmAttacker ? defenderLedgerInput : attackerLedgerInput);
 
-  // Hero rewards from this battle, viewer-perspective.
+  // Hero rewards from this battle, viewer-perspective. Only a winning attack
+  // pays XP now, so the defender's side is 0 on every new report — it is still
+  // read rather than hardcoded, so reports written when defending did pay keep
+  // showing what was actually earned.
   const myHeroXp = iAmAttacker ? report.attackerHeroXp : report.defenderHeroXp;
   const capturedItem =
     iAmAttacker && report.droppedItemSlot && report.droppedItemLevel && report.droppedItemRarity
@@ -288,6 +295,23 @@ export default async function BattleResultPage({
             <span className="nums font-bold text-red-300" dir="ltr">{formatNumber(foePower)}</span>
           </div>
         </div>
+
+        {/* The XP rides inside the banner rather than down in the aftermath
+            strip: it is what the player came to see after a win, and on a phone
+            the plunder panel alone pushed the strip off the first screen. */}
+        {myHeroXp > 0 && (
+          <div className="mt-4 flex justify-center">
+            <Tip tip={HERO_XP_TIP}>
+              <span className="inline-flex cursor-help items-center gap-2 rounded-full border border-purple-400/40 bg-purple-500/10 px-4 py-1.5 shadow-[0_0_24px_-10px_rgba(192,132,252,0.9)]">
+                <Icon name="spark" size={16} className="text-purple-300" />
+                <span className="nums text-base font-black text-purple-200" dir="ltr">
+                  +{formatNumber(myHeroXp)}
+                </span>
+                <span className="text-xs font-bold text-purple-300/90">ניסיון לגיבור</span>
+              </span>
+            </Tip>
+          </div>
+        )}
       </div>
 
       {/* -------- the haul, straight under the verdict --------
@@ -336,7 +360,7 @@ export default async function BattleResultPage({
         </div>
       )}
 
-      {/* -------- aftermath: turns, casualties and hero XP on one line --------
+      {/* -------- aftermath: turns and casualties on one line --------
           These are one-number facts. Given a panel each they ate a full screen
           of height above the report that actually matters, so they ride in a
           single strip; the explanations moved into their tooltips. */}
@@ -363,15 +387,6 @@ export default async function BattleResultPage({
             value={`${iAmAttacker ? "+" : "−"}${formatNumber(report.enslavedSoldiers)}`}
             tone={iAmAttacker ? "text-emerald-400" : "text-red-400"}
             tip="ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים)."
-          />
-        )}
-        {myHeroXp > 0 && (
-          <StatChip
-            icon="spark"
-            label="ניסיון לגיבור"
-            value={`+${formatNumber(myHeroXp)}`}
-            tone="text-purple-300"
-            tip="ניסיון לגיבור מהקרב הזה — ניצחון בתקיפה מעניק הכי הרבה. הכמות תלויה בפער הרמות (כל איפוס של היריב נחשב 100 רמות, ולכן גם יריב ברמה 1 אחרי איפוס משלם יפה) ובעד כמה הקרב היה צמוד: מחיקת יריב חלש ונמוך ממך מזכה במעט, ניצחון מול יריב שווה או גבוה ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה."
           />
         )}
         {wonWheelSpin && (

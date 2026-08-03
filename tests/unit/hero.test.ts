@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as hero from "@/lib/game/hero";
 import {
   HERO_BAG_CAPACITY,
   HERO_DAMAGE_PER_LOST_DEFENSE,
@@ -20,7 +21,6 @@ import {
   RESET_LEVEL_EQUIV,
   applyHeroXp,
   attackWinXp,
-  defenseWinXp,
   effectiveHeroLevel,
   levelGapXpFactor,
   atSetCeiling,
@@ -130,13 +130,10 @@ describe("battle XP", () => {
     expect(levelGapXpFactor(0, 50)).toBe(MIN_LEVEL_GAP_XP_FACTOR);
   });
 
-  it("still pays a successful defence, on the same two multipliers", () => {
-    const strong = { level: 80, resets: 1 };
-    const weak = { level: 20, resets: 0 };
-    expect(defenseWinXp(weak, strong, 100_000, 100_000)).toBeGreaterThan(
-      defenseWinXp(weak, weak, 100_000, 100_000)
-    );
-    expect(defenseWinXp(weak, weak, 100_000, 100_000)).toBeGreaterThan(0);
+  it("has no defence counterpart — repelling a raid pays nothing", () => {
+    // Defending is rewarded by keeping what you have, not by hero progress, so
+    // a winning attack is the only XP-bearing outcome of a player battle.
+    expect(hero).not.toHaveProperty("defenseWinXp");
   });
 
   it("keeps one win worth a comparable slice of a level all the way up", () => {

@@ -60,7 +60,6 @@ import {
   attackWinXp,
   bonusMultiplier,
   damagedHealth,
-  defenseWinXp,
   heroBonuses,
   rollItemDrop,
 } from "@/lib/game/hero";
@@ -1117,20 +1116,17 @@ export async function attackEmpire(
       }
 
       /* ---- heroes: battle XP + level-ups (1 stat point per level) ---- */
-      // Only the winner learns anything: a repelled attacker and a breached
-      // defender both earn zero XP.
+      // A winning attack is the only thing here that pays XP: a repelled
+      // attacker earns nothing, and neither does the defender who repelled him
+      // (see `attackWinXp` for why defending is deliberately unpaid).
       // שיקוי הניסיון doubles the winner's haul of XP. Folded in here rather
       // than at the hero write, so the battle report shows the XP that was
-      // really earned instead of the un-doubled base.
-      // Happy Hour multiplies on top, and does so for *both* sides: the window is
-      // the server's, not one player's, so a defender who repels a raid during
-      // the golden hour is paid it too.
-      const happyXp = happyHourFactor(happyHour, "boostXp");
+      // really earned instead of the un-doubled base. Happy Hour multiplies on
+      // top of it.
       const attackerXpMultiplier =
-        (attackerPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
-      const defenderXpMultiplier =
-        (defenderPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) * happyXp;
-      // Both standings feed both formulas: the XP is a comparison now (see
+        (attackerPotions.has("DOUBLE_XP") ? POTION_DOUBLE : 1) *
+        happyHourFactor(happyHour, "boostXp");
+      // Both standings feed the formula: the XP is a comparison (see
       // `levelGapXpFactor`), so a heroless side is read as a level-1 rookie.
       const attackerStanding = {
         level: attackerHero?.level ?? 1,
@@ -1150,16 +1146,6 @@ export async function attackEmpire(
             ) * attackerXpMultiplier
           )
         : 0;
-      const defenderHeroXp = attackerWins
-        ? 0
-        : Math.round(
-            defenseWinXp(
-              defenderStanding,
-              attackerStanding,
-              defenderPower,
-              attackerPower
-            ) * defenderXpMultiplier
-          );
 
       if (attackerHero && attackerHeroXp > 0) {
         // The class XP bonus (הצל) scales every battle-XP gain.
@@ -1184,25 +1170,6 @@ export async function attackEmpire(
           await grantCitizens(tx, empireId, levelsGained * CITIZENS_PER_LEVEL);
         }
       }
-      if (defenderHero && defenderHeroXp > 0) {
-        const next = applyHeroXp(
-          defenderHero,
-          Math.round(defenderHeroXp * classXpMultiplier(defenderHero))
-        );
-        await tx.hero.update({
-          where: { id: defenderHero.id },
-          data: {
-            level: next.level,
-            xp: next.xp,
-            unspentPoints: { increment: next.pointsGained },
-          },
-        });
-        const levelsGained = next.level - defenderHero.level;
-        if (levelsGained > 0) {
-          await grantCitizens(tx, targetEmpireId, levelsGained * CITIZENS_PER_LEVEL);
-        }
-      }
-
       /* ---- item capture: winning attacks can loot a hero item ---- */
       let droppedItem: ReturnType<typeof rollItemDrop> = null;
       if (attackerWins && attackerHero) {
@@ -1282,7 +1249,9 @@ export async function attackEmpire(
           // even on a fractional tunable; the display rounds it.
           defenseBonusPct: (DEFENSE_BONUS - 1) * 100,
           attackerHeroXp,
-          defenderHeroXp,
+          // Always 0 now — defending pays no XP. The column stays so reports
+          // written while it did still read back honestly.
+          defenderHeroXp: 0,
           wonWheelSpin,
           // Recorded on a win only: on a repelled raid nothing was at stake, so
           // flagging the shields would credit them with a save they never made.

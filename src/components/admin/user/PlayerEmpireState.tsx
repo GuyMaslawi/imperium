@@ -10,15 +10,19 @@ import {
   recomputeEmpirePower,
   resetEmpireProgress,
   setEmpireSeason,
+  setEmpireVip,
   updateEmpireClocks,
   updateEmpireProtection,
 } from "@/server/actions/admin";
+import { VIP_LABEL } from "@/lib/game/vip";
 
 export interface PlayerEmpireStateProps {
   empire: {
     id: string;
     seasonId: string | null;
     protectedUntil: Date | null;
+    /** When VIP was bought (or granted) — null for a player without it. */
+    vipSince: Date | null;
     lastRegularUpdateAt: Date;
     lastDailyUpdateAt: Date;
     reportsSeenAt: Date;
@@ -130,6 +134,29 @@ export function PlayerEmpireState({
                 })),
               ]}
             />
+          </ActionForm>
+
+          {/* ---- VIP ----
+              One button, whichever way it is currently set. A grant is not a
+              sale and a revocation is not a refund: neither touches diamonds. */}
+          <ActionForm
+            action={setEmpireVip}
+            submitLabel={empire.vipSince ? `בטל ${VIP_LABEL}` : `הענק ${VIP_LABEL}`}
+            submitVariant="secondary"
+            submitClassName="w-full text-xs"
+            className="panel-inset rounded-lg p-3"
+          >
+            <input type="hidden" name="empireId" value={empire.id} />
+            <input type="hidden" name="userId" value={userId} />
+            <input type="hidden" name="grant" value={empire.vipSince ? "0" : "1"} />
+            <StatLine
+              label={`${VIP_LABEL} (VIP)`}
+              value={empire.vipSince ? fmt(empire.vipSince) : "אין"}
+              tone={empire.vipSince ? "text-gold-bright" : "text-zinc-400"}
+            />
+            <p className="text-[11px] text-zinc-500">
+              פותח את הפעולות המהירות בלבד. אינו משנה יהלומים לאף כיוון.
+            </p>
           </ActionForm>
 
           <ActionForm

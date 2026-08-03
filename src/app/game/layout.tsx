@@ -25,6 +25,8 @@ import { ChatDock } from "@/components/game/ChatDock";
 import { ActivePotions } from "@/components/game/ActivePotions";
 import { getActivePotionExpiries } from "@/lib/game/potionEffects";
 import { MiniGameButton } from "@/components/game/MiniGameButton";
+import { VipQuickCommand } from "@/components/game/VipQuickCommand";
+import { isVip } from "@/lib/game/vip";
 import { getMiniGameStates } from "@/server/actions/minigame";
 import { HappyHourBanner } from "@/components/game/HappyHourBanner";
 import { getHappyHourState } from "@/server/actions/happyHour";
@@ -232,6 +234,10 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
                   release and call out each winner from the corner instead; see
                   MiniGameButton. */}
               <MiniGameButton initial={miniGames} />
+              {/* The VIP command post. Rendered for everyone — for a player
+                  without the pass the chip opens what it would unlock, which is
+                  the only place in the game that says so on every screen. */}
+              <VipQuickCommand isVip={isVip(empire)} />
               <ActivePotions
                 activeUntil={potionActiveUntil}
                 serverNow={now.getTime()}
