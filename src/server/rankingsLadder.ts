@@ -190,10 +190,11 @@ export async function getCityLadderPage(
       level: number | null;
       resets: number | null;
       lastSeenAt: Date | null;
+      isBot: boolean;
     }[]
   >`
     SELECT e.id, e.name, e.gold, e."militaryPower" AS power,
-           e."lastSeenAt", a.soldiers, h.level, h.resets
+           e."lastSeenAt", e."isBot", a.soldiers, h.level, h.resets
     FROM "Empire" e
     LEFT JOIN "Army" a ON a."empireId" = e.id
     LEFT JOIN "Hero" h ON h."empireId" = e.id
@@ -219,7 +220,7 @@ export async function getCityLadderPage(
       // heartbeat is stamped by the chat dock's poll, which on a fresh tab has
       // not run yet, so trusting the column alone would draw "לא מחובר" on the
       // one row whose reader knows better.
-      online: r.id === viewerId || isOnline(r.lastSeenAt, now),
+      online: r.id === viewerId || isOnline(r, now),
     })),
     total,
     myRank,
@@ -319,6 +320,9 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
         generalPower: true,
         spyPower: true,
         lastSeenAt: true,
+        // Never true here — the board filters bots out — but presence is read
+        // off the row as a whole, one rule everywhere (see isOnline).
+        isBot: true,
         army: { select: { mineSlaves: true } },
         bankAccount: { select: { goldBalance: true } },
       },
@@ -330,7 +334,7 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
         value: Math.floor(pick(e)),
         // The heartbeat is collapsed to a boolean here and the Date is dropped:
         // what ships to the browser must not be the timestamp itself.
-        online: isOnline(e.lastSeenAt, now),
+        online: isOnline(e, now),
         // Public knowledge — the city ladder already names every empire in your
         // own tier, and the boss banner names the tier itself.
         cities: e.cities,
@@ -382,7 +386,7 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   // top ten, and a raider need not be on any of them.
   const named = await prisma.empire.findMany({
     where: { id: { in: sums.map((t) => t.attackerEmpireId) } },
-    select: { id: true, name: true, cities: true, lastSeenAt: true },
+    select: { id: true, name: true, cities: true, lastSeenAt: true, isBot: true },
   });
   const byId = new Map(named.map((e) => [e.id, e]));
   const now = new Date();
@@ -393,7 +397,7 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
     // A raider whose empire row has since been deleted reads as away, which is
     // the truthful answer for a name that is no longer anybody — and holds no
     // city at all, rather than a made-up one.
-    online: isOnline(byId.get(t.attackerEmpireId)?.lastSeenAt, now),
+    online: isOnline(byId.get(t.attackerEmpireId), now),
     cities: byId.get(t.attackerEmpireId)?.cities ?? null,
   }));
 }

@@ -18,8 +18,8 @@ import { formatNumber } from "@/lib/game/format";
  * level 1 (marked with a reset badge), all allocated points are wiped, and the
  * empire immediately receives 3,000 citizens, 6,000 turns and a fresh point
  * pool. The pool is the reason `resets` is a prop: every reset is worth another
- * permanent 25 points, so the promise has to name *this* player's figure (25 on
- * the first reset, 50 on the second) rather than the constant.
+ * permanent 30 points, so the promise has to name *this* player's figure (31 in
+ * hand on the first reset, 61 on the second) rather than the constant.
  */
 export function HeroResetButton({ resets }: { resets: number }) {
   const freshPoints = heroResetPoints(resets + 1);

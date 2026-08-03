@@ -13,6 +13,7 @@ import { heroBonuses, resourceProductionPct } from "@/lib/game/hero";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getActiveResourceBoosts } from "@/lib/game/diamondEffects";
 import { mineProductionBreakdown } from "@/lib/game/resources";
+import { isVip } from "@/lib/game/vip";
 import { MineCard } from "@/components/game/MineCard";
 import { MineSlaveQuickActions } from "@/components/game/MineSlaveQuickActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -39,6 +40,7 @@ const EMBERS = [
 
 export default async function ProductionPage() {
   const empire = await requireEmpire();
+  const vip = isVip(empire);
 
   const mines = PRODUCTION_BUILDING_TYPES.map((type) => {
     const building = empire.buildings.find((b) => b.type === type);
@@ -118,7 +120,7 @@ export default async function ProductionPage() {
         </div>
       </div>
 
-      <MineSlaveQuickActions />
+      <MineSlaveQuickActions isVip={vip} />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {mines.map((mine) => {
@@ -147,6 +149,7 @@ export default async function ProductionPage() {
               productionPerSlave={mineProductionValue(mine.level)}
               breakdown={breakdown}
               upgradeCost={mineUpgradeCost(mine.level, resource)}
+              isVip={vip}
             />
           );
         })}

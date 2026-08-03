@@ -17,13 +17,14 @@ export const CITIZENS_PER_LEVEL = 25;
  * Reset ("prestige") at level 100: the hero returns to level 1 with these.
  *
  * The points are **cumulative across resets** — every reset behind the hero is
- * worth another 25, permanently. A hero on his first reset starts level 1 with
- * 25 points and can reach 125 at the cap; his second reset starts him at 50, his
- * third at 75. See `heroPointPool`, which is the single expression of that rule.
+ * worth another 30, permanently. A hero on his first reset starts level 1 with
+ * 30 of them (31 points in hand, the level-1 point included) and can reach 130
+ * at the cap; his second reset starts him at 60, his third at 90. See
+ * `heroPointPool`, which is the single expression of that rule.
  */
 export const HERO_RESET_CITIZENS = 3000;
 export const HERO_RESET_TURNS = 6000;
-export const HERO_RESET_POINTS = 25;
+export const HERO_RESET_POINTS = 30;
 
 /** The four columns hero points live in — what `heroPointsHeld` sums. */
 export type HeroPointColumns = Pick<
@@ -46,9 +47,9 @@ export function heroPointsHeld(hero: HeroPointColumns): number {
  * - **one per level he stands at**, level 1 included. A newborn hero therefore
  *   already holds one point, and the promise "every level gained is another
  *   point" holds all the way up: level 16 → 16, level 100 → 100.
- * - **25 per reset behind him**, and they *stack* — the grant of every reset
- *   survives, not just the most recent one. A first reset means 25 points at
- *   level 1 and 125 at the cap; a second, 50 at level 1 and 150 at the cap.
+ * - **30 per reset behind him**, and they *stack* — the grant of every reset
+ *   survives, not just the most recent one. A first reset means 31 points at
+ *   level 1 and 130 at the cap; a second, 61 at level 1 and 160 at the cap.
  *
  * Because it is a pure function of (level, resets), any hero row can be checked
  * against it — which is exactly what `applyPendingUpdates` does on every load,
@@ -84,7 +85,7 @@ export function xpToNextLevel(level: number): number {
  * A hero's standing on one scale, resets included. A reset sends the hero back
  * to level 1, so raw level alone says nothing about a prestiged opponent: a
  * level-1 hero with one reset has already climbed the whole ladder once and
- * kept 25 points and his gear. Every reset is therefore worth a full ladder
+ * kept 30 points and his gear. Every reset is therefore worth a full ladder
  * (`HERO_MAX_LEVEL` levels) here, which is what makes him read as the veteran
  * he is when the two sides of a battle are compared.
  */

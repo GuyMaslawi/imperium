@@ -16,7 +16,7 @@ import { VIP_COST, VIP_LABEL, VIP_PERKS } from "@/lib/game/vip";
  * It says what it is *not* out loud. Every other card on this page changes the
  * game's numbers (production, plunder immunity, turns), so a 1000-diamond item
  * with a crown on it invites exactly the wrong assumption; the line about
- * "חיסכון בזמן בלבד" is there to be read before the purchase, not after it.
+ * "חיסכון בלחיצות בלבד" is there to be read before the purchase, not after it.
  */
 export function VipCard({
   diamonds,
@@ -48,15 +48,16 @@ export function VipCard({
           </span>
         ) : (
           <span className="text-[11px] text-zinc-500">
-            רכישה חד־פעמית · לא פג תוקף · חיסכון בזמן בלבד
+            רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד
           </span>
         )}
       </div>
 
       <p className="mt-2 text-sm text-zinc-300">
-        פותח את כל הפעולות הגורפות של המשחק בלחיצה אחת, מכל מסך — ואת כפתור
-        ״מפקדה״ בסרגל העליון. לא נותן משאבים, לא נותן עוצמה ולא מגן על האימפריה:
-        רק חוסך לך את הלחיצות.
+        פותח את כפתורי ״הכל״ שכבר קיימים במשחק — בבנק, במחסנים ובמכרות — ואת
+        כפתור ״מפקדה״ בסרגל העליון שמפעיל אותם מכל מסך. אין כאן פעולה חדשה: כל
+        מצב שהם מגיעים אליו, אפשר להגיע אליו גם ידנית. לא נותן משאבים, לא נותן
+        עוצמה ולא מגן על האימפריה.
       </p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">

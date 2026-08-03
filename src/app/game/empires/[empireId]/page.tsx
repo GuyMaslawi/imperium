@@ -171,7 +171,7 @@ export default async function EmpireProfilePage({
   // becomes a prop, or the dossier would ship "away since 03:14" to every rival.
   // Your own dossier always reads online: you are demonstrably here, and your own
   // heartbeat can be up to PRESENCE_TOUCH_MS old.
-  const online = isMe || isOnline(empire.lastSeenAt, now);
+  const online = isMe || isOnline(empire, now);
 
   const potionExpiries = isMe
     ? {}

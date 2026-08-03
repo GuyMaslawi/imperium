@@ -3,11 +3,15 @@ config({ path: ".env.local", override: true });
 
 import { afterAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
-import { STORAGE_TYPES, storageCapacityForLevel } from "@/lib/game/constants";
+import {
+  PRODUCTION_BUILDING_TYPES,
+  STORAGE_TYPES,
+  mineUpgradeCost,
+} from "@/lib/game/constants";
 import { VIP_COST } from "@/lib/game/vip";
 
 /**
- * VIP (חותם המלוכה) and the bulk actions it unlocks.
+ * VIP (חותם המלוכה) and the one-click actions it gates.
  *
  * Two distinct classes of invariant live here, and neither can be asserted
  * without a database:
@@ -16,14 +20,14 @@ import { VIP_COST } from "@/lib/game/vip";
  *    Under READ COMMITTED two clicks both pass that read, so what actually
  *    stops the second charge is the `vipSince: null` in the guarded UPDATE's
  *    WHERE — a property of Postgres, not of the TypeScript above it.
- * 2. **The bulk actions are the paywall, server-side.** The buttons are only
- *    rendered for VIP, but rendering is not authorisation: every action
- *    re-checks the pass, and an empire without it must come back untouched.
+ * 2. **The gate is the server, not the page.** The "הכל" buttons are only
+ *    rendered for VIP, but rendering is not authorisation: every gated action
+ *    re-reads `vipSince` inside its own transaction, and an empire without the
+ *    pass must come back untouched — not a coin moved, not a slave reassigned,
+ *    not a mine level bought.
  *
- * Everything else asserted here is the "convenience, not power" rule in
- * numbers: storing all four warehouses moves exactly what one-at-a-time
- * deposits would have moved, stops at each warehouse's ceiling, and never
- * conjures a resource that was not already in the empire's column.
+ * The other half is the "convenience, not power" rule in numbers: with the pass
+ * each action lands exactly where the free, manual path would have landed it.
  */
 
 let currentEmpireId: string | null = null;
@@ -37,13 +41,17 @@ vi.mock("@/lib/auth", () => ({
 // commit, and the catch would report a failure the database does not agree with.
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 
+const { buyVip } = await import("@/server/actions/vip");
+const { depositAllGoldToBank, withdrawAllGoldFromBank } = await import(
+  "@/server/actions/bank"
+);
 const {
-  buyVip,
-  storeAllResources,
-  releaseAllResources,
-  upgradeAllStorages,
-  trainMaxUnits,
-} = await import("@/server/actions/vip");
+  depositAllToStorage,
+  withdrawAllFromStorage,
+  assignAllMineSlavesToResource,
+  splitMineSlavesEqually,
+  upgradeMineToMax,
+} = await import("@/server/actions/game");
 
 const prisma = new PrismaClient();
 const TAG = `vip${Date.now().toString(36)}`;
@@ -60,14 +68,17 @@ interface EmpireOptions {
   wood?: number;
   iron?: number;
   stone?: number;
-  citizens?: number;
   /** Warehouse level, one per resource (level 1 holds 10,000). */
   storageLevel?: number;
   /** Starting stock inside every warehouse. */
   stored?: number;
+  /** Gold already sitting in the bank. */
+  banked?: number;
+  /** Mine slaves the empire owns, all of them unassigned to start with. */
+  mineSlaves?: number;
 }
 
-/** An empire with four warehouses and no clock backlog to settle. */
+/** An empire with four warehouses, four mines and no clock backlog to settle. */
 async function makeEmpire(label: string, options: EmpireOptions = {}) {
   const {
     diamonds = 0,
@@ -76,9 +87,10 @@ async function makeEmpire(label: string, options: EmpireOptions = {}) {
     wood = 0,
     iron = 0,
     stone = 0,
-    citizens = 0,
     storageLevel = 1,
     stored = 0,
+    banked = 0,
+    mineSlaves = 0,
   } = options;
 
   const user = await prisma.user.create({
@@ -99,7 +111,6 @@ async function makeEmpire(label: string, options: EmpireOptions = {}) {
       wood,
       iron,
       stone,
-      citizens,
       // The lazy clock is not what is under test: start it settled so a
       // production tick cannot move the columns these assertions read.
       lastRegularUpdateAt: new Date(),
@@ -111,6 +122,11 @@ async function makeEmpire(label: string, options: EmpireOptions = {}) {
           storedAmount: stored,
         })),
       },
+      buildings: {
+        create: PRODUCTION_BUILDING_TYPES.map((type) => ({ type, level: 1 })),
+      },
+      army: { create: { mineSlaves } },
+      bankAccount: { create: { goldBalance: banked } },
     },
   });
   await prisma.hero.create({ data: { empireId: empire.id } });
@@ -126,7 +142,6 @@ function balances(id: string) {
       wood: true,
       iron: true,
       stone: true,
-      citizens: true,
       diamonds: true,
       vipSince: true,
     },
@@ -138,11 +153,39 @@ async function warehouses(id: string) {
     where: { empireId: id },
     orderBy: { resourceType: "asc" },
   });
-  return rows.map((r) => ({
-    type: r.resourceType,
-    level: r.level,
-    stored: r.storedAmount,
-  }));
+  return rows.map((r) => ({ type: r.resourceType, level: r.level, stored: r.storedAmount }));
+}
+
+async function mines(id: string) {
+  const rows = await prisma.building.findMany({
+    where: { empireId: id, type: { in: [...PRODUCTION_BUILDING_TYPES] } },
+    orderBy: { type: "asc" },
+  });
+  return rows.map((r) => ({ type: r.type, level: r.level, slaves: r.slavesAssigned }));
+}
+
+function bankGold(id: string) {
+  return prisma.bankAccount
+    .findUniqueOrThrow({ where: { empireId: id }, select: { goldBalance: true } })
+    .then((a) => a.goldBalance);
+}
+
+/** Every gated action, invoked the way its form invokes it. */
+function gatedActions() {
+  const storageForm = new FormData();
+  storageForm.set("resourceType", "GOLD");
+  const resourceForm = new FormData();
+  resourceForm.set("resource", "gold");
+
+  return [
+    () => depositAllGoldToBank(),
+    () => withdrawAllGoldFromBank(),
+    () => depositAllToStorage({}, storageForm),
+    () => withdrawAllFromStorage({}, storageForm),
+    () => assignAllMineSlavesToResource({}, resourceForm),
+    () => splitMineSlavesEqually(),
+    () => upgradeMineToMax({}, resourceForm),
+  ];
 }
 
 describe("buying the pass", () => {
@@ -181,183 +224,170 @@ describe("buying the pass", () => {
   });
 });
 
-describe("the paywall is server-side", () => {
-  it("refuses every bulk action for an empire without the pass", async () => {
+describe("the gate is server-side", () => {
+  it("refuses every one-click action for an empire without the pass, and moves nothing", async () => {
     const empire = await makeEmpire("free", {
-      gold: 5_000,
-      wood: 5_000,
-      iron: 5_000,
-      stone: 5_000,
-      citizens: 100,
+      gold: 50_000,
+      wood: 50_000,
+      iron: 50_000,
+      stone: 50_000,
       stored: 1_000,
+      banked: 5_000,
+      mineSlaves: 40,
     });
     const before = await balances(empire.id);
 
-    const trainForm = new FormData();
-    trainForm.set("unit", "soldiers");
-    const results = await Promise.all([
-      storeAllResources(),
-      releaseAllResources(),
-      upgradeAllStorages(),
-      trainMaxUnits({}, trainForm),
-    ]);
+    const results = await Promise.all(gatedActions().map((run) => run()));
 
     expect(results.every((r) => r.error)).toBe(true);
-    // Not a resource, not a citizen, not a warehouse level moved.
     expect(await balances(empire.id)).toEqual(before);
+    expect(await bankGold(empire.id)).toBe(5_000);
     expect((await warehouses(empire.id)).every((w) => w.stored === 1_000)).toBe(true);
+    expect((await mines(empire.id)).every((m) => m.level === 1 && m.slaves === 0)).toBe(
+      true
+    );
+  });
+
+  it("lets the same calls through once the pass is stamped on", async () => {
+    const empire = await makeEmpire("granted", {
+      gold: 50_000,
+      wood: 50_000,
+      iron: 50_000,
+      stone: 50_000,
+      mineSlaves: 40,
+    });
+
+    expect((await depositAllGoldToBank()).error).toBeTruthy();
+    await prisma.empire.update({
+      where: { id: empire.id },
+      data: { vipSince: new Date() },
+    });
+
+    expect((await depositAllGoldToBank()).success).toBeTruthy();
+    expect(await bankGold(empire.id)).toBe(50_000);
   });
 });
 
-describe("storing and releasing all four warehouses", () => {
-  it("moves every available resource in, and stops at each ceiling", async () => {
-    const capacity = storageCapacityForLevel(1);
-    const empire = await makeEmpire("store", {
-      vip: true,
-      // Gold overflows its warehouse; the other three fit with room to spare.
-      gold: capacity + 4_000,
-      wood: 1_500,
-      iron: 900,
-      stone: 0,
-    });
+describe("the bank, in one press", () => {
+  it("banks every available coin and hands it all back", async () => {
+    const empire = await makeEmpire("bank", { vip: true, gold: 12_345 });
 
-    const res = await storeAllResources();
-    expect(res.success).toBeTruthy();
+    expect((await depositAllGoldToBank()).success).toBeTruthy();
+    expect((await balances(empire.id)).gold).toBe(0);
+    expect(await bankGold(empire.id)).toBe(12_345);
 
-    const after = await balances(empire.id);
-    // The overflow stays available — a full warehouse is not an error, it is a
-    // partial move, and the remainder is still the player's to spend.
-    expect(after.gold).toBe(4_000);
-    expect(after.wood).toBe(0);
-    expect(after.iron).toBe(0);
-    expect(after.stone).toBe(0);
-
-    const stock = Object.fromEntries(
-      (await warehouses(empire.id)).map((w) => [w.type, w.stored])
-    );
-    expect(stock.GOLD).toBe(capacity);
-    expect(stock.WOOD).toBe(1_500);
-    expect(stock.IRON).toBe(900);
-    expect(stock.STONE).toBe(0);
+    expect((await withdrawAllGoldFromBank()).success).toBeTruthy();
+    expect((await balances(empire.id)).gold).toBe(12_345);
+    expect(await bankGold(empire.id)).toBe(0);
   });
 
-  it("never overdraws under a burst of parallel presses", async () => {
-    const empire = await makeEmpire("storerace", {
-      vip: true,
-      gold: 3_000,
-      wood: 3_000,
-      iron: 3_000,
-      stone: 3_000,
-    });
+  it("never banks the same coins twice under a burst of presses", async () => {
+    const empire = await makeEmpire("bankrace", { vip: true, gold: 9_000 });
 
-    await Promise.all(Array.from({ length: 6 }, () => storeAllResources()));
+    await Promise.all(Array.from({ length: 6 }, () => depositAllGoldToBank()));
 
+    // Conservation: what is in the bank plus what is still available is exactly
+    // what the empire started with.
+    expect((await balances(empire.id)).gold + (await bankGold(empire.id))).toBe(9_000);
+  });
+});
+
+describe("a warehouse, in one press", () => {
+  it("fills to the ceiling and leaves the overflow available", async () => {
+    const empire = await makeEmpire("store", { vip: true, gold: 14_000 });
+    const capacity = (await warehouses(empire.id)).find((w) => w.type === "GOLD")!;
+
+    const form = new FormData();
+    form.set("resourceType", "GOLD");
+    expect((await depositAllToStorage({}, form)).success).toBeTruthy();
+
+    const stock = (await warehouses(empire.id)).find((w) => w.type === "GOLD")!;
     const after = await balances(empire.id);
-    const stock = await warehouses(empire.id);
-    // Conservation: whatever ended up inside plus whatever is still available
-    // is exactly what the empire started with, on every resource.
+    // A full warehouse is not an error: it is a partial move, and the remainder
+    // is still the player's to spend.
+    expect(stock.stored + after.gold).toBe(14_000 + capacity.stored);
     expect(after.gold).toBeGreaterThanOrEqual(0);
-    for (const w of stock) {
-      const key = w.type.toLowerCase() as "gold" | "wood" | "iron" | "stone";
-      expect(after[key] + w.stored).toBe(3_000);
-    }
   });
 
-  it("empties all four back into the available balances", async () => {
+  it("empties back into the available balance", async () => {
     const empire = await makeEmpire("release", { vip: true, stored: 2_500 });
 
-    const res = await releaseAllResources();
-    expect(res.success).toBeTruthy();
+    const form = new FormData();
+    form.set("resourceType", "WOOD");
+    expect((await withdrawAllFromStorage({}, form)).success).toBeTruthy();
 
-    const after = await balances(empire.id);
-    expect([after.gold, after.wood, after.iron, after.stone]).toEqual([
-      2_500, 2_500, 2_500, 2_500,
-    ]);
-    expect((await warehouses(empire.id)).every((w) => w.stored === 0)).toBe(true);
+    expect((await balances(empire.id)).wood).toBe(2_500);
+    const stock = (await warehouses(empire.id)).find((w) => w.type === "WOOD")!;
+    expect(stock.stored).toBe(0);
   });
 
-  it("refuses an empty set of warehouses rather than reporting a no-op move", async () => {
+  it("refuses an empty warehouse rather than reporting a no-op move", async () => {
     await makeEmpire("empty", { vip: true });
-    expect((await releaseAllResources()).error).toBeTruthy();
+    const form = new FormData();
+    form.set("resourceType", "IRON");
+    expect((await withdrawAllFromStorage({}, form)).error).toBeTruthy();
   });
 });
 
-describe("upgrading every warehouse", () => {
-  it("raises exactly one level per warehouse, and only what is affordable", async () => {
-    // Enough for two warehouses at level 1 (1,920 / 1,440 / 1,200 / 1,200),
-    // and short of the third.
-    const empire = await makeEmpire("upgrade", {
-      vip: true,
-      gold: 4_200,
-      wood: 3_200,
-      iron: 2_700,
-      stone: 2_700,
-    });
-
-    const res = await upgradeAllStorages();
-    expect(res.success).toBeTruthy();
-
-    const levels = (await warehouses(empire.id)).map((w) => w.level);
-    // Never two levels on one warehouse, and never zero on all of them.
-    expect(Math.max(...levels)).toBe(2);
-    expect(levels.filter((l) => l === 2).length).toBeGreaterThanOrEqual(1);
-    expect(levels.filter((l) => l === 2).length).toBeLessThan(4);
-
-    const after = await balances(empire.id);
-    for (const value of [after.gold, after.wood, after.iron, after.stone]) {
-      expect(value).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  it("refuses outright when nothing is affordable, and spends nothing", async () => {
-    const empire = await makeEmpire("poor", { vip: true, gold: 10 });
-
-    expect((await upgradeAllStorages()).error).toBeTruthy();
-    expect((await balances(empire.id)).gold).toBe(10);
-    expect((await warehouses(empire.id)).every((w) => w.level === 1)).toBe(true);
-  });
-});
-
-describe("training every free citizen", () => {
-  it("converts the whole population and leaves none behind", async () => {
-    const empire = await makeEmpire("train", { vip: true, citizens: 417 });
+describe("the mine crew, in one press", () => {
+  it("puts the whole crew on one mine, then splits it evenly", async () => {
+    const empire = await makeEmpire("crew", { vip: true, mineSlaves: 41 });
 
     const form = new FormData();
-    form.set("unit", "soldiers");
-    expect((await trainMaxUnits({}, form)).success).toBeTruthy();
+    form.set("resource", "iron");
+    expect((await assignAllMineSlavesToResource({}, form)).success).toBeTruthy();
 
-    expect((await balances(empire.id)).citizens).toBe(0);
-    const army = await prisma.army.findUniqueOrThrow({
-      where: { empireId: empire.id },
-      select: { soldiers: true },
-    });
-    expect(army.soldiers).toBe(417);
+    let layout = await mines(empire.id);
+    expect(layout.find((m) => m.type === "IRON_MINE")!.slaves).toBe(41);
+    expect(layout.reduce((sum, m) => sum + m.slaves, 0)).toBe(41);
+
+    expect((await splitMineSlavesEqually()).success).toBeTruthy();
+    layout = await mines(empire.id);
+    // 41 across four mines: 11/10/10/10, and never more slaves than exist.
+    expect(layout.reduce((sum, m) => sum + m.slaves, 0)).toBe(41);
+    expect(Math.max(...layout.map((m) => m.slaves))).toBe(11);
+    expect(Math.min(...layout.map((m) => m.slaves))).toBe(10);
   });
 
-  it("cannot be raced into training more units than there were citizens", async () => {
-    const empire = await makeEmpire("trainrace", { vip: true, citizens: 200 });
+  it("cannot be raced into assigning more slaves than the empire owns", async () => {
+    const empire = await makeEmpire("crewrace", { vip: true, mineSlaves: 30 });
 
-    const forms = Array.from({ length: 6 }, () => {
+    const forms = ["gold", "wood", "iron", "stone"].map((resource) => {
       const f = new FormData();
-      f.set("unit", "mineSlaves");
+      f.set("resource", resource);
       return f;
     });
-    await Promise.all(forms.map((f) => trainMaxUnits({}, f)));
+    await Promise.all([
+      ...forms.map((f) => assignAllMineSlavesToResource({}, f)),
+      splitMineSlavesEqually(),
+    ]);
 
-    const after = await balances(empire.id);
-    const army = await prisma.army.findUniqueOrThrow({
-      where: { empireId: empire.id },
-      select: { mineSlaves: true },
-    });
-    expect(after.citizens + army.mineSlaves).toBe(200);
+    const layout = await mines(empire.id);
+    expect(layout.reduce((sum, m) => sum + m.slaves, 0)).toBeLessThanOrEqual(30);
   });
+});
 
-  it("still needs a spy centre for spies", async () => {
-    const empire = await makeEmpire("spies", { vip: true, citizens: 50 });
+describe("a mine, to the ceiling", () => {
+  it("buys every level the treasury can carry, at the ladder's own prices", async () => {
+    // Enough gold for the first few rungs of the gold mine and nothing more.
+    const budget = 40_000;
+    const empire = await makeEmpire("max", { vip: true, gold: budget });
 
     const form = new FormData();
-    form.set("unit", "spies");
-    expect((await trainMaxUnits({}, form)).error).toBeTruthy();
-    expect((await balances(empire.id)).citizens).toBe(50);
+    form.set("resource", "gold");
+    expect((await upgradeMineToMax({}, form)).success).toBeTruthy();
+
+    const mine = (await mines(empire.id)).find((m) => m.type === "GOLD_MINE")!;
+    expect(mine.level).toBeGreaterThan(1);
+
+    // Exactly the sum of the levels it bought — the shortcut never discounts.
+    let spent = 0;
+    for (let level = 1; level < mine.level; level++) {
+      spent += mineUpgradeCost(level, "gold").gold;
+    }
+    const after = await balances(empire.id);
+    expect(after.gold).toBe(budget - spent);
+    // And it stopped because the next rung was unaffordable, not early.
+    expect(after.gold).toBeLessThan(mineUpgradeCost(mine.level, "gold").gold);
   });
 });

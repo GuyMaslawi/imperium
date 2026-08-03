@@ -13,6 +13,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
+import { VipLockedAction } from "./VipLockedAction";
 import { formatNumber } from "@/lib/game/format";
 
 export interface BankActionsProps {
@@ -23,6 +24,11 @@ export interface BankActionsProps {
   /** Whole gold protected in the gold warehouse. */
   storedGold: number;
   remainingDeposits: number;
+  /**
+   * The pass gates the two "all" buttons. Without it the typed-amount deposit
+   * and withdrawal below them still do everything they always did.
+   */
+  isVip: boolean;
 }
 
 type BankActionKind = "deposit" | "withdraw" | "depositAll" | "withdrawAll";
@@ -34,6 +40,7 @@ export function BankActions({
   bankGold,
   storedGold,
   remainingDeposits,
+  isVip,
 }: BankActionsProps) {
   const [depositState, depositAction] = useActionState<ActionState, FormData>(
     depositGoldToBank,
@@ -150,16 +157,20 @@ export function BankActions({
               <span aria-hidden>⬇️</span>
               הפקדה
             </p>
-            <SubmitButton
-              variant="secondary"
-              className="btn btn-ghost w-full"
-              formAction={depositAllAction}
-              onClick={handleQuickAction("depositAll")}
-              disabled={depositsExhausted}
-              pendingText="מפקיד..."
-            >
-              הפקד הכל
-            </SubmitButton>
+            {isVip ? (
+              <SubmitButton
+                variant="secondary"
+                className="btn btn-ghost w-full"
+                formAction={depositAllAction}
+                onClick={handleQuickAction("depositAll")}
+                disabled={depositsExhausted}
+                pendingText="מפקיד..."
+              >
+                הפקד הכל
+              </SubmitButton>
+            ) : (
+              <VipLockedAction label="הפקד הכל" className="w-full" />
+            )}
             <SubmitButton
               className="btn btn-dark w-full"
               formAction={depositAction}
@@ -177,15 +188,19 @@ export function BankActions({
               <span aria-hidden>⬆️</span>
               משיכה
             </p>
-            <SubmitButton
-              variant="secondary"
-              className="btn btn-ghost w-full"
-              formAction={withdrawAllAction}
-              onClick={handleQuickAction("withdrawAll")}
-              pendingText="מושך..."
-            >
-              משוך הכל
-            </SubmitButton>
+            {isVip ? (
+              <SubmitButton
+                variant="secondary"
+                className="btn btn-ghost w-full"
+                formAction={withdrawAllAction}
+                onClick={handleQuickAction("withdrawAll")}
+                pendingText="מושך..."
+              >
+                משוך הכל
+              </SubmitButton>
+            ) : (
+              <VipLockedAction label="משוך הכל" className="w-full" />
+            )}
             <SubmitButton
               className="btn btn-dark w-full"
               formAction={withdrawAction}

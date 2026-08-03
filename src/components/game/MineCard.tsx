@@ -12,6 +12,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { usePulse } from "@/components/ui/motion";
 import { MineRig, type MineRigPulseKind } from "./MineRig";
+import { VipLockedAction } from "./VipLockedAction";
 import { formatNumber } from "@/lib/game/format";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
 
@@ -31,6 +32,8 @@ export interface MineCardProps {
   /** Real production per regular update, broken down by active bonus. */
   breakdown: MineProductionBreakdown;
   upgradeCost: { gold: number; wood: number; iron: number; stone: number };
+  /** The pass gates "שדרג למקסימום". "שדרג רמה" beside it stays free. */
+  isVip: boolean;
 }
 
 export function MineCard({
@@ -45,6 +48,7 @@ export function MineCard({
   productionPerSlave,
   breakdown,
   upgradeCost,
+  isVip,
 }: MineCardProps) {
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeMine,
@@ -225,14 +229,18 @@ export function MineCard({
             <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">
               שדרג רמה
             </SubmitButton>
-            <SubmitButton
-              formAction={maxAction}
-              variant="secondary"
-              className="btn btn-ghost w-full"
-              pendingText="משדרג..."
-            >
-              שדרג למקסימום
-            </SubmitButton>
+            {isVip ? (
+              <SubmitButton
+                formAction={maxAction}
+                variant="secondary"
+                className="btn btn-ghost w-full"
+                pendingText="משדרג..."
+              >
+                שדרג למקסימום
+              </SubmitButton>
+            ) : (
+              <VipLockedAction label="שדרג למקסימום" className="w-full" />
+            )}
           </div>
         </form>
       )}

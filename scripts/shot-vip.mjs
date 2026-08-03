@@ -1,5 +1,6 @@
-// Shots of the VIP surfaces: the shop card, the warehouse bulk bar, the
-// command-post dialog and the training card — before and after the pass.
+// Shots of the VIP surfaces — before and after the pass: the shop card, the
+// screens whose one-click "הכל" buttons the pass gates (bank, warehouses,
+// production) and the command-post dialog.
 // Shares the session-cookie recipe with scripts/shot-overlays.mjs.
 //
 // DEV ONLY, and it WRITES: to shoot both states it sets `vipSince` on the
@@ -47,8 +48,9 @@ const browser = await puppeteer.launch({
 
 const CASES = [
   { id: "diamonds", url: "/game/diamonds" },
+  { id: "bank", url: "/game/bank" },
   { id: "storage", url: "/game/storage" },
-  { id: "army", url: "/game/army" },
+  { id: "production", url: "/game/production" },
   { id: "command", url: "/game/base", open: "מפקדה" },
 ];
 

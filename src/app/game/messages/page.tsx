@@ -53,7 +53,11 @@ export default async function MessagesPage() {
       // is collapsed to a boolean below — the timestamp itself never crosses.
       // `isStaff` rides along so a letter from the game's own account is named
       // in molten gold — the one channel staff still share with players.
-      include: { sender: { select: { name: true, lastSeenAt: true, isStaff: true } } },
+      include: {
+        sender: {
+          select: { name: true, lastSeenAt: true, isStaff: true, isBot: true },
+        },
+      },
     }),
     // The seed the compose form opens on — an alphabetical first page, not the
     // roster. This used to be `take: 1000`, which meant every load of this page
@@ -172,9 +176,7 @@ export default async function MessagesPage() {
             // `undefined` for a deleted author, which draws no dot at all — a
             // hollow ring would claim he is merely away. System mail (a battle
             // report, a quest haul) has no sender to be online in the first place.
-            const fromOnline = m.sender
-              ? isOnline(m.sender.lastSeenAt, now)
-              : undefined;
+            const fromOnline = m.sender ? isOnline(m.sender, now) : undefined;
             return (
               <li
                 key={m.id}

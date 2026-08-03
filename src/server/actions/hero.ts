@@ -118,9 +118,9 @@ export async function allocateHeroPoints(
  * Level-100 hero reset: the hero returns to level 1, all allocated points
  * are wiped, and the empire receives 3,000 citizens, 6,000 turns and a fresh
  * pool of hero points. The reset counter marks the hero as prestiged — and it
- * is what sizes the grant, since every reset is worth another permanent 25
- * points (see `heroPointPool`): 25 after the first, 50 after the second, and so
- * on, each carried all the way back up to the cap.
+ * is what sizes the grant, since every reset is worth another permanent 30
+ * points (see `heroPointPool`): 31 in hand after the first, 61 after the second,
+ * and so on, each carried all the way back up to the cap.
  */
 export async function resetHero(): Promise<ActionState> {
   try {

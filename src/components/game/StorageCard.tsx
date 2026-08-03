@@ -17,6 +17,7 @@ import { Meter } from "@/components/ui/Meter";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { usePulse } from "@/components/ui/motion";
 import { StorageSilo, type SiloPulseKind } from "./StorageSilo";
+import { VipLockedAction } from "./VipLockedAction";
 import type { OreKind } from "./oreTint";
 import { formatNumber } from "@/lib/game/format";
 
@@ -30,6 +31,11 @@ export interface StorageCardProps {
   stored: number;
   capacity: number;
   upgradeCost: { gold: number; wood: number; iron: number; stone: number };
+  /**
+   * The pass gates "הפקד הכל" / "משוך הכל". The amount box above them, and the
+   * upgrade below, stay free.
+   */
+  isVip: boolean;
 }
 
 type TransferKind = "deposit" | "withdraw" | "depositAll" | "withdrawAll";
@@ -44,6 +50,7 @@ export function StorageCard({
   stored,
   capacity,
   upgradeCost,
+  isVip,
 }: StorageCardProps) {
   /** The resource this warehouse holds — drives its canonical icon and tint. */
   const storedResource = resourceType.toLowerCase() as OreKind;
@@ -235,24 +242,33 @@ export function StorageCard({
           >
             משוך
           </SubmitButton>
-          <SubmitButton
-            variant="secondary"
-            className="btn btn-ghost w-full"
-            formAction={depositAllAction}
-            onClick={handleQuickAction("depositAll")}
-            pendingText="מפקיד..."
-          >
-            הפקד הכל
-          </SubmitButton>
-          <SubmitButton
-            variant="secondary"
-            className="btn btn-ghost w-full"
-            formAction={withdrawAllAction}
-            onClick={handleQuickAction("withdrawAll")}
-            pendingText="מושך..."
-          >
-            משוך הכל
-          </SubmitButton>
+          {isVip ? (
+            <>
+              <SubmitButton
+                variant="secondary"
+                className="btn btn-ghost w-full"
+                formAction={depositAllAction}
+                onClick={handleQuickAction("depositAll")}
+                pendingText="מפקיד..."
+              >
+                הפקד הכל
+              </SubmitButton>
+              <SubmitButton
+                variant="secondary"
+                className="btn btn-ghost w-full"
+                formAction={withdrawAllAction}
+                onClick={handleQuickAction("withdrawAll")}
+                pendingText="מושך..."
+              >
+                משוך הכל
+              </SubmitButton>
+            </>
+          ) : (
+            <>
+              <VipLockedAction label="הפקד הכל" className="w-full" />
+              <VipLockedAction label="משוך הכל" className="w-full" />
+            </>
+          )}
         </div>
       </form>
       <FormMessage

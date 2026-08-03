@@ -9,6 +9,7 @@ import {
 } from "@/lib/game/constants";
 import { formatGameTime, nextDailyUpdate } from "@/lib/game/time";
 import { formatDate, formatNumber } from "@/lib/game/format";
+import { isVip } from "@/lib/game/vip";
 import { BankActions } from "@/components/game/BankActions";
 import { BankFxProvider } from "@/components/game/BankFx";
 import { BankVault } from "@/components/game/BankVault";
@@ -89,6 +90,7 @@ export default async function BankPage() {
                 bankGold={bankGold}
                 storedGold={storedGold}
                 remainingDeposits={remainingDeposits}
+                isVip={isVip(empire)}
               />
             </div>
 

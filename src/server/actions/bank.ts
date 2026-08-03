@@ -8,6 +8,7 @@ import { getActiveEmpireId } from "@/lib/auth";
 import { allowedDepositsPerDailyPeriod } from "@/lib/game/constants";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
+import { VIP_REQUIRED_ERROR, isVip } from "@/lib/game/vip";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
@@ -28,6 +29,8 @@ interface BankContext {
   /** Whole gold protected in the gold warehouse. */
   storedGold: number;
   remainingDeposits: number;
+  /** Gates the two "all" transfers — the typed-amount ones are free. */
+  isVip: boolean;
 }
 
 /**
@@ -66,6 +69,7 @@ async function runBankAction(
           0,
           allowed - bankAccount.depositsUsedInCurrentPeriod
         ),
+        isVip: isVip(empire),
       };
       return perform(ctx, tx, empireId);
     });
@@ -189,8 +193,14 @@ export async function depositGoldToBank(
   );
 }
 
+/**
+ * VIP: the same deposit, with the amount read off the empire instead of typed
+ * into the box above it. The gate is here rather than in the component because
+ * the button being absent from the page stops nobody from posting to it.
+ */
 export async function depositAllGoldToBank(): Promise<ActionState> {
   return runBankAction(async (ctx, tx, empireId) => {
+    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
     if (ctx.availableGold < 1) {
       return ctx.storedGold > 0
         ? { error: "יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק." }
@@ -216,8 +226,10 @@ export async function withdrawGoldFromBank(
   });
 }
 
+/** VIP: the whole balance out in one press. See depositAllGoldToBank. */
 export async function withdrawAllGoldFromBank(): Promise<ActionState> {
   return runBankAction(async (ctx, tx, empireId) => {
+    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
     if (ctx.bankGold < 1) {
       return { error: "אין זהב למשיכה מהבנק." };
     }

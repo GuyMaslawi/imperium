@@ -1033,7 +1033,7 @@ export async function updateHero(
         : clampLevel(num(formData, "xp"), 0, xpToNextLevel(level));
 
     // Stat points have exactly two sources — one per level the hero stands at
-    // and 25 for every reset behind him — and `heroPointPool` is the only place
+    // and 30 for every reset behind him — and `heroPointPool` is the only place
     // that says so. Each point is a permanent +1% on a core combat stat, so an
     // unbounded field here is a bigger cheat than any resource number. The pool
     // is filled in allocation order and whatever exceeds it is dropped.

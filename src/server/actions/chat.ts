@@ -408,7 +408,7 @@ export async function getChatThreads(): Promise<ChatThread[]> {
     const [partners, unread] = await Promise.all([
       prisma.empire.findMany({
         where: { id: { in: partnerIds } },
-        select: { id: true, name: true, lastSeenAt: true },
+        select: { id: true, name: true, lastSeenAt: true, isBot: true },
       }),
       prisma.chatMessage.groupBy({
         by: ["senderEmpireId"],
@@ -443,7 +443,7 @@ export async function getChatThreads(): Promise<ChatThread[]> {
         at: h.createdAt.getTime(),
         time: formatGameTime(h.createdAt),
         unread: unreadById.get(h.partner) ?? 0,
-        online: isOnline(byId.get(h.partner)!.lastSeenAt, now),
+        online: isOnline(byId.get(h.partner)!, now),
       }));
   } catch (err) {
     await logError("chat.getChatThreads", err);
@@ -491,13 +491,13 @@ export async function getChatThread(
 
     const row = await prisma.empire.findFirst({
       where: { id: partnerId, user: notBannedWhere() },
-      select: { id: true, name: true, lastSeenAt: true },
+      select: { id: true, name: true, lastSeenAt: true, isBot: true },
     });
     if (!row) return { partner: null, lines: [], unread: 0, typing: false };
     const partner: ChatPlayer = {
       id: row.id,
       name: row.name,
-      online: isOnline(row.lastSeenAt),
+      online: isOnline(row),
     };
 
     const between = [
@@ -727,13 +727,13 @@ export async function getChatRoster(): Promise<ChatPlayer[]> {
       where: { id: { not: empireId }, user: notBannedWhere() },
       orderBy: [{ lastSeenAt: { sort: "desc", nulls: "last" } }, { name: "asc" }],
       take: CHAT_ROSTER_MAX,
-      select: { id: true, name: true, lastSeenAt: true },
+      select: { id: true, name: true, lastSeenAt: true, isBot: true },
     });
     const now = new Date();
     return rows.map((row) => ({
       id: row.id,
       name: row.name,
-      online: isOnline(row.lastSeenAt, now),
+      online: isOnline(row, now),
     }));
   } catch {
     return [];

@@ -41,6 +41,7 @@ import {
 } from "@/lib/game/constants";
 import { getTunables } from "@/lib/game/config";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
+import { VIP_REQUIRED_ERROR, isVip } from "@/lib/game/vip";
 import { grantCitizens } from "@/lib/game/grants";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
@@ -207,6 +208,11 @@ export async function upgradeMine(
 
 /* --------------------------- upgrade mine to max --------------------------- */
 
+/**
+ * VIP: every level the treasury can carry, in one press. The free path to the
+ * exact same mine is `upgradeMine`, pressed once per level at the same prices —
+ * this buys the presses, not the levels.
+ */
 export async function upgradeMineToMax(
   _prev: ActionState,
   formData: FormData
@@ -225,6 +231,7 @@ export async function upgradeMineToMax(
       if (building.level >= MINE_MAX_LEVEL) {
         return { error: "המכרה כבר ברמה המקסימלית" };
       }
+      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
 
       const discountPct = await getShopDiscountPct(empireId, tx);
 
@@ -332,12 +339,17 @@ export async function upgradeMineToMax(
 /**
  * Write a full assignment map (mine type -> slaves) inside a transaction,
  * after validating it against the empire's total mine slaves.
+ *
+ * `compute` also receives the settled empire, which is what lets the two
+ * crew-wide shortcuts check the VIP pass against the same read the assignment
+ * is validated against, inside the same transaction.
  */
 async function applyAssignments(
   empireId: string,
   compute: (
     totalSlaves: number,
-    current: Map<BuildingType, number>
+    current: Map<BuildingType, number>,
+    empire: FullEmpire
   ) => Map<BuildingType, number> | { error: string }
 ): Promise<ActionState & { assigned?: Map<BuildingType, number> }> {
   return prisma.$transaction(async (tx) => {
@@ -360,7 +372,7 @@ async function applyAssignments(
       mines.map((b) => [b.type, b.slavesAssigned])
     );
 
-    const next = compute(totalSlaves, current);
+    const next = compute(totalSlaves, current, empire);
     if (!(next instanceof Map)) return next;
 
     let sum = 0;
@@ -434,6 +446,10 @@ export async function assignMineSlavesToResource(
   }
 }
 
+/**
+ * VIP: the whole crew onto one mine. Free players reach the same layout with
+ * `assignMineSlavesToResource`, typing the number into each of the four cards.
+ */
 export async function assignAllMineSlavesToResource(
   _prev: ActionState,
   formData: FormData
@@ -446,7 +462,8 @@ export async function assignAllMineSlavesToResource(
   try {
     const empireId = await requireOwnEmpireId();
     let total = 0;
-    const result = await applyAssignments(empireId, (totalSlaves) => {
+    const result = await applyAssignments(empireId, (totalSlaves, _current, empire) => {
+      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
       total = totalSlaves;
       const next = new Map<BuildingType, number>(
         PRODUCTION_BUILDING_TYPES.map((type) => [type, 0])
@@ -466,10 +483,12 @@ export async function assignAllMineSlavesToResource(
   }
 }
 
+/** VIP: an even four-way split. See assignAllMineSlavesToResource. */
 export async function splitMineSlavesEqually(): Promise<ActionState> {
   try {
     const empireId = await requireOwnEmpireId();
-    const result = await applyAssignments(empireId, (totalSlaves) => {
+    const result = await applyAssignments(empireId, (totalSlaves, _current, empire) => {
+      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
       const base = Math.floor(totalSlaves / PRODUCTION_BUILDING_TYPES.length);
       let remainder = totalSlaves % PRODUCTION_BUILDING_TYPES.length;
       const next = new Map<BuildingType, number>();
@@ -1431,6 +1450,8 @@ interface StorageTransferContext {
   freeSpace: number;
   /** Whole units currently protected inside the warehouse. */
   storedAmount: number;
+  /** Gates the two "all" transfers — the typed-amount ones are free. */
+  isVip: boolean;
 }
 
 /**
@@ -1466,6 +1487,7 @@ async function runStorageTransfer(
         available: Math.floor(empire[resourceKey]),
         freeSpace: Math.max(0, Math.floor(capacity - storage.storedAmount)),
         storedAmount: Math.floor(storage.storedAmount),
+        isVip: isVip(empire),
       };
       return perform(ctx, tx, empireId);
     });
@@ -1574,6 +1596,11 @@ export async function withdrawFromStorage(
   });
 }
 
+/**
+ * VIP: the same deposit with the amount read off the empire instead of typed
+ * into the card's box. The gate lives here, not in StorageCard: a button that
+ * is not rendered is still an action anyone can post to.
+ */
 export async function depositAllToStorage(
   _prev: ActionState,
   formData: FormData
@@ -1582,6 +1609,7 @@ export async function depositAllToStorage(
   if (!parsed.success) return { error: "סוג מחסן לא תקין" };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
+    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
     if (ctx.freeSpace < 1) return { error: "המחסן מלא — שדרג אותו כדי לאחסן עוד" };
     const amount = Math.min(ctx.available, ctx.freeSpace);
     if (amount < 1) return { error: "אין משאבים זמינים לאחסון" };
@@ -1589,6 +1617,7 @@ export async function depositAllToStorage(
   });
 }
 
+/** VIP: the whole warehouse out in one press. See depositAllToStorage. */
 export async function withdrawAllFromStorage(
   _prev: ActionState,
   formData: FormData
@@ -1597,6 +1626,7 @@ export async function withdrawAllFromStorage(
   if (!parsed.success) return { error: "סוג מחסן לא תקין" };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
+    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
     if (ctx.storedAmount < 1) return { error: "המחסן ריק" };
     return transferFromStorage(ctx, tx, empireId, ctx.storedAmount);
   });

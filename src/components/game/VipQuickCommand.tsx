@@ -5,14 +5,15 @@ import { useState } from "react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Icon } from "@/components/ui/Icon";
 import { VIP_COST, VIP_LABEL, VIP_PERKS, VIP_SHORT } from "@/lib/game/vip";
-import { VipQuickActions, type VipActionKey } from "./VipQuickActions";
+import { VipQuickActions } from "./VipQuickActions";
 
 /**
  * The VIP command post: a chip in the row the season pass and the timers ride
- * in, opening every bulk action from wherever the player happens to be.
+ * in, opening the game's one-click bulk actions from wherever the player
+ * happens to be.
  *
- * Reachability is the actual product here. "אחסן הכל" on the warehouse screen
- * saves seven clicks; the same button reachable from the battle report you are
+ * Reachability is the actual product here. "הפקד הכל" on the warehouse screen
+ * saves the typing; the same button reachable from the battle report you are
  * reading saves the trip to the warehouse screen as well — which is the trip
  * players skip, and the reason their resources are sitting unprotected when the
  * raid lands.
@@ -22,19 +23,6 @@ import { VipQuickActions, type VipActionKey } from "./VipQuickActions";
  * people it is sold to, and a locked control that names what it unlocks is the
  * honest version of an advertisement.
  */
-
-/** Every bulk action, in the order they are used in a session. */
-const DOCK_ACTIONS: VipActionKey[] = [
-  "storeAll",
-  "releaseAll",
-  "bankDepositAll",
-  "bankWithdrawAll",
-  "upgradeStorages",
-  "trainSoldiers",
-  "trainSpies",
-  "trainMineSlaves",
-];
-
 export function VipQuickCommand({ isVip }: { isVip: boolean }) {
   const [open, setOpen] = useState(false);
 
@@ -80,17 +68,18 @@ export function VipQuickCommand({ isVip }: { isVip: boolean }) {
         {isVip ? (
           <>
             <p className="mt-1 text-xs text-zinc-400">
-              כל הפעולות הגורפות, מכל מסך במשחק. כל פעולה מדווחת בדיוק מה קרה.
+              אותן פעולות שבעמודי הבנק, המחסנים והייצור — מכל מסך במשחק. כל
+              פעולה מדווחת בדיוק מה קרה.
             </p>
             <div className="mt-4">
-              <VipQuickActions keys={DOCK_ACTIONS} columns={2} />
+              <VipQuickActions />
             </div>
           </>
         ) : (
           <>
             <p className="mt-1 text-xs text-zinc-400">
-              רכישה חד־פעמית שפותחת פעולות גורפות בלחיצה אחת. חיסכון בזמן בלבד —
-              בלי משאבים, בלי עוצמה ובלי הגנה שאין לשחקן חינמי.
+              רכישה חד־פעמית שפותחת את כפתורי ״הכל״ שכבר קיימים במשחק. חיסכון
+              בלחיצות בלבד — כל מה שהם עושים אפשר לעשות גם בלעדיהם, ידנית.
             </p>
             <ul className="mt-4 space-y-2">
               {VIP_PERKS.map((perk) => (

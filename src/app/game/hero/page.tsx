@@ -22,6 +22,9 @@ import {
   HERO_DAMAGE_PER_LOST_DEFENSE,
   HERO_MAX_HEALTH,
   HERO_MAX_LEVEL,
+  HERO_RESET_CITIZENS,
+  HERO_RESET_POINTS,
+  HERO_RESET_TURNS,
   heroClassBonusLines,
   heroClassImage,
   heroReviveAt,
@@ -156,7 +159,7 @@ export default async function HeroPage() {
               </Tip>
               {hero.resets > 0 && (
                 <Tip
-                  tip={`תג איפוס: הגיבור הגיע לרמה 100 ואופס ${hero.resets === 1 ? "פעם אחת" : `${hero.resets} פעמים`}. כל איפוס העניק 2,500 אזרחים ו-25 נקודות גיבור.`}
+                  tip={`תג איפוס: הגיבור הגיע לרמה ${HERO_MAX_LEVEL} ואופס ${hero.resets === 1 ? "פעם אחת" : `${hero.resets} פעמים`}. כל איפוס העניק ${formatNumber(HERO_RESET_CITIZENS)} אזרחים, ${formatNumber(HERO_RESET_TURNS)} תורות ו-${HERO_RESET_POINTS} נקודות גיבור לצמיתות.`}
                 >
                   <span className="rounded-md border border-purple-400/60 bg-purple-950/80 px-1.5 py-0.5 text-xs font-black text-purple-300">
                     ↻ ×{hero.resets}

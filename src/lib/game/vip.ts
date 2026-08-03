@@ -5,17 +5,19 @@ import type { IconName } from "@/components/ui/Icon";
  *
  * A one-off purchase that buys **time, not power**.
  *
- * Everything VIP unlocks is a bulk version of a button the game already gives
- * every player for free: storing four warehouses instead of one, turning every
- * free citizen into soldiers in a click, raising all four warehouses a level.
- * Nothing here produces a resource, adds a point of power, blocks an attack or
- * shortens a cooldown — a paying player ends a session in exactly the state a
- * patient one does, just with eight fewer clicks between him and it.
+ * The pass does not add actions to the game. It unlocks the one-click "do it to
+ * everything" buttons the game already has — הפקד הכל in the bank, הפקד/משוך הכל
+ * on a warehouse, הצב הכל / חלק שווה on the mine crew, שדרג למקסימום on a mine.
+ * A player without it still reaches every one of those states: he types the
+ * amount, he presses per warehouse, he buys the mine a level at a time. Nothing
+ * here produces a resource, adds a point of power, blocks an attack or shortens
+ * a cooldown — a paying player ends a session in exactly the state a patient one
+ * does, just with fewer presses between him and it.
  *
  * That line is the whole reason the pass can be sold at all, and it is worth
- * defending: the moment a VIP button grants something a free player cannot
- * reach at any click count, the shop stops selling convenience and starts
- * selling the ladder.
+ * defending: the moment a VIP button reaches a state a free player cannot reach
+ * at any click count, the shop stops selling convenience and starts selling the
+ * ladder.
  *
  * It never expires. Not a subscription and not a timed buff — there is no
  * `vipUntil`, no countdown in the command bar and no expiry mail to write. It
@@ -40,6 +42,14 @@ export function isVip(empire: VipHolder | null | undefined): boolean {
   return empire?.vipSince != null;
 }
 
+/**
+ * The refusal every gated action returns without the pass.
+ *
+ * Shared, because the gate lives in three files (bank, game, vip) and a player
+ * who hits it from two different screens must be told the same thing.
+ */
+export const VIP_REQUIRED_ERROR = `הפעולה הזו נפתחת עם ${VIP_LABEL} — ניתן לרכוש בעמוד היהלומים`;
+
 /** The perks, as the shop card and the guide list them. */
 export interface VipPerk {
   icon: IconName;
@@ -49,24 +59,24 @@ export interface VipPerk {
 
 export const VIP_PERKS: VipPerk[] = [
   {
+    icon: "bank",
+    title: "בנק · הפקד הכל · משוך הכל",
+    desc: "כל הזהב הזמין נכנס לחיסכון (או חוזר ממנו) בלי להקליד סכום.",
+  },
+  {
     icon: "storage",
-    title: "אחסן הכל · שחרר הכל",
-    desc: "כל ארבעת המחסנים בלחיצה אחת, במקום שמונה לחיצות בארבעה כרטיסים.",
+    title: "מחסנים · הפקד הכל · משוך הכל",
+    desc: "כל מחסן מתמלא או מתרוקן בלחיצה, במקום הקלדת כמות בכל אחד מהארבעה.",
   },
   {
-    icon: "army",
-    title: "אמן הכל",
-    desc: "כל האזרחים הפנויים הופכים ליחידה שבחרת — בלי להקליד כמות.",
-  },
-  {
-    icon: "upgrades",
-    title: "שדרג את כל המחסנים",
-    desc: "מעלה רמה בכל מחסן שאתה יכול לממן, בלחיצה אחת.",
+    icon: "mine",
+    title: "מכרות · הצב הכל · חלק שווה · שדרג למקסימום",
+    desc: "כל עבדי המכרות למשאב אחד או בחלוקה שווה, ומכרה שעולה רמות עד שנגמר התקציב.",
   },
   {
     icon: "spark",
-    title: "מפקדה מהירה בכל מסך",
-    desc: "כפתור בסרגל העליון שפותח את כל הפעולות האלה — ואת הבנק — מכל עמוד במשחק.",
+    title: "מפקדה בכל מסך",
+    desc: "כפתור בסרגל העליון שפותח את כל הפעולות האלה מכל עמוד במשחק.",
   },
 ];
 

@@ -143,13 +143,29 @@ export function typingLabel(names: string[]): string | null {
   return `${names.length} שחקנים מקלידים…`;
 }
 
-/** Whether a heartbeat is recent enough to show the green dot. */
+/**
+ * Whether an empire shows the green dot: a heartbeat recent enough, or a bot.
+ *
+ * Takes the row rather than the timestamp so that the bot rule cannot be
+ * forgotten at one call site — every surface that draws the dot reads presence
+ * through here, and a garrison must never be the one row on the city ladder
+ * that is permanently "לא מחובר". A bot has no browser to stamp `lastSeenAt`,
+ * so left to the column alone it would advertise itself as a bot on the very
+ * board it was planted to populate (see src/lib/bot.ts). Being always at the
+ * keyboard is also the honest answer for something the server settles on
+ * demand: a bot's garrison rebuilds whenever anyone looks at it.
+ *
+ * The row is nullable for callers resolving a name that may no longer exist —
+ * a deleted empire reads as away.
+ */
 export function isOnline(
-  lastSeenAt: Date | null | undefined,
+  empire: { lastSeenAt: Date | null; isBot: boolean } | null | undefined,
   now: Date = new Date()
 ): boolean {
-  if (!lastSeenAt) return false;
-  return now.getTime() - lastSeenAt.getTime() < PRESENCE_ONLINE_MS;
+  if (!empire) return false;
+  if (empire.isBot) return true;
+  if (!empire.lastSeenAt) return false;
+  return now.getTime() - empire.lastSeenAt.getTime() < PRESENCE_ONLINE_MS;
 }
 
 /**

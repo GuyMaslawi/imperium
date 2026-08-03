@@ -8,14 +8,10 @@ import {
 } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
 import { StorageCard } from "@/components/game/StorageCard";
-import {
-  VipLockedTeaser,
-  VipQuickActions,
-} from "@/components/game/VipQuickActions";
 import { oreVars } from "@/components/game/oreTint";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
-import { VIP_LABEL, isVip } from "@/lib/game/vip";
+import { isVip } from "@/lib/game/vip";
 
 export const metadata = { title: "מחסנים | קראלדור" };
 
@@ -157,31 +153,6 @@ export default async function StoragePage() {
         </div>
       </div>
 
-      {/* -------- VIP bulk controls --------
-          This screen is where the pass earns itself: storing four warehouses
-          by hand is eight presses across four cards, and it is the chore
-          players skip right before they get raided. */}
-      <section className="panel rounded-xl p-4">
-        <h2 className="mb-3 flex flex-wrap items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
-          <Icon name="crown" size={16} className="text-crimson-bright" />
-          פעולות מהירות
-          <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
-            {VIP_LABEL}
-          </span>
-        </h2>
-        {vip ? (
-          <VipQuickActions
-            keys={["storeAll", "releaseAll", "upgradeStorages"]}
-            columns={3}
-          />
-        ) : (
-          <VipLockedTeaser
-            keys={["storeAll", "releaseAll", "upgradeStorages"]}
-            columns={3}
-          />
-        )}
-      </section>
-
       <p className="panel-inset rounded-xl p-4 text-sm text-zinc-400">
         <Icon name="shield" size={16} className="inline align-[-2px]" /> המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים
         ויכולים להיגנב בתקיפה.
@@ -198,6 +169,7 @@ export default async function StoragePage() {
             stored={warehouse.stored}
             capacity={warehouse.capacity}
             upgradeCost={storageUpgradeCost(warehouse.level)}
+            isVip={vip}
           />
         ))}
       </div>

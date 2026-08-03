@@ -166,8 +166,8 @@ describe("the point pool", () => {
         HERO_MAX_LEVEL + r * HERO_RESET_POINTS
       );
     }
-    // The figure the reset screen promises: 125 at the cap on the first reset.
-    expect(heroPointPool(HERO_MAX_LEVEL, 1)).toBe(125);
+    // The figure the reset screen promises: 130 at the cap on the first reset.
+    expect(heroPointPool(HERO_MAX_LEVEL, 1)).toBe(130);
   });
 
   it("hands a reset hero his whole new pool as unspent points", () => {

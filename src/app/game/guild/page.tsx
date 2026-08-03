@@ -370,8 +370,10 @@ export default async function GuildPage() {
                   // rather than count them as a fighter.
                   isStaff: true,
                   // Collapsed to a boolean before it reaches the roster below —
-                  // the raw heartbeat never becomes a prop.
+                  // the raw heartbeat never becomes a prop. `isBot` rides along
+                  // because presence is read off the whole row (see isOnline).
                   lastSeenAt: true,
+                  isBot: true,
                   // The roster shows the hero level, not `empire.level` — that
                   // column is never incremented by gameplay.
                   hero: { select: { level: true } },
@@ -482,8 +484,7 @@ export default async function GuildPage() {
                       RTL row draws it at the name's right edge. */}
                   <PresenceDot
                     online={
-                      member.empireId === empire.id ||
-                      isOnline(member.empire.lastSeenAt, now)
+                      member.empireId === empire.id || isOnline(member.empire, now)
                     }
                   />
                   <span className="text-sm font-semibold text-zinc-100">
