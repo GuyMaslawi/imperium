@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -9,6 +9,7 @@ import { Meter } from "@/components/ui/Meter";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatCompact } from "@/lib/game/format";
+import { useScrollLock } from "@/components/ui/scrollLock";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 
 type NavItem = {
@@ -123,6 +124,10 @@ function BurgerGlyph({ open }: { open: boolean }) {
  * stacking context. The bar keeps a same-size placeholder so the row's layout
  * is unchanged, and the button re-anchors itself over that slot with the same
  * fixed offsets the header uses (dir=ltr, so: leading edge on the left).
+ *
+ * The panel's position/height/overflow are NOT utilities — they are the
+ * `.nav-drawer` rule in globals.css, which has to be unlayered to outrank
+ * .ornate-shell's `position: relative`. See the long note there.
  */
 export function MobileMenu(props: SidebarProps) {
   const pathname = usePathname();
@@ -131,9 +136,32 @@ export function MobileMenu(props: SidebarProps) {
   // an inert copy of the glyph so the bar never flashes a hole where it goes.
   const mounted = useSyncExternalStore(subscribeNever, () => true, () => false);
 
-  // While open: Escape closes, the back button closes (the only navigation that
-  // can start while the drawer covers everything — taps on its own links are
-  // handled below), and the page behind it does not scroll.
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Whether the nav is scrolled to its end — drives the bottom fade, which is
+  // the only cue that the list continues past the fold.
+  //
+  // State, not a `dataset` write on a ref. The attribute is rendered from JSX,
+  // so React owns it: any re-render of the drawer puts the JSX value straight
+  // back and silently undoes an imperative write. That is not theoretical —
+  // it is what happened here, and the fade stayed hidden on exactly the
+  // viewport where the list overflowed by the least.
+  //
+  // Setting it on every scroll event is not a re-render per frame: the setter
+  // is passed the same boolean nearly every time, and React bails out of a
+  // render when the state is unchanged.
+  const [atEnd, setAtEnd] = useState(true);
+  const syncEnd = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setAtEnd(el.scrollTop + el.clientHeight >= el.scrollHeight - 4);
+  }, []);
+
+  // The page behind the drawer does not scroll while it is open.
+  useScrollLock(open);
+
+  // While open: Escape closes, and the back button closes (the only navigation
+  // that can start while the drawer covers everything — taps on its own links
+  // are handled below).
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
@@ -142,14 +170,43 @@ export function MobileMenu(props: SidebarProps) {
     };
     document.addEventListener("keydown", onKey);
     window.addEventListener("popstate", close);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
       window.removeEventListener("popstate", close);
-      document.body.style.overflow = prev;
     };
   }, [open]);
+
+  // Open onto the row the player is standing on. With seventeen entries the
+  // current screen is often below the fold, and a drawer that opens on a list
+  // with no visible "you are here" reads as the wrong list.
+  useEffect(() => {
+    if (!open) return;
+    scrollRef.current
+      ?.querySelector('a[aria-current="page"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [open]);
+
+  // A ResizeObserver rather than a one-shot measure on open: the hero portrait
+  // finishes loading after the drawer is already on screen and grows the card
+  // by enough to push the list past the fold, so a fade computed at open time
+  // says "this is the whole list" when it no longer is. Watching the scroller
+  // and its content also covers the rows that come and go (the war row, badges)
+  // and a rotation, so the window resize listener is not needed on top.
+  useEffect(() => {
+    if (!open) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(syncEnd);
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    // After paint, not during the effect: the drawer is mid slide-in here and
+    // has not been laid out at its final size yet.
+    const frame = requestAnimationFrame(syncEnd);
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
+  }, [open, syncEnd]);
 
   return (
     <>
@@ -165,7 +222,11 @@ export function MobileMenu(props: SidebarProps) {
 
       {mounted &&
         createPortal(
-          <div className={`fixed inset-0 z-[60] lg:hidden ${open ? "" : "pointer-events-none"}`}>
+          <div
+            className={`fixed inset-x-0 top-0 z-[60] h-[100dvh] lg:hidden ${
+              open ? "" : "pointer-events-none"
+            }`}
+          >
             <div
               onClick={() => setOpen(false)}
               className={`absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-200 ${
@@ -183,11 +244,22 @@ export function MobileMenu(props: SidebarProps) {
               // Offscreen is not just invisible: while closed the drawer is out
               // of the tab order and out of the accessibility tree entirely.
               inert={!open}
-              className={`ornate-shell absolute inset-y-0 right-0 flex w-[86vw] max-w-xs flex-col gap-4 overflow-y-auto rounded-l-lg p-3 pt-[calc(var(--header-h)+0.75rem)] transition-transform duration-200 ${
+              data-at-end={String(atEnd)}
+              className={`ornate-shell nav-drawer flex w-[86vw] max-w-xs flex-col rounded-l-lg transition-transform duration-200 ${
                 open ? "translate-x-0" : "translate-x-full"
               }`}
             >
-              <SidebarContent {...props} pathname={pathname} />
+              {/* The frame clips and the border stays painted; this is the one
+                  thing that scrolls. Top padding clears the command bar the
+                  hamburger sits in, and belongs to the scroller so the ornate
+                  edge still starts at the top of the panel. */}
+              <div
+                ref={scrollRef}
+                onScroll={syncEnd}
+                className="nav-drawer-scroll flex flex-col gap-4 p-3 pt-[calc(var(--header-h)+0.75rem)]"
+              >
+                <SidebarContent {...props} pathname={pathname} />
+              </div>
             </aside>
 
             {/* Mirrors the command bar's own row box, so the button lands
@@ -494,6 +566,9 @@ function SidebarContent({
                   // is in the viewport at all times, so the default would fire a
                   // request per row on every render.
                   prefetch={false}
+                  // Names the current screen for a screen reader, and is what
+                  // the mobile drawer scrolls to when it opens.
+                  aria-current={active ? "page" : undefined}
                   className={`group flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
                     active
                       ? "bg-gold/12 text-gold-bright shadow-[inset_3px_0_0_var(--gold)]"

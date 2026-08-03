@@ -1,22 +1,39 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { StoreSeal } from "@/components/game/StoreSeal";
+import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { formatNumber } from "@/lib/game/format";
 import {
   DIAMOND_PACKAGES,
   discountedPrice,
   formatIls,
+  isValidBuyerName,
+  isValidBuyerPhone,
   packageTotal,
   packageValuePct,
   STORE_IDLE,
   type DiamondPackage,
   type StoreActionState,
 } from "@/lib/game/diamondStore";
-import { purchaseDiamondPackage } from "@/server/actions/diamondStore";
+import {
+  purchaseDiamondPackage,
+  startDiamondCheckout,
+} from "@/server/actions/diamondStore";
+
+/**
+ * How the active gateway takes money.
+ *
+ * - `direct` — one server call charges and credits (the mock provider). The
+ *   modal is a confirmation and nothing else.
+ * - `order` — the buyer pays on the gateway's own hosted page, so the modal
+ *   collects what that page demands (a full name and an Israeli mobile) and then
+ *   hands the browser over to it.
+ */
+type CheckoutKind = "direct" | "order";
 
 const TAG_META: Record<
   NonNullable<DiamondPackage["tag"]>,
@@ -40,6 +57,7 @@ export function DiamondStore({
   purchasesLive = false,
   locked = false,
   testMode = false,
+  checkoutKind = "direct",
 }: {
   discountPct: number;
   /** Whether real-money purchases are open to everyone (real provider wired). */
@@ -51,6 +69,8 @@ export function DiamondStore({
   locked?: boolean;
   /** Charges are play money (the mock provider). */
   testMode?: boolean;
+  /** Shape of the active gateway — decides what the checkout modal asks for. */
+  checkoutKind?: CheckoutKind;
 }) {
   const hasDiscount = discountPct > 0;
   const [pending, setPending] = useState<DiamondPackage | null>(null);
@@ -136,6 +156,7 @@ export function DiamondStore({
           pkg={pending}
           discountPct={discountPct}
           testMode={testMode}
+          checkoutKind={checkoutKind}
           onClose={() => setPending(null)}
         />
       )}
@@ -345,30 +366,59 @@ function CheckoutModal({
   pkg,
   discountPct,
   testMode,
+  checkoutKind,
   onClose,
 }: {
   pkg: DiamondPackage;
   discountPct: number;
   testMode: boolean;
+  checkoutKind: CheckoutKind;
   onClose: () => void;
 }) {
+  const hosted = checkoutKind === "order";
   const [state, action] = useActionState<StoreActionState, FormData>(
-    purchaseDiamondPackage,
+    hosted ? startDiamondCheckout : purchaseDiamondPackage,
     STORE_IDLE
   );
+  const [buyerName, setBuyerName] = useState("");
+  const [buyerPhone, setBuyerPhone] = useState("");
 
   const total = packageTotal(pkg);
   const net = discountedPrice(pkg.priceIls, discountPct);
   const hasDiscount = discountPct > 0;
   const credited = state.status === "success" ? (state.diamonds ?? total) : null;
+  const redirecting = state.status === "redirect" && !!state.url;
+
+  // A full-page navigation, not a router push: the destination is the gateway's
+  // own origin, and the buyer must actually leave our app to pay.
+  useEffect(() => {
+    if (state.status === "redirect" && state.url) {
+      window.location.href = state.url;
+    }
+  }, [state]);
+
+  // The gateway rejects these itself, but only after a PENDING purchase row has
+  // been opened and the buyer has watched a spinner — so the button stays dead
+  // until both are plausible.
+  const detailsReady =
+    !hosted || (isValidBuyerName(buyerName) && isValidBuyerPhone(buyerPhone));
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      // dvh, and z-100 with it: this is a modal, and the modal rung is 100 (see
+      // the stacking order in globals.css) — at z-50 the chat dock sat on top of
+      // the purchase card. Height in dvh so the "אשר רכישה" button at the foot
+      // of the card is not behind the phone's URL bar. See ui/Dialog.
+      className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative max-h-[90vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-sky-400/30 bg-panel p-6 shadow-2xl"
+        // Same omission the wheel had: a modal that takes real money and was
+        // announced to a screen reader as an anonymous div.
+        role="dialog"
+        aria-modal="true"
+        aria-label="אישור רכישה"
+        className="relative max-h-full w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl border border-sky-400/30 bg-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div
@@ -376,7 +426,17 @@ function CheckoutModal({
           className="pointer-events-none absolute -top-16 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full bg-sky-400/15 blur-3xl"
         />
 
-        {credited !== null ? (
+        {redirecting ? (
+          <div className="relative space-y-3 text-center">
+            <span aria-hidden className="block animate-pulse text-5xl">
+              🔐
+            </span>
+            <h3 className="text-lg font-black text-sky-200">מעביר לתשלום מאובטח…</h3>
+            <p className="text-sm text-zinc-400">
+              עוד רגע תועבר לעמוד הסליקה. אל תסגור את החלון.
+            </p>
+          </div>
+        ) : credited !== null ? (
           <div className="relative space-y-3 text-center">
             <span aria-hidden className="block text-5xl">
               ✅
@@ -461,12 +521,44 @@ function CheckoutModal({
 
             <form className="grid gap-2">
               <input type="hidden" name="packageId" value={pkg.id} />
+
+              {hosted && (
+                <div className="grid gap-2 pb-1">
+                  {/* Required by the gateway's payment page, and by the receipt
+                      an עוסק פטור issues per sale — not by us. Said out loud so
+                      it does not read as arbitrary data collection. */}
+                  <p className="text-[11px] text-zinc-500">
+                    פרטים אלה נדרשים על ידי חברת הסליקה ולהפקת הקבלה.
+                  </p>
+                  <Input
+                    label="שם מלא"
+                    name="buyerName"
+                    value={buyerName}
+                    onChange={(e) => setBuyerName(e.target.value)}
+                    autoComplete="name"
+                    placeholder="ישראל ישראלי"
+                  />
+                  <Input
+                    label="טלפון נייד"
+                    name="buyerPhone"
+                    value={buyerPhone}
+                    onChange={(e) => setBuyerPhone(e.target.value)}
+                    autoComplete="tel"
+                    inputMode="tel"
+                    placeholder="0501234567"
+                    dir="ltr"
+                    className="text-left"
+                  />
+                </div>
+              )}
+
               <SubmitButton
                 className="btn btn-gold w-full"
                 formAction={action}
-                pendingText="מעבד תשלום..."
+                disabled={!detailsReady}
+                pendingText={hosted ? "פותח עמוד תשלום..." : "מעבד תשלום..."}
               >
-                שלם {formatIls(net)}
+                {hosted ? `המשך לתשלום ${formatIls(net)}` : `שלם ${formatIls(net)}`}
               </SubmitButton>
               <button
                 type="button"

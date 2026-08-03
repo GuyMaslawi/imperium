@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useScrollLock } from "@/components/ui/scrollLock";
 import { MINIGAME_TYPE_META, type MiniGameState } from "@/lib/game/minigame";
 
 /**
@@ -161,14 +162,16 @@ export function MiniGameTakeover({
     const timer = setTimeout(close, TAKEOVER_MS);
     const onKey = () => close();
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
     };
   }, [close]);
+
+  // Refcounted (see ui/scrollLock) — this overlay hands straight over to the
+  // mini-game board, so the two are briefly on screen together and the naive
+  // save/restore left the page locked once both had gone.
+  useScrollLock(true);
 
   if (typeof document === "undefined") return null;
 

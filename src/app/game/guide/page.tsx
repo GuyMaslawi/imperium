@@ -49,7 +49,9 @@ import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   TIERS_PER_CATEGORY,
   WEAPON_CATEGORY_META,
+  WEAPON_COST_GROWTH,
   WEAPON_GATE_EVERY,
+  WEAPON_POWER_GROWTH,
   weaponTierGate,
   weaponTierUnlockCost,
   weaponsOfCategory,
@@ -927,7 +929,14 @@ export default async function GuidePage() {
               <Lead>
                 נשק הוא הדרך להפוך משאבים לכוח. יש{" "}
                 <b className="nums">{TIERS_PER_CATEGORY}</b> דרגות בכל אחת משלוש
-                הקטגוריות — התקפה, הגנה וריגול — והמחיר והכוח <b>שניהם מוכפלים בכל דרגה</b>.
+                הקטגוריות — התקפה, הגנה וריגול. בכל דרגה המחיר{" "}
+                <b>מוכפל</b> (×{WEAPON_COST_GROWTH}) אבל הכוח גדל{" "}
+                <b>×{WEAPON_POWER_GROWTH}</b> — ולכן כל דרגה נותנת{" "}
+                <b className="nums">
+                  {Math.round((WEAPON_POWER_GROWTH / WEAPON_COST_GROWTH - 1) * 100)}%
+                </b>{" "}
+                יותר כוח לכל זהב מזו שמתחתיה. תמיד שווה לקנות את הדרגה הגבוהה ביותר
+                שנפתחה לך.
               </Lead>
 
               <Formula
@@ -938,34 +947,47 @@ export default async function GuidePage() {
                     <O>=</O>
                     <N>5</N>
                     <O>×</O>
-                    <N>2</N>
+                    <N>{WEAPON_POWER_GROWTH}</N>
                     <sup className="text-gold-dim">(t−1)</sup>
                     <O>|</O>
                     <V>מחיר</V>
                     <O>=</O>
                     <N>50</N>
                     <O>×</O>
-                    <N>2</N>
+                    <N>{WEAPON_COST_GROWTH}</N>
                     <sup className="text-gold-dim">(t−1)</sup>
                     <V> זהב</V>
                     <O>+</O>
                     <N>25</N>
                     <O>×</O>
-                    <N>2</N>
+                    <N>{WEAPON_COST_GROWTH}</N>
                     <sup className="text-gold-dim">(t−1)</sup>
                     <V> מכל שאר</V>
                   </>
                 }
                 legend={[
-                  { term: "יחס קבוע", desc: "התקפה והגנה: 1 כוח לכל 10 זהב — בכל דרגה." },
-                  { term: "ריגול", desc: "בסיס 4 במקום 5 — 1 כוח לכל 12.5 זהב." },
-                  { term: "למה לשדרג", desc: "פחות פריטים לאותו כוח = פחות לחיצות, אותו מחיר." },
+                  {
+                    term: "היחס משתפר",
+                    desc: `התקפה והגנה: 1 כוח לכל 10 זהב בדרגה 1, ובכל דרגה מעליה ×${WEAPON_POWER_GROWTH / WEAPON_COST_GROWTH} כוח לאותו זהב.`,
+                  },
+                  { term: "ריגול", desc: "בסיס 4 במקום 5 — מתחיל ב־1 כוח לכל 12.5 זהב, ומשתפר באותו קצב." },
+                  {
+                    term: "למה לשדרג",
+                    desc: "אותו זהב בדרגה גבוהה = יותר כוח, ופחות פריטים לקנות. אין שום סיבה להישאר בדרגה ישנה.",
+                  },
                 ]}
                 example={
                   <>
                     דרגה <N>1</N>: <N>5</N> כוח ב־<N>50</N> זהב. דרגה <N>20</N>:{" "}
-                    <N>{formatShort(5 * 2 ** 19)}</N> כוח ב־
-                    <N>{formatShort(50 * 2 ** 19)}</N> זהב. אותו יחס בדיוק.
+                    <N>{formatShort(Math.round(5 * WEAPON_POWER_GROWTH ** 19))}</N> כוח
+                    ב־
+                    <N>{formatShort(50 * WEAPON_COST_GROWTH ** 19)}</N> זהב — פי{" "}
+                    <N>
+                      {formatShort(
+                        (WEAPON_POWER_GROWTH / WEAPON_COST_GROWTH) ** 19
+                      )}
+                    </N>{" "}
+                    כוח לכל זהב.
                   </>
                 }
               />
@@ -995,9 +1017,13 @@ export default async function GuidePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {weaponsOfCategory("ATTACK").map((w) => {
+                      {weaponsOfCategory("ATTACK").map((w, i) => {
                         const gate = weaponTierGate(w.tier);
                         const unlock = weaponTierUnlockCost(w.tier - 1);
+                        // Read the spy figure off the real definition rather
+                        // than scaling the attack one — power is rounded, so
+                        // the two ladders are not an exact 4/5 of each other.
+                        const spyPower = weaponsOfCategory("SPY")[i]?.power ?? 0;
                         return (
                           <tr key={w.tier}>
                             <td className="nums font-black text-gold-bright" dir="ltr">
@@ -1008,7 +1034,7 @@ export default async function GuidePage() {
                               {formatShort(w.power)}
                             </td>
                             <td className="nums text-purple-300" dir="ltr">
-                              {formatShort((w.power / 5) * 4)}
+                              {formatShort(spyPower)}
                             </td>
                             <td>
                               <Cost

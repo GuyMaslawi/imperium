@@ -112,11 +112,14 @@ export function forgeDiscountedCost(cost: number, active: boolean): number {
 /* ------------------------------ drops ------------------------------ */
 
 /**
- * Chance a won attack also yields a potion. Kept below the item-drop rate
- * (19%): a potion is a whole hour of a bent rule, and one every few raids is
- * plenty for a player to always have something on the belt to spend.
+ * Chance a won attack also yields a potion. Kept far below the item-drop rate
+ * (19%) *on purpose*: an hour of a bent rule is the most valuable thing a raid
+ * can hand out, and at one-in-a-few-raids (the old 8%) every player simply had
+ * a permanent belt of them — the window stopped being an event. At 2% a brew is
+ * a windfall you save for the raid that matters, and the hero quest board (see
+ * lib/game/heroQuests.ts) stays the *reliable* way to go looking for one.
  */
-export const POTION_DROP_CHANCE = 0.08;
+export const POTION_DROP_CHANCE = 0.02;
 
 /** How many of one kind the belt will hold — a deep but not infinite stash. */
 export const POTION_STACK_CAP = 99;

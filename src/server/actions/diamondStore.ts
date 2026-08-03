@@ -10,6 +10,8 @@ import {
   DIAMOND_PACKAGES,
   discountedPrice,
   formatIls,
+  isValidBuyerName,
+  isValidBuyerPhone,
   packageTotal,
 } from "@/lib/game/diamondStore";
 import type { StoreActionState } from "@/lib/game/diamondStore";
@@ -251,6 +253,87 @@ export async function purchaseDiamondPackage(
         ? `רכישת בדיקה: נזקפו ${ctx.total.toLocaleString("he-IL")} יהלומים.`
         : `נזקפו ${ctx.total.toLocaleString("he-IL")} יהלומים לחשבונך!`,
     };
+  } catch {
+    return { status: "error", message: "אירעה שגיאה, נסה שוב" };
+  }
+}
+
+/**
+ * Open a hosted-checkout order and hand the browser the page to pay on.
+ *
+ * The create half of an approval-based gateway (Grow): the price is recomputed
+ * here from the package id and the live tunables, a PENDING
+ * {@link "@prisma/client".DiamondPurchase} row is opened for it, and the order
+ * is created against that fixed amount. **Nothing is charged and no diamonds are
+ * credited by this call** — settlement happens only after the gateway is asked,
+ * server to server, what the buyer actually paid (see `@/server/growSettle`).
+ *
+ * The buyer's name and phone are collected rather than derived: the gateway
+ * requires both on its payment page, and the receipt an עוסק פטור issues per
+ * sale has to name a real customer. They are passed straight through and not
+ * stored — the audit row already snapshots the email and empire name.
+ */
+export async function startDiamondCheckout(
+  _prev: StoreActionState,
+  formData: FormData
+): Promise<StoreActionState> {
+  try {
+    const buyerName = String(formData.get("buyerName") ?? "").trim();
+    const buyerPhone = String(formData.get("buyerPhone") ?? "").trim();
+    // Validated before the gate so a typo costs nothing: the rate limiter below
+    // spends a token per attempt, and a rejected name would otherwise burn the
+    // buyer's ten attempts on a missing surname.
+    if (!isValidBuyerName(buyerName)) {
+      return { status: "error", message: "יש להזין שם פרטי ושם משפחה" };
+    }
+    if (!isValidBuyerPhone(buyerPhone)) {
+      return { status: "error", message: "מספר טלפון נייד לא תקין (למשל 0501234567)" };
+    }
+
+    const gate = await preflight(String(formData.get("packageId") ?? ""), "checkout");
+    if (!gate.ok) return { status: gate.status, message: gate.message };
+    const ctx = gate.ctx;
+
+    // A direct provider (the mock) charges in one server call and has no page to
+    // send anyone to. Reaching here with one means a stale client bundle.
+    if (ctx.provider.kind !== "order") {
+      return {
+        status: "error",
+        message: "אמצעי התשלום השתנה. רענן את הדף ונסה שוב.",
+      };
+    }
+
+    const purchase = await openPurchaseRow(ctx);
+
+    const order = await ctx.provider.createOrder({
+      purchaseId: purchase.id,
+      empireId: ctx.empire.id,
+      packageId: ctx.pkg.id,
+      amountIls: ctx.amountIls,
+      description: `${ctx.total} יהלומים KRALDOR`,
+      buyer: { name: buyerName, phone: buyerPhone, email: ctx.user.email },
+    });
+
+    if (!order.ok) {
+      await prisma.diamondPurchase.update({
+        where: { id: purchase.id },
+        data: { status: "FAILED", failureReason: order.reason },
+      });
+      // The gateway's own wording is not shown: it is English, operational, and
+      // occasionally quotes the request back. The reason is on the audit row for
+      // /admin/purchases, which is where it belongs.
+      return { status: "error", message: "לא הצלחנו לפתוח את עמוד התשלום. נסה שוב." };
+    }
+
+    // The order id and its lookup token are stored *before* the buyer is sent
+    // anywhere, because the callback can arrive while the redirect is still in
+    // flight — and a callback that finds no `providerRef` has no row to settle.
+    await prisma.diamondPurchase.update({
+      where: { id: purchase.id },
+      data: { providerRef: order.orderId, providerToken: order.token ?? null },
+    });
+
+    return { status: "redirect", url: order.redirectUrl };
   } catch {
     return { status: "error", message: "אירעה שגיאה, נסה שוב" };
   }

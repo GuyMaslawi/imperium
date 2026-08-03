@@ -63,9 +63,10 @@ export function parseDiscordInvite(raw: string | null | undefined): string | nul
  * Read the number honestly. Nothing outside Discord verifies that the player
  * joined — there is no bot, so the button is taken on trust — which makes this
  * "what the game hands to anyone who clicks a link once". At store prices
- * (`diamondStore.ts`: 400 diamonds for ₪13.90) 500 is a little over ₪17 of real
- * value per account, where 25 was under a shekel. That is no longer a pointless
- * heist, and the size of the purse has stopped being the anti-abuse design.
+ * (`diamondStore.ts`: 400 diamonds for ₪19.90 since the 08-03 repricing) 500 is
+ * a little under ₪25 of real value per account, where 25 diamonds was under a
+ * shekel. That is no longer a pointless heist, and the size of the purse has
+ * stopped being the anti-abuse design.
  *
  * What has to carry that weight instead:
  *  - the once-per-empire guard in `claimDiscordReward` (a single

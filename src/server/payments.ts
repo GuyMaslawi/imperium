@@ -2,23 +2,26 @@ import "server-only";
 
 import { STORE_CURRENCY } from "@/lib/game/diamondStore";
 import { getLegalOperator, missingLegalFields } from "@/lib/legal";
+import { growProvider, growConfigStatus } from "@/server/grow";
 
 /**
  * Payment-provider seam for the real-money diamond store.
  *
- * No real gateway is wired right now: the only implementation is the built-in
- * `mock` provider, which approves every charge, moves no money, and exists so
- * the checkout is exercisable end to end before a gateway exists. Grow is the
- * provider this seam is waiting for.
- *
  * Two provider shapes are defined, because real gateways come in both:
  *
  * - **direct** (`DirectPaymentProvider`) — one server-side call charges and
- *   settles. The mock provider is this shape.
+ *   settles. The built-in `mock` provider is this shape: it approves every
+ *   charge, moves no money, and exists so the checkout is exercisable end to
+ *   end before credentials arrive.
  * - **order** (`OrderPaymentProvider`) — the buyer approves the payment on the
  *   provider's own page, so the flow is *create order → buyer approves →
- *   capture*. A hosted-checkout gateway lands here, and the settlement half is
- *   already written and hardened: see `@/server/purchases`.
+ *   capture*. **Grow is this shape** (see `@/server/grow`), and the settlement
+ *   half is already written and hardened: see `@/server/purchases`.
+ *
+ * Which one is active is decided by {@link getPaymentProvider} from the
+ * environment alone: configure the Grow credentials and the store switches to
+ * Grow; leave them unset and it stays on the mock. Nothing else in the codebase
+ * names a gateway.
  *
  * Going live is a two-step change, and both steps are enforced:
  *   1. Wire a provider that moves real money (`isTestMode === false`).
@@ -42,13 +45,49 @@ export type ChargeResult =
   | { ok: true; providerRef: string }
   | { ok: false; reason: string };
 
+/**
+ * Who is paying, as the gateway needs them.
+ *
+ * Not decoration: Grow requires a full name and an Israeli mobile number on
+ * every payment page, and an עוסק פטור has to name the customer on the receipt
+ * it issues per sale — so these are collected at checkout rather than derived.
+ * They are passed straight through to the gateway and never stored on our side
+ * beyond the `userEmail`/`empireName` snapshots the audit row already keeps.
+ */
+export interface BuyerDetails {
+  /** Full name, two words minimum (the gateway rejects a single name). */
+  name: string;
+  /** Israeli mobile, digits only, "05XXXXXXXX". */
+  phone: string;
+  /** Where the receipt goes — the account's verified address. */
+  email: string;
+}
+
 export interface OrderInput extends ChargeInput {
   /** The `DiamondPurchase` row this order settles — echoed back on capture. */
   purchaseId: string;
+  /** Buyer identity for the hosted page and the receipt. */
+  buyer: BuyerDetails;
 }
 
 export type OrderResult =
-  | { ok: true; orderId: string }
+  | {
+      ok: true;
+      /** Provider-side order id, stored as `providerRef` on the purchase row. */
+      orderId: string;
+      /**
+       * The provider's hosted payment page. The browser is sent here — this is
+       * the whole point of an order provider, so it is required rather than
+       * optional: a create-order that returned no page would leave the buyer on
+       * a spinner with a PENDING row already open.
+       */
+      redirectUrl: string;
+      /**
+       * Provider-side secret for querying this order later, stored as
+       * `providerToken` on the purchase row. See {@link OrderRef}.
+       */
+      token?: string | null;
+    }
   | { ok: false; reason: string };
 
 export type CaptureResult =
@@ -80,19 +119,43 @@ export interface DirectPaymentProvider extends ProviderBase {
   charge(input: ChargeInput): Promise<ChargeResult>;
 }
 
+/**
+ * How an already-opened order is named back to the provider.
+ *
+ * The id alone is not always enough: Grow's order lookup is authenticated by a
+ * per-process token issued at creation time, so the token travels with the id
+ * rather than being re-derived. It is stored on the purchase row
+ * (`providerToken`) precisely so the *return from the payment page* can verify
+ * a payment without trusting anything the browser carried back.
+ */
+export interface OrderRef {
+  /** Provider-side order id — `providerRef` on the purchase row. */
+  orderId: string;
+  /** Provider-side secret for querying that order, when the gateway needs one. */
+  token?: string | null;
+}
+
 export interface OrderPaymentProvider extends ProviderBase {
   readonly kind: "order";
   /** Open an order for the buyer to approve. Never throws. */
   createOrder(input: OrderInput): Promise<OrderResult>;
-  /** Capture an order the buyer approved. Never throws. */
-  captureOrder(orderId: string): Promise<CaptureResult>;
+  /**
+   * Ask the provider, server to server, what actually happened to an order,
+   * and report the money it says moved. Never throws.
+   *
+   * This is the *only* trusted source of a payment's amount and status. Neither
+   * the browser returning from the hosted page nor the gateway's callback body
+   * may be believed on its own — see `@/app/api/pay/grow/[secret]/route.ts`.
+   */
+  captureOrder(ref: OrderRef): Promise<CaptureResult>;
 }
 
 export type PaymentProvider = DirectPaymentProvider | OrderPaymentProvider;
 
 /**
  * Placeholder provider: approves every charge instantly and returns a synthetic
- * reference. No network, no real money. Active until a gateway is wired.
+ * reference. No network, no real money. Active whenever Grow is unconfigured —
+ * which is every local checkout and every deploy without credentials.
  */
 class MockPaymentProvider implements DirectPaymentProvider {
   readonly kind = "direct" as const;
@@ -110,12 +173,19 @@ class MockPaymentProvider implements DirectPaymentProvider {
 const mockProvider = new MockPaymentProvider();
 
 /**
- * The active payment provider. Only the mock exists today; a real gateway is
- * selected here once it is wired, and everything downstream — the audit row,
- * the interlocks, the checkout UI — reads the provider through this one call.
+ * The active payment provider — the single place a gateway is selected.
+ * Everything downstream (the audit row, the interlocks, the checkout UI) reads
+ * it through this one call.
+ *
+ * Selection is by configuration, not by a flag: Grow takes over as soon as its
+ * credentials are present and complete, and the mock holds the seat otherwise.
+ * A *half*-configured Grow deliberately stays on the mock rather than shipping a
+ * provider that errors on every checkout — but it is not silent about it, since
+ * that state means a deploy meant to take money and is not. It is named, by env
+ * var, in {@link purchaseBlockers}.
  */
 export function getPaymentProvider(): PaymentProvider {
-  return mockProvider;
+  return growProvider() ?? mockProvider;
 }
 
 /**
@@ -165,8 +235,20 @@ export function purchaseBlockers(): string[] {
   if (process.env.DIAMOND_PURCHASES_LIVE !== "true") {
     blockers.push('DIAMOND_PURCHASES_LIVE אינו "true"');
   }
+  const grow = growConfigStatus();
   if (getPaymentProvider().isTestMode) {
-    blockers.push("לא מחובר ספק תשלומים אמיתי — הרכישות רצות על ספק דמה");
+    blockers.push(
+      grow.state === "unset"
+        ? "לא מחובר ספק תשלומים אמיתי — הרכישות רצות על ספק דמה"
+        : `Grow רץ בסביבת בדיקות (GROW_ENV=${grow.env}) — לא זז כסף אמיתי`
+    );
+  }
+  // A partial Grow configuration is its own blocker, and a louder one: it means
+  // a deploy *meant* to take money is running on the mock. Without this line the
+  // only symptom is the generic "no real provider" above, which reads like
+  // nothing was ever configured.
+  if (grow.state === "partial") {
+    blockers.push(`הגדרות Grow חסרות: ${grow.missing.join(", ")}`);
   }
   const missing = missingLegalFields();
   if (missing.length > 0) {

@@ -75,7 +75,16 @@ import {
   WHEEL_RESOURCE_BASE,
 } from "@/lib/game/wheel";
 import { armyPower, getEmpireMilitaryPower } from "@/lib/game/power";
-import { MAX_WEAPON_TIER, weaponByKey, weaponsPower } from "@/lib/game/weapons";
+import {
+  MAX_WEAPON_TIER,
+  WEAPON_CATEGORIES,
+  WEAPON_COST_GROWTH,
+  WEAPON_POWER_GROWTH,
+  WEAPONS,
+  weaponByKey,
+  weaponsOfCategory,
+  weaponsPower,
+} from "@/lib/game/weapons";
 
 describe("mines", () => {
   it("produces nothing without slaves", () => {
@@ -519,5 +528,51 @@ describe("power", () => {
 
   it("has a finite top tier", () => {
     expect(MAX_WEAPON_TIER).toBeGreaterThan(0);
+  });
+});
+
+describe("weapon tier curve", () => {
+  // The whole point of the tier ladder: a tier costs twice the one below it but
+  // is worth 2.5x its power, so buying up is always better than buying wide.
+  for (const category of WEAPON_CATEGORIES) {
+    it(`doubles the cost and multiplies power by ${WEAPON_POWER_GROWTH} every tier — ${category}`, () => {
+      const tiers = weaponsOfCategory(category);
+      expect(tiers).toHaveLength(MAX_WEAPON_TIER);
+
+      const base = tiers[0]!.power;
+      for (let i = 1; i < tiers.length; i++) {
+        const prev = tiers[i - 1]!;
+        const cur = tiers[i]!;
+
+        expect(cur.cost.gold).toBe(prev.cost.gold * WEAPON_COST_GROWTH);
+        expect(cur.cost.wood).toBe(prev.cost.wood * WEAPON_COST_GROWTH);
+        expect(cur.cost.iron).toBe(prev.cost.iron * WEAPON_COST_GROWTH);
+        expect(cur.cost.stone).toBe(prev.cost.stone * WEAPON_COST_GROWTH);
+
+        // Power is the exact geometric curve, rounded to a whole number — so
+        // the ratio between two neighbours is 2.5 up to that rounding, which
+        // only shows on the tiny early tiers (195 -> 488, not 487.5).
+        expect(cur.power).toBe(Math.round(base * WEAPON_POWER_GROWTH ** i));
+        const ratio = cur.power / prev.power;
+        expect(ratio).toBeGreaterThan(WEAPON_POWER_GROWTH - 0.15);
+        expect(ratio).toBeLessThan(WEAPON_POWER_GROWTH + 0.15);
+      }
+    });
+
+    it(`makes every tier worth more power per gold than the one below — ${category}`, () => {
+      const tiers = weaponsOfCategory(category);
+      for (let i = 1; i < tiers.length; i++) {
+        const prev = tiers[i - 1]!;
+        const cur = tiers[i]!;
+        expect(cur.power / cur.cost.gold).toBeGreaterThan(prev.power / prev.cost.gold);
+      }
+    });
+  }
+
+  it("keeps the top tier inside safe-integer range once stacked", () => {
+    // Power lands in Float columns and is summed across an arsenal, so the top
+    // tier must leave room for a real stockpile before precision goes.
+    const top = Math.max(...WEAPONS.map((w) => w.power));
+    expect(top * 1_000).toBeLessThan(Number.MAX_SAFE_INTEGER);
   });
 });

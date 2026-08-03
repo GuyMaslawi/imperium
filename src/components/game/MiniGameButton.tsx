@@ -14,6 +14,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useScrollLock } from "@/components/ui/scrollLock";
 import { pollMiniGame, submitMiniGameGuess } from "@/server/actions/minigame";
 import {
   MINIGAME_TYPE_META,
@@ -515,7 +516,10 @@ function MiniGameStage({
       aria-label={`${meta.label} — ${state.title}`}
       dir="rtl"
       onClick={(e) => e.stopPropagation()}
-      className="panel-gold relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.85)] sm:p-5"
+      // `max-h-full` against a dvh-sized overlay, not `max-h-[90vh]` — see the
+      // note in ui/Dialog: on a phone `vh` is the toolbar-collapsed height, so
+      // the guess keypad at the bottom of this board ended up unreachable.
+      className="panel-gold relative z-10 max-h-full w-full max-w-3xl overflow-y-auto overscroll-contain rounded-2xl p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_20px_60px_rgba(0,0,0,0.85)] sm:p-5"
     >
       {/* ── Banner: what it is, what it pays, how long it lives ── */}
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gold/25 pb-3">
@@ -1167,13 +1171,10 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
       if (e.key === "Escape") setOpenId(null);
     };
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [modalOpen]);
+
+  useScrollLock(modalOpen);
 
   function play(eventId: string, value: string) {
     startTransition(async () => {
@@ -1228,7 +1229,7 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
 
       {openState && (
         <div
-          className="fixed inset-0 z-[95] flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+          className="fixed inset-x-0 top-0 z-[95] flex h-[100dvh] items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
           onClick={() => setOpenId(null)}
         >
           <MiniGameStage

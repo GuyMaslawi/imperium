@@ -16,11 +16,14 @@ import type { NextConfig } from "next";
  * skin the button, the iframe it renders the button into, the token endpoint it
  * calls, and the avatars it shows.
  *
- * No payment gateway is allowlisted: none is wired, and a hosted checkout that
- * is not in the policy fails visibly at integration time rather than silently
- * widening it now. Whichever gateway lands adds only what it actually needs —
- * typically `form-action`/`frame-src` for its hosted page, plus `payment=` in
- * the Permissions-Policy below if it renders a wallet inside an iframe.
+ * The payment gateway (Grow) is deliberately **not** allowlisted, and does not
+ * need to be. Its checkout is a full-page navigation to its own origin, which no
+ * directive here governs: `connect-src` does not apply (the API calls are
+ * server-to-server), `form-action` does not apply (we assign `location`, we do
+ * not submit a form), and `frame-src` does not apply (nothing is embedded). If
+ * the hosted page is ever moved into an iframe instead, that is the change that
+ * needs `frame-src` plus `payment=` widened in the Permissions-Policy below —
+ * and it should fail visibly rather than be pre-authorised now.
  */
 // React evaluates code via `eval` in development to rebuild server stacks for
 // the error overlay. Production builds never do, so the escape hatch is scoped

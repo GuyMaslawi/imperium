@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import { useScrollLock } from "@/components/ui/scrollLock";
 import { pollHappyHour, type HappyHourState } from "@/server/actions/happyHour";
 import { HAPPY_HOUR_EFFECTS } from "@/lib/game/happyHour";
 
@@ -151,14 +152,15 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
     const timer = setTimeout(close, TAKEOVER_MS);
     const onKey = () => close();
     document.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       clearTimeout(timer);
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
     };
   }, [close]);
+
+  // Refcounted — see ui/scrollLock. This lands unannounced, so it can and does
+  // arrive on top of whatever overlay the player already had open.
+  useScrollLock(true);
 
   if (typeof document === "undefined") return null;
 

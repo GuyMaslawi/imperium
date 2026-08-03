@@ -10,6 +10,7 @@ import {
 import { spinWheel } from "@/server/actions/wheel";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { useScrollLock } from "@/components/ui/scrollLock";
 
 /**
  * One line in a batch reveal: a prize totalled across the whole batch.
@@ -93,6 +94,11 @@ export function WheelOfFortune({
   seasonCycle: number;
   onClose: () => void;
 }) {
+  // The wheel is the only overlay in the game that never locked the page behind
+  // it, so on a phone a spin gesture that missed the wheel scrolled the base
+  // screen underneath instead.
+  useScrollLock(true);
+
   const [rotation, setRotation] = useState(0);
   /** "spin" is the long coast, "settle" the short push back into the detent. */
   const [phase, setPhase] = useState<"idle" | "spin" | "settle">("idle");
@@ -405,10 +411,19 @@ export function WheelOfFortune({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/85 p-4 backdrop-blur-sm"
+      // The overlay is the scroller here (the wheel itself must not be cropped),
+      // so it is sized in dvh: at `inset-0` its bottom ran under the phone's
+      // toolbar and the last stretch of a tall result panel was unreachable.
+      className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain bg-black/85 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
+        // This covers the screen and takes every click, so it owes a screen
+        // reader the same announcement the other modals make — and it is what
+        // an overlay sweep queries for. It had neither.
+        role="dialog"
+        aria-modal="true"
+        aria-label="גלגל המזל"
         dir="rtl"
         onClick={(e) => e.stopPropagation()}
         className="ornate-shell relative my-6 w-full max-w-lg rounded-xl p-4 text-center sm:p-6"

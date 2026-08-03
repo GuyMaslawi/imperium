@@ -10,6 +10,7 @@ import {
   type RefObject,
 } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { useScrollLock } from "@/components/ui/scrollLock";
 import {
   SEASON_PASS_HAUL_ORDER,
   SEASON_PASS_PREMIUM_MULTIPLIER,
@@ -572,7 +573,7 @@ function CycleClearedOverlay({
     <div
       dir="rtl"
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
+      className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
     >
       {/* confetti rains over the whole screen, behind the card */}
       <span aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -720,16 +721,17 @@ function useModalChrome(onClose: () => void) {
     };
 
     document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     box?.focus({ preventScroll: true });
 
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
       opener?.focus?.();
     };
   }, []);
+
+  // Refcounted, so a takeover landing over an open pass cannot leave the page
+  // scroll-locked after both are gone — see ui/scrollLock.
+  useScrollLock(true);
 
   return ref;
 }
@@ -963,7 +965,10 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
           // browser felt like — the dialog drifting under the pointer while the
           // ladder crawled. The shell is height-capped instead, and the ladder
           // below is the single scroll region.
-          className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
+          // `h-[100dvh]`, not `inset-0`: the shell below is `max-h-full`, and
+          // against a vh-tall box on a phone that capped the ladder to a height
+          // that ran under the browser toolbar. See ui/Dialog.
+          className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-center justify-center overflow-hidden bg-black/80 p-3 backdrop-blur-sm sm:p-6"
           onClick={closePass}
         >
           <PassDialog

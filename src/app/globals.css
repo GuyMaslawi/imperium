@@ -19,12 +19,22 @@
      85   mini-game corner toast      MiniGameButton
      95   mini-game board             MiniGameButton
     100   modals and dialogs          Dialog, SeasonPass, HappyHourBanner,
-                                      MiniGameTakeover
+                                      MiniGameTakeover, WheelOfFortune,
+                                      DiamondStore's purchase confirm
     110   incoming-attack vignette    WarAlerts
     120   incoming-attack toasts      WarAlerts
 
    Anything covering the whole viewport belongs at 60 or above; anything the
    page should be able to cover belongs below it.
+
+   The wheel and the purchase confirm were both sitting at z-50 — level with the
+   chat dock, which therefore floated its launcher pill over a spinning wheel and
+   over a card asking for money. Both are modals; both are on 100 now.
+
+   Every full-viewport overlay is also sized `h-[100dvh]` rather than `inset-0`,
+   for the reason spelled out on .nav-drawer below: a fixed box is laid out
+   against the large (toolbar-collapsed) viewport, so on a phone `inset-0` runs
+   its bottom edge under the browser chrome.
    ------------------------------------------------------------------------- */
 
 :root {
@@ -211,6 +221,60 @@ body {
     align-self: flex-start;
     max-height: calc(100dvh - var(--header-h) - 2rem);
   }
+}
+
+/* Mobile nav drawer (MobileMenu) — the same trap as .sidebar-sticky above, and
+   for a long time it was live: the panel wears .ornate-shell, whose unlayered
+   `position: relative` silently beat the `absolute` utility on it. So the
+   drawer was never positioned at all — it was a static block as tall as its own
+   content (890px of hero card + seventeen nav rows), sitting inside a
+   viewport-sized fixed parent. Its own box therefore never overflowed, which
+   left `overflow-y-auto` with nothing to scroll, and everything past the fold
+   (יהלומים down to קהילה) was simply unreachable on a phone.
+
+   The geometry lives here as one unlayered rule so it keeps winning:
+   - `100dvh`, never `100%` or `100vh`. A mobile browser sizes the *large*
+     viewport as if its collapsing toolbar were gone, so a 100vh-tall panel
+     hides its own bottom edge behind the URL bar — the player scrolls to the
+     end of the list and the last row is still under the chrome.
+   - `overflow: hidden` on the frame, so the ornate border and its inner bone
+     hairline stay painted around the edge while .nav-drawer-scroll inside does
+     the scrolling — exactly how the desktop <Sidebar> is built.
+   - `overscroll-behavior: contain` on the scroller: without it, flicking past
+     the end of the nav hands the gesture to the page behind the drawer. */
+.nav-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100dvh;
+  overflow: hidden;
+}
+.nav-drawer-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  /* Room for the home indicator on a gesture-bar phone, so the last nav row is
+     never half under it. */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
+/* "There is more below" — a fade over the bottom edge of the frame, lifted the
+   moment the scroller reaches the end. Without it a drawer that happens to cut
+   cleanly between two rows looks like a complete list. */
+.nav-drawer::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3.5rem;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(11, 10, 14, 0.97), transparent);
+  opacity: 1;
+  transition: opacity 0.2s ease-out;
+}
+.nav-drawer[data-at-end="true"]::after {
+  opacity: 0;
 }
 
 /* subtle inner bone hairline for the framed panels */
@@ -7975,12 +8039,20 @@ body {
 .mgt {
   position: fixed;
   inset: 0;
+  bottom: auto;
+  /* dvh, so the announcement is centred in what the player can actually see.
+     A fixed overlay is laid out against the large (toolbar-collapsed) viewport,
+     which on a phone pushes a centred card noticeably below centre and can slide
+     its bottom edge under the URL bar. Same reason ui/Dialog is sized this way. */
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   /* The modal rung — see the stacking order at the top of this file. An
      incoming-attack toast still outranks it, which is correct: being raided is
      worth more of the player's attention than being invited to a game. */
   z-index: 100;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: 1.25rem;
   animation: mgt-in 0.3s ease-out both;
@@ -8657,11 +8729,19 @@ body {
 .hh-takeover {
   position: fixed;
   inset: 0;
+  bottom: auto;
+  /* dvh, so the announcement is centred in what the player can actually see.
+     A fixed overlay is laid out against the large (toolbar-collapsed) viewport,
+     which on a phone pushes a centred card noticeably below centre and can slide
+     its bottom edge under the URL bar. Same reason ui/Dialog is sized this way. */
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   /* A modal, so it sits on the modal rung — see the stacking order at the top
      of this file. An incoming-attack toast still outranks it. */
   z-index: 100;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: 1.25rem;
   background: radial-gradient(circle at 50% 45%, rgba(60, 34, 2, 0.9), rgba(0, 0, 0, 0.94) 70%);

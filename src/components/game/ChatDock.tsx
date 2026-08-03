@@ -800,7 +800,10 @@ export function ChatDock({
   const panel = (
     <div
       dir="rtl"
-      className="chat-panel flex h-[min(72vh,30rem)] w-[min(92vw,22.5rem)] flex-col overflow-hidden rounded-2xl border border-gold/40 bg-[#0f0e12]/97 shadow-[0_20px_60px_rgba(0,0,0,0.85)] backdrop-blur-sm"
+      // dvh: at 72vh the panel is measured against the toolbar-collapsed height,
+      // so on a phone the composer at its foot sat behind the URL bar and the
+      // player could read the room but not write to it.
+      className="chat-panel flex h-[min(72dvh,30rem)] w-[min(92vw,22.5rem)] flex-col overflow-hidden rounded-2xl border border-gold/40 bg-[#0f0e12]/97 shadow-[0_20px_60px_rgba(0,0,0,0.85)] backdrop-blur-sm"
     >
       <div className="flex items-center gap-2 border-b border-gold/25 bg-gradient-to-l from-transparent to-gold-deep/25 px-2.5 py-2">
         {partner ? (

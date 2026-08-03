@@ -44,13 +44,21 @@ export interface WeaponDefinition {
 export const TIERS_PER_CATEGORY = 30;
 
 /**
- * Cost & power both double every tier.
+ * Cost doubles every tier, power grows by 2.5× every tier — the same rule in
+ * all three categories. Power outrunning cost is deliberate: it is what makes a
+ * higher tier worth buying instead of stacking more of the cheap one. Every
+ * tier buys 25% more power per gold than the tier below it.
+ *
  * Cost rule: gold is always double every other resource, and tier 1 starts at
  * 50 gold / 25 of each other resource — so tier `t` costs
  * gold = 50·2^(t-1), wood/iron/stone = 25·2^(t-1).
  */
 const BASE_GOLD_COST = 50;
 const BASE_OTHER_COST = 25;
+/** Cost multiplier per tier. */
+export const WEAPON_COST_GROWTH = 2;
+/** Power multiplier per tier — higher than the cost growth on purpose. */
+export const WEAPON_POWER_GROWTH = 2.5;
 const BASE_POWER: Record<WeaponCategory, number> = {
   ATTACK: 5,
   DEFENSE: 5,
@@ -58,7 +66,7 @@ const BASE_POWER: Record<WeaponCategory, number> = {
 };
 
 function weaponCostForTier(tier: number): WeaponCost {
-  const mult = 2 ** (tier - 1);
+  const mult = WEAPON_COST_GROWTH ** (tier - 1);
   return {
     gold: BASE_GOLD_COST * mult,
     wood: BASE_OTHER_COST * mult,
@@ -68,7 +76,9 @@ function weaponCostForTier(tier: number): WeaponCost {
 }
 
 function weaponPowerForTier(category: WeaponCategory, tier: number): number {
-  return BASE_POWER[category] * 2 ** (tier - 1);
+  // Rounded so power is always a whole number; the ratio between neighbouring
+  // tiers stays 2.5 to within the rounding of the first few (tiny) tiers.
+  return Math.round(BASE_POWER[category] * WEAPON_POWER_GROWTH ** (tier - 1));
 }
 
 /**

@@ -414,7 +414,9 @@ function SlotPicker({
           </span>
         </p>
       ) : (
-        <div className="grid max-h-[50vh] grid-cols-3 gap-3 overflow-y-auto pr-0.5">
+        // dvh, and `overscroll-contain` so flicking past the last row does not
+        // hand the gesture to the dialog behind this grid.
+        <div className="grid max-h-[50dvh] grid-cols-3 gap-3 overflow-y-auto overscroll-contain pr-0.5">
           {stacks.map((stack) => {
             const bonus = itemPrimaryBonus(slot, stack.level);
             const allowed = canEquipItem(heroLevel, stack.level);

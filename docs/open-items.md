@@ -62,7 +62,51 @@ Verify once against a known address in production (log it, or read it back from
 a `RateLimitBucket` key) and set the env var if the default is wrong. Cheap to
 check, expensive to be wrong about.
 
-### 1.4 Edge rules for unauthenticated floods
+### 1.4 Finish the Grow connection · **code complete 08-03, waiting on credentials**
+
+The whole Grow integration is written and tested; what is missing is input only
+Grow can give you. The store stays on the mock provider until all three of these
+are set, so nothing about the current deploy changes when you merge it.
+
+Set on Vercel (and in `.env` for local work):
+
+| Variable | Where it comes from |
+| --- | --- |
+| `GROW_USER_ID` | Grow panel — the business identifier |
+| `GROW_PAGE_CODE` | Grow panel — the payment-page identifier |
+| `GROW_CALLBACK_SECRET` | **you generate it**: `openssl rand -hex 24`. Letters and digits only, ≥24 chars |
+| `GROW_ENV` | `sandbox` (default) → `production` when you go live |
+| `GROW_PAYMENT_METHODS` | optional. Default `1,6,13,14` = card, Bit, Apple Pay, Google Pay |
+
+Then, in the Grow panel, set the server callback (`notifyUrl`) to:
+
+```
+https://<your-domain>/api/pay/grow/<GROW_CALLBACK_SECRET>
+```
+
+The secret is in the *path*, not a query string, because Grow rejects special
+characters in `notifyUrl`. It is the endpoint's only credential — Grow does not
+sign its callbacks — so treat it like a password: never commit it, and rotate it
+in both places at once if it leaks. Rotating is safe at any moment except while
+a payment is mid-flight.
+
+Two things to confirm in the panel **before the first real charge**, both marked
+`VERIFY:` in `src/server/grow.ts`:
+
+1. the parameter names for the order lookup (`getPaymentProcessInfo`), and
+2. the status-code table — the code trusts `statusCode === "2"` to mean paid.
+
+Both fail **closed**: anything unrecognised leaves the purchase PENDING and
+visible in `/admin/purchases` rather than crediting diamonds. So the failure mode
+of getting these wrong is a payment you have to settle by hand, not a leak.
+
+Order of operations for go-live: sandbox credentials → one end-to-end test
+purchase → check the row in `/admin/purchases` and that a receipt was issued →
+`GROW_ENV=production` → one real ₪ purchase, confirm the money lands in the bank
+→ `DIAMOND_PURCHASES_LIVE=true`. The interlocks in `arePurchasesLive()` enforce
+that ordering; they do not enforce that you actually looked at your bank account.
+
+### 1.5 Edge rules for unauthenticated floods
 
 The poll ceilings added on 07-30 and 08-01 are per-instance, in-process, and
 per-empire — they blunt one hostile *signed-in* client. A distributed or

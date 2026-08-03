@@ -486,15 +486,17 @@ async function buildRecap(
  * The line that introduces the podium in the channel.
  *
  * Counted rather than hardcoded at three: a season can close with fewer empires
- * than `PODIUM_SIZE` (an early season, a game that was just reset), and "קבלו את
- * שלושת השחקנים" over two names is the kind of small lie players notice.
+ * than `PODIUM_SIZE` (an early season, a game that was just reset), and "שלושת
+ * החזקים" over two names is the kind of small lie players notice.
+ *
+ * Written the way the players talk — short, no ceremony. The old line ("קבלו את
+ * שלושת השחקנים שהחזיקו מעמד כל הסיזן והוכיחו את עצמם") read like a speech; a
+ * teenager skims past it.
  */
 function podiumIntro(count: number): string {
-  const who =
-    count === 1
-      ? "השחקן שהחזיק מעמד כל הסיזן והוכיח את עצמו"
-      : `${count === 2 ? "שני" : "שלושת"} השחקנים שהחזיקו מעמד כל הסיזן והוכיחו את עצמם`;
-  return `קבלו את ${who} 👑`;
+  return count === 1
+    ? "הכי חזק בסיזן 👑"
+    : `${count === 2 ? "שני" : "שלושת"} הכי חזקים בסיזן 👑`;
 }
 
 /**
@@ -787,7 +789,8 @@ export async function closeSeason(
     await announceToDiscord({
       kind: "season",
       channel: "events",
-      title: `🏆 ${closed} נגמרה — זה הפודיום`,
+      // "הטופ 3" only when there really are three — see podiumIntro.
+      title: `🏆 ${closed} נגמרה — ${podium.length === 3 ? "הנה הטופ 3" : "הנה הזוכים"}`,
       body:
         (podium.length > 0
           ? `${podiumIntro(podium.length)}\n\n` +
@@ -803,14 +806,14 @@ export async function closeSeason(
                     : "")
               )
               .join("\n")
-          : "הסיזן נסגר בלי פודיום.") +
+          : "הסיזן נגמר בלי זוכים.") +
         "\n\n" +
         (podium.length === 0
           ? ""
           : podium.length === 1
-            ? "הוא בהיכל התהילה מעכשיו. "
-            : "הם בהיכל התהילה מעכשיו. ") +
-        "סיזן חדש בדרך — כולם חוזרים לקו ההתחלה. 🔄",
+            ? "הוא נכנס להיכל התהילה. "
+            : "הם נכנסים להיכל התהילה. ") +
+        "סיזן חדש בדרך — כולם מתחילים מאפס. 🔄",
       url: gameLink("/game/rankings"),
     });
   }

@@ -64,9 +64,30 @@ export default async function AdminPurchasesPage() {
       by: ["status"],
       _count: { _all: true },
     }),
+    // Explicit select, never the whole row: `providerToken` is the gateway
+    // credential that authenticates our order lookups, and it has no business
+    // leaving the database for a screen that only ever shows references.
     prisma.diamondPurchase.findMany({
       orderBy: { createdAt: "desc" },
       take: 200,
+      select: {
+        id: true,
+        createdAt: true,
+        empireId: true,
+        userId: true,
+        empireName: true,
+        userEmail: true,
+        packageId: true,
+        diamonds: true,
+        bonusDiamonds: true,
+        priceIls: true,
+        discountPct: true,
+        status: true,
+        isTest: true,
+        provider: true,
+        providerRef: true,
+        failureReason: true,
+      },
     }),
   ]);
 
@@ -108,8 +129,8 @@ export default async function AdminPurchasesPage() {
       </div>
 
       <p className="text-xs text-zinc-500">
-        מציג {purchases.length} רכישות אחרונות. &quot;רכישות בדיקה&quot; הן חיובי מוק
-        (ללא כסף אמיתי) עד לחיבור ספק תשלומים.
+        מציג {purchases.length} רכישות אחרונות. &quot;רכישות בדיקה&quot; הן חיובים שלא
+        הזיזו כסף אמיתי — ספק המוק, או Grow בסביבת ה־sandbox.
       </p>
 
       <div className="overflow-x-auto">
@@ -189,6 +210,18 @@ export default async function AdminPurchasesPage() {
                         </span>
                       )}
                     </span>
+                    {/* The gateway's own words for why a charge did not settle.
+                        Without it a failed row is indistinguishable from an
+                        abandoned one, and the difference is the whole diagnosis. */}
+                    {p.failureReason && (
+                      <span
+                        className="mt-1 block max-w-[22ch] truncate text-[10px] text-zinc-500"
+                        title={p.failureReason}
+                        dir="auto"
+                      >
+                        {p.failureReason}
+                      </span>
+                    )}
                   </td>
                   <td className="p-2 text-[11px] text-zinc-500" dir="ltr">
                     {p.provider}

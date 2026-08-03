@@ -61,6 +61,7 @@ export default async function BuyDiamondsPage() {
         purchasesLive={checkout.live}
         locked={!canPay}
         testMode={checkout.testMode}
+        checkoutKind={checkout.kind}
       />
     </div>
   );

@@ -699,6 +699,12 @@ model DiamondPurchase {
   /// identify the payment by (`providerRef` holds the order id).
   /// Unique for the same anti-replay reason as `providerRef`.
   captureRef    String?        @unique
+  /// Provider-side secret needed to *query* this order (Grow's `processToken`).
+  /// Stored so settlement can re-ask the gateway what the order is really worth
+  /// instead of believing an unsigned callback or a browser query string — see
+  /// `src/server/grow.ts`. Deliberately NOT unique: it is a credential, not an
+  /// identifier, and a uniqueness collision here would reject a valid payment.
+  providerToken String?
   /// True when no real money moved (the mock provider).
   isTest        Boolean        @default(false)
   status        PurchaseStatus @default(PENDING)
@@ -938,7 +944,10 @@ model GuildWarEntry {
   /// Stored rather than computed on read because the board polls every six
   /// seconds and summing it live means loading every member's army and every
   /// weapon row on each poll. advanceWar already has the figures in hand.
-  power Int @default(0)
+  ///
+  /// Float, like every other power column: weapon power grows 2.5× per tier, so
+  /// a mid-game guild's summed power passes the 2^31 ceiling of an Int easily.
+  power Float @default(0)
 
   /// Final placement, written at settlement (1 = champion).
   rank        Int?
