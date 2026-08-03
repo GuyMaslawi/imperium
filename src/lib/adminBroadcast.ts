@@ -13,23 +13,28 @@
  * What the broadcast and gift forms are pre-filled with.
  *
  * Not placeholders — real values, so a routine announcement takes one click and
- * anything more specific is a matter of typing over them. Written to read as an
- * in-game system message, because that is exactly what gets posted to Discord:
- * the same words, unchanged.
+ * anything more specific is a matter of typing over them.
+ *
+ * These four strings are the exception to the site's literary Hebrew, because
+ * they are the one bit of site copy that is *also* a Discord post — mirrored
+ * word for word — and they are read on a phone, mid-scroll, by someone deciding
+ * in two seconds whether to open the game. So they take the channel's voice
+ * instead of the site's: two short lines, no salutation, no sign-off, the news
+ * in the first four words. "שחקנים יקרים," reads like a letter from a bank; the
+ * player is being told something happened, not addressed.
  */
 export const BROADCAST_DEFAULTS = {
-  title: "📣 הודעה מההנהלה",
+  title: "📣 עדכון חדש עלה לאוויר",
   body:
-    "שחקנים יקרים,\n" +
-    "עדכון חדש עלה לקראלדור. היכנסו לראות מה השתנה.\n" +
-    "נתראה בשדה הקרב! ⚔️",
+    "יש חדש בקראלדור. 🚀\n" +
+    "תיכנסו לראות מה השתנה — ונתראה בשדה. ⚔️",
 } as const;
 
 export const GIFT_DEFAULTS = {
-  title: "🎁 מתנה מההנהלה",
+  title: "🎁 נחת לכם באוצר",
   body:
-    "מתנה קטנה מאיתנו — היא כבר נכנסה לאוצר שלכם.\n" +
-    "תעשו בה שימוש חכם. ⚔️",
+    "המתנה כבר אצלכם — לא צריך לעשות כלום. 💰\n" +
+    "תשרפו את זה חכם. ⚔️",
 } as const;
 
 /* ------------------------------- audiences ------------------------------- */
