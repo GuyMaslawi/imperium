@@ -15,12 +15,14 @@ import {
   INTELLIGENCE_MAX_LEVEL,
   MAX_CITIES,
   MINE_MAX_LEVEL,
+  MINE_UPGRADE_COST_GROWTH,
   NEWBIE_PROTECTION_MS,
   REGULAR_TICK_MINUTES,
   RESOURCE_META,
   SOLDIER_POWER,
   SPY_POWER,
   STORAGE_CAPACITY_PER_LEVEL,
+  STORAGE_GROWTH,
   TICKS_PER_DAY,
   TURNS_UPGRADE_COST_GROWTH,
   TURNS_UPGRADE_MAX_LEVEL,
@@ -34,6 +36,7 @@ import {
   empireUpgradeCostFor,
   empireUpgradeMaxLevel,
   mineUpgradeCost,
+  storageCapacityForLevel,
   storageUpgradeCost,
   turnsUpgradeCost,
   wheelLuckBonus,
@@ -597,7 +600,8 @@ export default async function GuidePage() {
                 <p className="mb-2 text-sm font-black text-gold-bright">מחיר שדרוג מכרה</p>
                 <p className="mb-2 text-xs text-zinc-400">
                   כל מכרה משודרג <b>במשאב שלו בלבד</b> — מכרה זהב בזהב, מחצבת אבן באבן.
-                  המחיר לינארי בדרגה הבאה, כך שהשדרוג הראשון אף פעם לא חינם.
+                  כל רמה עולה פי {MINE_UPGRADE_COST_GROWTH} מקודמתה, כך שהדרגות
+                  הראשונות זולות והטיפוס לרמה {MINE_MAX_LEVEL} הוא פרויקט של עונה.
                 </p>
                 <TableWrap maxHeight={320}>
                   <table className="guide-table">
@@ -755,6 +759,9 @@ export default async function GuidePage() {
                       <V>רמת המחסן</V>
                       <O>×</O>
                       <N>{nf(STORAGE_CAPACITY_PER_LEVEL)}</N>
+                      <O>×</O>
+                      <N>{STORAGE_GROWTH}</N>
+                      <sup className="text-[10px]">רמה−1</sup>
                       <O>=</O>
                       <R>קיבולת מוגנת</R>
                     </>
@@ -762,7 +769,7 @@ export default async function GuidePage() {
                   example={
                     <>
                       מחסן ברמה <N>25</N> מגן על{" "}
-                      <N>{formatShort(25 * STORAGE_CAPACITY_PER_LEVEL)}</N> יחידות מהמשאב שלו.
+                      <N>{formatShort(storageCapacityForLevel(25))}</N> יחידות מהמשאב שלו.
                     </>
                   }
                 />
@@ -785,7 +792,7 @@ export default async function GuidePage() {
                               {lvl} → {lvl + 1}
                             </td>
                             <td className="nums text-emerald-300" dir="ltr">
-                              {formatShort((lvl + 1) * STORAGE_CAPACITY_PER_LEVEL)}
+                              {formatShort(storageCapacityForLevel(lvl + 1))}
                             </td>
                             <td>
                               <Cost
@@ -1607,6 +1614,12 @@ export default async function GuidePage() {
                   מעור ונחושת ועד לזהב לבן זוהר. הרמה קובעת את הבונוס — הסט קובע
                   איך זה נראה על הגיבור.
                 </p>
+                <p className="mb-3 text-[11px] leading-relaxed text-amber-300/90">
+                  <b>לכל סט יש מקסימום משלו:</b> זהב מעלה חפץ רק בתוך הסט שלו —
+                  פשוט → מתקדם → אליט → אגדי — ושם הוא נעצר. אגדי לא משודרג יותר,
+                  ולא משנה באיזו רמה הוא. הדרך היחידה לסט הבא היא לשלול חפץ ממנו
+                  בקרב.
+                </p>
                 <div className="grid grid-cols-5 gap-2 lg:grid-cols-10">
                   {HERO_ITEM_SETS.map((set) => (
                     <div key={set.dir} className="text-center">
@@ -1634,6 +1647,7 @@ export default async function GuidePage() {
                   <p className="mb-3 text-[11px] leading-relaxed text-zinc-400">
                     הדרגה נגזרת מהרמה, והסדרה חוזרת על עצמה בכל עשור רמות: רמות 1–2
                     פשוט, 3–7 מתקדם, 8–9 אליט, 10 אגדי — ואז שוב, עשור אחד גבוה יותר.
+                    אגדי סוגר את הסט: אין לאן לשדרג אותו.
                   </p>
                   <table className="guide-table">
                     <thead>

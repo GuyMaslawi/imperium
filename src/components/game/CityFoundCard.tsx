@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/Card";
 import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { CITIZEN_GROWTH_LEVELS_PER_CITY } from "@/lib/game/constants";
-import { cityAt } from "@/lib/game/cities";
+import { cityName } from "@/lib/game/cities";
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -55,28 +55,25 @@ export function CityFoundCard({
         </span>
         <div>
           <h3 className="font-bold text-gold-bright">עליית עיר</h3>
-          {/* Named, not numbered: the card is the moment the player decides to
-              make the climb, and "אשמורן → תרשיש" is a destination in a way
-              that "3 → 4" never was. The tier stays alongside — it is what the
-              costs and the hero gate are keyed to. */}
+          {/* Named first, numbered in the parentheses the name carries: the card
+              is the moment the player decides to make the climb, and
+              "אשמורן (3) → תרשיש (4)" is a destination in a way that "3 → 4"
+              never was — while the tier is still what the costs and the hero
+              gate are keyed to. */}
           <p className="text-xs font-semibold text-gold">
-            <span className="text-bone">{cityAt(cities).name}</span>
+            <span className="text-bone">{cityName(cities)}</span>
             {!isMax && (
               <>
                 {" → "}
-                <span className="text-bone">{cityAt(cities + 1).name}</span>
+                <span className="text-bone">{cityName(cities + 1)}</span>
               </>
             )}{" "}
             <span className="font-normal text-gold-dim">
-              (עיר{" "}
-              <span className="nums" dir="ltr">
-                {cities}
-              </span>{" "}
-              מתוך{" "}
+              (מתוך{" "}
               <span className="nums" dir="ltr">
                 {maxCities}
-              </span>
-              )
+              </span>{" "}
+              ערים)
             </span>
           </p>
         </div>
@@ -84,7 +81,7 @@ export function CityFoundCard({
 
       {isMax ? (
         <p className="text-sm text-zinc-400">
-          הגעת ל<span className="font-bold text-bone">{cityAt(cities).name}</span> — העיר
+          הגעת ל<span className="font-bold text-bone">{cityName(cities)}</span> — העיר
           האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.
         </p>
       ) : (

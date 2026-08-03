@@ -19,6 +19,7 @@ import {
   HERO_STAT_META,
   RARITY_META,
   SLOT_META,
+  atSetCeiling,
   canEquipItem,
   discardWheelSpinChance,
   itemBonusLines,
@@ -82,6 +83,8 @@ export function ItemDialog({
   const nextBonus =
     upgradeToLevel != null ? itemPrimaryBonus(item.slot, upgradeToLevel).value : null;
   const canAfford = upgradeCost != null && gold >= upgradeCost;
+  // An אגדי is the top of its set — finished, but not the top of the game.
+  const setCapped = atSetCeiling(level);
   // Can't upgrade an item past the hero's own level.
   const meetsUpgradeLevel = upgradeToLevel != null && heroLevel >= upgradeToLevel;
 
@@ -271,6 +274,34 @@ export function ItemDialog({
         </div>
       )}
 
+      {/* nothing left to buy — say which of the two ceilings this is */}
+      {upgradeToLevel == null && (
+        <div className="panel-inset mt-4 rounded-lg p-3 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-400">שדרוג</span>
+            <span className="font-black text-gold-bright">
+              {setCapped ? "שיא הסט ✦" : "רמה מקסימלית ✦"}
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+            {setCapped ? (
+              <>
+                אגדי הוא הרמה הגבוהה בסט{" "}
+                <b className="text-zinc-300">{itemSetForLevel(level).label}</b> — אין
+                לאן לשדרג אותו יותר. הסט הבא (
+                <b className="text-zinc-300">{itemSetForLevel(level + 1).label}</b>)
+                מגיע רק כשלל מתקיפה מנצחת.
+              </>
+            ) : (
+              <>
+                רמה <b className="nums text-zinc-300">{level}</b> — אין ציוד גבוה
+                מזה במשחק.
+              </>
+            )}
+          </p>
+        </div>
+      )}
+
       {(msg.error || msg.success) && (
         <p
           className={`mt-3 text-xs font-semibold ${
@@ -325,7 +356,9 @@ export function ItemDialog({
           disabled={pending || upgradeToLevel == null || !meetsUpgradeLevel || !canAfford}
           title={
             upgradeToLevel == null
-              ? "הפריט כבר ברמה הגבוהה ביותר"
+              ? setCapped
+                ? `אגדי הוא שיא הסט ${itemSetForLevel(level).label} — הסט הבא מגיע כשלל`
+                : "הפריט כבר ברמה הגבוהה ביותר"
               : !meetsUpgradeLevel
                 ? `דרוש גיבור רמה ${upgradeToLevel} כדי לשדרג`
                 : !canAfford
@@ -335,7 +368,9 @@ export function ItemDialog({
           className="btn btn-dark py-2 text-sm"
         >
           {upgradeToLevel == null
-            ? "רמה מקסימלית"
+            ? setCapped
+              ? "שיא הסט"
+              : "רמה מקסימלית"
             : !meetsUpgradeLevel
               ? `דרוש רמה ${upgradeToLevel}`
               : "שדרג"}

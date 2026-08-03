@@ -2,18 +2,25 @@ import { describe, expect, it } from "vitest";
 import {
   BANK_DAILY_INTEREST_MAX_LEVEL,
   BANK_INTEREST_MAX_RATE,
+  CITIZEN_GROWTH_LEVELS_PER_CITY,
+  CITY_COST_TIER_MULTIPLIER,
+  EMPIRE_UPGRADE_COST_GROWTH,
   MAX_CITIES,
   MINE_MAX_LEVEL,
+  STORAGE_CAPACITY_PER_LEVEL,
   TICKS_PER_DAY,
   TURNS_UPGRADE_MAX_LEVEL,
   WHEEL_LUCK_MAX_LEVEL,
   bankInterestRate,
   bankInterestUpgradeCost,
   cityCost,
+  empireUpgradeCost,
   empireUpgradeCostFor,
   mineProductionPerTick,
   mineProductionValue,
+  mineUpgradeCost,
   storageCapacityForLevel,
+  storageUpgradeCost,
   turnsPerRegularUpdate,
   turnsUpgradeCost,
   wheelLuckBonus,
@@ -120,6 +127,92 @@ describe("storage", () => {
   it("grows with level and is always positive", () => {
     expect(storageCapacityForLevel(2)).toBeGreaterThan(storageCapacityForLevel(1));
     expect(storageCapacityForLevel(1)).toBeGreaterThan(0);
+  });
+
+  it("never hands a level less capacity than the old linear curve did", () => {
+    // The ladder went geometric to keep pace with an economy that compounds,
+    // and the growth factor rides on top of the original `level × 10,000`
+    // rather than replacing it — precisely so that no warehouse standing today
+    // wakes up smaller than its stored amount.
+    for (const level of [1, 2, 5, 10, 25, 50, 100]) {
+      expect(storageCapacityForLevel(level)).toBeGreaterThanOrEqual(
+        level * STORAGE_CAPACITY_PER_LEVEL
+      );
+    }
+    expect(storageCapacityForLevel(0)).toBe(0);
+  });
+
+  it("charges more per unit of capacity as the ladder climbs", () => {
+    const cheap = storageUpgradeCost(5).gold / storageCapacityForLevel(6);
+    const dear = storageUpgradeCost(60).gold / storageCapacityForLevel(61);
+    // Capacity and price carry the same factor, so the ratio holds steady —
+    // what must not happen is the price falling behind what it buys.
+    expect(dear).toBeGreaterThanOrEqual(cheap * 0.9);
+  });
+});
+
+describe("the linear ladders that were repriced", () => {
+  // Income here is multiplicative — slaves × mine level × cities × ticks — and
+  // these three ladders used to be linear in the level. Playtesters read them as
+  // free because they were: the whole 100-rung citizen ladder came to 8.4M gold,
+  // half a percent of a tenth city. Each test below pins the shape, not a
+  // number, so retuning a base stays cheap but going linear again does not.
+  const LADDERS = [
+    { name: "citizens/intel/bank deposits", cost: (l: number) => empireUpgradeCost(l).gold },
+    { name: "warehouses", cost: (l: number) => storageUpgradeCost(l).gold },
+    { name: "gold mines", cost: (l: number) => mineUpgradeCost(l, "gold").gold },
+  ];
+
+  it.each(LADDERS)("prices $name geometrically, not linearly", ({ cost }) => {
+    // A linear ladder has a constant *difference* between rungs; a geometric one
+    // has a constant ratio, so its steps keep widening.
+    const earlyStep = cost(11) - cost(10);
+    const lateStep = cost(51) - cost(50);
+    expect(lateStep).toBeGreaterThan(earlyStep * 2);
+  });
+
+  it.each(LADDERS)("makes the first rung of $name cost something", ({ cost }) => {
+    // A brand-new empire earns on the order of 23K gold a day, and the old
+    // opening rungs (1,700 / 640 / 1,500) were a rounding error against that.
+    // The floor is an hour of that income rather than a day: warehouses sit
+    // right on it deliberately — see STORAGE_UPGRADE_BASE — because level 1 is
+    // what protects a newcomer's resources and must stay within reach.
+    expect(cost(1)).toBeGreaterThanOrEqual(1_000);
+  });
+
+  it("keeps ten citizen rungs in step with one city tier", () => {
+    // CITIZEN_GROWTH_LEVELS_PER_CITY unlocks ten rungs per city and each city
+    // tier costs CITY_COST_TIER_MULTIPLIER times the last, so the citizen ladder
+    // is pinned to the pace at which the game hands it out.
+    const tenRungs =
+      EMPIRE_UPGRADE_COST_GROWTH ** CITIZEN_GROWTH_LEVELS_PER_CITY;
+    expect(tenRungs).toBeGreaterThan(CITY_COST_TIER_MULTIPLIER * 0.9);
+    expect(tenRungs).toBeLessThan(CITY_COST_TIER_MULTIPLIER * 1.1);
+  });
+
+  it("keeps the mine ladder reachable despite its length", () => {
+    // MINE_MAX_LEVEL is 250 rungs. At the ×1.1 the empire upgrades use, the top
+    // rung would cost seventeen trillion and the cap would leave the economy;
+    // the whole ladder has to stay inside the same order as the tenth city.
+    const fullLadder = Array.from({ length: MINE_MAX_LEVEL - 1 }, (_, i) =>
+      mineUpgradeCost(i + 1, "gold").gold
+    ).reduce((a, b) => a + b, 0);
+    expect(fullLadder).toBeGreaterThan(cityCost(MAX_CITIES - 1).gold);
+    expect(fullLadder).toBeLessThan(cityCost(MAX_CITIES - 1).gold * 100);
+  });
+
+  it("is the curve the purchase actions actually charge", () => {
+    expect(empireUpgradeCostFor("CITIZEN_GROWTH", 7)).toEqual(empireUpgradeCost(7));
+    expect(empireUpgradeCostFor("INTELLIGENCE", 7)).toEqual(empireUpgradeCost(7));
+    expect(empireUpgradeCostFor("BANK_DEPOSIT_COUNT", 7)).toEqual(empireUpgradeCost(7));
+  });
+
+  it("charges a mine only in its own resource", () => {
+    const cost = mineUpgradeCost(40, "wood");
+    expect(cost.wood).toBeGreaterThan(0);
+    expect(cost.gold).toBe(0);
+    expect(cost.iron).toBe(0);
+    expect(cost.stone).toBe(0);
   });
 });
 

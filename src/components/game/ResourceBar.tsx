@@ -60,6 +60,7 @@ export function ResourceBar({
   resources,
   mobileMenu,
   inbox,
+  discord,
   admin,
 }: {
   resources: Record<ResourceKey, number>;
@@ -67,6 +68,12 @@ export function ResourceBar({
   mobileMenu?: ReactNode;
   /** History + messages pills, parked in the bar's free space (see InboxNav). */
   inbox?: ReactNode;
+  /**
+   * The community channel, riding beside the inbox pills — null while no invite
+   * is configured. It belongs next to the messages badge because it is the same
+   * question ("what am I being told?"), just answered outside the game.
+   */
+  discord?: ReactNode;
   /** Admin control-center pill — the layout passes it for admins only. */
   admin?: ReactNode;
 }) {
@@ -108,6 +115,9 @@ export function ResourceBar({
 
         {/* history + messages (the bar's free stretch) */}
         {inbox}
+
+        {/* the community channel, one pill further out */}
+        {discord}
 
         {/* control center (admins only) */}
         {admin}

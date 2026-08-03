@@ -23,6 +23,7 @@ import {
   defenseWinXp,
   effectiveHeroLevel,
   levelGapXpFactor,
+  atSetCeiling,
   canEquipItem,
   canUpgradeItem,
   damagedHealth,
@@ -272,6 +273,33 @@ describe("item tiers and upgrades", () => {
   it("stops offering an upgrade at the top rung", () => {
     expect(nextTierLevel(ITEM_LEVELS[ITEM_LEVELS.length - 1])).toBeNull();
     expect(itemUpgradeCost(ITEM_LEVELS[ITEM_LEVELS.length - 1])).toBeNull();
+  });
+
+  it("ends every set at its אגדי — gold never crosses a decade", () => {
+    // Each set has a maximum of its own: upgrading walks 1 → 3 → 8 → 10 inside
+    // the decade and stops. Level 11 exists, but only as loot.
+    for (let decade = 0; decade < 10; decade++) {
+      const legendary = decade * 10 + 10;
+      expect(tierForLevel(legendary)).toBe("LEGENDARY");
+      expect(nextTierLevel(legendary)).toBeNull();
+      expect(itemUpgradeCost(legendary)).toBeNull();
+      expect(canUpgradeItem(HERO_MAX_LEVEL, legendary)).toBe(false);
+      // ...and no upgrade anywhere on the ladder targets the next set.
+      expect(nextTierLevel(decade * 10 + 9)).toBe(legendary);
+    }
+    // The distinction the UI draws: a set ceiling is not the game's ceiling.
+    expect(atSetCeiling(10)).toBe(true);
+    expect(atSetCeiling(90)).toBe(true);
+    expect(atSetCeiling(HERO_MAX_LEVEL)).toBe(false);
+    expect(atSetCeiling(9)).toBe(false);
+  });
+
+  it("never targets a level outside the item's own decade", () => {
+    for (let level = 1; level < HERO_MAX_LEVEL; level++) {
+      const target = nextTierLevel(level);
+      if (target === null) continue;
+      expect(Math.ceil(target / 10)).toBe(Math.ceil(level / 10));
+    }
   });
 
   it("prices an upgrade by the level it lands on, anchored at 10 and 100", () => {

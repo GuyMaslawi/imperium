@@ -24,6 +24,7 @@ import {
 } from "@/lib/game/minigame";
 import { Icon } from "@/components/ui/Icon";
 import { PlayerLink } from "@/components/ui/PlayerLink";
+import { MiniGameTakeover } from "@/components/game/MiniGameTakeover";
 
 /**
  * Two rates, because this panel lives in the game's layout — it is mounted on
@@ -688,7 +689,8 @@ function MiniGameStage({
 /* ========================================================================== */
 
 /**
- * Which events a player has already been told about.
+ * Which events a player has already been told about — i.e. already had the
+ * release takeover for (see MiniGameTakeover).
  *
  * A list rather than the single id this used to hold: several releases can run
  * at once, and remembering only the last one heralded meant the older game
@@ -722,8 +724,7 @@ function writeHeralded(ids: Set<string>): void {
   }
 }
 
-/** How long the invitation and each winner call stay on screen. */
-const HERALD_MS = 14_000;
+/** How long each winner call stays on screen. */
 const WINNER_TOAST_MS = 7_000;
 
 /** Most notes on screen at once — a burst of wins must not become a wall. */
@@ -734,37 +735,38 @@ const NOTE_LIMIT = 4;
  * `setTimeout` has to be rebuilt whenever the list changes, which silently
  * restarted the clock on every note still on screen — so a steady trickle of
  * winners could keep the first one pinned there indefinitely.
+ *
+ * Only wins live here now. The release invitation used to be a note in this
+ * same column, which is what made a new game indistinguishable from every other
+ * toast the game drops in that corner — it is a full-screen takeover instead.
  */
-type CornerNote = { id: string; expiresAt: number } & (
-  | { kind: "herald"; title: string; body: string; icon: string; eventId: string }
+type CornerNote = {
+  id: string;
+  expiresAt: number;
+  name: string;
+  empireId: string;
+  eventId: string;
   // `game` is only filled while more than one release is live — with a single
   // game on the board it would name the only thing it could possibly be.
-  | { kind: "winner"; name: string; empireId: string; eventId: string; game: string | null }
-);
+  game: string | null;
+};
 
 /**
- * The bottom-right column: the one-time invitation when a game is released, and
- * a call every time someone wins.
+ * The bottom-right column: a call every time someone wins.
  *
- * This is what replaced the always-on panel. A released mini-game still has to
- * *interrupt* — an event nobody notices is a prize nobody competes for — but it
- * has to interrupt once and then get out of the way, and the pill in the
- * command bar is where it lives for the rest of the window. The winner calls
- * are the rest of the trade: pulling the standings off every screen would have
- * made the event silent, so the standings come to the player instead, only when
- * something actually happened.
+ * This is half of what replaced the always-on panel (the takeover is the other
+ * half). Pulling the standings off every screen would have made a running event
+ * silent between its release and its end, so the standings come to the player
+ * instead — only when something actually happened.
  *
  * Corner chosen to miss the neighbours: WarAlerts owns top-center, the chat dock
  * owns bottom-left.
  */
 function CornerNotes({
   notes,
-  onOpen,
   onDismiss,
 }: {
   notes: CornerNote[];
-  /** Opens the release the note is about — not "the" game; there may be several. */
-  onOpen: (eventId: string) => void;
   onDismiss: (id: string) => void;
 }) {
   if (typeof document === "undefined" || notes.length === 0) return null;
@@ -777,56 +779,33 @@ function CornerNotes({
       // reaches the dock's corner, and being the higher layer it covered it.
       className="pointer-events-none fixed bottom-20 right-3 z-[85] flex w-[min(88vw,20rem)] flex-col gap-2 print:hidden sm:bottom-3"
     >
-      {notes.map((note) =>
-        note.kind === "herald" ? (
+      {notes.map((note) => (
+        <div key={note.id} className="mg-note mg-note--winner pointer-events-auto">
+          <span className="mg-note-icon" aria-hidden>
+            🏆
+          </span>
+          <span className="min-w-0 flex-1 text-xs text-zinc-300">
+            <span className="font-black text-emerald-300">
+              <PlayerLink empireId={note.empireId} name={note.name} />
+            </span>{" "}
+            לקח את הפרס
+            {note.game && (
+              <>
+                {" ב"}
+                <span className="font-bold text-gold-bright">״{note.game}״</span>
+              </>
+            )}
+          </span>
           <button
-            key={note.id}
             type="button"
-            onClick={() => {
-              onDismiss(note.id);
-              onOpen(note.eventId);
-            }}
-            className="mg-note mg-note--herald pointer-events-auto text-right"
+            aria-label="סגירה"
+            onClick={() => onDismiss(note.id)}
+            className="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-white/10 hover:text-zinc-300"
           >
-            <span className="mg-note-icon" aria-hidden>
-              {note.icon}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-black text-gold-bright">
-                {note.title}
-              </span>
-              <span className="block truncate text-[11px] text-amber-100/80">{note.body}</span>
-            </span>
-            <span className="mg-note-cta">שחק</span>
+            ✕
           </button>
-        ) : (
-          <div key={note.id} className="mg-note mg-note--winner pointer-events-auto">
-            <span className="mg-note-icon" aria-hidden>
-              🏆
-            </span>
-            <span className="min-w-0 flex-1 text-xs text-zinc-300">
-              <span className="font-black text-emerald-300">
-                <PlayerLink empireId={note.empireId} name={note.name} />
-              </span>{" "}
-              לקח את הפרס
-              {note.game && (
-                <>
-                  {" ב"}
-                  <span className="font-bold text-gold-bright">״{note.game}״</span>
-                </>
-              )}
-            </span>
-            <button
-              type="button"
-              aria-label="סגירה"
-              onClick={() => onDismiss(note.id)}
-              className="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-white/10 hover:text-zinc-300"
-            >
-              ✕
-            </button>
-          </div>
-        )
-      )}
+        </div>
+      ))}
     </div>,
     document.body
   );
@@ -1049,7 +1028,6 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
         seen.add(row.empireId);
         fresh.push({
           id: `win:${s.id}:${row.empireId}`,
-          kind: "winner",
           name: row.name,
           empireId: row.empireId,
           eventId: s.id,
@@ -1071,9 +1049,10 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
   }, [states, crowded]);
 
   /**
-   * The one-time invitation, once per release. Only for a player who can still
+   * The release takeover, once per release. Only for a player who can still
    * play it: someone who already solved a game (or spent their attempts) on
-   * another tab does not need to be invited into it, and the pill is enough.
+   * another tab does not need the screen taken to be invited into it, and the
+   * pill is enough.
    *
    * localStorage is not readable while rendering on the server, so the decision
    * is made after mount — which also keeps the server's HTML and the client's
@@ -1085,9 +1064,15 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
    * had already sworn it was delivered. Marking the release the moment it is
    * scheduled makes every later pass a no-op, so this can run as often as it
    * likes. The timers are cancelled only on unmount, never on a re-run.
+   *
+   * A *queue* rather than a flag, because an admin can field several games at
+   * once (see MAX_LIVE_MINIGAMES) and two takeovers stacked on the same screen
+   * would be one unreadable screen: they announce themselves in turn, oldest
+   * release first, each waiting for the one before it to leave.
    */
   const heralded = useRef<Set<string> | null>(null);
   const heraldTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [takeoverQueue, setTakeoverQueue] = useState<string[]>([]);
   useEffect(
     () => () => {
       for (const t of heraldTimers.current) clearTimeout(t);
@@ -1100,26 +1085,59 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
       if (s.finished || heralded.current.has(s.id)) continue;
       heralded.current.add(s.id);
       writeHeralded(heralded.current);
-      const note: CornerNote = {
-        id: `herald:${s.id}`,
-        kind: "herald",
-        icon: MINIGAME_TYPE_META[s.type].icon,
-        title: s.title,
-        body: `בפרס: ${s.prizeText}`,
-        eventId: s.id,
-        expiresAt: Date.now() + HERALD_MS,
-      };
+      const id = s.id;
       // A beat of delay so the page finishes painting first — slammed into the
       // same frame as a navigation it reads as a loading artefact, not an event.
       heraldTimers.current.push(
         setTimeout(() => {
-          setNotes((prev) =>
-            prev.some((n) => n.id === note.id) ? prev : [...prev, note].slice(-NOTE_LIMIT)
-          );
+          setTakeoverQueue((prev) => (prev.includes(id) ? prev : [...prev, id]));
         }, 600)
       );
     }
   }, [states]);
+
+  // Resolved every render against the live list: a release that ends (or is
+  // pulled) while it is queued never gets to take the screen for a game that is
+  // no longer there.
+  const takeoverState =
+    takeoverQueue.length > 0
+      ? (states.find((s) => s.id === takeoverQueue[0] && !s.finished) ?? null)
+      : null;
+  const takeoverId = takeoverQueue[0];
+  useEffect(() => {
+    if (takeoverId == null || takeoverState !== null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTakeoverQueue((prev) => prev.filter((id) => id !== takeoverId));
+  }, [takeoverId, takeoverState]);
+
+  const dropTakeover = useCallback((id: string) => {
+    setTakeoverQueue((prev) => prev.filter((q) => q !== id));
+  }, []);
+
+  /**
+   * Happy Hour gets the screen first.
+   *
+   * An admin opening a golden hour and fielding a game with it is one action to
+   * them and two takeovers to the player — both fixed, both on the modal rung,
+   * landing within half a second of each other. Rather than couple the two
+   * components, this watches for the other one in the DOM and simply waits: the
+   * Happy Hour takeover always leaves on its own, and the queue is patient.
+   */
+  const [hhTakeover, setHhTakeover] = useState(false);
+  const queued = takeoverQueue.length > 0;
+  useEffect(() => {
+    if (!queued) return;
+    const check = () => {
+      // Any `.hh-takeover`, including one already fading: crossing a screen
+      // that is on its way out is the same collision, half-transparent.
+      const busy = document.querySelector(".hh-takeover") !== null;
+      // Reacting to another component's DOM, not deriving state from props.
+      setHhTakeover(busy);
+    };
+    check();
+    const id = setInterval(check, 400);
+    return () => clearInterval(id);
+  }, [queued]);
 
   // Notes expire on their own deadline. One sweep for the whole column rather
   // than a timer per note — see CornerNote for what a per-note timer got wrong.
@@ -1194,7 +1212,19 @@ export function MiniGameButton({ initial }: { initial: MiniGameState[] }) {
         ))}
       </div>
 
-      <CornerNotes notes={notes} onOpen={setOpenId} onDismiss={dismissNote} />
+      {/* One announcement at a time, and never over an open board — a player who
+          is already inside a game does not need the screen taken to be told a
+          game exists. It waits in the queue until the board is closed. */}
+      {takeoverState && !openState && !hhTakeover && (
+        <MiniGameTakeover
+          key={takeoverState.id}
+          state={takeoverState}
+          onPlay={() => setOpenId(takeoverState.id)}
+          onDone={() => dropTakeover(takeoverState.id)}
+        />
+      )}
+
+      <CornerNotes notes={notes} onDismiss={dismissNote} />
 
       {openState && (
         <div

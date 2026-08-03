@@ -416,20 +416,45 @@ export function tierForLevel(level: number): HeroRarity {
 /**
  * The level where each tier band begins, within a decade: פשוט at +1,
  * מתקדם at +3, אליט at +8, אגדי at +10. Upgrading an item jumps its level to
- * the next of these — i.e. up to the start of the next tier.
+ * the next of these — i.e. up to the start of the next tier, and never past the
+ * אגדי that closes the decade (see `nextTierLevel`).
  */
 const BAND_START_OFFSETS = [1, 3, 8, 10];
 
-/** Every level an item can be upgraded *to*, ascending: 1,3,8,10,11,13,…,100. */
+/**
+ * Every rung of the ladder, ascending: 1,3,8,10,11,13,…,100. These are the
+ * levels an item can *sit* on — the band starts drops land on and upgrades climb
+ * to — but a rung that opens a new decade (11, 21, …) is only ever reached by
+ * finding a piece of that set, never by upgrading into it.
+ */
 export const UPGRADE_LEVELS: number[] = Array.from(
   { length: HERO_MAX_LEVEL / 10 },
   (_, decade) => decade * 10
 ).flatMap((base) => BAND_START_OFFSETS.map((o) => base + o));
 
-/** The level an item reaches when upgraded, or null if already maxed (100). */
+/**
+ * The level an item reaches when upgraded, or null when it has nothing left to
+ * upgrade into.
+ *
+ * **An אגדי is the ceiling of its set.** Upgrading walks a piece up its own
+ * decade — 1 → 3 → 8 → 10 — and stops there: every set has a maximum of its own,
+ * and no amount of gold carries a piece across into the set above it. The only
+ * way into the next set is to *find* a piece of it, which is what keeps the gear
+ * ladder a matter of playing rather than of banking gold.
+ */
 export function nextTierLevel(level: number): number | null {
+  if (tierForLevel(level) === "LEGENDARY") return null;
   for (const v of UPGRADE_LEVELS) if (v > level) return v;
   return null;
+}
+
+/**
+ * True when an item cannot be upgraded because its *set* has run out, not
+ * because the game has: an אגדי below level 100. The distinction is the whole
+ * message to the player — this piece is finished, the next one is loot.
+ */
+export function atSetCeiling(level: number): boolean {
+  return nextTierLevel(level) === null && level < HERO_MAX_LEVEL;
 }
 
 /**
@@ -487,8 +512,8 @@ function roundSignificant(value: number): number {
 }
 
 /**
- * Gold needed to upgrade one item to the next tier level, or null when it is
- * already at the maximum level (nothing higher to upgrade to).
+ * Gold needed to upgrade one item to the next tier level, or null when there is
+ * nothing to upgrade into — an אגדי, which closes its set.
  */
 export function itemUpgradeCost(level: number): number | null {
   const target = nextTierLevel(level);
@@ -1088,8 +1113,8 @@ export function canEquipItem(heroLevel: number, itemLevel: number): boolean {
 
 /**
  * Upgrade requirement: the level the item would *reach* must not exceed the
- * hero's own level — you can't push gear above your hero. Returns false when the
- * item is already maxed (nothing higher to upgrade to).
+ * hero's own level — you can't push gear above your hero. Returns false when
+ * there is nothing to upgrade into: an אגדי, or level 100.
  */
 export function canUpgradeItem(heroLevel: number, itemLevel: number): boolean {
   const target = nextTierLevel(itemLevel);

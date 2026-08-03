@@ -57,7 +57,7 @@ export function CitySkyline({ cities, maxCities }: CitySkylineProps) {
               key={i}
               className={`skyline-tower${held ? " skyline-held" : ""}`}
               style={{ "--h": `${height}%`, "--i": i } as CSSProperties}
-              title={`${i + 1}. ${cityFullName(i + 1)}`}
+              title={cityFullName(i + 1)}
             >
               <span className="skyline-roof" />
               <span className="skyline-windows" />

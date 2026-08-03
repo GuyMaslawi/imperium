@@ -508,8 +508,10 @@ function CityDowngradeCard({
       }
       desc={
         <>
-          מוריד אותך עיר אחת בלבד — מעיר {cities} לעיר {eligible ? target : cities}
-          {eligible && ` (${cityName(target)})`}. אין החזר משאבים, והדרך חזרה היא
+          {/* The name already carries its own "(tier)" — printing the bare
+              number again here would nest one parenthesis inside another. */}
+          מוריד אותך עיר אחת בלבד — מעיר {cityName(cities)} ל
+          {cityName(eligible ? target : cities)}. אין החזר משאבים, והדרך חזרה היא
           ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{CITY_DOWNGRADE_COOLDOWN_HOURS}{" "}
           שעה.
         </>

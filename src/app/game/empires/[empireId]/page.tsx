@@ -6,7 +6,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { PresenceDot } from "@/components/ui/PresenceDot";
 import { isOnline } from "@/lib/game/chat";
-import { cityName } from "@/lib/game/cities";
+import { cityFullName, cityName } from "@/lib/game/cities";
+import { MAX_CITIES } from "@/lib/game/constants";
+import { Tip } from "@/components/ui/Tip";
 import { RankActions } from "@/components/game/RankActions";
 import { MessageCompose } from "@/components/game/MessageCompose";
 import { ShieldBadges } from "@/components/game/ShieldBadges";
@@ -197,9 +199,34 @@ export default async function EmpireProfilePage({
         title={empire.name}
         subtitle={
           <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-            <span>
-              {empire.user.name} · {cityName(empire.cities)}
-            </span>
+            <span>{empire.user.name}</span>
+            {/* The city used to ride here as a bare name after a middot —
+                "דן · תדמור" — which reads as part of the player's name unless
+                you already know the catalog. It is labelled and tiered now,
+                because it is the fact that decides everything below it: the
+                war actions are dead on a dossier from another city. */}
+            <Tip
+              className="shrink-0"
+              tip={`${cityFullName(empire.cities)} — מתוך ${MAX_CITIES} ערים. ${
+                isMe
+                  ? "זו העיר שלך."
+                  : sameCity
+                    ? "זו גם העיר שלך — ריגול ותקיפה פתוחים."
+                    : "עיר אחרת משלך — אין ריגול ואין תקיפה, רק דואר."
+              }`}
+            >
+              <span
+                className={`cursor-help whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                  sameCity
+                    ? "border-gold/40 bg-gold/10 text-gold"
+                    : "border-border-subtle bg-panel-inset text-zinc-400"
+                }`}
+              >
+                <Icon name="base" size={12} className="inline-block align-middle text-crimson-bright" />{" "}
+                עיר{" "}
+                <span className="font-bold text-bone">{cityName(empire.cities)}</span>
+              </span>
+            </Tip>
             <PresenceDot online={online} label />
           </span>
         }

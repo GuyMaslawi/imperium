@@ -620,6 +620,50 @@ export async function settleDueWars(now: Date = new Date()): Promise<void> {
       console.error(`[guild-war] settlement failed for ${war.id}`, error);
     }
   }
+  // Only after a war was actually claimed for settlement — which is once a
+  // night, by whichever reader gets there first. This sweep is called from the
+  // six-second live poll, and hanging an extra query off every one of those to
+  // delete something that appears once a day is the kind of cost that only
+  // shows up under load.
+  if (due.length > 0) await purgeOldWars(now);
+}
+
+/**
+ * Delete wars that are no longer news.
+ *
+ * A finished campaign is readable for exactly GUILD_WAR_RESULTS_LINGER_MS —
+ * that is the whole window `getFocusWar` looks back over — and after it nothing
+ * in the game can reach the row again: no ranking, medal, world record or
+ * profile is derived from a war, and every prize was banked into the empires
+ * themselves at settlement. What would be left behind is a nightly pile of
+ * thirty rounds × entrants clash rows, kept forever for a screen with no way to
+ * open it. So the history is not archived, it is dropped.
+ *
+ * Runs on the same lazy clock as the rest of the war (there is no cron), and
+ * only over wars that are genuinely finished — a SCHEDULED window past its end
+ * has not been paid out yet and belongs to settleWar above, not here.
+ */
+export async function purgeOldWars(now: Date): Promise<void> {
+  const cutoff = new Date(now.getTime() - GUILD_WAR_RESULTS_LINGER_MS);
+  try {
+    // Bounded like the settlement sweep: this runs on a page load, and a
+    // one-off backlog is better cleared a few nights at a time than in one
+    // cascade nobody asked for.
+    const stale = await prisma.guildWar.findMany({
+      where: { status: { in: ["SETTLED", "CANCELLED"] }, endsAt: { lt: cutoff } },
+      orderBy: { endsAt: "asc" },
+      select: { id: true },
+      take: 10,
+    });
+    if (stale.length === 0) return;
+    // Entries and clashes go with it — both cascade on warId.
+    await prisma.guildWar.deleteMany({
+      where: { id: { in: stale.map((war) => war.id) } },
+    });
+  } catch (error) {
+    // Housekeeping must never take the arena down with it.
+    console.error("[guild-war] purge failed", error);
+  }
 }
 
 /* ------------------------------ reading the war ------------------------------ */

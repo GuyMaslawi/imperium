@@ -31,6 +31,8 @@ import { getHappyHourState } from "@/server/actions/happyHour";
 import { getSeasonPassState } from "@/server/actions/seasonPass";
 import { getCollectableAchievements } from "@/server/achievementState";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
+import { DiscordLink } from "@/components/ui/DiscordLink";
+import { Tip } from "@/components/ui/Tip";
 import { discordInviteUrl } from "@/server/discord";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
@@ -54,6 +56,9 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
   const heroXp = heroAtCap ? 1 : hero?.xp ?? 0;
 
   const admin = await isAdmin();
+  // Read once and handed to both surfaces that offer the channel on every
+  // screen: the chat dock and the command-bar pill.
+  const discordUrl = discordInviteUrl();
   // Every running release, oldest first — the admin can field more than one at
   // a time, and they share the command bar's row.
   const miniGames = await getMiniGameStates();
@@ -168,7 +173,7 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
       {/* The chat dock rides in the corner of every game screen — the public
           room and private conversations, without leaving the page you are on.
           Admins get the moderation control on each line. */}
-      <ChatDock canModerate={admin} discordUrl={discordInviteUrl()} />
+      <ChatDock canModerate={admin} discordUrl={discordUrl} />
       <ResourceBar
         resources={{
           gold: empire.gold,
@@ -186,6 +191,20 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
             unreadMessages={unreadMessages}
             collectableAchievements={collectableAchievements}
           />
+        }
+        discord={
+          // Nothing at all until the channel exists (discordInviteUrl fails
+          // closed), which is also why the Tip is only mounted alongside a real
+          // link — an empty tooltip wrapper in the command bar would still be a
+          // hover target over nothing.
+          discordUrl ? (
+            <Tip
+              tip="קהילת קראלדור בדיסקורד — עדכונים, שעות שמחה, מיני-משחקים ושאר השחקנים. נפתח בלשונית חדשה"
+              side="bottom"
+            >
+              <DiscordLink url={discordUrl} variant="topbar" label="דיסקורד" />
+            </Tip>
+          ) : null
         }
         admin={admin ? <AdminNav /> : null}
       />

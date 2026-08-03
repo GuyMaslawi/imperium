@@ -18,7 +18,8 @@
      60   mobile nav drawer           Sidebar/MobileMenu
      85   mini-game corner toast      MiniGameButton
      95   mini-game board             MiniGameButton
-    100   modals and dialogs          Dialog, SeasonPass, HappyHourBanner
+    100   modals and dialogs          Dialog, SeasonPass, HappyHourBanner,
+                                      MiniGameTakeover
     110   incoming-attack vignette    WarAlerts
     120   incoming-attack toasts      WarAlerts
 
@@ -651,12 +652,167 @@ body {
 .nav-glow-gold {
   animation: nav-glow-gold 2.4s ease-in-out infinite;
 }
+/* --- Top-bar Discord pill — the one thing in the command bar that is alive
+   without waiting for you to do something.
+
+   It sits beside the inbox pills, so it has to be readable as a *different*
+   kind of signal: those are alarms (red/green/gold, 1.8s, and only while they
+   have something), this is an open door that is always there. Hence blurple,
+   a much slower breath, and motion that is decorative rather than countable —
+   nothing here ever means "you have N of something".
+
+   Four layers, all on the anchor itself (no extra DOM):
+     the element   a slow blurple breath on the border and halo
+     ::before      a shine that sweeps the face once per cycle, then rests.
+                   Drawn as a moving background-position rather than a
+                   translated bar, so the pill's own border-radius clips it and
+                   no overflow:hidden is needed — which is what lets the dot
+                   below hang outside the box.
+     ::after       Discord's own online dot, in the same corner the inbox pills
+                   put their badge, ringed in the bar's background so it reads
+                   as a status light rather than a stray pixel
+     .discord-mark the mark itself, which wakes up and wiggles once a cycle
+   All four share the 3.4s/5.2s pair of periods, so they drift in and out of
+   phase instead of marching together. --- */
+.discord-pill {
+  position: relative;
+  border-color: rgba(88, 101, 242, 0.5);
+  background: linear-gradient(180deg, rgba(88, 101, 242, 0.2), rgba(11, 10, 14, 0.95));
+  color: #c7ccff;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+  animation: discord-breathe 3.4s ease-in-out infinite;
+}
+.discord-pill:hover,
+.discord-pill:focus-visible {
+  color: #fff;
+  border-color: rgba(126, 137, 255, 0.95);
+  transform: translateY(-1px);
+}
+.discord-pill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(160, 172, 255, 0.3) 46%,
+    rgba(235, 238, 255, 0.5) 50%,
+    rgba(160, 172, 255, 0.3) 54%,
+    transparent 62%
+  );
+  background-size: 260% 100%;
+  background-repeat: no-repeat;
+  animation: discord-sweep 5.2s ease-in-out infinite;
+}
+.discord-pill::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #3ba55d;
+  /* The inner ring is the bar's own background, so the dot reads as sitting on
+     top of the pill rather than punched into its corner. */
+  box-shadow:
+    0 0 0 2px #0b0a0e,
+    0 0 8px 1px rgba(59, 165, 93, 0.85);
+  animation: discord-online 2.2s ease-in-out infinite;
+}
+@keyframes discord-breathe {
+  0%,
+  100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.03),
+      0 0 0 0 rgba(88, 101, 242, 0);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      0 0 16px 1px rgba(88, 101, 242, 0.55);
+  }
+}
+/* Parked off the leading edge for most of the cycle, one pass across, then
+   parked again — a shine that never stops is a loading bar.
+   The travel is deliberately short (120% → -10%): the band is only on the pill
+   between roughly 80% and 20%, so a wider range spends the whole pass off the
+   edges and the shine reads as a flicker rather than a sweep. Measured, not
+   guessed — the endpoints are where a static screenshot shows it clear the
+   pill on either side. */
+@keyframes discord-sweep {
+  0%,
+  55% {
+    background-position: 120% 0;
+  }
+  85%,
+  100% {
+    background-position: -10% 0;
+  }
+}
+@keyframes discord-online {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.35);
+    opacity: 1;
+  }
+}
+@keyframes discord-mark {
+  0%,
+  70%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  77% {
+    transform: translateY(-2px) rotate(-10deg);
+  }
+  84% {
+    transform: translateY(-2px) rotate(10deg);
+  }
+  91% {
+    transform: translateY(0) rotate(-4deg);
+  }
+}
+.discord-pill .discord-mark {
+  animation: discord-mark 3.4s ease-in-out infinite;
+}
+/* Hovering hands the pill over to the pointer: the idle theatre stops so the
+   thing you are about to click is holding still, and the shine gets out of the
+   way of the brightened label. */
+.discord-pill:hover {
+  animation-play-state: paused;
+}
+.discord-pill:hover::before {
+  animation: none;
+  opacity: 0;
+}
+.discord-pill:hover .discord-mark {
+  animation-play-state: paused;
+}
 @media (prefers-reduced-motion: reduce) {
   .inbox-glow-red,
   .inbox-glow-green,
   .inbox-glow-gold,
-  .nav-glow-gold {
+  .nav-glow-gold,
+  .discord-pill,
+  .discord-pill::before,
+  .discord-pill::after,
+  .discord-pill .discord-mark {
     animation: none;
+  }
+  /* The sweep's resting position is off the edge; with the animation gone it
+     would otherwise sit frozen across the middle of the pill. */
+  .discord-pill::before {
+    opacity: 0;
   }
 }
 
@@ -7586,20 +7742,8 @@ body {
   padding: 0.55rem 0.65rem;
   animation: mg-note-in 0.4s cubic-bezier(0.22, 1.4, 0.5, 1) both;
 }
-.mg-note--herald {
-  border-color: rgba(228, 195, 90, 0.7);
-  box-shadow:
-    0 12px 30px -10px rgba(0, 0, 0, 0.9),
-    0 0 26px -10px rgba(244, 196, 74, 0.9);
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-}
-.mg-note--herald:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 16px 34px -10px rgba(0, 0, 0, 0.9),
-    0 0 32px -8px rgba(244, 196, 74, 1);
-}
+/* The release invitation used to be a note here too. It is a full-screen
+   takeover now (see the mgt- block below), so only wins are left. */
 .mg-note--winner { border-color: rgba(52, 211, 153, 0.35); }
 
 .mg-note-icon {
@@ -7614,16 +7758,6 @@ body {
   background: rgba(0, 0, 0, 0.45);
   font-size: 1.05rem;
 }
-.mg-note-cta {
-  flex-shrink: 0;
-  border-radius: 0.35rem;
-  background: var(--gold, #e4c35a);
-  padding: 0.15rem 0.55rem;
-  font-size: 0.7rem;
-  font-weight: 900;
-  color: #1a1206;
-}
-
 @keyframes mg-note-in {
   from { opacity: 0; transform: translateX(-1.2rem) scale(0.96); }
   to { opacity: 1; transform: none; }
@@ -7689,6 +7823,567 @@ body {
   .mg-note,
   .mg-winner { animation: none; }
   .mg-pill--live::after { opacity: 0; }
+}
+
+/* ============================================================================
+   The release takeover (prefix: mgt-)
+   The six seconds a newly released mini-game owns the screen. See
+   MiniGameTakeover.tsx for why it exists; what matters here is that it must NOT
+   look like the Happy Hour takeover below. That screen is molten gold around one
+   giant number; this one is a *table*, and the table is the message — a player
+   should know whether the cups or the safe went up before reading a word.
+
+   So the shell (.mgt, .mgt-rays, .mgt-shock, .mgt-rise) is shared and colourless,
+   and everything with a colour hangs off [data-game]: green felt under a
+   spotlight for the cups, cold steel under a searchlight for the safe.
+
+   All of it is switched off under prefers-reduced-motion at the foot of the
+   block; nothing here is the only carrier of any information.
+   ============================================================================ */
+
+.mgt {
+  position: fixed;
+  inset: 0;
+  /* The modal rung — see the stacking order at the top of this file. An
+     incoming-attack toast still outranks it, which is correct: being raided is
+     worth more of the player's attention than being invited to a game. */
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  animation: mgt-in 0.3s ease-out both;
+}
+
+.mgt[data-game="cups"] {
+  background: radial-gradient(circle at 50% 42%, rgba(6, 58, 42, 0.94), rgba(0, 0, 0, 0.95) 68%);
+  --mgt-accent: #34d399;
+  --mgt-accent-soft: rgba(52, 211, 153, 0.22);
+}
+.mgt[data-game="safe"] {
+  background: radial-gradient(circle at 50% 42%, rgba(10, 34, 58, 0.94), rgba(0, 0, 0, 0.95) 68%);
+  --mgt-accent: #7dd3fc;
+  --mgt-accent-soft: rgba(125, 211, 252, 0.2);
+}
+
+.mgt[data-leaving="true"] {
+  animation: mgt-out 0.42s ease-in both;
+}
+
+@keyframes mgt-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes mgt-out {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+
+/* Beams behind the stage, in the release's own colour. Same one-element conic
+   trick as .hh-rays — sixteen wedges laid by a repeating gradient rather than
+   sixteen absolutely-positioned divs. */
+.mgt-rays {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 190vmax;
+  height: 190vmax;
+  margin: -95vmax 0 0 -95vmax;
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--mgt-accent-soft) 0deg 4deg,
+    transparent 4deg 12deg,
+    rgba(255, 255, 255, 0.05) 12deg 15deg,
+    transparent 15deg 24deg
+  );
+  -webkit-mask-image: radial-gradient(closest-side, transparent 6%, #000 26%, transparent 68%);
+  mask-image: radial-gradient(closest-side, transparent 6%, #000 26%, transparent 68%);
+  animation: mgt-rays-spin 30s linear infinite;
+  pointer-events: none;
+  opacity: 0.85;
+}
+@keyframes mgt-rays-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* The ring that punches out on the first frame — the "an event just started". */
+.mgt-shock {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(26rem, 88vw);
+  height: min(26rem, 88vw);
+  margin: calc(min(26rem, 88vw) / -2) 0 0 calc(min(26rem, 88vw) / -2);
+  border-radius: 999px;
+  border: 3px solid var(--mgt-accent);
+  animation: mgt-shock-out 1s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+  pointer-events: none;
+}
+.mgt-shock--second {
+  animation-delay: 0.2s;
+  border-width: 2px;
+}
+@keyframes mgt-shock-out {
+  0% { opacity: 0.9; transform: scale(0.15); }
+  100% { opacity: 0; transform: scale(1.6); }
+}
+
+.mgt-kicker {
+  font-size: 0.8125rem;
+  font-weight: 900;
+  letter-spacing: 0.35em;
+  color: var(--mgt-accent);
+  text-shadow: 0 0 18px var(--mgt-accent-soft);
+}
+
+.mgt-title {
+  font-size: clamp(1.9rem, 7vw, 3.25rem);
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  background: linear-gradient(180deg, #fffdf5 0%, #ffe9a8 45%, #d9ab2e 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 22px rgba(0, 0, 0, 0.8));
+  animation: mgt-slam 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  animation-delay: 0.4s;
+}
+@keyframes mgt-slam {
+  0% { opacity: 0; transform: scale(1.9); filter: blur(10px); }
+  65% { opacity: 1; transform: scale(0.97); filter: blur(0); }
+  100% { transform: scale(1); }
+}
+
+.mgt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.45);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: #e7e5e4;
+  white-space: nowrap;
+}
+/* The prize is the reason to come; it is the one chip allowed to glow. */
+.mgt-chip--prize {
+  border-color: rgba(228, 195, 90, 0.65);
+  color: #ffe9a8;
+  box-shadow: 0 0 22px -8px var(--gold);
+}
+
+/* Everything under the stage rises in behind it, staggered by an inline delay
+   so the eye is led down rather than hit at once. */
+.mgt-rise {
+  animation: mgt-rise-in 0.45s cubic-bezier(0.22, 1.3, 0.5, 1) both;
+  animation-delay: var(--mgt-delay, 0s);
+}
+@keyframes mgt-rise-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ------------------------------- the stages ------------------------------- */
+
+.mgt-stage-wrap {
+  width: min(30rem, 86vw);
+  animation: mgt-stage-in 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: 0.12s;
+}
+@keyframes mgt-stage-in {
+  from { opacity: 0; transform: translateY(-1.5rem) scale(0.86); }
+  to { opacity: 1; transform: none; }
+}
+
+.mgt-stage {
+  position: relative;
+  height: 11rem;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 1rem;
+  /* The distance between two cups, and therefore the entire cups choreography —
+     the shuffle is written in whole slots so the trio can never walk off the
+     felt, whatever the screen is. */
+  --slot: 5rem;
+}
+
+/* --- מצא את הכדור: felt, spotlight, three cups weaving --- */
+
+.mgt-stage--cups {
+  background:
+    radial-gradient(120% 90% at 50% 120%, rgba(16, 92, 62, 0.85), transparent 70%),
+    linear-gradient(180deg, rgba(2, 22, 16, 0.2), rgba(2, 14, 10, 0.75));
+}
+
+/* The stage light, as a cone from above. A clipped trapezoid rather than a
+   radial glow: the cone is what makes the felt read as a table being played on
+   rather than a green rectangle. */
+.mgt-spot {
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  width: 130%;
+  height: 150%;
+  margin-left: -65%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 72%);
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  animation: mgt-spot-breathe 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes mgt-spot-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+/* The table itself — a felt band the cups stand on, with its own front edge. */
+.mgt-felt {
+  position: absolute;
+  inset: auto 6% 1.1rem;
+  height: 1.35rem;
+  border-radius: 999px / 60%;
+  background: linear-gradient(180deg, #157a52, #0b4630 60%, #06301f);
+  box-shadow:
+    0 0 34px -6px rgba(16, 185, 129, 0.55),
+    inset 0 2px 0 rgba(255, 255, 255, 0.14);
+}
+
+/* The ball, dropped onto the felt and then taken under — the premise of the
+   game in one beat. It is painted OVER the cups (and lands on the middle one's
+   slot) because the point is to watch it disappear: behind them it would simply
+   never have been on screen. */
+.mgt-ball {
+  position: absolute;
+  bottom: 1.5rem;
+  left: 50%;
+  z-index: 6;
+  height: 0.9rem;
+  width: 0.9rem;
+  margin-left: -0.45rem;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 30%, #fff6d5, #f0b429 60%, #a76a06);
+  box-shadow: 0 0 18px 5px rgba(250, 204, 21, 0.75);
+  animation: mgt-ball-hide 1.6s ease-in both;
+  pointer-events: none;
+}
+@keyframes mgt-ball-hide {
+  0% { opacity: 0; transform: translateY(-3.5rem) scale(0.5); }
+  30% { opacity: 1; transform: translateY(0) scale(1); }
+  40% { transform: translateY(-0.7rem) scale(1); }
+  50% { transform: translateY(0) scale(1); }
+  75% { opacity: 1; transform: translateY(0) scale(1); }
+  /* Swallowed rather than faded: it shrinks into the felt under a cup. */
+  100% { opacity: 0; transform: translateY(0.2rem) scale(0.35); }
+}
+
+/* One cup, and the whole shuffle.
+ *
+ * Every cup runs the SAME keyframes — a carousel one slot to the right, one
+ * more, then a lift back over the other two — from the SAME base position (the
+ * left slot), and is placed into its own slot purely by a negative delay of a
+ * third of a cycle. That is what keeps the trio honest: the path only ever
+ * spans slots 0..2, so no cup can walk off the felt at any width, and because
+ * the cycle is a rotation the loop closes on itself with nothing to hide.
+ *
+ * The version before this had each cup weave ±1 slot around its own place,
+ * which on a phone put the outer two a slot and a half past the edge of the
+ * table.
+ */
+.mgt-cup {
+  position: absolute;
+  bottom: 1.45rem;
+  left: 50%;
+  z-index: 2;
+  height: 4.8rem;
+  width: 3.6rem;
+  margin-left: calc(-1.8rem - var(--slot));
+  transform-origin: 50% 100%;
+  animation:
+    mgt-cup-carousel 3.6s ease-in-out infinite,
+    mgt-cup-front 3.6s steps(1, end) infinite;
+  animation-delay: calc(var(--i) * -1.2s);
+  pointer-events: none;
+}
+@keyframes mgt-cup-carousel {
+  0% { transform: translateX(0) translateY(0) rotate(0deg); }
+  16.6% { transform: translateX(calc(var(--slot) * 0.5)) translateY(-0.5rem) rotate(5deg); }
+  33.3% { transform: translateX(var(--slot)) translateY(0) rotate(0deg); }
+  50% { transform: translateX(calc(var(--slot) * 1.5)) translateY(-0.5rem) rotate(-5deg); }
+  66.6% { transform: translateX(calc(var(--slot) * 2)) translateY(0) rotate(0deg); }
+  /* The long way home, lifted clear over the other two. */
+  78% { transform: translateX(calc(var(--slot) * 1.35)) translateY(-2.1rem) rotate(-11deg); }
+  90% { transform: translateX(calc(var(--slot) * 0.5)) translateY(-1.5rem) rotate(9deg); }
+  100% { transform: translateX(0) translateY(0) rotate(0deg); }
+}
+/* The cup making that trip passes in front of the others, not through them. */
+@keyframes mgt-cup-front {
+  0%, 66.6% { z-index: 2; }
+  66.7%, 99.9% { z-index: 5; }
+  100% { z-index: 2; }
+}
+
+.mgt-cup-body {
+  position: absolute;
+  inset: 0 0.2rem 0.3rem;
+  overflow: hidden;
+  border-radius: 0.45rem 0.45rem 0.7rem 0.7rem;
+  background: linear-gradient(100deg, #7c2d12 0%, #c2410c 32%, #f97316 50%, #b93c0b 72%, #6c2409 100%);
+  box-shadow:
+    inset 0 0.28rem 0 rgba(255, 226, 190, 0.35),
+    inset 0 -0.5rem 1rem rgba(0, 0, 0, 0.45),
+    0 0.5rem 1.4rem rgba(0, 0, 0, 0.6);
+  /* Gently narrower at the top: an upturned cup. Any more taper and it stops
+     being a cup and becomes a traffic cone. */
+  clip-path: polygon(19% 0, 81% 0, 99% 100%, 1% 100%);
+}
+.mgt-cup-shine {
+  position: absolute;
+  top: 12%;
+  left: 28%;
+  height: 80%;
+  width: 18%;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), transparent);
+  filter: blur(1px);
+}
+/* The rim standing on the felt, plus the shadow it casts. */
+.mgt-cup-base {
+  position: absolute;
+  bottom: 0;
+  left: 0.05rem;
+  right: 0.05rem;
+  height: 0.45rem;
+  border-radius: 999px / 100%;
+  background: linear-gradient(180deg, #ea580c, #6c2409);
+  box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.8);
+}
+
+/* --- פריצת הכספת: steel, a winding dial, a searchlight, digit rain --- */
+
+.mgt-stage--safe {
+  background:
+    radial-gradient(110% 90% at 50% 20%, rgba(30, 64, 96, 0.7), transparent 70%),
+    linear-gradient(180deg, rgba(8, 16, 26, 0.85), rgba(3, 7, 12, 0.9));
+}
+
+/* Digits falling behind the door — the code, out there somewhere. */
+.mgt-digit {
+  position: absolute;
+  top: -1.5rem;
+  font-size: 0.9rem;
+  font-weight: 900;
+  color: rgba(125, 211, 252, 0.55);
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  animation: mgt-digit-fall linear infinite;
+  pointer-events: none;
+}
+@keyframes mgt-digit-fall {
+  0% { opacity: 0; transform: translateY(0); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(13rem); }
+}
+
+/* The searchlight crossing the vault. */
+.mgt-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 38%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    rgba(186, 230, 253, 0.2) 45%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(186, 230, 253, 0.2) 55%,
+    transparent
+  );
+  filter: blur(3px);
+  animation: mgt-sweep-across 2.9s linear infinite;
+  pointer-events: none;
+}
+@keyframes mgt-sweep-across {
+  0% { left: -40%; }
+  100% { left: 102%; }
+}
+
+/* The door: a brushed-steel disc with rivets, a dial and a handle. */
+.mgt-door {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 9.2rem;
+  width: 9.2rem;
+  margin: -4.6rem 0 0 -4.6rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, #9ca3af, #4b5563 52%, #1f2937 100%);
+  box-shadow:
+    0 0 0 0.35rem #111827,
+    0 0 0 0.42rem rgba(125, 211, 252, 0.35),
+    0 0 40px -6px rgba(56, 189, 248, 0.6),
+    inset 0 0 1.6rem rgba(0, 0, 0, 0.7);
+}
+
+/* Eight bolts around the rim, from one repeating gradient masked to a ring —
+   cheaper than eight elements and it never drifts out of alignment. */
+.mgt-rivets {
+  position: absolute;
+  inset: 0.5rem;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 22deg,
+    rgba(226, 232, 240, 0.85) 0deg 3deg,
+    transparent 3deg 45deg
+  );
+  -webkit-mask-image: radial-gradient(closest-side, transparent 78%, #000 80%, #000 92%, transparent 94%);
+  mask-image: radial-gradient(closest-side, transparent 78%, #000 80%, #000 92%, transparent 94%);
+}
+
+/* The dial, winding as if someone is working the code right now. Stepped
+   rotation rather than linear: a safe dial clicks between notches. */
+.mgt-dial {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 4.3rem;
+  width: 4.3rem;
+  margin: -2.15rem 0 0 -2.15rem;
+  border-radius: 50%;
+  animation: mgt-dial-turn 3.2s steps(12, end) infinite;
+}
+@keyframes mgt-dial-turn {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.mgt-dial-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 32%, #e2e8f0, #94a3b8 55%, #475569 100%);
+  box-shadow: inset 0 0 0 0.18rem rgba(15, 23, 42, 0.75);
+}
+/* The graduations, kept to a ring at the rim. Unmasked they run all the way to
+   the middle, and a dial face full of radial lines reads as a spider's web. */
+.mgt-dial-face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(15, 23, 42, 0.85) 0deg 1.5deg,
+    transparent 1.5deg 15deg
+  );
+  -webkit-mask-image: radial-gradient(closest-side, transparent 68%, #000 72%);
+  mask-image: radial-gradient(closest-side, transparent 68%, #000 72%);
+}
+.mgt-dial-mark {
+  position: absolute;
+  top: 0.28rem;
+  left: 50%;
+  height: 1.1rem;
+  width: 0.22rem;
+  margin-left: -0.11rem;
+  border-radius: 999px;
+  background: #f8fafc;
+  box-shadow: 0 0 10px rgba(248, 250, 252, 0.9);
+}
+/* The spoked wheel, turning on its own beat so it never locks to the dial.
+   The RIM is what makes it a vault handle: four bare crossed bars over a
+   graduated dial drew a wall clock, hands and all. Two pseudo-elements for the
+   spokes; a single bar with offset shadows (the first attempt) drew one stripe
+   across the whole door. */
+.mgt-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 7.4rem;
+  width: 7.4rem;
+  margin: -3.7rem 0 0 -3.7rem;
+  border-radius: 50%;
+  background: radial-gradient(circle, #e2e8f0 0 11%, #94a3b8 11% 14%, transparent 15%);
+  box-shadow:
+    inset 0 0 0 0.34rem #94a3b8,
+    inset 0 0 0 0.42rem rgba(15, 23, 42, 0.8);
+  filter: drop-shadow(0 2px 7px rgba(0, 0, 0, 0.7));
+  animation: mgt-handle-turn 5.5s ease-in-out infinite;
+}
+.mgt-handle::before,
+.mgt-handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.3rem;
+  right: 0.3rem;
+  height: 0.42rem;
+  margin-top: -0.21rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #64748b, #e2e8f0 50%, #64748b);
+}
+.mgt-handle::after {
+  transform: rotate(90deg);
+}
+@keyframes mgt-handle-turn {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(140deg); }
+}
+/* The padlock over the dial: what the player is being asked to remove. */
+.mgt-lock {
+  position: absolute;
+  bottom: -0.4rem;
+  left: 50%;
+  margin-left: -1rem;
+  width: 2rem;
+  text-align: center;
+  font-size: 1.5rem;
+  filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.8));
+  animation: mgt-lock-rattle 2.4s ease-in-out infinite;
+}
+@keyframes mgt-lock-rattle {
+  0%, 62%, 100% { transform: rotate(0deg) scale(1); }
+  70% { transform: rotate(-9deg) scale(1.08); }
+  78% { transform: rotate(8deg) scale(1.08); }
+  86% { transform: rotate(-5deg) scale(1.04); }
+}
+
+/* A phone gets a shorter table and a tighter row. Only --slot moves: the whole
+   choreography is written in slots, so the shuffle re-scales with it and the
+   keyframes never have to be restated. */
+@media (max-width: 480px) {
+  .mgt-stage {
+    height: 9.5rem;
+    --slot: 3.7rem;
+  }
+  .mgt-cup {
+    height: 4rem;
+    width: 3rem;
+    margin-left: calc(-1.5rem - var(--slot));
+  }
+  .mgt-door { height: 7.2rem; width: 7.2rem; margin: -3.6rem 0 0 -3.6rem; }
+  .mgt-handle { height: 5.4rem; width: 5.4rem; margin: -2.7rem 0 0 -2.7rem; }
+  .mgt-dial { height: 3.6rem; width: 3.6rem; margin: -1.8rem 0 0 -1.8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mgt,
+  .mgt-rays,
+  .mgt-title,
+  .mgt-rise,
+  .mgt-stage-wrap,
+  .mgt-spot,
+  .mgt-cup,
+  .mgt-dial,
+  .mgt-handle,
+  .mgt-lock { animation: none; }
+  /* These exist only as motion; without it they are noise. */
+  .mgt-shock,
+  .mgt-sweep,
+  .mgt-digit { display: none; }
+  /* The ball is normally covered by the cups a second in — with no shuffle to
+     cover it, leaving it on the felt gives the still picture its subject. */
+  .mgt-ball { animation: none; }
 }
 
 /* ============================================================================

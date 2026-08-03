@@ -222,6 +222,20 @@ export interface BoardRow {
    * LadderRow.online.
    */
   online: boolean;
+  /**
+   * The city tier this empire holds (`Empire.cities`), so the board can name the
+   * place each row lives in.
+   *
+   * These boards are global — the one thing they do *not* say, unlike the city
+   * ladder where every row shares the viewer's city, is where the leader
+   * actually is. That decides whether the reader can do anything about him:
+   * spying and attacking are confined to your own city tier.
+   *
+   * `null` only on the theft board, for a raider whose empire row is gone — the
+   * name resolves to a placeholder there and inventing a city for it would be a
+   * lie.
+   */
+  cities: number | null;
 }
 
 export type BoardKey = "slaves" | "bank" | "spy" | "power";
@@ -278,6 +292,7 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
       select: {
         id: true,
         name: true,
+        cities: true,
         generalPower: true,
         spyPower: true,
         lastSeenAt: true,
@@ -293,6 +308,9 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
         // The heartbeat is collapsed to a boolean here and the Date is dropped:
         // what ships to the browser must not be the timestamp itself.
         online: isOnline(e.lastSeenAt, now),
+        // Public knowledge — the city ladder already names every empire in your
+        // own tier, and the boss banner names the tier itself.
+        cities: e.cities,
       }))
       // A board of empires with nothing to show is noise, not a ranking.
       .filter((r) => r.value > 0);
@@ -333,7 +351,7 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   // top ten, and a raider need not be on any of them.
   const named = await prisma.empire.findMany({
     where: { id: { in: sums.map((t) => t.attackerEmpireId) } },
-    select: { id: true, name: true, lastSeenAt: true },
+    select: { id: true, name: true, cities: true, lastSeenAt: true },
   });
   const byId = new Map(named.map((e) => [e.id, e]));
   const now = new Date();
@@ -342,7 +360,9 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
     name: byId.get(t.attackerEmpireId)?.name ?? "אימפריה",
     value: Math.floor(t._sum.stolenGold ?? 0),
     // A raider whose empire row has since been deleted reads as away, which is
-    // the truthful answer for a name that is no longer anybody.
+    // the truthful answer for a name that is no longer anybody — and holds no
+    // city at all, rather than a made-up one.
     online: isOnline(byId.get(t.attackerEmpireId)?.lastSeenAt, now),
+    cities: byId.get(t.attackerEmpireId)?.cities ?? null,
   }));
 }

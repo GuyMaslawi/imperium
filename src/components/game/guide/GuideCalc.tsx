@@ -659,16 +659,24 @@ export function ItemUpgradeCalc() {
   const from = UPGRADE_LEVELS[Math.min(fromIdx, UPGRADE_LEVELS.length - 1)];
   const to = UPGRADE_LEVELS[Math.max(toIdx, fromIdx)];
 
-  const { total, steps } = useMemo(() => {
+  // Gold only buys the rungs *inside* a set. An אגדי has nothing to upgrade
+  // into, so a range that crosses a decade is not a price at all — it is a price
+  // plus that many pieces of loot, and the calculator says so rather than
+  // quietly charging for a step no player can buy.
+  const { total, steps, setJumps } = useMemo(() => {
     let sum = 0;
     let count = 0;
+    let jumps = 0;
     for (const lvl of UPGRADE_LEVELS) {
-      if (lvl >= from && lvl < to) {
-        sum += itemUpgradeCost(lvl) ?? 0;
+      if (lvl < from || lvl >= to) continue;
+      const cost = itemUpgradeCost(lvl);
+      if (cost === null) jumps += 1;
+      else {
+        sum += cost;
         count += 1;
       }
     }
-    return { total: sum, steps: count };
+    return { total: sum, steps: count, setJumps: jumps };
   }, [from, to]);
 
   const nextCost = itemUpgradeCost(from);
@@ -702,8 +710,20 @@ export function ItemUpgradeCalc() {
         />
       </div>
 
+      {setJumps > 0 && (
+        <p className="mt-3 text-[11px] leading-relaxed text-amber-300/90">
+          ⚠ המסלול חוצה <b className="nums">{setJumps}</b> מעברי סט. אגדי הוא שיא
+          הסט שלו ואי אפשר לשדרג אותו — החפץ של הסט הבא נופל כשלל בקרב. העלות
+          למטה היא רק של השדרוגים שאפשר לקנות בזהב.
+        </p>
+      )}
+
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <Result label="מחיר השדרוג הבא" value={nextCost ? formatShort(nextCost) : "—"} sub="זהב" />
+        <Result
+          label="מחיר השדרוג הבא"
+          value={nextCost ? formatShort(nextCost) : "—"}
+          sub={nextCost ? "זהב" : "אגדי — שיא הסט"}
+        />
         <Result label={`עלות כוללת (${steps} שדרוגים)`} value={formatShort(total)} sub="זהב" tone="text-bone-bright" />
         <Result
           label={`הבונוס ברמה ${to}`}

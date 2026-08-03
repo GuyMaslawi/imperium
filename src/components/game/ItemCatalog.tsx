@@ -68,7 +68,8 @@ export function ItemCatalog({
           ))}
         </p>
         <p className="mt-1">
-          ⬆ שדרוג מעלה את רמת החפץ לדרגה הבאה (וגם את הסטטים) · 🔒 = הגיבור שלך
+          ⬆ שדרוג מעלה את רמת החפץ לדרגה הבאה בתוך הסט (וגם את הסטטים), ונעצר
+          באגדי — הסט הבא מגיע רק כשלל · 🔒 = הגיבור שלך
           (רמה{" "}
           <span className="nums text-gold-bright" dir="ltr">
             {heroLevel}

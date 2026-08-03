@@ -1,4 +1,5 @@
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { Tip } from "@/components/ui/Tip";
 import { SHIELDS, shieldMeta, type ShieldKey } from "@/lib/game/diamondShop";
 
 /**
@@ -19,49 +20,46 @@ export const SHIELD_TONE: Record<ShieldKey, string> = {
 };
 
 /**
- * The word each shield wears when it is drawn with a label — the `מגן` half of
- * the name is already said by the shield outline, so the pill only has to name
- * what is behind it.
- */
-const SHIELD_WORD: Record<ShieldKey, string> = {
-  resources: "משאבים",
-  soldiers: "חיילים",
-};
-
-/**
- * The bare pill for one shield — a shield outline plus what it covers. Shared by
- * the live badges below, the shop card and the ladder legend so all three stay
- * identical.
+ * The pill for one shield — a shield outline, tinted by which shield it is.
+ * Shared by the live badges below and every report that mentions a shield, so
+ * the same mark always means the same thing.
+ *
+ * It carries no word and no second glyph on purpose. A raid shield is a
+ * secondary fact on a row that is already dense (name, city, guild, power), and
+ * spelling `משאבים` / `חיילים` beside every one of them cost a line of reading
+ * for something most readers skip. The tint carries the difference — gold for
+ * the resource shield, blue for the soldier shield — and the tooltip says it in
+ * full for anyone who stops on it.
  *
  * The frame (`rounded-md px-2 py-0.5`) is deliberately the same one every other
  * stat pill wears — power, guild, health. A shield drawn tighter than its
  * neighbours read as a lesser, decorative mark sitting in a row of real ones.
- *
- * `label` spells the cover out in a word rather than a second glyph. Two icons
- * side by side is a rebus: readers saw a shield and a box and had to guess, and
- * nothing on the row told them the guess was right. Anywhere there is room for
- * three characters, prefer the word.
  */
 export function ShieldGlyph({
   shieldKey,
   size = 12,
-  title,
-  label = false,
+  tip,
 }: {
   shieldKey: ShieldKey;
   size?: number;
-  title?: string;
-  /** Name the cover in words instead of drawing a second icon. */
-  label?: boolean;
+  /** Override the tooltip; defaults to the shield's badge line. */
+  tip?: string;
 }) {
+  const meta = shieldMeta(shieldKey);
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold ${SHIELD_TONE[shieldKey]}`}
-      title={title}
-    >
-      <Icon name="shield" size={size} />
-      {label ? SHIELD_WORD[shieldKey] : <Icon name={SHIELD_ICON[shieldKey]} size={size} />}
-    </span>
+    // shrink-0 on the Tip wrapper as well as the pill: the wrapper is the flex
+    // child, so without it a tight row squeezes the badge instead of the name.
+    <Tip className="shrink-0" tip={tip ?? meta.badge}>
+      <span
+        // The pill is the whole meaning here, so it needs its own name for a
+        // reader who never sees the tint or the tooltip.
+        role="img"
+        aria-label={meta.label}
+        className={`inline-flex shrink-0 cursor-help items-center rounded-md border px-2 py-0.5 ${SHIELD_TONE[shieldKey]}`}
+      >
+        <Icon name="shield" size={size} />
+      </span>
+    </Tip>
   );
 }
 
@@ -80,13 +78,10 @@ export type ShieldState = Partial<Record<ShieldKey, Date | string | null>>;
 export function ShieldBadges({
   shields,
   size = "sm",
-  label = false,
 }: {
   shields: ShieldState | undefined;
   /** `sm` for table rows, `md` for the profile header. */
   size?: "sm" | "md";
-  /** Name each shield's cover in words — see ShieldGlyph. */
-  label?: boolean;
 }) {
   if (!shields) return null;
   const active = SHIELDS.filter((s) => shields[s.key] != null);
@@ -95,13 +90,7 @@ export function ShieldBadges({
   return (
     <>
       {active.map((s) => (
-        <ShieldGlyph
-          key={s.key}
-          shieldKey={s.key}
-          size={size === "md" ? 14 : 12}
-          label={label}
-          title={shieldMeta(s.key).badge}
-        />
+        <ShieldGlyph key={s.key} shieldKey={s.key} size={size === "md" ? 14 : 12} />
       ))}
     </>
   );

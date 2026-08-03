@@ -125,6 +125,42 @@ export const RESOURCE_TO_MINE: Record<StorableResource, ProductionBuildingType> 
   stone: "STONE_QUARRY",
 };
 
+/* ------------------------------ pricing ------------------------------ */
+
+/** Round to three significant figures so prices read as prices, not as noise. */
+function roundPrice(value: number): number {
+  if (value <= 0) return 0;
+  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 2);
+  return Math.round(value / magnitude) * magnitude;
+}
+
+/**
+ * Every ladder in this file is geometric, and they are all geometric for the
+ * same reason: income in this game is *multiplicative* — production is
+ * `slaves × mine level × cities × ticks`, and all three of those factors grow at
+ * once — while a linear price ladder grows by a constant step. The two curves
+ * diverge within days.
+ *
+ * The linear ladders that used to live here (citizens/intelligence/bank deposits
+ * at `1,700 × level`, warehouses at `640 × level`, mines at `750 × tier`) proved
+ * it in the field: the whole 100-rung citizen ladder came to 8.4M gold — half a
+ * percent of a tenth city, and under a minute of late-game income — and a
+ * focused player maxed a mine to level {@link MINE_MAX_LEVEL} inside four days,
+ * then sat on billions with nothing to spend them on. Playtesters read the
+ * upgrades as free, because they were.
+ *
+ * The factor is chosen per ladder from its *length*, not by taste: a short
+ * ladder needs a steep factor to keep its ceiling far away, a long one needs a
+ * gentle factor or the top rung leaves the economy entirely. See each
+ * `*_COST_GROWTH` for the reasoning behind its own number.
+ *
+ * `level` is the empire's *current* level and the price is for the next rung, so
+ * the exponent is `level - 1`: a ladder's first purchase pays the base flat.
+ */
+function geometricCost(base: number, growth: number, level: number): number {
+  return roundPrice(base * growth ** Math.max(0, level - 1));
+}
+
 /* ------------------------------ mines ------------------------------ */
 
 /**
@@ -154,28 +190,52 @@ export function mineProductionPerTick(level: number, assignedSlaves: number): nu
   return assignedSlaves * mineProductionValue(level);
 }
 
-/** Per-tier base price of a mine upgrade, in the mine's own resource. */
+/**
+ * Price of a mine's *first* upgrade, in the mine's own resource. A day-one
+ * empire earns roughly 23K gold a day, so 5,000 is an affordable first purchase
+ * that still reads as a purchase.
+ */
 const MINE_UPGRADE_BASE: Record<StorableResource, number> = {
-  gold: 500 * 1.5,
-  wood: 300 * 1.4,
-  iron: 300 * 1.4,
-  stone: 250 * 1.4,
+  gold: 5_000,
+  wood: 2_800,
+  iron: 2_800,
+  stone: 2_300,
 };
 
 /**
- * Cost to upgrade a mine from `level` to `level + 1`. Priced by the next
- * tier, so the price rises with every rung. Each mine is
+ * Each mine level multiplies the previous level's price by this.
+ *
+ * The gentlest factor in the file, because this is by far the longest ladder:
+ * {@link MINE_MAX_LEVEL} is 250 rungs, and at the ×1.1 used for the empire
+ * upgrades the top rung would cost seventeen *trillion* — off the economy
+ * entirely. At ×1.05 the ladder totals ~18.9B across its 249 purchases, and a
+ * simulated all-in player (everything into slaves, citizen rungs and this
+ * ladder) reaches level 113 by day 7, 241 by day 30 and the cap around day 45 —
+ * a month and a half instead of the four days the old linear `750 × tier`
+ * allowed. Shorten the ladder and this factor has to rise.
+ *
+ * That same simulation shows what this change does *not* fix: past the cap the
+ * player banks hundreds of billions with nothing to spend them on. The endgame
+ * needs a gold sink of its own; repricing the climb only buys time.
+ */
+export const MINE_UPGRADE_COST_GROWTH = 1.05;
+
+/**
+ * Cost to upgrade a mine from `level` to `level + 1`. Each mine is
  * upgraded with its own resource only — a gold mine costs gold, a wood
  * camp costs wood, and so on; the other three resources are always 0.
  */
 export function mineUpgradeCost(level: number, resource: StorableResource) {
-  const tier = level + 1;
   return {
     gold: 0,
     wood: 0,
     iron: 0,
     stone: 0,
-    [resource]: Math.round(MINE_UPGRADE_BASE[resource] * tier),
+    [resource]: geometricCost(
+      MINE_UPGRADE_BASE[resource],
+      MINE_UPGRADE_COST_GROWTH,
+      level
+    ),
   };
 }
 
@@ -247,19 +307,54 @@ export const STORAGE_META: Record<ResourceStorageType, StorageMeta> = {
 
 export const STORAGE_TYPES = Object.keys(STORAGE_META) as ResourceStorageType[];
 
-/** Warehouse capacity per level, per resource. */
+/** Warehouse capacity granted by the first level, per resource. */
 export const STORAGE_CAPACITY_PER_LEVEL = 10_000;
 
+/**
+ * Both warehouse capacity and its price carry this factor per level.
+ *
+ * Capacity grows with the price on purpose. A warehouse is the only thing that
+ * protects resources from plunder, and its capacity is an *absolute* number
+ * while everything it defends against is multiplicative — a flat 10,000 per
+ * level meant a level-50 warehouse guarded 500K against an empire earning tens
+ * of millions a day. Repricing the ladder without rescaling what it buys would
+ * not have made warehouses expensive, it would have retired them. Carrying the
+ * same factor on both sides holds the gold-per-unit-stored ratio where it has
+ * always been, and keeps the linear term so no existing warehouse ever loses
+ * capacity under the new curve (the factor is ≥ 1 at every level).
+ */
+export const STORAGE_GROWTH = 1.05;
+
 export function storageCapacityForLevel(level: number): number {
-  return level * STORAGE_CAPACITY_PER_LEVEL;
+  if (level <= 0) return 0;
+  return Math.round(
+    level * STORAGE_CAPACITY_PER_LEVEL * STORAGE_GROWTH ** (level - 1)
+  );
 }
 
+/**
+ * Price of a warehouse's *first* upgrade. Deliberately the gentlest opening
+ * rung in the file: a warehouse is what keeps a new empire's resources out of a
+ * raider's hands, so the level nobody should be priced out of is level 1. Three
+ * times the old `640` puts the first purchase at a few hours of a day-one
+ * empire's income — a real decision, not a wall.
+ */
+const STORAGE_UPGRADE_BASE = {
+  gold: 1_200 * 1.6,
+  wood: 900 * 1.6,
+  iron: 750 * 1.6,
+  stone: 750 * 1.6,
+} as const;
+
 export function storageUpgradeCost(level: number) {
+  // Linear × geometric, matching storageCapacityForLevel exactly, so the price
+  // per unit of protected resource is the same at every rung of the ladder.
+  const mult = level * STORAGE_GROWTH ** Math.max(0, level - 1);
   return {
-    gold: Math.round(400 * level * 1.6),
-    wood: Math.round(300 * level * 1.6),
-    iron: Math.round(250 * level * 1.6),
-    stone: Math.round(250 * level * 1.6),
+    gold: roundPrice(STORAGE_UPGRADE_BASE.gold * mult),
+    wood: roundPrice(STORAGE_UPGRADE_BASE.wood * mult),
+    iron: roundPrice(STORAGE_UPGRADE_BASE.iron * mult),
+    stone: roundPrice(STORAGE_UPGRADE_BASE.stone * mult),
   };
 }
 
@@ -378,22 +473,14 @@ const WHEEL_LUCK_BASE_COST = {
 /** Each wheel-luck level multiplies the previous level's price by this. */
 export const WHEEL_LUCK_COST_GROWTH = 1.55;
 
-/** Round to three significant figures so prices read as prices, not as noise. */
-function roundPrice(value: number): number {
-  if (value <= 0) return 0;
-  const magnitude = 10 ** Math.max(0, Math.floor(Math.log10(value)) - 2);
-  return Math.round(value / magnitude) * magnitude;
-}
-
 /** Cost to take wheel luck from `level` to `level + 1`. */
 export function wheelLuckUpgradeCost(level: number) {
-  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
-  const mult = WHEEL_LUCK_COST_GROWTH ** Math.max(0, level - 1);
+  const g = WHEEL_LUCK_COST_GROWTH;
   return {
-    gold: roundPrice(WHEEL_LUCK_BASE_COST.gold * mult),
-    wood: roundPrice(WHEEL_LUCK_BASE_COST.wood * mult),
-    iron: roundPrice(WHEEL_LUCK_BASE_COST.iron * mult),
-    stone: roundPrice(WHEEL_LUCK_BASE_COST.stone * mult),
+    gold: geometricCost(WHEEL_LUCK_BASE_COST.gold, g, level),
+    wood: geometricCost(WHEEL_LUCK_BASE_COST.wood, g, level),
+    iron: geometricCost(WHEEL_LUCK_BASE_COST.iron, g, level),
+    stone: geometricCost(WHEEL_LUCK_BASE_COST.stone, g, level),
   };
 }
 
@@ -463,13 +550,12 @@ export const BANK_INTEREST_COST_GROWTH = 4;
 
 /** Cost to take bank interest from `level` to `level + 1`. */
 export function bankInterestUpgradeCost(level: number) {
-  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
-  const mult = BANK_INTEREST_COST_GROWTH ** Math.max(0, level - 1);
+  const g = BANK_INTEREST_COST_GROWTH;
   return {
-    gold: roundPrice(BANK_INTEREST_BASE_COST.gold * mult),
-    wood: roundPrice(BANK_INTEREST_BASE_COST.wood * mult),
-    iron: roundPrice(BANK_INTEREST_BASE_COST.iron * mult),
-    stone: roundPrice(BANK_INTEREST_BASE_COST.stone * mult),
+    gold: geometricCost(BANK_INTEREST_BASE_COST.gold, g, level),
+    wood: geometricCost(BANK_INTEREST_BASE_COST.wood, g, level),
+    iron: geometricCost(BANK_INTEREST_BASE_COST.iron, g, level),
+    stone: geometricCost(BANK_INTEREST_BASE_COST.stone, g, level),
   };
 }
 
@@ -647,24 +733,53 @@ export function empireUpgradeMaxLevel(
   return EMPIRE_UPGRADE_META[type].maxLevel;
 }
 
+/**
+ * The generic ladder — CITIZEN_GROWTH, INTELLIGENCE and BANK_DEPOSIT_COUNT all
+ * price against it. The base is a full day of a brand-new empire's gold income,
+ * so the very first rung costs something; the old `1,700 × level` opened at 7%
+ * of a day and was the purchase playtesters described as free.
+ */
+const EMPIRE_UPGRADE_BASE_COST = {
+  gold: 25_000,
+  wood: 13_000,
+  iron: 13_000,
+  stone: 9_000,
+} as const;
+
+/**
+ * Each generic-upgrade level multiplies the previous level's price by this.
+ *
+ * ×1.1 is not arbitrary: {@link CITIZEN_GROWTH_LEVELS_PER_CITY} unlocks ten
+ * rungs per city and {@link CITY_COST_TIER_MULTIPLIER} raises the price of a
+ * city by 2.5 per tier — and 1.1¹⁰ ≈ 2.59. So ten citizen rungs cost about what
+ * one city tier costs, and the ladder stays pinned to the pace at which the game
+ * unlocks it however far an empire gets. The full 100-rung citizen ladder now
+ * totals ~3.1B, against ~8.4M before.
+ *
+ * The two short ladders that share this curve land where they should as a
+ * side effect: all 14 intelligence rungs come to ~700K, all 8 bank-deposit
+ * rungs to ~286K.
+ */
+export const EMPIRE_UPGRADE_COST_GROWTH = 1.1;
+
 export function empireUpgradeCost(level: number) {
+  const g = EMPIRE_UPGRADE_COST_GROWTH;
   return {
-    gold: Math.round(1000 * level * 1.7),
-    wood: Math.round(600 * level * 1.5),
-    iron: Math.round(600 * level * 1.5),
-    stone: Math.round(400 * level * 1.5),
+    gold: geometricCost(EMPIRE_UPGRADE_BASE_COST.gold, g, level),
+    wood: geometricCost(EMPIRE_UPGRADE_BASE_COST.wood, g, level),
+    iron: geometricCost(EMPIRE_UPGRADE_BASE_COST.iron, g, level),
+    stone: geometricCost(EMPIRE_UPGRADE_BASE_COST.stone, g, level),
   };
 }
 
 /** Cost to take the turns gain from `level` to `level + 1`. */
 export function turnsUpgradeCost(level: number) {
-  // Levels start at 1, so the first purchase (1 → 2) pays the base price flat.
-  const mult = TURNS_UPGRADE_COST_GROWTH ** Math.max(0, level - 1);
+  const g = TURNS_UPGRADE_COST_GROWTH;
   return {
-    gold: roundPrice(TURNS_UPGRADE_BASE_COST.gold * mult),
-    wood: roundPrice(TURNS_UPGRADE_BASE_COST.wood * mult),
-    iron: roundPrice(TURNS_UPGRADE_BASE_COST.iron * mult),
-    stone: roundPrice(TURNS_UPGRADE_BASE_COST.stone * mult),
+    gold: geometricCost(TURNS_UPGRADE_BASE_COST.gold, g, level),
+    wood: geometricCost(TURNS_UPGRADE_BASE_COST.wood, g, level),
+    iron: geometricCost(TURNS_UPGRADE_BASE_COST.iron, g, level),
+    stone: geometricCost(TURNS_UPGRADE_BASE_COST.stone, g, level),
   };
 }
 

@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/admin/happy-hour", label: "Happy Hour", icon: "🔥" },
   { href: "/admin/seasons", label: "עונות", icon: "📅" },
   { href: "/admin/guilds", label: "בריתות", icon: "🤝" },
+  { href: "/admin/war", label: "מלחמת בריתות", icon: "⚔️" },
   { href: "/admin/balance", label: "איזון גלובלי", icon: "⚖️" },
   { href: "/admin/purchases", label: "רכישות והכנסות", icon: "💳" },
   { href: "/admin/audit", label: "יומן פעולות", icon: "📜" },

@@ -203,7 +203,8 @@ export default async function RankingsPage({
           </h2>
           {/* Wraps: the rank readout and a link do not always fit one phone line.
               The presence and shield legends that used to sit here are gone —
-              the rows spell both out in words, so the key only repeated itself. */}
+              every mark on a row now explains itself where it stands (in words,
+              or in its own tooltip), so the key only repeated itself. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-xs text-zinc-400">
               הדירוג שלך:{" "}
@@ -343,8 +344,9 @@ export default async function RankingsPage({
                               row of icon-only pills — a sword that meant "hero
                               level" (and read as attack power), a ↻ counter, a
                               hard-coded 100♥ the ladder never actually loaded,
-                              and a two-icon shield rebus. Everything that stayed
-                              now says what it is in words. */}
+                              and a two-icon shield rebus. What stayed says what
+                              it is in words; the shield is the one exception,
+                              and it explains itself in a tooltip. */}
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-zinc-500 empty:mt-0">
                             {/* Everyone on this ladder holds the same number of
                                 cities — that is what the bucket *is* — so the
@@ -370,8 +372,11 @@ export default async function RankingsPage({
                               </span>
                             )}
                             {/* Paid raid shields — worth knowing before you
-                                spend turns on a target whose loot is locked. */}
-                            <ShieldBadges shields={shieldsByEmpire.get(empire.id)} label />
+                                spend turns on a target whose loot is locked.
+                                Icon-only: which shield it is rides in the tint
+                                and the tooltip, so a row that mostly does not
+                                have one does not pay for the ones that do. */}
+                            <ShieldBadges shields={shieldsByEmpire.get(empire.id)} />
                           </div>
                         </div>
                       </div>

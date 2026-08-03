@@ -66,7 +66,7 @@ import {
 } from "@/lib/game/happyHour";
 import { SEASON_PASS_XP_MAX } from "@/lib/game/seasonPass";
 import { ACHIEVEMENT_BY_KEY, GLORY_KEYS } from "@/lib/game/achievements";
-import { lastDailyUpdate } from "@/lib/game/time";
+import { formatGameDateTime, lastDailyUpdate } from "@/lib/game/time";
 import {
   DEFAULT_TUNABLES,
   getTunables,
@@ -2830,6 +2830,162 @@ export async function deleteGuild(
     });
     revalidatePath("/admin/guilds");
     return { success: "הברית פורקה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/* ============================================================= */
+/*                        GUILD WAR                              */
+/* ============================================================= */
+
+/** Revalidate everything a war row is visible through. */
+function revalidateWarScreens() {
+  revalidatePath("/admin/war");
+  // The arena, plus the "war is on" badge the game layout renders from a live
+  // war row.
+  revalidatePath("/game", "layout");
+}
+
+/**
+ * Call off a war that has not been decided — the campaign running right now, or
+ * the next bell still taking enrolments — by deleting it outright.
+ *
+ * Deleting rather than flipping the status to CANCELLED is the point. That
+ * status is the *game's* verdict on a night too few guilds turned up for, and
+ * the board keeps showing it for three hours so the lone guild understands why
+ * it was paid nothing. An admin calling a war off has nothing to explain on the
+ * board — the enrolled guilds are told by message, here — while a surviving row
+ * is a row the screen keeps showing and the lazy clock keeps picking up.
+ *
+ * Nothing is clawed back because nothing was paid: ranks and prizes are only
+ * written at settlement, which by definition has not run for a SCHEDULED war.
+ */
+export async function cancelGuildWar(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+
+    const war = await prisma.guildWar.findUnique({
+      where: { id },
+      select: {
+        startsAt: true,
+        status: true,
+        entries: { select: { guildId: true } },
+      },
+    });
+    if (!war) return { error: "המלחמה לא נמצאה" };
+    if (war.status !== "SCHEDULED") {
+      return { error: "המלחמה כבר הוכרעה — אפשר רק למחוק אותה" };
+    }
+
+    // The guilds' *current* rosters, not the enrolled ones: this is a notice,
+    // not a payout, and whoever is in the guild now is who turns up to find the
+    // arena empty tonight.
+    const guildIds = war.entries.map((entry) => entry.guildId);
+    const members =
+      guildIds.length > 0
+        ? await prisma.guildMember.findMany({
+            where: { guildId: { in: guildIds } },
+            select: { empireId: true },
+          })
+        : [];
+
+    const when = formatGameDateTime(war.startsAt);
+
+    await prisma.$transaction(
+      async (tx) => {
+        if (members.length > 0) {
+          await tx.message.createMany({
+            data: members.map((member) => ({
+              empireId: member.empireId,
+              kind: "SYSTEM" as const,
+              title: "🏳️ מלחמת הבריתות בוטלה",
+              body: `המלחמה שנקבעה ל-${when} בוטלה על ידי הנהלת המשחק. ההרשמה נמחקה ולא חולקו פרסים — אפשר להירשם מחדש למלחמה הבאה.`,
+              href: "/game/war",
+            })),
+          });
+        }
+        // Entries and clashes cascade on warId. If a catch-up is mid-flight
+        // this waits on the row lock advanceWar holds, and a catch-up that
+        // starts after the delete simply finds no war and stops.
+        await tx.guildWar.delete({ where: { id } });
+      },
+      { timeout: 20_000, maxWait: 10_000 }
+    );
+
+    await logAdmin(admin, {
+      action: "guildwar.cancel",
+      targetType: "guildWar",
+      targetId: id,
+      summary: `מלחמת בריתות ${when} בוטלה (${guildIds.length} בריתות)`,
+    });
+    revalidateWarScreens();
+    return {
+      success: `המלחמה בוטלה ונמחקה. ${
+        members.length > 0 ? `${members.length} שחקנים קיבלו הודעה.` : "לא הייתה אף הרשמה."
+      }`,
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Delete a war row and everything hanging off it, silently. For clearing out
+ * decided wars — the history nobody reads — where a cancellation notice would
+ * be nonsense.
+ */
+export async function deleteGuildWar(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const id = str(formData, "id");
+    // deleteMany, so a war already swept away by the lazy purge (or by another
+    // admin) reads as "gone" rather than a P2025 the client sees as an error.
+    const { count } = await prisma.guildWar.deleteMany({ where: { id } });
+    if (count === 0) return { error: "המלחמה לא נמצאה" };
+
+    await logAdmin(admin, {
+      action: "guildwar.delete",
+      targetType: "guildWar",
+      targetId: id,
+      summary: "מלחמת בריתות נמחקה",
+    });
+    revalidateWarScreens();
+    return { success: "המלחמה נמחקה" };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
+/**
+ * Wipe every decided war at once. The same housekeeping `purgeOldWars` does on
+ * the clock, without waiting for the results window to run out.
+ */
+export async function purgeFinishedWars(
+  _prev: AdminActionState,
+  _formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const { count } = await prisma.guildWar.deleteMany({
+      where: { status: { in: ["SETTLED", "CANCELLED"] } },
+    });
+    if (count === 0) return { success: "אין מלחמות שהסתיימו למחיקה" };
+
+    await logAdmin(admin, {
+      action: "guildwar.purge",
+      targetType: "guildWar",
+      summary: `נמחקו ${count} מלחמות שהסתיימו`,
+    });
+    revalidateWarScreens();
+    return { success: `${count} מלחמות שהסתיימו נמחקו` };
   } catch (e) {
     return toErr(e);
   }

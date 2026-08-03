@@ -16,6 +16,7 @@ import {
   HERO_STAT_META,
   RARITY_META,
   SLOT_ORDER,
+  atSetCeiling,
   canEquipItem,
   canUpgradeItem,
   heroResetPoints,
@@ -25,6 +26,7 @@ import {
   rollDiscardWheelSpin,
   tierForLevel,
 } from "@/lib/game/hero";
+import { itemSetForLevel } from "@/lib/game/heroSets";
 import { forgeDiscountedCost } from "@/lib/game/potions";
 import { isPotionActive } from "@/lib/game/potionEffects";
 import type { ActionState } from "./game";
@@ -461,7 +463,15 @@ export async function upgradeHeroItem(
       if (!item) return { error: "הפריט לא נמצא בתיק שלך" };
 
       const targetLevel = nextTierLevel(item.level);
-      if (targetLevel === null) return { error: "הפריט כבר ברמה הגבוהה ביותר" };
+      // An אגדי closes its set: there is no higher rung inside the decade, and
+      // gold never carries a piece into the set above it.
+      if (targetLevel === null) {
+        return {
+          error: atSetCeiling(item.level)
+            ? `אגדי הוא שיא הסט "${itemSetForLevel(item.level).label}" — הסט הבא מגיע כשלל בקרב`
+            : "הפריט כבר ברמה הגבוהה ביותר",
+        };
+      }
 
       // Can't push an item above the hero's own level.
       if (hero.level < targetLevel) {

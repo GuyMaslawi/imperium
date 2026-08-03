@@ -569,7 +569,7 @@ export async function castCityDowngradeSpell(
 
       const to = empire.cities - 1;
       return {
-        success: `ירדת לעיר ${to} — ${cityName(to)}. הקסם יהיה זמין שוב בעוד ${CITY_DOWNGRADE_COOLDOWN_HOURS} שעה.`,
+        success: `ירדת ל${cityName(to)}. הקסם יהיה זמין שוב בעוד ${CITY_DOWNGRADE_COOLDOWN_HOURS} שעה.`,
       };
     });
 

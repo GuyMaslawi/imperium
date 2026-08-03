@@ -45,13 +45,23 @@ export function cityAt(cities: number): CityName {
   return CITY_NAMES[tier - 1];
 }
 
-/** Just the name — the common case at a call site. */
+/**
+ * "אשמורן (1)" — the name with its tier, the common case at a call site.
+ *
+ * The name alone is a story but not a position: a player reading "תדמור" on a
+ * leaderboard row cannot tell whether that empire is above or below him without
+ * knowing the catalog by heart. The tier rides along in parentheses everywhere
+ * the name is printed, so the ladder stays readable to someone who has only
+ * seen two of the ten cities. Call sites that need the bare name (because they
+ * already print the number themselves, like the guide's city table) reach for
+ * `cityAt(n).name`.
+ */
 export function cityName(cities: number): string {
-  return cityAt(cities).name;
+  const city = cityAt(cities);
+  return `${city.name} (${city.tier})`;
 }
 
-/** "אשמורן · משמר הגבול" — for tooltips that have room for the whole title. */
+/** "אשמורן (1) · משמר הגבול" — for tooltips that have room for the whole title. */
 export function cityFullName(cities: number): string {
-  const city = cityAt(cities);
-  return `${city.name} · ${city.epithet}`;
+  return `${cityName(cities)} · ${cityAt(cities).epithet}`;
 }

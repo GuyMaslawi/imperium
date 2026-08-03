@@ -170,7 +170,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 {boss.title}
               </span>
             </p>
-            <Tip tip={`${boss.name} שולט ב${cityFullName(cities)} — עיר מספר ${cities}.`}>
+            <Tip tip={`${boss.name} שולט ב${cityFullName(cities)}.`}>
               <span className="cursor-help shrink-0 rounded border border-[rgb(var(--boss-accent))]/60 bg-black/60 px-1.5 py-0.5 text-[10px] font-black text-[rgb(var(--boss-accent))]">
                 עיר {cityName(cities)}
               </span>

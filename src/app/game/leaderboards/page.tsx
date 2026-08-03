@@ -7,14 +7,43 @@ import {
   type BoardRow,
 } from "@/server/rankingsLadder";
 import { formatNumber } from "@/lib/game/format";
+import { cityFullName, cityName } from "@/lib/game/cities";
 import { AutoRefresh } from "@/components/game/AutoRefresh";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { PresenceDot } from "@/components/ui/PresenceDot";
+import { Tip } from "@/components/ui/Tip";
 
 export const metadata = { title: "טבלאות מובילים | KRALDOR" };
 
 type Period = "day" | "week";
+
+/**
+ * Which city the row's empire sits in.
+ *
+ * These boards are the only ones in the game that cross cities — the ladder on
+ * /game/rankings is one bucket, so there the city is a page-level fact printed
+ * once in the header. Here every row can be somewhere else, and where a leader
+ * stands is what decides whether the reader can spy on him or raid him at all.
+ * `null` is a raider whose empire no longer exists (see BoardRow.cities).
+ */
+function CityChip({ cities }: { cities: number | null }) {
+  if (cities === null) return null;
+  // shrink-0 on the Tip wrapper too, not just the pill inside it: the wrapper
+  // is the flex child, and without it the row squeezes the chip instead of
+  // truncating the (already truncating) name.
+  return (
+    <Tip
+      className="shrink-0"
+      tip={`${cityFullName(cities)} — ריגול ותקיפה אפשריים רק בתוך העיר שלך.`}
+    >
+      <span className="shrink-0 cursor-help whitespace-nowrap rounded-full border border-border-subtle bg-panel-inset px-1.5 text-[10px] font-semibold text-zinc-400">
+        <Icon name="base" size={10} className="inline-block align-middle text-crimson-bright" />{" "}
+        {cityName(cities)}
+      </span>
+    </Tip>
+  );
+}
 
 /** A single leaderboard, top players first. */
 function Board({
@@ -79,6 +108,7 @@ function Board({
                       את/ה
                     </span>
                   )}
+                  <CityChip cities={row.cities} />
                 </span>
                 {!hideValue && (
                   <span className="nums inline-flex shrink-0 items-center gap-1 font-bold text-gold-bright" dir="ltr">
@@ -136,7 +166,12 @@ export default async function LeaderboardsPage({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-zinc-400">דירוג גלובלי על פני כל השחקנים במשחק.</p>
+        {/* The scope note earns its keep now that the rows name cities: these
+            boards cross the whole game, so the leader on them is usually
+            somewhere you cannot reach. */}
+        <p className="text-xs text-zinc-400">
+          דירוג גלובלי על פני כל השחקנים במשחק — ליד כל שם מופיעה העיר שבה הוא יושב.
+        </p>
         <Link href="/game/rankings" className="btn btn-ghost px-4 py-2 text-sm">
           <Icon name="base" size={16} className="inline-block align-middle" /> דירוג העיר שלי
         </Link>
@@ -235,6 +270,7 @@ export default async function LeaderboardsPage({
                         את/ה
                       </span>
                     )}
+                    <CityChip cities={row.cities} />
                   </span>
                   <span className="nums inline-flex shrink-0 items-center gap-1 font-bold text-gold-bright" dir="ltr">
                     {formatNumber(row.value)} <Icon name="gold" size={13} className="inline-block align-middle text-gold-bright" />
