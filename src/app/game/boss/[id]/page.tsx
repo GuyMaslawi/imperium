@@ -28,9 +28,12 @@ import {
 } from "@/lib/game/bossBattle";
 import type { BossRoundLogEntry } from "@/server/bossSiege";
 import { cityName } from "@/lib/game/cities";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT, type T } from "@/i18n/server";
 
-export const metadata = { title: "קרב בוס | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("קרב בוס | KRALDOR") };
+}
 
 /** Reward columns, paired with the report field that holds each amount. */
 const REWARD_FIELDS = {
@@ -47,41 +50,41 @@ const REWARD_FIELDS = {
  */
 const ENDING_META: Record<
   BossBattleStatus,
-  { headline: string; tone: string; blurb: (boss: string) => string }
+  { headline: string; tone: string; blurb: (t: T, boss: string) => string }
 > = {
   KILLED: {
     headline: "הבוס הופל",
     tone: "text-emerald-400",
-    blurb: (boss) => `${boss} נפל. מכלאות המצודה נפתחו והאוצר שלו נלקח.`,
+    blurb: (t, boss) => t("{boss} נפל. מכלאות המצודה נפתחו והאוצר שלו נלקח.", { boss }),
   },
   ROUTED: {
     headline: "הצבא נשבר",
     tone: "text-red-500",
-    blurb: (boss) =>
-      `הקו נשבר תחת ${boss} והכוחות נסוגו באמצע הקרב. חצי מהשלל שנצבר אבד עם שיירת האספקה.`,
+    blurb: (t, boss) =>
+      t("הקו נשבר תחת {boss} והכוחות נסוגו באמצע הקרב. חצי מהשלל שנצבר אבד עם שיירת האספקה.", { boss }),
   },
   SPENT: {
     headline: "הקרב נגמר",
     tone: "text-amber-400",
-    blurb: (boss) =>
-      `${boss} עוד עומד, אבל פצוע — והפצעים נשארים עד שהוא נופל. תקוף שוב וסיים את העבודה.`,
+    blurb: (t, boss) =>
+      t("{boss} עוד עומד, אבל פצוע — והפצעים נשארים עד שהוא נופל. תקוף שוב וסיים את העבודה.", { boss }),
   },
   // Kept only so reports written while retreating was a player action still render.
   RETREATED: {
     headline: "נסיגה מסודרת",
     tone: "text-amber-300",
-    blurb: (boss) => `הכוחות נסוגו. ${boss} נשאר פצוע.`,
+    blurb: (t, boss) => t("הכוחות נסוגו. {boss} נשאר פצוע.", { boss }),
   },
   EXPIRED: {
     headline: "הקרב נסגר",
     tone: "text-zinc-400",
-    blurb: (boss) =>
-      `${boss} כבר לא היה שם כשהכוחות הגיעו — הוא נפל או קם לתחייה לפני שהקרב הוכרע. השלל שנצבר שולם.`,
+    blurb: (t, boss) =>
+      t("{boss} כבר לא היה שם כשהכוחות הגיעו — הוא נפל או קם לתחייה לפני שהקרב הוכרע. השלל שנצבר שולם.", { boss }),
   },
   ACTIVE: {
     headline: "הקרב נמשך",
     tone: "text-gold-bright",
-    blurb: () => "הקרב הזה עדיין רץ.",
+    blurb: (t) => t("הקרב הזה עדיין רץ."),
   },
 };
 
@@ -158,10 +161,10 @@ export default async function BossFightPage({
         <div className="flex flex-wrap gap-2">
           <Link href="/game/rankings" className="btn btn-gold px-5 py-2 text-sm">
             <Icon name="rankings" size={16} className="inline-block align-middle" />{" "}
-            {fight.victory ? "חזרה לבוס העיר" : "תקוף שוב"}
+            {fight.victory ? t("חזרה לבוס העיר") : t("תקוף שוב")}
           </Link>
           <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm">
-            <Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס
+            <Icon name="base" size={16} className="inline-block align-middle" /> {t("חזרה לבסיס")}
           </Link>
         </div>
         <p className="nums text-xs text-zinc-500" dir="ltr">
@@ -185,16 +188,16 @@ export default async function BossFightPage({
             className={`text-center text-3xl font-black sm:text-4xl ${ending.tone}`}
             style={{ textShadow: "0 2px 18px rgba(0,0,0,0.8)" }}
           >
-            {ending.headline}
+            {t(ending.headline)}
           </p>
           {grade && (
             <Tip
-              tip={`דירוג הקרב נקבע לפי כמה מהמהלכים הקצינים קראו נכון (תלוי ברמת הגיבור) ולפי הצבא ששרד — והוא מכפיל את אוצר ההפלה ב־×${BOSS_GRADE_BONUS[grade]}. דירוג S דורש לפחות ${BOSS_GRADE_MIN_DECISIONS} סבבים של קריאות נכונות, ולכן הפלה במכה אחת לא מגיעה אליו: קרב שהוכרע מהר לא הספיק להוכיח כלום.`}
+              tip={t("דירוג הקרב נקבע לפי כמה מהמהלכים הקצינים קראו נכון (תלוי ברמת הגיבור) ולפי הצבא ששרד — והוא מכפיל את אוצר ההפלה ב־×{bonus}. דירוג S דורש לפחות {min} סבבים של קריאות נכונות, ולכן הפלה במכה אחת לא מגיעה אליו: קרב שהוכרע מהר לא הספיק להוכיח כלום.", { bonus: BOSS_GRADE_BONUS[grade], min: BOSS_GRADE_MIN_DECISIONS })}
             >
               <span
                 className={`cursor-help rounded-lg border px-3 py-1 text-sm font-black ${GRADE_TONE[grade]}`}
               >
-                דירוג {grade} · {BOSS_GRADE_LABEL[grade]} ×{BOSS_GRADE_BONUS[grade]}
+                {t("דירוג {grade} · {label} ×{bonus}", { grade, label: t(BOSS_GRADE_LABEL[grade]), bonus: BOSS_GRADE_BONUS[grade] })}
               </span>
             </Tip>
           )}
@@ -217,10 +220,10 @@ export default async function BossFightPage({
               />
             </div>
             <p className="max-w-full truncate font-black text-emerald-300">{me.name}</p>
-            <p className="text-[11px] text-zinc-500">{myClassMeta.label} · תוקף</p>
+            <p className="text-[11px] text-zinc-500">{t(myClassMeta.label)} · {t("תוקף")}</p>
           </div>
 
-          <p className="shrink-0 pt-6 text-xs text-zinc-500">מול</p>
+          <p className="shrink-0 pt-6 text-xs text-zinc-500">{t("מול")}</p>
 
           {/* boss side */}
           <div className="flex min-w-0 flex-1 flex-col items-center gap-2 text-center">
@@ -240,7 +243,7 @@ export default async function BossFightPage({
               {boss.name}
             </p>
             <p className="text-[11px] text-zinc-500">
-              {boss.title} · עיר {cityName(t, fight.cityTier)}
+              {t(boss.title)} · {t("עיר {city}", { city: cityName(t, fight.cityTier) })}
             </p>
           </div>
         </div>
@@ -266,7 +269,7 @@ export default async function BossFightPage({
                   −{formatNumber(Math.round(fight.damageDealt))}
                 </span>
                 <span className="text-zinc-500">
-                  נזק בקרב הזה מתוך מאגר של{" "}
+                  {t("נזק בקרב הזה מתוך מאגר של")}{" "}
                   <span className="nums" dir="ltr">
                     {formatNumber(fight.bossMaxHp)}
                   </span>
@@ -292,7 +295,7 @@ export default async function BossFightPage({
                 <span className="nums font-bold text-emerald-300" dir="ltr">
                   {formatNumber(fight.attackerPower)}
                 </span>
-                <span className="text-zinc-500">כוח קרב</span>
+                <span className="text-zinc-500">{t("כוח קרב")}</span>
                 <span className="nums font-bold text-[rgb(var(--boss-accent))]" dir="ltr">
                   {formatNumber(fight.bossPower)}
                 </span>
@@ -302,7 +305,7 @@ export default async function BossFightPage({
         </div>
 
         <p className="relative mt-4 text-center text-sm text-zinc-400">
-          {ending.blurb(boss.name)}
+          {ending.blurb(t, boss.name)}
         </p>
       </div>
 
@@ -314,7 +317,7 @@ export default async function BossFightPage({
         <div className="panel-gold rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
             <Icon name="gold" size={16} className="text-gold-bright" />{" "}
-            {fight.victory ? `אוצר ${boss.name}` : "שלל הקרב"}
+            {fight.victory ? t("אוצר {boss}", { boss: boss.name }) : t("שלל הקרב")}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {BOSS_REWARD_RESOURCES.map((res) => (
@@ -335,7 +338,7 @@ export default async function BossFightPage({
           </div>
           {!fight.victory && (
             <p className="mt-2 text-[11px] text-zinc-500">
-              שולם לפי הנזק שגרמת מתוך מאגר החיים שלו. אוצר ההפלה עצמו עוד מחכה מעבר לשער.
+              {t("שולם לפי הנזק שגרמת מתוך מאגר החיים שלו. אוצר ההפלה עצמו עוד מחכה מעבר לשער.")}
             </p>
           )}
         </div>
@@ -352,7 +355,7 @@ export default async function BossFightPage({
       >
         {(BOSS_CASUALTIES || fight.soldiersLost > 0) && (
           <div className="panel-inset rounded-xl p-4 text-center">
-            <p className="text-xs text-zinc-400">אבדות שלך</p>
+            <p className="text-xs text-zinc-400">{t("אבדות שלך")}</p>
             <p className="nums mt-1 text-xl font-black text-red-400" dir="ltr">
               −{formatNumber(fight.soldiersLost)}{" "}
               <Icon name="army" size={18} className="inline-block align-middle" />
@@ -360,25 +363,25 @@ export default async function BossFightPage({
           </div>
         )}
         <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">סבבים שנלחמו</p>
+          <p className="text-xs text-zinc-400">{t("סבבים שנלחמו")}</p>
           <p className="nums mt-1 text-xl font-black text-gold" dir="ltr">
             {fight.rounds || log.length}
           </p>
           {accuracy != null && (
             <p className="nums mt-0.5 text-[11px] text-zinc-500">
-              <span dir="ltr">{Math.round(accuracy * 100)}%</span> קריאות נכונות
+              <span dir="ltr">{Math.round(accuracy * 100)}%</span> {t("קריאות נכונות")}
             </p>
           )}
         </div>
         <div className="panel-inset rounded-xl p-4 text-center">
-          <p className="text-xs text-zinc-400">תורות שנוצלו</p>
+          <p className="text-xs text-zinc-400">{t("תורות שנוצלו")}</p>
           <p className="nums mt-1 text-xl font-black text-gold" dir="ltr">
             {formatNumber(fight.turnsSpent)}
           </p>
         </div>
         <div className="panel-inset rounded-xl p-4 text-center">
-          <Tip tip="שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.">
-            <p className="cursor-help text-xs text-zinc-400">⛓️ שבויים ששוחררו</p>
+          <Tip tip={t("שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.")}>
+            <p className="cursor-help text-xs text-zinc-400">{t("⛓️ שבויים ששוחררו")}</p>
           </Tip>
           <p className="nums mt-1 text-xl font-black text-emerald-400" dir="ltr">
             +{formatNumber(fight.rewardSlaves)}{" "}
@@ -391,7 +394,7 @@ export default async function BossFightPage({
       {log.length > 0 && (
         <div className="panel rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-            <Icon name="reports" size={16} className="text-gold" /> סבב אחר סבב
+            <Icon name="reports" size={16} className="text-gold" /> {t("סבב אחר סבב")}
           </h3>
           <ul className="space-y-1">
             {log.map((entry) => {
@@ -446,13 +449,13 @@ export default async function BossFightPage({
       {(fight.heroXp > 0 || droppedItem) && (
         <div className="panel rounded-xl p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
-            <Icon name="spark" size={18} className="text-crimson-bright" /> הגיבור שלך
+            <Icon name="spark" size={18} className="text-crimson-bright" /> {t("הגיבור שלך")}
           </h3>
           <div className="flex flex-wrap items-center gap-4">
             {fight.heroXp > 0 && (
-              <Tip tip="ניסיון לגיבור מהקרב הזה, על אותה חלוקה כמו השלל: לפי הנזק שנגרם, ובונוס מלא על ההפלה.">
+              <Tip tip={t("ניסיון לגיבור מהקרב הזה, על אותה חלוקה כמו השלל: לפי הנזק שנגרם, ובונוס מלא על ההפלה.")}>
                 <div className="panel-inset cursor-help rounded-lg p-3 text-center">
-                  <p className="text-[11px] text-zinc-400">ניסיון שהתקבל</p>
+                  <p className="text-[11px] text-zinc-400">{t("ניסיון שהתקבל")}</p>
                   <p className="nums mt-0.5 text-xl font-black text-purple-300" dir="ltr">
                     +{formatNumber(fight.heroXp)}
                   </p>
@@ -472,19 +475,19 @@ export default async function BossFightPage({
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
-                    <Icon name="gift" size={16} className="inline-block align-middle" /> שלל הבוס:{" "}
+                    <Icon name="gift" size={16} className="inline-block align-middle" /> {t("שלל הבוס:")}{" "}
                     {itemDisplayName(t, droppedItem.slot, droppedItem.level)}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
-                    רמת פריט{" "}
+                    {t("רמת פריט")}{" "}
                     <span className="nums" dir="ltr">
                       {droppedItem.level}
                     </span>{" "}
-                    · נוסף לתיק הגיבור
+                    · {t("נוסף לתיק הגיבור")}
                   </p>
                   <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
-                    <Icon name="attack" size={14} className="inline-block align-middle" /> לציוד
-                    הגיבור
+                    <Icon name="attack" size={14} className="inline-block align-middle" /> {t("לציוד הגיבור")}
+
                   </Link>
                 </div>
               </div>

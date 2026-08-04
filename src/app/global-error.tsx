@@ -28,6 +28,9 @@ export default function GlobalError({
     );
   }, [error]);
 
+  // i18n-exempt-start: this boundary replaces the root layout, so it renders
+  // outside LocaleProvider — there is no translator to reach it, and a crash
+  // screen is the one place a fallback language is acceptable.
   return (
     <html lang="he" dir="rtl">
       <body
@@ -71,4 +74,5 @@ export default function GlobalError({
       </body>
     </html>
   );
+  // i18n-exempt-end
 }

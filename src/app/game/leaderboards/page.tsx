@@ -15,7 +15,10 @@ import { PresenceDot } from "@/components/ui/PresenceDot";
 import { Tip } from "@/components/ui/Tip";
 import { getT } from "@/i18n/server";
 
-export const metadata = { title: "טבלאות מובילים | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("טבלאות מובילים | KRALDOR") };
+}
 
 type Period = "day" | "week";
 
@@ -50,7 +53,7 @@ async function CityChip({ cities }: { cities: number | null }) {
 }
 
 /** A single leaderboard, top players first. */
-function Board({
+async function Board({
   title,
   icon,
   iconClass,
@@ -68,6 +71,7 @@ function Board({
   /** Rank the board by value but keep the actual number secret. */
   hideValue?: boolean;
 }) {
+  const t = await getT();
   return (
     <div className="panel-gold flex flex-col rounded-xl p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
@@ -75,7 +79,7 @@ function Board({
         {title}
       </h3>
       {rows.length === 0 ? (
-        <p className="text-sm text-zinc-500">אין נתונים עדיין.</p>
+        <p className="text-sm text-zinc-500">{t("אין נתונים עדיין.")}</p>
       ) : (
         <ol className="space-y-1.5 text-sm">
           {rows.map((row, index) => {
@@ -109,7 +113,7 @@ function Board({
                   </Link>
                   {isMe && (
                     <span className="shrink-0 rounded-full bg-gold/15 px-1.5 text-[10px] font-bold text-gold">
-                      את/ה
+                        {t("את/ה")}
                     </span>
                   )}
                   <CityChip cities={row.cities} />
@@ -141,6 +145,7 @@ export default async function LeaderboardsPage({
 }: {
   searchParams: Promise<{ theft?: string }>;
 }) {
+  const t = await getT();
   const myEmpire = await requireEmpire();
   const { theft } = await searchParams;
   const period: Period = theft === "day" ? "day" : "week";
@@ -165,7 +170,7 @@ export default async function LeaderboardsPage({
       {/* Balances, slaves and plunder all shift constantly — keep the boards live. */}
       <AutoRefresh intervalMs={30_000} />
       <SectionHeading
-        title="טבלאות מובילים"
+        title={t("טבלאות מובילים")}
         ornament={<Icon name="rankings" size={22} className="text-crimson" />}
       />
 
@@ -174,16 +179,16 @@ export default async function LeaderboardsPage({
             boards cross the whole game, so the leader on them is usually
             somewhere you cannot reach. */}
         <p className="text-xs text-zinc-400">
-          דירוג גלובלי על פני כל השחקנים במשחק — ליד כל שם מופיעה העיר שבה הוא יושב.
+            {t("דירוג גלובלי על פני כל השחקנים במשחק — ליד כל שם מופיעה העיר שבה הוא יושב.")}
         </p>
         <Link href="/game/rankings" className="btn btn-ghost px-4 py-2 text-sm">
-          <Icon name="base" size={16} className="inline-block align-middle" /> דירוג העיר שלי
+            <Icon name="base" size={16} className="inline-block align-middle" /> {t("דירוג העיר שלי")}
         </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Board
-          title="עבדים"
+          title={t("עבדים")}
           icon="mine"
           iconClass="text-crimson-bright"
           unit={<Icon name="mine" size={13} className="inline-block align-middle" />}
@@ -192,7 +197,7 @@ export default async function LeaderboardsPage({
           hideValue
         />
         <Board
-          title="הבנק הגדול ביותר"
+          title={t("הבנק הגדול ביותר")}
           icon="bank"
           iconClass="text-gold-bright"
           unit={<Icon name="gold" size={13} className="inline-block align-middle text-gold-bright" />}
@@ -201,7 +206,7 @@ export default async function LeaderboardsPage({
           hideValue
         />
         <Board
-          title="הריגול הגבוה ביותר"
+          title={t("הריגול הגבוה ביותר")}
           icon="spy"
           iconClass="text-crimson-bright"
           unit={<Icon name="spy" size={13} className="inline-block align-middle" />}
@@ -210,7 +215,7 @@ export default async function LeaderboardsPage({
           hideValue
         />
         <Board
-          title="כוח כללי"
+          title={t("כוח כללי")}
           icon="spark"
           iconClass="text-gold-bright"
           unit={<Icon name="spark" size={13} className="inline-block align-middle" />}
@@ -225,26 +230,26 @@ export default async function LeaderboardsPage({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
             <Icon name="attack" size={18} className="text-crimson-bright" />
-            הגניבות הגדולות ביותר
+          {t("הגניבות הגדולות ביותר")}
           </h3>
           <div className="flex gap-1.5">
             <Link
               href="/game/leaderboards?theft=day"
               className={`btn px-3 py-1.5 text-xs ${period === "day" ? "btn-gold" : "btn-ghost"}`}
             >
-              היום
+              {t("היום")}
             </Link>
             <Link
               href="/game/leaderboards?theft=week"
               className={`btn px-3 py-1.5 text-xs ${period === "week" ? "btn-gold" : "btn-ghost"}`}
             >
-              השבוע
+              {t("השבוע")}
             </Link>
           </div>
         </div>
         {theftRows.length === 0 ? (
           <p className="text-sm text-zinc-500">
-            לא נגנב זהב {period === "day" ? "היום" : "השבוע"} עדיין.
+            {period === "day" ? t("לא נגנב זהב היום עדיין.") : t("לא נגנב זהב השבוע עדיין.")}
           </p>
         ) : (
           <ol className="space-y-1.5 text-sm">
@@ -271,7 +276,7 @@ export default async function LeaderboardsPage({
                     </Link>
                     {isMe && (
                       <span className="shrink-0 rounded-full bg-gold/15 px-1.5 text-[10px] font-bold text-gold">
-                        את/ה
+                      {t("את/ה")}
                       </span>
                     )}
                     <CityChip cities={row.cities} />

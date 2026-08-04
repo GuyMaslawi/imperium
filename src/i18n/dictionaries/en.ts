@@ -3194,6 +3194,46 @@ export const EN: Record<string, string> = {
   "הקרב הוכרע בהשוואה ישירה בין שני הסכומים — התוקף מנצח רק אם כוחו גדול ממש מכוח המגן. שוויון נחשב הדיפה.":
     "The battle came down to a straight comparison of the two totals — the attacker wins only if his power is strictly greater. A tie counts as a repulse.",
 
+  /* ------------------------------------------------------------------ */
+  /* the boss battle report                                              */
+  /* ------------------------------------------------------------------ */
+  "הבוס הופל": "The boss has fallen",
+  "{boss} נפל. מכלאות המצודה נפתחו והאוצר שלו נלקח.":
+    "{boss} is down. The keep's pens are open and his treasure is yours.",
+  "הצבא נשבר": "The army broke",
+  "הקו נשבר תחת {boss} והכוחות נסוגו באמצע הקרב. חצי מהשלל שנצבר אבד עם שיירת האספקה.":
+    "The line broke under {boss} and the forces pulled back mid-battle. Half the haul earned was lost with the supply train.",
+  "הקרב נגמר": "The battle is over",
+  "{boss} עוד עומד, אבל פצוע — והפצעים נשארים עד שהוא נופל. תקוף שוב וסיים את העבודה.":
+    "{boss} is still standing, but wounded — and the wounds stay until he falls. Attack again and finish it.",
+  "נסיגה מסודרת": "An orderly retreat",
+  "הכוחות נסוגו. {boss} נשאר פצוע.": "The forces pulled back. {boss} is left wounded.",
+  "הקרב נסגר": "The battle closed",
+  "{boss} כבר לא היה שם כשהכוחות הגיעו — הוא נפל או קם לתחייה לפני שהקרב הוכרע. השלל שנצבר שולם.":
+    "{boss} was no longer there when the forces arrived — he had fallen or risen again before the battle was decided. The haul earned has been paid.",
+  "הקרב נמשך": "The battle runs on",
+  "הקרב הזה עדיין רץ.": "This battle is still running.",
+  "חזרה לבוס העיר": "Back to the city boss",
+  "תקוף שוב": "Attack again",
+  "דירוג הקרב נקבע לפי כמה מהמהלכים הקצינים קראו נכון (תלוי ברמת הגיבור) ולפי הצבא ששרד — והוא מכפיל את אוצר ההפלה ב־×{bonus}. דירוג S דורש לפחות {min} סבבים של קריאות נכונות, ולכן הפלה במכה אחת לא מגיעה אליו: קרב שהוכרע מהר לא הספיק להוכיח כלום.":
+    "The battle grade follows how many moves the officers read right (which comes from the hero's level) and how much of the army survived — and it multiplies the kill treasure by ×{bonus}. An S needs at least {min} rounds read correctly, so a one-blow kill never reaches it: a battle decided that fast proved nothing.",
+  "דירוג {grade} · {label} ×{bonus}": "Grade {grade} · {label} ×{bonus}",
+  "נזק בקרב הזה מתוך מאגר של": "damage in this battle, out of a pool of",
+  "אוצר {boss}": "{boss}'s treasure",
+  "שלל הקרב": "The battle's haul",
+  "שולם לפי הנזק שגרמת מתוך מאגר החיים שלו. אוצר ההפלה עצמו עוד מחכה מעבר לשער.":
+    "Paid on the damage you landed out of his health pool. The kill treasure itself is still waiting behind the gate.",
+  "סבבים שנלחמו": "Rounds fought",
+  "קריאות נכונות": "read correctly",
+  "תורות שנוצלו": "Turns spent",
+  "⛓️ שבויים ששוחררו": "⛓️ Captives freed",
+  "סבב אחר סבב": "Round by round",
+  "הגיבור שלך": "Your hero",
+  "ניסיון לגיבור מהקרב הזה, על אותה חלוקה כמו השלל: לפי הנזק שנגרם, ובונוס מלא על ההפלה.":
+    "Hero experience from this battle, split the same way as the haul: by the damage landed, with the full bonus on the kill.",
+  "ניסיון שהתקבל": "Experience earned",
+  "שלל הבוס:": "Boss drop:",
+
   /* hero gear */
   "ברשותך מאז": "Yours since",
   "לבש {item}": "Equip {item}",

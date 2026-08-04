@@ -14,9 +14,12 @@ import { MarkSeen } from "@/components/game/MarkSeen";
 import { MessageCompose, type PlayerOption } from "@/components/game/MessageCompose";
 import type { MessageKind } from "@prisma/client";
 import type { CSSProperties, ReactNode } from "react";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "הודעות | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("הודעות | קראלדור") };
+}
 
 /** The night sky over the loft — fixed, so SSR and hydration agree. */
 const STARS = [
@@ -43,7 +46,7 @@ const KIND_META: Record<MessageKind, { icon: ReactNode; label: string; tone: str
 };
 
 export default async function MessagesPage() {
-  const { locale } = await getI18n();
+  const { t, locale } = await getI18n();
   const empire = await requireEmpire();
 
   const [messages, roster] = await Promise.all([
@@ -88,7 +91,7 @@ export default async function MessagesPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markMessagesRead} clears="messages" />
-      <SectionHeading title="הודעות" ornament={<Icon name="messages" size={22} className="text-crimson" />} />
+        <SectionHeading title={t("הודעות")} ornament={<Icon name="messages" size={22} className="text-crimson" />} />
 
       {/* -------- the loft --------
           A night sky with couriers crossing it. The wax seal is the one part
@@ -129,7 +132,7 @@ export default async function MessagesPage() {
           </span>
           <div className="text-right">
             <p className="text-base font-bold tracking-wide text-gold-bright">
-              מגדל היונים
+            {t("מגדל היונים")}
             </p>
             <p className="mt-0.5 text-xs text-zinc-400">
               {unread > 0 ? (
@@ -137,15 +140,15 @@ export default async function MessagesPage() {
                   <span className="nums font-bold text-red-300" dir="ltr">
                     {unread}
                   </span>{" "}
-                  הודעות חדשות מתוך{" "}
+              {t("הודעות חדשות מתוך")}{" "}
                 </>
               ) : (
-                "אין דואר חדש — "
+              t("אין דואר חדש — ")
               )}
               <span className="nums font-bold text-zinc-300" dir="ltr">
                 {messages.length}
               </span>{" "}
-              בתיבה
+              {t("בתיבה")}
             </p>
           </div>
         </div>
@@ -153,7 +156,7 @@ export default async function MessagesPage() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-500">
-          תיבת הדואר שלך — הודעות משחקנים והתראות מהמערכת.
+            {t("תיבת הדואר שלך — הודעות משחקנים והתראות מהמערכת.")}
         </p>
         <MessageCompose players={players} />
       </div>
@@ -161,9 +164,9 @@ export default async function MessagesPage() {
       {messages.length === 0 ? (
         <div className="panel-gold rounded-xl p-10 text-center">
           <p className="text-4xl">🕊️</p>
-          <p className="mt-3 font-bold text-zinc-300">אין הודעות עדיין</p>
+            <p className="mt-3 font-bold text-zinc-300">{t("אין הודעות עדיין")}</p>
           <p className="mt-1 text-sm text-zinc-500">
-            הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת יופיעו כאן.
+              {t("הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת יופיעו כאן.")}
           </p>
         </div>
       ) : (
@@ -174,7 +177,7 @@ export default async function MessagesPage() {
             // A PLAYER message whose author was deleted keeps its text but
             // loses the name (the FK is SetNull, not Cascade).
             const from =
-              m.kind === "PLAYER" ? m.sender?.name ?? "שחקן שנמחק" : null;
+              m.kind === "PLAYER" ? m.sender?.name ?? t("שחקן שנמחק") : null;
             // `undefined` for a deleted author, which draws no dot at all — a
             // hollow ring would claim he is merely away. System mail (a battle
             // report, a quest haul) has no sender to be online in the first place.
@@ -199,14 +202,14 @@ export default async function MessagesPage() {
                       <p className="font-bold text-zinc-100">{m.title}</p>
                       {fresh && (
                         <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">
-                          חדש
+                          {t("חדש")}
                         </span>
                       )}
                     </div>
                     {from && (
                       <p className="mt-0.5 flex items-center gap-1.5 text-xs text-emerald-300/90">
                         <span>
-                          מאת{" "}
+                        {t("מאת")}{" "}
                           {/* The name is the way to his dossier — an inbox is
                               where you meet a rival, and answering the letter
                               usually means looking him up first. `senderEmpireId`
@@ -230,7 +233,7 @@ export default async function MessagesPage() {
                     </p>
                     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <span className={`font-semibold ${meta.tone.split(" ")[1]}`}>
-                        {meta.label}
+                        {t(meta.label)}
                       </span>
                       <span className="text-zinc-600" aria-hidden>·</span>
                       <span className="nums text-zinc-500" dir="ltr">
@@ -243,7 +246,7 @@ export default async function MessagesPage() {
                             href={m.href}
                             className="font-bold text-gold-bright hover:text-white"
                           >
-                            לצפייה בדוח המלא ←
+                          {t("לצפייה בדוח המלא")} ←
                           </Link>
                         </>
                       )}
