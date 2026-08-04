@@ -311,10 +311,20 @@ export class PayPlusProvider implements OrderPaymentProvider {
       currency_code: STORE_CURRENCY,
       language_code: "he",
       // Payment *confirmation* mail. Not the tax receipt — that is a separate
-      // PayPlus module ("חשבוניות דיגיטליות") which has to be subscribed and
-      // switched on for this payment page before any document is issued at all.
+      // PayPlus module ("חשבונית+") which has to be subscribed and switched on
+      // for this payment page before any document is issued at all.
       sendEmailApproval: true,
       sendEmailFailure: false,
+      // Issue the tax document for this transaction. PayPlus's own integration
+      // guide ("Website or App" → *Enable Invoice Generation*) names this as the
+      // parameter to send once the invoice module is subscribed, and the field
+      // reference documents its default as `true` — but only *after* the module
+      // is active on this payment page. Sending it explicitly costs nothing and
+      // removes the page's default as a possible reason a receipt never appears.
+      //
+      // It is not sufficient on its own: with no invoicing company connected in
+      // the panel, PayPlus issues no document no matter what this says.
+      initial_invoice: true,
       // ---------------------------------------------------------------- VAT
       // The operator is an **עוסק פטור**: exempt from charging VAT. Left to its
       // default, PayPlus would issue every receipt with VAT broken out — a wrong
@@ -338,11 +348,13 @@ export class PayPlusProvider implements OrderPaymentProvider {
           vat_type: VAT_EXEMPT,
         },
       ],
-      // `charge_method` is deliberately omitted so the page's own configured
-      // method applies. The documented enum is ambiguous about which number is a
-      // plain charge, and guessing wrong here means either a J2-style
-      // authorisation that never captures, or a refund. Set it in the panel.
-      //
+      // 1 = Charge (J4): the card is charged immediately. The enum was once read
+      // as ambiguous here and left to the page's own setting; PayPlus's guide now
+      // spells it out (0 = card check J2, 1 = charge J4, 2 = approval J5,
+      // 3 = recurring, 4 = refund), so it is stated rather than inherited. A page
+      // left on J5 would authorise without capturing — money never taken, and no
+      // tax document, which is one of the ways a receipt silently fails to appear.
+      charge_method: 1,
       // Our purchase row id, echoed back on the callback *and* the only handle
       // `Transactions/View` gives us on this order — see `captureOrder`.
       more_info: input.purchaseId,

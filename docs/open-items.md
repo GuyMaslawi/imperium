@@ -108,15 +108,23 @@ There is no callback secret to invent, unlike Grow: **PayPlus signs the body**
 amount is still re-read from `Transactions/View` before anything is credited —
 a signature proves the message is theirs, not that it is fresh or unique.
 
-Two things to confirm in the panel before the first real charge:
+One thing to confirm in the panel before the first real charge: the success
+**status code** — the code trusts `"000"`, marked `VERIFY:`. It fails **closed**:
+anything unrecognised leaves the purchase PENDING and visible in
+`/admin/purchases` rather than crediting diamonds. (`charge_method` used to be
+left to the page's setting; it is now sent explicitly as `1` — Charge/J4 — since
+PayPlus's guide documents the enum unambiguously.)
 
-1. the payment page's **charge method** — the API call deliberately omits
-   `charge_method` so the page's own setting applies, because the documented enum
-   is ambiguous and guessing wrong yields an authorisation that never captures;
-2. the success **status code** — the code trusts `"000"`, marked `VERIFY:`.
-
-Both fail **closed**: anything unrecognised leaves the purchase PENDING and
-visible in `/admin/purchases` rather than crediting diamonds.
+**Receipts are a panel subscription, not a code path.** The API request already
+sends everything PayPlus's guide asks for — `initial_invoice: true`,
+`paying_vat: false`, `items[].vat_type: 2` (exempt), and a `customer` with a name
+and e-mail — but PayPlus issues no tax document at all until **חשבונית+** (or an
+external invoicing company) is subscribed in the panel *and* enabled on this
+specific payment page, with a document numbering series configured. `sendEmailApproval`
+sends a payment confirmation, which is not a receipt. Once a document does get
+issued, `Invoice/GetDocuments` returns its PDF links (`original_doc_url` /
+`copy_doc_url`) keyed by `transaction_uid` — the way to prove issuance without
+waiting on the buyer's inbox.
 
 Order of operations for go-live: page UID → staging test purchase (PayPlus
 publishes sandbox card numbers) → check the row in `/admin/purchases` and that a

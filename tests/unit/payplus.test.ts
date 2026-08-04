@@ -204,8 +204,12 @@ describe("createOrder", () => {
     expect(sent.refURL_success).toBe("https://kraldor.example/game/diamonds/buy/success");
     // Receipts are a legal obligation for an עוסק פטור, not a nicety.
     expect(sent.sendEmailApproval).toBe(true);
-    // Deliberately absent so the page's configured method applies.
-    expect(sent).not.toHaveProperty("charge_method");
+    // The parameter PayPlus's integration guide names for issuing the document.
+    // It cannot make a receipt appear on its own — the invoice module still has
+    // to be live on the page — but its absence is one reason none would.
+    expect(sent.initial_invoice).toBe(true);
+    // 1 = Charge (J4). A page left on J5 authorises without ever capturing.
+    expect(sent.charge_method).toBe(1);
   });
 
   it("bills as VAT-exempt, because the operator is an עוסק פטור", async () => {
