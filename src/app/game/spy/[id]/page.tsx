@@ -137,13 +137,33 @@ const RESOURCE_LABEL: Record<string, string> = {
 
 /** Display names for the diamond-shop buffs that aren't shields. */
 const BOOST_META: Partial<
-  Record<string, { icon: IconName; label: string; effect: (pct: number) => string }>
+  Record<string, { icon: IconName; label: string; effect: (t: T, pct: number) => string }>
 > = {
-  RESOURCE_BOOST_GOLD: { icon: "gold", label: "האצת מכרה זהב", effect: (p) => `+${p}% תפוקת זהב` },
-  RESOURCE_BOOST_WOOD: { icon: "wood", label: "האצת מכרה עץ", effect: (p) => `+${p}% תפוקת עץ` },
-  RESOURCE_BOOST_IRON: { icon: "iron", label: "האצת מכרה ברזל", effect: (p) => `+${p}% תפוקת ברזל` },
-  RESOURCE_BOOST_STONE: { icon: "stone", label: "האצת מחצבת אבן", effect: (p) => `+${p}% תפוקת אבן` },
-  SHOP_DISCOUNT: { icon: "shop", label: "הנחת חנות", effect: (p) => `${p}% הנחה על רכישות` },
+  RESOURCE_BOOST_GOLD: {
+    icon: "gold",
+    label: "האצת מכרה זהב",
+    effect: (t, p) => t("+{pct}% תפוקת זהב", { pct: p }),
+  },
+  RESOURCE_BOOST_WOOD: {
+    icon: "wood",
+    label: "האצת מכרה עץ",
+    effect: (t, p) => t("+{pct}% תפוקת עץ", { pct: p }),
+  },
+  RESOURCE_BOOST_IRON: {
+    icon: "iron",
+    label: "האצת מכרה ברזל",
+    effect: (t, p) => t("+{pct}% תפוקת ברזל", { pct: p }),
+  },
+  RESOURCE_BOOST_STONE: {
+    icon: "stone",
+    label: "האצת מחצבת אבן",
+    effect: (t, p) => t("+{pct}% תפוקת אבן", { pct: p }),
+  },
+  SHOP_DISCOUNT: {
+    icon: "shop",
+    label: "הנחת חנות",
+    effect: (t, p) => t("{pct}% הנחה על רכישות", { pct: p }),
+  },
 };
 
 /* ============================ the active-effects board ============================ */
@@ -167,8 +187,8 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: "protection",
       icon: "shield",
-      label: "חסינות שחקן חדש",
-      effect: "לא ניתן לתקוף או לרגל אותו כלל",
+      label: t("חסינות שחקן חדש"),
+      effect: t("לא ניתן לתקוף או לרגל אותו כלל"),
       expiresAt: Date.parse(intel.protectedUntil),
       tone: "border-emerald-500/40 bg-emerald-500/10 text-emerald-300",
       critical: true,
@@ -181,8 +201,11 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
       id: `shield-${shield.key}`,
       icon: "shield",
       glyph: <ShieldGlyph shieldKey={shield.key} size={13} />,
-      label: meta.label,
-      effect: shield.key === "resources" ? "ניצחון עליו לא יניב שלל" : "ניצחון עליו לא ישעבד חיילים",
+      label: t(meta.label),
+      effect:
+        shield.key === "resources"
+          ? t("ניצחון עליו לא יניב שלל")
+          : t("ניצחון עליו לא ישעבד חיילים"),
       expiresAt: Date.parse(shield.expiresAt),
       tone: "border-gold/40 bg-gold/10 text-gold-bright",
       critical: true,
@@ -195,8 +218,8 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: "hero-dead",
       icon: "heart",
-      label: "הגיבור מת",
-      effect: "כל בונוסי הגיבור מנוטרלים עד שיקום",
+      label: t("הגיבור מת"),
+      effect: t("כל בונוסי הגיבור מנוטרלים עד שיקום"),
       expiresAt: Date.parse(intel.hero.reviveAt),
       tone: "border-red-500/40 bg-red-500/10 text-red-400",
       critical: true,
@@ -213,7 +236,7 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: `spell-${spell.type}`,
       icon: meta.icon,
-      label: meta.label,
+      label: t(meta.label),
       effect: meta.effectLabel(t, Math.round(spell.pct)),
       expiresAt: Date.parse(spell.expiresAt),
       tone: "border-violet-400/40 bg-violet-500/10 text-violet-300",
@@ -226,8 +249,8 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: `potion-${potion.kind}`,
       icon: "potion",
-      label: meta.label,
-      effect: meta.tagline,
+      label: t(meta.label),
+      effect: t(meta.tagline),
       expiresAt: Date.parse(potion.expiresAt),
       tone: "border-rose-400/40 bg-rose-500/10 text-rose-300",
       critical: potion.kind === "HERO_INVULNERABLE",
@@ -240,8 +263,8 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: `boost-${boost.kind}`,
       icon: meta.icon,
-      label: meta.label,
-      effect: meta.effect(Math.round(boost.magnitude)),
+      label: t(meta.label),
+      effect: meta.effect(t, Math.round(boost.magnitude)),
       expiresAt: Date.parse(boost.expiresAt),
       tone: "border-cyan-400/40 bg-cyan-500/10 text-cyan-300",
     });
@@ -251,8 +274,8 @@ function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
     rows.push({
       id: "hero-quest",
       icon: "quest",
-      label: `מסע הגיבור · דרגה ${intel.hero.quest.tier}`,
-      effect: "הגיבור בדרכים — שלל צפוי לחזור אליו",
+      label: t("מסע הגיבור · דרגה {tier}", { tier: intel.hero.quest.tier }),
+      effect: t("הגיבור בדרכים — שלל צפוי לחזור אליו"),
       expiresAt: Date.parse(intel.hero.quest.endsAt),
       tone: "border-sky-400/40 bg-sky-500/10 text-sky-300",
     });
@@ -298,12 +321,12 @@ export default async function SpyResultPage({
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="דוח ריגול"
+        title={t("דוח ריגול")}
         subtitle={<PlayerLink empireId={foe.id} name={foe.name} />}
         ornament={<Icon name="spy" size={22} className="text-crimson" />}
       />
 
-      <Verdict report={report} foeName={foe.name} />
+      <Verdict report={report} foeName={foe.name} t={t} />
 
       {report.success &&
         (intel ? (
@@ -316,24 +339,28 @@ export default async function SpyResultPage({
             t={t}
           />
         ) : (
-          <LegacyDossier report={report} />
+          <LegacyDossier report={report} t={t} />
         ))}
 
       {/* ------------------------------ actions ------------------------------ */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <p className="nums text-xs text-zinc-500">
           <Icon name="turns" size={13} className="inline-block align-middle" />{" "}
-          <span dir="ltr">{formatDate(report.createdAt, locale)}</span> · {report.turnsSpent} תורות
+          <span dir="ltr">{formatDate(report.createdAt, locale)}</span> ·{" "}
+          {t("{turns} תורות", { turns: report.turnsSpent })}
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href={`/game/empires/${foe.id}`} className="btn btn-gold px-5 py-2 text-sm">
-            <Icon name="attack" size={16} className="inline-block align-middle" /> תקוף את {foe.name}
+            <Icon name="attack" size={16} className="inline-block align-middle" />{" "}
+            {t("תקוף את {foe}", { foe: foe.name })}
           </Link>
           <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm">
-            <Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס
+            <Icon name="base" size={16} className="inline-block align-middle" />{" "}
+            {t("חזרה לבסיס")}
           </Link>
           <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm">
-            <Icon name="reports" size={16} className="inline-block align-middle" /> היסטוריה
+            <Icon name="reports" size={16} className="inline-block align-middle" />{" "}
+            {t("היסטוריה")}
           </Link>
         </div>
       </div>
@@ -346,7 +373,9 @@ export default async function SpyResultPage({
 function Verdict({
   report,
   foeName,
+  t,
 }: {
+  t: T;
   report: {
     success: boolean;
     attackerIntel: number | null;
@@ -369,19 +398,22 @@ function Verdict({
       }`}
     >
       <p className={`text-xl font-black ${report.success ? "text-emerald-300" : "text-red-400"}`}>
-        {report.success ? `הריגול על ${foeName} הצליח! ✅` : "המרגל נתפס! המשימה נכשלה 🚨"}
+        {report.success
+          ? t("הריגול על {foe} הצליח! ✅", { foe: foeName })
+          : t("המרגל נתפס! המשימה נכשלה 🚨")}
       </p>
       <p className="mt-1 text-sm text-zinc-400">
         {report.success
-          ? "כח המודיעין שלך גבר על היעד — התיק המלא לפניך."
-          : "כח המודיעין של היעד גבר — המרגל אבד. שדרג מודיעין, גייס מרגלים או נשקי ריגול."}
+          ? t("כח המודיעין שלך גבר על היעד — התיק המלא לפניך.")
+          : t("כח המודיעין של היעד גבר — המרגל אבד. שדרג מודיעין, גייס מרגלים או נשקי ריגול.")}
       </p>
 
       {report.attackerIntel != null && report.defenderIntel != null && (
         <div className="mx-auto mt-4 max-w-md">
           <div className="mb-1.5 flex items-center justify-between text-[11px]">
             <span className="text-red-400">
-              <Icon name="spy" size={14} className="inline-block align-middle" /> המודיעין שלך{" "}
+              <Icon name="spy" size={14} className="inline-block align-middle" />{" "}
+              {t("המודיעין שלך")}{" "}
               <span className="nums font-bold" dir="ltr">
                 {formatNumber(Math.round(mine))}
               </span>
@@ -390,13 +422,14 @@ function Verdict({
               <span className="nums font-bold" dir="ltr">
                 {formatNumber(Math.round(theirs))}
               </span>{" "}
-              המודיעין שלו <Icon name="shield" size={14} className="inline-block align-middle" />
+              {t("המודיעין שלו")}{" "}
+              <Icon name="shield" size={14} className="inline-block align-middle" />
             </span>
           </div>
           <DuelBar leftPct={myShare} />
           {report.guildBonus ? (
             <p className="nums mt-2 text-[11px] text-violet-300">
-              קסם ברית <span dir="ltr">+{Math.round(report.guildBonus)}%</span>
+              {t("קסם ברית")} <span dir="ltr">+{Math.round(report.guildBonus)}%</span>
             </p>
           ) : null}
         </div>
@@ -413,7 +446,9 @@ function Verdict({
  */
 function LegacyDossier({
   report,
+  t,
 }: {
+  t: T;
   report: {
     revealedGold: number | null;
     revealedWood: number | null;
@@ -426,28 +461,32 @@ function LegacyDossier({
 }) {
   return (
     <>
-      <Card icon="citizens" title="אוכלוסייה" gold>
+      <Card icon="citizens" title={t("אוכלוסייה")} gold>
         <div className="grid grid-cols-3 gap-3">
-          <Tile icon="army" label="חיילים" value={formatNumber(report.revealedSoldiers ?? 0)} />
-          <Tile icon="spy" label="מרגלים" value={formatNumber(report.revealedSpies ?? 0)} />
-          <Tile icon="mine" label="עבדי מכרות" value={formatNumber(report.revealedMineSlaves ?? 0)} />
+          <Tile icon="army" label={t("חיילים")} value={formatNumber(report.revealedSoldiers ?? 0)} />
+          <Tile icon="spy" label={t("מרגלים")} value={formatNumber(report.revealedSpies ?? 0)} />
+          <Tile
+            icon="mine"
+            label={t("עבדי מכרות")}
+            value={formatNumber(report.revealedMineSlaves ?? 0)}
+          />
         </div>
       </Card>
       <Card
         icon="gold"
-        title="משאבים זמינים"
+        title={t("משאבים זמינים")}
         gold
-        hint="משאבים אלה זמינים לביזה — משאבים במחסן מוגנים מפני תקיפה."
+        hint={t("משאבים אלה זמינים לביזה — משאבים במחסן מוגנים מפני תקיפה.")}
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Tile icon="gold" iconClass="text-gold-bright" label="זהב" value={formatNumber(report.revealedGold ?? 0)} tone="text-gold-bright" />
-          <Tile icon="wood" iconClass="text-amber-600" label="עץ" value={formatNumber(report.revealedWood ?? 0)} tone="text-gold-bright" />
-          <Tile icon="iron" iconClass="text-slate-300" label="ברזל" value={formatNumber(report.revealedIron ?? 0)} tone="text-gold-bright" />
-          <Tile icon="stone" iconClass="text-stone-400" label="אבן" value={formatNumber(report.revealedStone ?? 0)} tone="text-gold-bright" />
+          <Tile icon="gold" iconClass="text-gold-bright" label={t("זהב")} value={formatNumber(report.revealedGold ?? 0)} tone="text-gold-bright" />
+          <Tile icon="wood" iconClass="text-amber-600" label={t("עץ")} value={formatNumber(report.revealedWood ?? 0)} tone="text-gold-bright" />
+          <Tile icon="iron" iconClass="text-slate-300" label={t("ברזל")} value={formatNumber(report.revealedIron ?? 0)} tone="text-gold-bright" />
+          <Tile icon="stone" iconClass="text-stone-400" label={t("אבן")} value={formatNumber(report.revealedStone ?? 0)} tone="text-gold-bright" />
         </div>
       </Card>
       <p className="text-center text-xs text-zinc-600">
-        דוח ישן — נאסף לפני שהמרגלים למדו להביא את התיק המלא. רגל שוב כדי לקבל דוח מלא.
+        {t("דוח ישן — נאסף לפני שהמרגלים למדו להביא את התיק המלא. רגל שוב כדי לקבל דוח מלא.")}
       </p>
     </>
   );
@@ -488,15 +527,15 @@ function FullDossier({
       </div>
 
       {/* ---------------- population & stock ---------------- */}
-      <Card icon="citizens" title="אוכלוסייה ומלאי">
+      <Card icon="citizens" title={t("אוכלוסייה ומלאי")}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
-          <Tile icon="citizens" label="אזרחים" value={formatNumber(intel.citizens)} />
-          <Tile icon="army" label={UNIT_META.soldiers.labelPlural} value={formatNumber(intel.army.soldiers)} />
-          <Tile icon="spy" label={UNIT_META.spies.labelPlural} value={formatNumber(intel.army.spies)} />
-          <Tile icon="mine" label={UNIT_META.mineSlaves.labelPlural} value={formatNumber(intel.army.mineSlaves)} />
-          <Tile icon="turns" iconClass="text-emerald-400" label="תורות" value={formatNumber(intel.turns)} tone="text-emerald-400" />
-          <Tile icon="diamond" iconClass="text-cyan-300" label="יהלומים" value={formatNumber(intel.diamonds)} tone="text-cyan-300" />
-          <Tile icon="wheel" label="סיבובי גלגל" value={formatNumber(intel.wheelSpins)} />
+          <Tile icon="citizens" label={t("אזרחים")} value={formatNumber(intel.citizens)} />
+          <Tile icon="army" label={t(UNIT_META.soldiers.labelPlural)} value={formatNumber(intel.army.soldiers)} />
+          <Tile icon="spy" label={t(UNIT_META.spies.labelPlural)} value={formatNumber(intel.army.spies)} />
+          <Tile icon="mine" label={t(UNIT_META.mineSlaves.labelPlural)} value={formatNumber(intel.army.mineSlaves)} />
+          <Tile icon="turns" iconClass="text-emerald-400" label={t("תורות")} value={formatNumber(intel.turns)} tone="text-emerald-400" />
+          <Tile icon="diamond" iconClass="text-cyan-300" label={t("יהלומים")} value={formatNumber(intel.diamonds)} tone="text-cyan-300" />
+          <Tile icon="wheel" label={t("סיבובי גלגל")} value={formatNumber(intel.wheelSpins)} />
         </div>
       </Card>
 
@@ -504,9 +543,11 @@ function FullDossier({
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <Card
           icon="gold"
-          title="אוצר גלוי — זמין לביזה"
+          title={t("אוצר גלוי — זמין לביזה")}
           gold
-          hint={`רק המשאבים שמחוץ למחסן נלקחים בקרב — ${Math.round(plunderRate * 100)}% מהם לתוקף המנצח.`}
+          hint={t("רק המשאבים שמחוץ למחסן נלקחים בקרב — {pct}% מהם לתוקף המנצח.", {
+            pct: Math.round(plunderRate * 100),
+          })}
         >
           <div className="grid grid-cols-2 gap-3">
             {resourceKeys.map((key) => {
@@ -517,13 +558,15 @@ function FullDossier({
                   key={key}
                   icon={ico.name}
                   iconClass={ico.className}
-                  label={RESOURCE_LABEL[key]}
+                  label={t(RESOURCE_LABEL[key])}
                   value={formatNumber(amount)}
                   tone="text-gold-bright"
                   sub={
                     shieldedResources
-                      ? "מוגן במגן משאבים"
-                      : `שלל צפוי ${formatNumber(Math.floor(amount * plunderRate))}`
+                      ? t("מוגן במגן משאבים")
+                      : t("שלל צפוי {amount}", {
+                          amount: formatNumber(Math.floor(amount * plunderRate)),
+                        })
                   }
                 />
               );
@@ -533,17 +576,17 @@ function FullDossier({
 
         <Card
           icon="storage"
-          title="מחסנים — מחוץ להישג יד"
-          hint="מה שנמצא במחסן לא נבזז לעולם. הרמה קובעת את הקיבולת — מחסן מלא מסמן שהיעד עומד לגלוש החוצה."
+          title={t("מחסנים — מחוץ להישג יד")}
+          hint={t("מה שנמצא במחסן לא נבזז לעולם. הרמה קובעת את הקיבולת — מחסן מלא מסמן שהיעד עומד לגלוש החוצה.")}
           aside={
             <span className="nums text-xs font-bold text-zinc-400">
-              סה״כ <span dir="ltr">{formatNumber(totalStored)}</span>
+              {t("סה״כ")} <span dir="ltr">{formatNumber(totalStored)}</span>
             </span>
           }
         >
           <div className="space-y-3">
             {intel.storages.length === 0 && (
-              <p className="text-sm text-zinc-500">אין ליעד מחסנים.</p>
+              <p className="text-sm text-zinc-500">{t("אין ליעד מחסנים.")}</p>
             )}
             {intel.storages.map((storage) => {
               const meta = STORAGE_META[storage.type];
@@ -553,9 +596,9 @@ function FullDossier({
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="flex items-center gap-1.5 text-zinc-300">
                       <Icon name={meta.icon} size={15} className={resourceIcon(meta.resourceKey).className} />
-                      {meta.label}
+                      {t(meta.label)}
                       <span className="nums text-zinc-500">
-                        רמה <span dir="ltr">{storage.level}</span>
+                        {t("רמה")} <span dir="ltr">{storage.level}</span>
                       </span>
                     </span>
                     <span className="nums font-bold text-zinc-200" dir="ltr">
@@ -574,26 +617,28 @@ function FullDossier({
       {intel.bank && (
         <Card
           icon="bank"
-          title="חשבון הבנק"
-          hint="זהב בבנק חסין מביזה לחלוטין — אבל הוא מגלה כמה שווה היעד באמת, וכמה הפקדות נשארו לו עד העדכון היומי הבא."
+          title={t("חשבון הבנק")}
+          hint={t("זהב בבנק חסין מביזה לחלוטין — אבל הוא מגלה כמה שווה היעד באמת, וכמה הפקדות נשארו לו עד העדכון היומי הבא.")}
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Tile
               icon="gold"
               iconClass="text-gold-bright"
-              label="יתרה בבנק"
+              label={t("יתרה בבנק")}
               value={formatNumber(intel.bank.balance)}
               tone="text-gold-bright"
             />
             <Tile
               icon="bank"
-              label="הפקדות שנוצלו"
+              label={t("הפקדות שנוצלו")}
               value={`${intel.bank.depositsUsed} / ${intel.bank.depositsAllowed}`}
-              sub={`נותרו ${Math.max(0, intel.bank.depositsAllowed - intel.bank.depositsUsed)}`}
+              sub={t("נותרו {count}", {
+                count: Math.max(0, intel.bank.depositsAllowed - intel.bank.depositsUsed),
+              })}
             />
             <Tile
               icon="upgrades"
-              label="ריבית יומית"
+              label={t("ריבית יומית")}
               value={`${Math.round(intel.bank.interestPct)}%`}
               tone="text-emerald-400"
             />
@@ -603,48 +648,48 @@ function FullDossier({
 
       {/* ---------------- army & power ---------------- */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card icon="spark" title="כוח האימפריה" gold>
+        <Card icon="spark" title={t("כוח האימפריה")} gold>
           <dl className="space-y-2.5 text-sm">
             <Line
-              label={<><Icon name="attack" size={15} className="inline-block align-middle text-red-400" /> כוח התקפה</>}
+              label={<><Icon name="attack" size={15} className="inline-block align-middle text-red-400" /> {t("כוח התקפה")}</>}
               value={formatNumber(intel.power.attack)}
               tone="text-red-400"
             />
             <Line
-              label={<><Icon name="shield" size={15} className="inline-block align-middle text-sky-300" /> כוח הגנה</>}
+              label={<><Icon name="shield" size={15} className="inline-block align-middle text-sky-300" /> {t("כוח הגנה")}</>}
               value={formatNumber(intel.power.defense)}
               tone="text-sky-300"
             />
             <Line
-              label={<><Icon name="spy" size={15} className="inline-block align-middle text-gold" /> כוח ריגול</>}
+              label={<><Icon name="spy" size={15} className="inline-block align-middle text-gold" /> {t("כוח ריגול")}</>}
               value={formatNumber(intel.power.spy)}
               tone="text-gold"
             />
             <Line
-              label={<><Icon name="army" size={15} className="inline-block align-middle" /> כוח צבאי</>}
+              label={<><Icon name="army" size={15} className="inline-block align-middle" /> {t("כוח צבאי")}</>}
               value={formatNumber(intel.power.military)}
             />
             <Line
-              label={<><Icon name="crown" size={15} className="inline-block align-middle text-gold-bright" /> כוח כללי</>}
+              label={<><Icon name="crown" size={15} className="inline-block align-middle text-gold-bright" /> {t("כוח כללי")}</>}
               value={formatNumber(intel.power.general)}
               tone="text-gold-bright"
             />
             <Line
-              label={<><Icon name="spy" size={15} className="inline-block align-middle text-violet-300" /> מודיעין אפקטיבי</>}
+              label={<><Icon name="spy" size={15} className="inline-block align-middle text-violet-300" /> {t("מודיעין אפקטיבי")}</>}
               value={formatNumber(Math.round(intel.power.intel))}
               tone="text-violet-300"
             />
           </dl>
           <p className="mt-3 text-[11px] text-zinc-500">
-            &quot;מודיעין אפקטיבי&quot; הוא מה שריגול נגדי צריך לעבור — כוח הריגול שלו כפול שדרוג המודיעין.
+            {t("״מודיעין אפקטיבי״ הוא מה שריגול נגדי צריך לעבור — כוח הריגול שלו כפול שדרוג המודיעין.")}
           </p>
           <div className="mt-4">
             <div className="mb-1.5 flex items-center justify-between text-[11px]">
               <span className="text-red-400">
-                <Icon name="attack" size={14} className="inline-block align-middle" /> התקפה
+                <Icon name="attack" size={14} className="inline-block align-middle" /> {t("התקפה")}
               </span>
               <span className="text-sky-300">
-                הגנה <Icon name="shield" size={14} className="inline-block align-middle" />
+                {t("הגנה")} <Icon name="shield" size={14} className="inline-block align-middle" />
               </span>
             </div>
             <DuelBar
@@ -659,8 +704,8 @@ function FullDossier({
 
         <Card
           icon="army"
-          title="מה יש להרוויח"
-          hint="הערכה לפי הכללים הנוכחיים, בהנחת ניצחון בקרב. מגנים בתוקף מאפסים את הרלוונטי מהם."
+          title={t("מה יש להרוויח")}
+          hint={t("הערכה לפי הכללים הנוכחיים, בהנחת ניצחון בקרב. מגנים בתוקף מאפסים את הרלוונטי מהם.")}
         >
           <dl className="space-y-2.5 text-sm">
             {resourceKeys.map((key) => {
@@ -671,7 +716,7 @@ function FullDossier({
                   label={
                     <>
                       <Icon name={ico.name} size={15} className={`inline-block align-middle ${ico.className}`} />{" "}
-                      {RESOURCE_LABEL[key]}
+                      {t(RESOURCE_LABEL[key])}
                     </>
                   }
                   value={
@@ -705,7 +750,7 @@ function FullDossier({
       >
         <div className="space-y-4">
           {WEAPON_CATEGORIES.map((category) => (
-            <ArsenalCategory key={category} category={category} intel={intel} />
+            <ArsenalCategory key={category} category={category} intel={intel} t={t} />
           ))}
         </div>
       </Card>
@@ -913,9 +958,11 @@ function FullDossier({
 function ArsenalCategory({
   category,
   intel,
+  t,
 }: {
   category: WeaponCategory;
   intel: SpyIntel;
+  t: T;
 }) {
   const meta = WEAPON_CATEGORY_META[category];
   const rows = intel.weapons
@@ -933,35 +980,35 @@ function ArsenalCategory({
     <div className="panel-inset rounded-lg p-3">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h4 className="flex items-center gap-2 text-sm font-bold text-gold">
-          <span aria-hidden>{meta.icon}</span> {meta.label}
+          <span aria-hidden>{meta.icon}</span> {t(meta.label)}
           <span className="nums text-xs font-normal text-zinc-500">
-            <span dir="ltr">{formatNumber(totalCount)}</span> פריטים · דרגה פתוחה{" "}
+            <span dir="ltr">{formatNumber(totalCount)}</span> {t("פריטים · דרגה פתוחה")}{" "}
             <span dir="ltr">{unlockedTier}</span>
           </span>
         </h4>
         <span className="nums text-sm font-black text-gold-bright">
-          {meta.powerLabel} <span dir="ltr">{formatNumber(totalPower)}</span>
+          {t(meta.powerLabel)} <span dir="ltr">{formatNumber(totalPower)}</span>
         </span>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-xs text-zinc-500">אין ליעד ולו נשק אחד בקטגוריה הזו.</p>
+        <p className="text-xs text-zinc-500">{t("אין ליעד ולו נשק אחד בקטגוריה הזו.")}</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[26rem] text-right text-xs">
+          <table className="w-full min-w-[26rem] text-start text-xs">
             <thead className="text-zinc-500">
               <tr className="border-b border-border-subtle">
-                <th className="pb-1.5 font-medium">נשק</th>
-                <th className="pb-1.5 font-medium">דרגה</th>
-                <th className="pb-1.5 font-medium">כמות</th>
-                <th className="pb-1.5 font-medium">כוח ליחידה</th>
-                <th className="pb-1.5 font-medium">כוח כולל</th>
+                <th className="pb-1.5 font-medium">{t("נשק")}</th>
+                <th className="pb-1.5 font-medium">{t("דרגה")}</th>
+                <th className="pb-1.5 font-medium">{t("כמות")}</th>
+                <th className="pb-1.5 font-medium">{t("כוח ליחידה")}</th>
+                <th className="pb-1.5 font-medium">{t("כוח כולל")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
                 <tr key={row.def.key} className="border-b border-border-subtle/60 last:border-0">
-                  <td className="py-1.5 font-medium text-zinc-200">{row.def.name}</td>
+                  <td className="py-1.5 font-medium text-zinc-200">{t(row.def.name)}</td>
                   <td className="nums py-1.5 text-zinc-400" dir="ltr">{row.def.tier}</td>
                   <td className="nums py-1.5 font-bold text-zinc-100" dir="ltr">
                     {formatNumber(row.qty)}

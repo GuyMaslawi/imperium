@@ -2666,6 +2666,359 @@ export const EN: Record<string, string> = {
   "סיסמה חדשה חייבת להכיל לפחות 8 תווים":
     "A new password needs at least 8 characters",
 
+  /* ------------------------------------------------------------------ */
+  /* the mines: one card and the rig drawn on it                         */
+  /* ------------------------------------------------------------------ */
+  "שיא": "max",
+  "תפוקה לעדכון רגיל": "Output per regular update",
+  " (כולל בונוסים)": " (bonuses included)",
+  "תפוקה לעבד מכרות": "Output per mine slave",
+  "תפוקת בסיס לעדכון": "Base output per update",
+  "בונוסים פעילים": "Live bonuses",
+  "סה״כ בפועל": "Actual total",
+  "ניהול עובדים (פנויים:": "Crew (free:",
+  "מעדכן...": "Updating…",
+  "עדכן חלוקה": "Update the crew",
+  "המכונה משודרגת למקסימום": "This machine is fully upgraded",
+  "שדרג רמה": "Upgrade a level",
+  "שדרג למקסימום": "Upgrade to max",
+  "{mine} — מושבת, אין עובדים": "{mine} — idle, no crew",
+  "{mine} — {slaves} עובדים, {output} {resource} לעדכון":
+    "{mine} — {slaves} workers, {output} {resource} per update",
+  "מושבת": "IDLE",
+  "המכרה טרם נבנה": "the mine is not built yet",
+  "אין עובדים במכרה": "no crew on the mine",
+  "לעדכון · צוות": "per update · crew",
+
+  /* ------------------------------------------------------------------ */
+  /* composing a message                                                 */
+  /* ------------------------------------------------------------------ */
+  "הודעה חדשה": "New message",
+  "נמען": "Recipient",
+  "נמענים": "Recipients",
+  "הסרת {name}": "Remove {name}",
+  "חיפוש שחקן לפי שם אימפריה": "Search for a player by empire name",
+  "לא נמצא שחקן בשם הזה.": "No player by that name.",
+  "מוצגים {count} השחקנים הראשונים — הקלד שם כדי לחפש בכל המשחק.":
+    "Showing the first {count} players — type a name to search the whole game.",
+  "הגעת למקסימום {max} נמענים בהודעה אחת.":
+    "You have hit the ceiling of {max} recipients in one message.",
+  "נושא": "Subject",
+  "על מה ההודעה?": "What is it about?",
+  "תוכן ההודעה": "The message",
+  "עד {max} תווים": "up to {max} characters",
+  "ההודעה תגיע לתיבת הדואר של הנמענים.":
+    "The message lands in the recipients' inbox.",
+  "שולח...": "Sending…",
+  "שליחה": "Send",
+
+  /* ------------------------------------------------------------------ */
+  /* signing the guild up for the war                                    */
+  /* ------------------------------------------------------------------ */
+  "הרשמה למלחמה הבאה": "Sign up for the next war",
+  "הזירה נפתחת ב־": "the arena opens at",
+  "ונסגרת ב־": "and closes at",
+  "ההרשמה פתוחה תמיד — כל לחיצה רושמת אתכם לקרב הקרוב שטרם התחיל. אחרי זה אין מה לעשות: הקרב מתנהל אוטומטית והמערכת מנהלת אותו לבד.":
+    "Sign-up is always open — one press enters you in the next battle that has not started. After that there is nothing to do: the fight runs automatically and the system handles every clash.",
+  "הפרס מחולק לרוסטר שהיה בברית כשהפעמון צלצל. מי שמצטרף באמצע הקרב נלחם ומוסיף נקודות — אבל מקבל פרס רק מהמלחמה הבאה.":
+    "The prize is split between the roster that was in the guild when the bell rang. Anyone who joins mid-battle fights and adds points — but is only paid from the next war on.",
+  "{guild} רשומה ✓": "{guild} is signed up ✓",
+  "לא רשומים": "Not signed up",
+  "בריתות רשומות:": "Guilds signed up:",
+  "צריך לפחות {min} בריתות — אחרת הקרב מתבטל ואף אחד לא זוכה בכלום.":
+    "At least {min} guilds are needed — otherwise the battle is called off and nobody wins anything.",
+  "מבטל...": "Withdrawing…",
+  "ביטול ההרשמה": "Withdraw",
+  "נרשמים...": "Signing up…",
+  "רשום את {guild} למלחמה": "Sign {guild} up for the war",
+  "רק מנהיג או סגן יכולים לרשום את הברית — ההרשמה מכניסה את כל הרוסטר לזירה למשך חצי שעה, וזו לא החלטה של חבר בודד.":
+    "Only a leader or an officer can sign the guild up — it puts the whole roster in the arena for half an hour, and that is not one member's call.",
+
+  /* ------------------------------------------------------------------ */
+  /* the hero: prestige reset, death and the item catalogue              */
+  /* ------------------------------------------------------------------ */
+  "הגיבור הגיע לרמה {level}!": "Your hero has reached level {level}!",
+  "איפוס הגיבור יחזיר אותו לרמה 1 ויעניק מיד":
+    "Resetting the hero takes him back to level 1 and pays out, at once,",
+  "ו־": "and",
+  "{count} נקודות גיבור": "{count} hero points",
+  ". כל הנקודות שהוקצו יימחקו — אך כל איפוס מוסיף {points} נקודות פתיחה לצמיתות, כך שתחזור לרמה {level} עם":
+    ". Every allocated point is wiped — but each reset permanently adds {points} starting points, so you come back to level {level} with",
+  "{count} נקודות": "{count} points",
+  "הציוד הלבוש נשאר עליך": "The gear you are wearing stays on you",
+  "וממשיך להעניק את מלוא הבונוס — אבל שים לב:":
+    "and keeps paying its full bonus — but note:",
+  "חפץ שתסיר יינעל בתיק עד שתחזור לרמתו":
+    "a piece you take off is locked in the pack until you are back at its level",
+  "🔄 איפוס גיבור": "🔄 Reset the hero",
+  "אישור סופי — אפס!": "Final confirmation — reset!",
+
+  "הגיבור שלך נפל בקרב": "Your hero has fallen in battle",
+  "כל הבונוסים שלו מושבתים": "every bonus he carries is switched off",
+  "כל עוד הוא מת,": "While he is dead,",
+  "אף אחד מהבונוסים שלו אינו פועל": "not one of his bonuses is live",
+  "— הנקודות שהקצית, החפצים שהוא לובש ובונוס המחלקה מושבתים לחלוטין: הצבא שלך נלחם בלעדיו, והמכרות מייצרים בלעדיו. הוא יקום מעצמו כעבור":
+    "— the points you allocated, the gear he wears and the class bonus are all off: your army fights without him, and the mines produce without him. He rises on his own after",
+  "— או מיד, תמורת יהלומים.": "— or at once, for diamonds.",
+  "קם לתחייה מעצמו בעוד": "Rises on his own in",
+  "מחייה...": "Reviving…",
+  "החייאה מיידית ל-100% חיים ·": "Revive at once at 100% health ·",
+  "יש לך": "You have",
+  "יהלומים — חסרים": "diamonds — short by",
+  "לרכישת יהלומים": "Buy diamonds",
+
+  "🎯 חפצים נלכדים בניצחון בתקיפה (סיכוי":
+    "🎯 Gear is taken by winning an attack (a",
+  "ללכידה). ככל שהדרגה נדירה יותר, כך היא נופלת לעיתים רחוקות יותר — הסיכוי בכל תקיפה מנצחת:":
+    "chance of a drop). The rarer the rung, the less often it falls — the odds on every won attack:",
+  "⬆ שדרוג מעלה את רמת החפץ לדרגה הבאה בתוך הסט (וגם את הסטטים), ונעצר באגדי — הסט הבא מגיע רק כשלל · 🔒 = הגיבור שלך (רמה":
+    "⬆ An upgrade raises the item to the next rung inside its set (and its stats with it), and stops at legendary — the next set only arrives as plunder · 🔒 = your hero (level",
+  ") עדיין לא יכול ללבוש · ✓ = נמצא ברשותך":
+    ") cannot wear it yet · ✓ = you own it",
+  "✦ כל עשר רמות מתחלף הסט וכל תשעת החפצים מקבלים מראה חדש, יקר וחזק יותר:":
+    "✦ Every ten levels the set changes and all nine pieces take on a new, richer, stronger look:",
+  "— עד": "— up to",
+  "ברמה 100": "at level 100",
+  " · ועוד ": " · plus ",
+  "נלכד בניצחון בתקיפה על שחקן אחר": "taken by winning an attack on another player",
+
+  "דרישה: גיבור רמה": "Requires: a level",
+  "ממשיך לפעול — אך הסרתו תנעל אותו עד רמה":
+    "still working — but taking it off locks it until level",
+  "✔ לבוש כעת": "✔ worn now",
+  "נמצא ברשותך": "you own this",
+  "רמה {level}": "Level {level}",
+  "נעול — הגיבור ברמה נמוכה מדי": "Locked — your hero's level is too low",
+  "לבוש": "WORN",
+
+  /* ------------------------------------------------------------------ */
+  /* account security and the Discord welcome purse                      */
+  /* ------------------------------------------------------------------ */
+  "שינוי סיסמה": "Change password",
+  "שינוי הסיסמה מנתק את כל המכשירים האחרים המחוברים לחשבון.":
+    "Changing your password signs out every other device on the account.",
+  "סיסמה נוכחית": "Current password",
+  "סיסמה חדשה": "New password",
+  "לפחות 8 תווים": "at least 8 characters",
+  "עדכן סיסמה": "Update password",
+  "אבטחת החשבון": "Account security",
+  "חושד שמישהו אחר נכנס לחשבון שלך? ניתוק מכל המכשירים מבטל מיד כל התחברות קיימת, בכל מכשיר, כולל זה — תצטרך להתחבר מחדש.":
+    "Think someone else has been in your account? Signing out everywhere kills every live session at once, on every device including this one — you will have to sign in again.",
+  "נתק מכל המכשירים": "Sign out everywhere",
+  "אירעה שגיאה": "Something went wrong",
+  "מתנת הצטרפות": "Joining gift",
+  "פעם אחת בלבד, לכל אימפריה:": "Once per empire, and once only:",
+  "יהלומים על הצטרפות לערוץ. אנחנו לא בודקים — סומכים עליכם. מתנת פתיחה, כל עוד הערוץ צעיר.":
+    "diamonds for joining the channel. We do not check — we trust you. An opening gift, while the channel is young.",
+  "המתנה נאספה. תודה שהצטרפת — נתראה בערוץ.":
+    "Gift collected. Thanks for joining — see you in the channel.",
+  "המתנה תיפתח לאיסוף ברגע שהערוץ יעלה לאוויר.":
+    "The gift opens the moment the channel goes live.",
+  "1. פתחו את הערוץ": "1. Open the channel",
+  "2. אספו {count} יהלומים": "2. Collect {count} diamonds",
+
+  /* ------------------------------------------------------------------ */
+  /* the hero's own points, and the two buttons on a rival's row         */
+  /* ------------------------------------------------------------------ */
+  "נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בשורת התכונה מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).":
+    "Points earned from levelling that you have not spent yet. Pressing +1 / +5 on a stat's row commits them for good (they only come back on a level-100 reset).",
+  "נקודות פנויות — כל נקודה ‎+1%": "unspent points — each one is ‎+1%",
+  "אחוז זה מגיע אך ורק מהנקודות שהקצה ({pct}%). חפצי הגיבור אינם משפיעים עליו — הם נספרים בנפרד.":
+    "This percentage comes from allocated points alone ({pct}%). Hero gear does not touch it — that is counted separately.",
+  "אחוז זה מגיע אך ורק מהנקודות שהקצית ({pct}%). חפצי הגיבור אינם משפיעים עליו — ראה ״סך הכל מהגיבור״ למטה.":
+    "This percentage comes from the points you allocated alone ({pct}%). Hero gear does not touch it — see \"Everything the hero pays\" below.",
+  "שים את כל {count} הנקודות ב{stat}": "Put all {count} points into {stat}",
+  "תוקף…": "Attacking…",
+  "עלות תקיפה: {turns} תורות": "Attack costs {turns} turns",
+  "אין לך מספיק תורות לתקיפה": "You do not have enough turns to attack",
+  "תקיפה": "Attack",
+  "{turns} תורות": "{turns} turns",
+  "מרגל…": "Spying…",
+  "עלות ריגול: {turns} תורות": "A spy run costs {turns} turns",
+  "אין לך מספיק תורות לריגול": "You do not have enough turns to spy",
+
+  /* ------------------------------------------------------------------ */
+  /* the season countdown, the update clocks and the alert toasts        */
+  /* ------------------------------------------------------------------ */
+  "ימים": "days",
+  "שעות": "hours",
+  "דקות": "minutes",
+  "שניות": "seconds",
+  "פעמיים ביום (07:30 / 19:30) מגיעים אזרחים חדשים, יהלומים וריבית בבנק, ונפתחות הפקדות חדשות.":
+    "Twice a day (07:30 / 19:30) new citizens, diamonds and bank interest arrive, and fresh deposits open.",
+  "עדכון יומי:": "Daily update:",
+  "כל 5 דקות: המכרות מייצרים משאבים (לפי עבדי המכרות המוצבים) ומתקבלות תורות.":
+    "Every 5 minutes: the mines produce resources (by the slaves assigned to them) and turns arrive.",
+  "עדכון דירוג:": "Regular update:",
+  "מתעדכן…": "Updating…",
+
+  /* ------------------------------------------------------------------ */
+  /* the pass, the command dock, the vault and the player's own blurb    */
+  /* ------------------------------------------------------------------ */
+  "רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד":
+    "One-off purchase · never expires · saves clicks and nothing else",
+  "פותח את כפתורי ״הכל״ שכבר קיימים במשחק — בבנק, במחסנים ובמכרות — ואת כפתור ״מפקדה״ בסרגל העליון שמפעיל אותם מכל מסך. אין כאן פעולה חדשה: כל מצב שהם מגיעים אליו, אפשר להגיע אליו גם ידנית. לא נותן משאבים, לא נותן עוצמה ולא מגן על האימפריה.":
+    "Unlocks the \"all\" buttons the game already has — in the bank, the warehouses and the mines — and the \"Command\" button in the top bar that reaches them from any screen. There is no new action here: every state they reach, you can reach by hand. It grants no resources, no power and no protection.",
+  "הפעולות המהירות פתוחות — פתח את ״מפקדה״ בסרגל העליון":
+    "The quick actions are open — use \"Command\" in the top bar",
+  "רכוש {pass} ·": "Buy {pass} ·",
+  "מפקדה": "Command",
+  "מפקדה מהירה": "Quick command",
+  "אותן פעולות שבעמודי הבנק, המחסנים והייצור — מכל מסך במשחק. כל פעולה מדווחת בדיוק מה קרה.":
+    "The same actions as on the bank, warehouse and production screens — from any screen in the game. Each one reports exactly what it did.",
+
+  "כספת הבנק — {gold} זהב, {pct}% מהזהב שלך":
+    "The bank vault — {gold} gold, {pct}% of everything you hold",
+  "הכספת ריקה": "the vault is empty",
+  "הבנק המרכזי": "The Central Bank",
+  "פעיל · דרגה": "live · tier",
+  "יתרה בבנק": "Balance in the bank",
+  "מהזהב שלך מוגן בכספת · חשוף:": "of your gold is safe in the vault · exposed:",
+  "ריבית:": "Interest:",
+  "בעדכון הבא:": "Next update:",
+
+  "התיאור שלי": "My blurb",
+  "דברי השחקן": "The player's own words",
+  "ערוך": "Edit",
+  "כתוב תיאור": "Write a blurb",
+  "מי אתה, בשביל מה אתה משחק, ולמי כדאי לא להתעסק איתך…":
+    "Who you are, what you play for, and who had better leave you alone…",
+  "נותרו": "Left:",
+  "תווים · התיאור גלוי לכל שחקן שנכנס לפרופיל שלך":
+    "characters · every player who opens your profile can read this",
+  "שומר...": "Saving…",
+  "שמור": "Save",
+  "עוד לא כתבת כלום על עצמך. כל מי שנכנס לפרופיל שלך יראה כאן את מה שתכתוב.":
+    "You have not written anything about yourself yet. Whatever you write here is what visitors to your profile will read.",
+
+  /* ------------------------------------------------------------------ */
+  /* the guild's two upgrade cards, and Happy Hour                       */
+  /* ------------------------------------------------------------------ */
+  "עזרת הברית": "Guild aid",
+  "כל חבר נלחם עם תוספת כוח בקרב — גם כשהוא תוקף וגם כשתוקפים אותו.":
+    "Every member fights with extra power — attacking and defending alike.",
+  "+{pct}% מסך הכוח הכולל של הברית להתקפה ולהגנה":
+    "+{pct}% of the guild's combined power, on attack and on defence",
+  "כל חבר יכול לשדרג — משולם מהזהב הזמין שלך.":
+    "Any member can upgrade it — paid from your own available gold.",
+  "קיבולת הברית": "Guild capacity",
+  "הרחבת הברית מוסיפה מקום לחבר נוסף — עד 10 חברים.":
+    "Expanding the guild makes room for one more member — up to 10.",
+  "מנהיג או סגן בלבד — משולם מהזהב הזמין שלו.":
+    "Leader or officer only — paid from their own available gold.",
+  "מרחיב...": "Expanding…",
+  "הרחב ל־{count}": "Expand to {count}",
+  "קיבולת מקסימלית (10)": "Capacity is maxed (10)",
+
+  "נפתח עכשיו לכל השחקנים": "OPEN NOW TO EVERYONE",
+  "נגמרת בעוד": "Ends in",
+  "— כל תקיפה עכשיו שווה כפליים.": "— every attack is worth double right now.",
+  "רצה עד להודעה חדשה — כל תקיפה עכשיו שווה כפליים.":
+    "Running until further notice — every attack is worth double right now.",
+  "⚔️ קדימה, לניצול!": "⚔️ Go and use it!",
+  "Happy Hour פעיל — {multiplier}": "Happy Hour is live — {multiplier}",
+  "כל השחקנים · עכשיו · אל תבזבז את זה":
+    "everyone · right now · do not waste it",
+  "∞ עד להודעה חדשה": "∞ until further notice",
+
+  /* ------------------------------------------------------------------ */
+  /* signing up, and the guild's own forms                               */
+  /* ------------------------------------------------------------------ */
+  "הקמת אימפריה חדשה": "Found a new empire",
+  "השם שלך": "Your name",
+  "למשל: דוד": "e.g. Alex",
+  "למשל: ממלכת הברזל": "e.g. The Iron Realm",
+  "מקים אימפריה...": "Founding the empire…",
+  "הקם אימפריה": "Found the empire",
+  "כבר יש לך אימפריה?": "Already have an empire?",
+  "התחבר": "Sign in",
+  "בחר את הגיבור שלך": "Choose your hero",
+  "לכל דמות יתרון קבוע משלה — הבחירה מלווה את האימפריה שלך לאורך הדרך.":
+    "Each class carries its own standing advantage — the choice stays with your empire the whole way.",
+  "ברוך הבא, {name}": "Welcome, {name}",
+  "עוד צעד אחד — בחר שם לאימפריה ואת הגיבור שיוביל אותה לקרב.":
+    "One more step — name your empire and pick the hero who will lead it into battle.",
+  "שלח לי קישור חדש": "Send me a new link",
+
+  "שם הברית": "Guild name",
+  "לדוגמה: אבירי השולחן": "e.g. Knights of the Table",
+  "מקים ברית...": "Founding the guild…",
+  "⚒️ שלם {cost}": "⚒️ Pay {cost}",
+  "והקם ברית": "and found the guild",
+  "אין לך מספיק יהלומים להקמת ברית.":
+    "You do not have enough diamonds to found a guild.",
+  "הקמת ברית דורשת משאבים ורצינות. בחר שם בתבונה.":
+    "Founding a guild takes resources and intent. Choose the name wisely.",
+  "שם האימפריה להזמנה": "Empire name to invite",
+  "שם מדויק של השחקן": "the player's exact name",
+  "שלח הזמנה": "Send the invitation",
+  "הברית מלאה — הרחב את הקיבולת כדי להזמין עוד שחקנים.":
+    "The guild is full — expand its capacity to invite more players.",
+  "מנהיג וסגן יכולים להזמין שחקנים שאינם בברית אחרת, ולהרחיק חברים. ההזמנה נשלחת לתיבת ההודעות והשחקן בוחר אם להצטרף.":
+    "A leader or officer can invite players who are not in another guild, and remove members. The invitation lands in the player's inbox and they choose whether to join.",
+  "לדחות את ההזמנה מ״{guild}״? ההזמנה תימחק.":
+    "Decline the invitation from \"{guild}\"? It will be deleted.",
+  "מלאה 🚫": "full 🚫",
+  "מצטרף...": "Joining…",
+  "הצטרף": "Join",
+  "דוחה...": "Declining…",
+  "דחה": "Decline",
+  "אתה החבר האחרון — עזיבה תפרק את הברית והזהב שבקופה יוחזר אליך. להמשיך?":
+    "You are the last member — leaving disbands the guild and returns the treasury's gold to you. Continue?",
+  "לעזוב את הברית?": "Leave the guild?",
+  "עוזב...": "Leaving…",
+  "פרק את הברית": "Disband the guild",
+  "עזוב את הברית": "Leave the guild",
+  "הורד לחבר": "Demote to member",
+  "מנה לסגן": "Promote to officer",
+  "להעביר את הנהגת הברית ל־{name}? אתה תהפוך לסגן.":
+    "Hand the guild's leadership to {name}? You become an officer.",
+  "העבר הנהגה": "Hand over leadership",
+  "להרחיק את {name} מהברית?": "Remove {name} from the guild?",
+  "❌ הרחק": "❌ Remove",
+
+  /* ------------------------------------------------------------------ */
+  /* odds and ends: the admin strip, the boss button, the small chrome   */
+  /* ------------------------------------------------------------------ */
+  "מרכז השליטה — ניהול שחקנים, אימפריות, מתנות, איזון והכרזות":
+    "The control centre — players, empires, gifts, balance and announcements",
+  "מרכז שליטה": "Control centre",
+  "מצב אדמין — אתה משחק בתור": "Admin mode — you are playing as",
+  "כל פעולה תירשם על שם השחקן.": "Every action is recorded under their name.",
+  "חזרה לחשבון האדמין": "Back to the admin account",
+  "הצבא יוצא לדרך…": "The army is marching…",
+  "תקוף שוב את {boss}": "Attack {boss} again",
+  "תקוף את {boss}": "Attack {boss}",
+  "לא ניתן לתקוף כרגע": "You cannot attack right now",
+  "עלות התקיפה: {turns} תורות · הקרב רץ כדקה":
+    "The assault costs {turns} turns · the battle runs about a minute",
+  "היתרה שלך": "Your balance",
+  "הוצאת יהלומים": "Spend diamonds",
+  "רכישת יהלומים": "Buy diamonds",
+  "אימוג׳ים": "Emoji",
+  "קסמים פעילים": "Live spells",
+  "שום אפקט לא פועל עליו כרגע.": "No effect is running on them right now.",
+  "חנות היהלומים נעולה — {note}": "The diamond store is sealed — {note}",
+  "נסה את מזלך!": "Try your luck!",
+  "תוכן המדריך": "Guide contents",
+  "תוכן העניינים": "Contents",
+  "חזרה לתוכן העניינים": "Back to the contents",
+  "דוגמה": "Example",
+  "{unit} — {count} יחידות במסדר": "{unit} — {count} on parade",
+  "{unit} — המסדר ריק": "{unit} — the yard is empty",
+  "המסדר ריק": "the yard is empty",
+  "{store} — {stored} מתוך {capacity}, {pct}% מלא":
+    "{store} — {stored} of {capacity}, {pct}% full",
+  "{days}ד": "{days}d",
+  "פג": "over",
+  "טוען": "Loading",
+  "רק רגע...": "One moment…",
+  "קהילת קראלדור בדיסקורד": "The Kraldor community on Discord",
+  "הנהלת המשחק — {name}": "Game staff — {name}",
+  "הפרופיל של {name}": "{name}'s profile",
+  "מחובר עכשיו": "online now",
+  "לא מחובר עכשיו": "offline",
+
   /* hero gear */
   "ברשותך מאז": "Yours since",
   "לבש {item}": "Equip {item}",

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { formatNumber } from "@/lib/game/format";
 import { useCountUp, type Pulse } from "@/components/ui/motion";
+import { useT } from "@/i18n/client";
 
 /**
  * The parade ground drawn on every training card: a torch-lit yard behind the
@@ -86,6 +87,7 @@ export function MusterYard({ unit, label, owned, power, pulse }: MusterYardProps
     "--unit-glow": tint.glow,
   } as CSSProperties;
 
+  const t = useT();
   return (
     <div
       className={`yard yard-${unit}${pulse ? " yard-active" : ""}`}
@@ -93,8 +95,11 @@ export function MusterYard({ unit, label, owned, power, pulse }: MusterYardProps
       role="img"
       aria-label={
         owned > 0
-          ? `${label} — ${formatNumber(owned)} יחידות במסדר`
-          : `${label} — המסדר ריק`
+          ? t("{unit} — {count} יחידות במסדר", {
+              unit: label,
+              count: formatNumber(owned),
+            })
+          : t("{unit} — המסדר ריק", { unit: label })
       }
     >
       <span className="yard-sky" aria-hidden />
@@ -130,7 +135,7 @@ export function MusterYard({ unit, label, owned, power, pulse }: MusterYardProps
         ))}
       </div>
 
-      {owned <= 0 && <span className="yard-empty">המסדר ריק</span>}
+      {owned <= 0 && <span className="yard-empty">{t("המסדר ריק")}</span>}
 
       {/* -------- the muster roll -------- */}
       <div className="yard-plate">
@@ -145,7 +150,7 @@ export function MusterYard({ unit, label, owned, power, pulse }: MusterYardProps
               <span className="nums" dir="ltr">
                 {formatNumber(owned * power)}
               </span>{" "}
-              עוצמה
+              {t("עוצמה")}
             </>
           ) : null}
         </span>

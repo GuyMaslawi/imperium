@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/i18n/client";
+
 /**
  * Whether a player has the game open right now, drawn the same way everywhere.
  *
@@ -23,7 +27,7 @@
  */
 
 /** The word the dot says out loud, in the tooltip and in the labelled pill. */
-const PRESENCE_WORD = { on: "מחובר עכשיו", off: "לא מחובר" } as const;
+const PRESENCE_WORD = { on: "מחובר עכשיו", off: "לא מחובר עכשיו" } as const;
 
 export function PresenceDot({
   online,
@@ -34,11 +38,12 @@ export function PresenceDot({
   /** Spell it out in a word beside the dot, for surfaces with no legend. */
   label?: boolean;
 }) {
+  const t = useT();
   // Undisclosed presence draws nothing. A hollow dot reads as "this player is
   // away", and some callers genuinely do not know — see searchChatPlayers.
   if (online === undefined) return null;
 
-  const word = online ? PRESENCE_WORD.on : PRESENCE_WORD.off;
+  const word = t(online ? PRESENCE_WORD.on : PRESENCE_WORD.off);
   const dot = (
     <span
       aria-hidden

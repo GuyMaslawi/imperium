@@ -505,7 +505,7 @@ function SidebarContent({
               portrait badge only, and each number appears exactly once. */}
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5">
             <div className="flex min-w-0 items-center justify-between gap-2">
-              <p className="shrink-0 font-bold text-gold-bright">גיבור</p>
+              <p className="shrink-0 font-bold text-gold-bright">{t("גיבור")}</p>
               {/* On the trailing edge, on the same column as the two numbers
                   below it: every row of the card now reads "what it is" on one
                   side and "which one / how much" on the other. */}

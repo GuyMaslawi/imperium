@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/i18n/client";
+
 /**
  * KRALDOR brandmark — "Obsidian & Crimson".
  * A dark imperial crest: an obsidian shield edged in crimson, a bone crown
@@ -62,6 +66,7 @@ export function Logo({
   subtitle?: boolean;
   className?: string;
 }) {
+  const t = useT();
   return (
     <div className={`flex items-center gap-3 ${className ?? ""}`} dir="ltr">
       <LogoMark size={size} />
@@ -77,7 +82,7 @@ export function Logo({
             className="mt-1 tracking-[0.42em] text-bone-dim"
             style={{ fontSize: size * 0.2 }}
           >
-            קראלדור
+            {t("קראלדור")}
           </span>
         )}
       </div>

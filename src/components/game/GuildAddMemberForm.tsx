@@ -6,6 +6,7 @@ import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export interface GuildAddMemberFormProps {
   /** True when every seat is taken — the form disables instead of failing. */
@@ -23,6 +24,7 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
     {}
   );
 
+  const t = useT();
   return (
     <form action={action} className="mt-4 space-y-2">
       <div className="flex flex-wrap items-end gap-2">
@@ -31,7 +33,7 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
             htmlFor="add-member-name"
             className="mb-1.5 block text-xs font-semibold text-gold"
           >
-            שם האימפריה להזמנה
+            {t("שם האימפריה להזמנה")}
           </label>
           <input
             id="add-member-name"
@@ -40,23 +42,24 @@ export function GuildAddMemberForm({ full }: GuildAddMemberFormProps) {
             required
             maxLength={60}
             disabled={full}
-            placeholder="שם מדויק של השחקן"
+            placeholder={t("שם מדויק של השחקן")}
             className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none disabled:opacity-50"
           />
         </div>
         <SubmitButton
           className="btn btn-dark"
           disabled={full}
-          pendingText="שולח..."
+          pendingText={t("שולח...")}
         >
-          <Icon name="citizens" size={14} className="inline-block align-text-bottom text-bone" /> שלח הזמנה
+          <Icon name="citizens" size={14} className="inline-block align-text-bottom text-bone" />{" "}
+          {t("שלח הזמנה")}
         </SubmitButton>
       </div>
 
       <p className="text-[11px] text-zinc-500">
         {full
-          ? "הברית מלאה — הרחב את הקיבולת כדי להזמין עוד שחקנים."
-          : "מנהיג וסגן יכולים להזמין שחקנים שאינם בברית אחרת, ולהרחיק חברים. ההזמנה נשלחת לתיבת ההודעות והשחקן בוחר אם להצטרף."}
+          ? t("הברית מלאה — הרחב את הקיבולת כדי להזמין עוד שחקנים.")
+          : t("מנהיג וסגן יכולים להזמין שחקנים שאינם בברית אחרת, ולהרחיק חברים. ההזמנה נשלחת לתיבת ההודעות והשחקן בוחר אם להצטרף.")}
       </p>
 
       <FormMessage error={state.error} success={state.success} />

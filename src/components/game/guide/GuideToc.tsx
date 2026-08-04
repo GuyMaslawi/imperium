@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export interface TocEntry {
   id: string;
@@ -30,6 +31,7 @@ function jumpTo(id: string) {
  * the "get me back to the index" case instead.
  */
 export function GuideToc({ entries }: { entries: TocEntry[] }) {
+  const t = useT();
   const [active, setActive] = useState("");
 
   useEffect(() => {
@@ -54,10 +56,10 @@ export function GuideToc({ entries }: { entries: TocEntry[] }) {
   }, [entries]);
 
   return (
-    <nav aria-label="תוכן המדריך" className="panel-gold rounded-xl p-3 sm:p-4">
+    <nav aria-label={t("תוכן המדריך")} className="panel-gold rounded-xl p-3 sm:p-4">
       <p className="mb-2.5 flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-gold-dim">
         <span className="rule-gold w-6" />
-        תוכן העניינים
+        {t("תוכן העניינים")}
         <span className="rule-gold flex-1" />
       </p>
       {/* One column until there is room for two. Two columns on a phone leaves
@@ -92,6 +94,7 @@ export function GuideToc({ entries }: { entries: TocEntry[] }) {
  * long enough that scrolling back by hand is a real cost.
  */
 export function BackToTop() {
+  const t = useT();
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
@@ -105,7 +108,7 @@ export function BackToTop() {
     <button
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-      aria-label="חזרה לתוכן העניינים"
+      aria-label={t("חזרה לתוכן העניינים")}
       // Sits a launcher's height above the corner: the chat dock owns the
       // bottom-left of every game screen.
       className={`fixed bottom-20 left-6 z-40 flex h-11 w-11 items-center justify-center rounded-full border border-gold/60 bg-[#12100b]/95 text-gold-bright shadow-[0_8px_30px_rgba(0,0,0,0.8)] transition-all duration-200 hover:border-gold hover:bg-[#1b1710] ${

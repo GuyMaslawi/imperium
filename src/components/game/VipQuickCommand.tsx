@@ -6,6 +6,7 @@ import { Icon } from "@/components/ui/Icon";
 import { VIP_SHORT } from "@/lib/game/vip";
 import { VipQuickActions } from "./VipQuickActions";
 import { VipUpsellDialog } from "./VipUpsellDialog";
+import { useT } from "@/i18n/client";
 
 /**
  * The VIP command post: a chip in the row the season pass and the timers ride
@@ -26,6 +27,7 @@ import { VipUpsellDialog } from "./VipUpsellDialog";
 export function VipQuickCommand({ isVip }: { isVip: boolean }) {
   const [open, setOpen] = useState(false);
 
+  const t = useT();
   return (
     <>
       <button
@@ -34,10 +36,10 @@ export function VipQuickCommand({ isVip }: { isVip: boolean }) {
         className={`btn gap-1.5 px-3 py-1.5 text-sm ${isVip ? "btn-gold" : "btn-dark"}`}
       >
         <Icon name="crown" size={15} aria-hidden />
-        מפקדה
+        {t("מפקדה")}
         {!isVip && (
           <span className="rounded bg-red-500 px-1 text-[9px] font-black text-white">
-            {VIP_SHORT}
+            {t(VIP_SHORT)}
           </span>
         )}
       </button>
@@ -55,11 +57,11 @@ export function VipQuickCommand({ isVip }: { isVip: boolean }) {
               className="flex items-center gap-2 text-lg font-black text-gold-bright"
             >
               <Icon name="crown" size={20} className="text-crimson-bright" />
-              מפקדה מהירה
+              {t("מפקדה מהירה")}
             </h2>
             <button
               onClick={() => setOpen(false)}
-              aria-label="סגור"
+              aria-label={t("סגור")}
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-gold/30 text-sm text-gold-dim transition hover:bg-gold/10 hover:text-gold-bright"
             >
               ✕
@@ -67,8 +69,7 @@ export function VipQuickCommand({ isVip }: { isVip: boolean }) {
           </div>
 
           <p className="mt-1 text-xs text-zinc-400">
-            אותן פעולות שבעמודי הבנק, המחסנים והייצור — מכל מסך במשחק. כל פעולה
-            מדווחת בדיוק מה קרה.
+            {t("אותן פעולות שבעמודי הבנק, המחסנים והייצור — מכל מסך במשחק. כל פעולה מדווחת בדיוק מה קרה.")}
           </p>
           <div className="mt-4">
             <VipQuickActions />

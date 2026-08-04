@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { formatNumber } from "@/lib/game/format";
 import { oreVars, type OreKind } from "./oreTint";
 import { useAfterFirstPaint, type Pulse } from "@/components/ui/motion";
+import { useT } from "@/i18n/client";
 
 /**
  * The warehouse drawn on every storage card: a ribbed silo whose contents rise
@@ -82,12 +83,18 @@ export function StorageSilo({
 
   const crest = resource === "gold" ? LIQUID_CREST : SOLID_CREST;
 
+  const t = useT();
   return (
     <div
       className={`silo${nearFull ? " silo-full" : ""}${pulse ? ` silo-${pulse.kind}` : ""}`}
       style={oreVars(resource)}
       role="img"
-      aria-label={`${label} — ${formatNumber(stored)} מתוך ${formatNumber(capacity)}, ${pct}% מלא`}
+      aria-label={t("{store} — {stored} מתוך {capacity}, {pct}% מלא", {
+        store: label,
+        stored: formatNumber(stored),
+        capacity: formatNumber(capacity),
+        pct,
+      })}
     >
       <span className="silo-floor" aria-hidden />
       <span className="silo-pipe" aria-hidden />
@@ -129,7 +136,7 @@ export function StorageSilo({
               </span>
             </div>
           ) : (
-            <span className="silo-empty">המחסן ריק</span>
+            <span className="silo-empty">{t("המחסן ריק")}</span>
           )}
 
           {TICKS.map((tick) => (

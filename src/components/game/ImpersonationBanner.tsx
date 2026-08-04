@@ -1,5 +1,6 @@
 import { readImpersonationReturn } from "@/lib/auth";
 import { returnToAdmin } from "@/server/actions/impersonation";
+import { getT } from "@/i18n/server";
 
 /**
  * The strip that says "this is not your account".
@@ -13,22 +14,23 @@ export async function ImpersonationBanner({ empireName }: { empireName: string }
   const ticket = await readImpersonationReturn();
   if (!ticket) return null;
 
+  const t = await getT();
   return (
     <div
       dir="rtl"
       className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 border-b border-crimson/40 bg-crimson/20 px-3 py-1.5 text-center text-xs text-amber-100"
     >
       <span>
-        <span aria-hidden>👁️</span> מצב אדמין — אתה משחק בתור{" "}
-        <strong className="text-gold-bright">{empireName}</strong>. כל פעולה
-        תירשם על שם השחקן.
+        <span aria-hidden>👁️</span> {t("מצב אדמין — אתה משחק בתור")}{" "}
+        <strong className="text-gold-bright">{empireName}</strong>.{" "}
+        {t("כל פעולה תירשם על שם השחקן.")}
       </span>
       <form action={returnToAdmin}>
         <button
           type="submit"
           className="rounded-md border border-gold/50 px-2 py-0.5 font-bold text-gold-bright transition-colors hover:bg-gold/15"
         >
-          חזרה לחשבון האדמין
+          {t("חזרה לחשבון האדמין")}
         </button>
       </form>
     </div>

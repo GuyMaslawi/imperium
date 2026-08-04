@@ -4,8 +4,10 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { attackEmpire, type ActionState } from "@/server/actions/game";
 import { ATTACK_TURN_COST } from "@/lib/game/constants";
+import { useT } from "@/i18n/client";
 
 function SubmitButton({ label, disabled }: { label: string; disabled: boolean }) {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <button
@@ -13,12 +15,12 @@ function SubmitButton({ label, disabled }: { label: string; disabled: boolean })
       disabled={pending || disabled}
       title={
         disabled
-          ? "אין לך מספיק תורות לתקיפה"
-          : `עלות תקיפה: ${ATTACK_TURN_COST} תורות`
+          ? t("אין לך מספיק תורות לתקיפה")
+          : t("עלות תקיפה: {turns} תורות", { turns: ATTACK_TURN_COST })
       }
       className="btn btn-gold px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-45"
     >
-      {pending ? "תוקף…" : label}
+      {pending ? t("תוקף…") : t(label)}
     </button>
   );
 }

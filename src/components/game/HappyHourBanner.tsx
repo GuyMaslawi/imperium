@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useScrollLock } from "@/components/ui/scrollLock";
 import { pollHappyHour, type HappyHourState } from "@/server/actions/happyHour";
 import { HAPPY_HOUR_EFFECTS } from "@/lib/game/happyHour";
+import { useDir, useT } from "@/i18n/client";
 
 /**
  * Happy Hour, as players meet it.
@@ -136,6 +137,7 @@ function EffectChips({
  * Escape, or just waiting — because it is an announcement, not a decision.
  */
 function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void }) {
+  const t = useT();
   const [leaving, setLeaving] = useState(false);
   const closed = useRef(false);
 
@@ -199,7 +201,7 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
           className="hh-rise text-sm font-black tracking-[0.4em] text-amber-300"
           style={{ ["--hh-delay" as string]: "0.15s" }}
         >
-          נפתח עכשיו לכל השחקנים
+          {t("נפתח עכשיו לכל השחקנים")}
         </p>
 
         <p className="hh-takeover-mult nums" dir="ltr">
@@ -210,7 +212,7 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
           className="hh-rise text-4xl font-black tracking-wide text-gold-bright sm:text-5xl"
           style={{ ["--hh-delay" as string]: "0.5s" }}
         >
-          {state.title}
+          {t(state.title)}
         </h2>
 
         <div className="hh-rise" style={{ ["--hh-delay" as string]: "0.7s" }}>
@@ -223,7 +225,7 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
         >
           {state.endsAt != null ? (
             <>
-              נגמרת בעוד{" "}
+              {t("נגמרת בעוד")}{" "}
               <span className="text-gold-bright">
                 <Countdown
                   endsAt={state.endsAt}
@@ -231,10 +233,10 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
                   onExpire={close}
                 />
               </span>{" "}
-              — כל תקיפה עכשיו שווה כפליים.
+              {t("— כל תקיפה עכשיו שווה כפליים.")}
             </>
           ) : (
-            "רצה עד להודעה חדשה — כל תקיפה עכשיו שווה כפליים."
+            t("רצה עד להודעה חדשה — כל תקיפה עכשיו שווה כפליים.")
           )}
         </p>
 
@@ -244,7 +246,7 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
           className="hh-rise btn btn-gold px-8 py-3 text-base"
           style={{ ["--hh-delay" as string]: "1s" }}
         >
-          ⚔️ קדימה, לניצול!
+          {t("⚔️ קדימה, לניצול!")}
         </button>
       </div>
     </div>,
@@ -258,6 +260,8 @@ function Takeover({ state, onDone }: { state: HappyHourState; onDone: () => void
  * is one idle poll.
  */
 export function HappyHourBanner({ initial }: { initial: HappyHourState | null }) {
+  const t = useT();
+  const dir = useDir();
   const router = useRouter();
   const [state, setState] = useState<HappyHourState | null>(initial);
   const [takeoverId, setTakeoverId] = useState<string | null>(null);
@@ -324,9 +328,11 @@ export function HappyHourBanner({ initial }: { initial: HappyHourState | null })
       )}
 
       <section
-        dir="rtl"
+        dir={dir}
         className="hh-banner mb-5 p-4"
-        aria-label={`Happy Hour פעיל — ${state.multiplierLabel}`}
+        aria-label={t("Happy Hour פעיל — {multiplier}", {
+          multiplier: state.multiplierLabel,
+        })}
       >
         {Array.from({ length: 9 }).map((_, i) => (
           <span
@@ -352,10 +358,10 @@ export function HappyHourBanner({ initial }: { initial: HappyHourState | null })
             <div className="min-w-0">
               <p className="flex items-center gap-2 text-lg font-black leading-tight text-gold-bright sm:text-xl">
                 <span aria-hidden>🔥</span>
-                <span className="truncate">{state.title}</span>
+                <span className="truncate">{t(state.title)}</span>
               </p>
               <p className="text-xs font-bold text-amber-100">
-                כל השחקנים · עכשיו · אל תבזבז את זה
+                {t("כל השחקנים · עכשיו · אל תבזבז את זה")}
               </p>
             </div>
           </div>
@@ -378,7 +384,7 @@ export function HappyHourBanner({ initial }: { initial: HappyHourState | null })
               </span>
             ) : (
               <span className="shrink-0 rounded-lg border border-gold/60 bg-black/45 px-3 py-1.5 text-sm font-black text-gold-bright">
-                ∞ עד להודעה חדשה
+                {t("∞ עד להודעה חדשה")}
               </span>
             )}
           </div>

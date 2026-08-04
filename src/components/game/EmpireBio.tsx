@@ -8,6 +8,7 @@ import { charCount, clampChars } from "@/lib/game/text";
 import { Icon } from "@/components/ui/Icon";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { useT } from "@/i18n/client";
 
 /**
  * The player's own words, under the records case on their dossier.
@@ -38,6 +39,7 @@ export function EmpireBio({
   isMe: boolean;
   className?: string;
 }) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     saveEmpireBio,
     {}
@@ -69,7 +71,7 @@ export function EmpireBio({
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
           <Icon name="reports" size={16} className="text-gold" />
-          {isMe ? "התיאור שלי" : "דברי השחקן"}
+          {isMe ? t("התיאור שלי") : t("דברי השחקן")}
         </h2>
         {isMe && !editing && (
           <button
@@ -80,7 +82,7 @@ export function EmpireBio({
             }}
             className="cursor-pointer text-xs font-semibold text-gold hover:text-gold-bright"
           >
-            {bio ? "ערוך" : "כתוב תיאור"}
+            {bio ? t("ערוך") : t("כתוב תיאור")}
           </button>
         )}
       </div>
@@ -93,18 +95,18 @@ export function EmpireBio({
             autoFocus
             value={draft}
             onChange={(e) => setDraft(clampChars(e.target.value, BIO_MAX))}
-            placeholder="מי אתה, בשביל מה אתה משחק, ולמי כדאי לא להתעסק איתך…"
+            placeholder={t("מי אתה, בשביל מה אתה משחק, ולמי כדאי לא להתעסק איתך…")}
             className="w-full resize-y rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none"
           />
           <p className="text-[11px] text-zinc-500">
-            נותרו{" "}
+            {t("נותרו")}{" "}
             <span className="nums font-bold text-zinc-300" dir="ltr">
               {left}
             </span>{" "}
-            תווים · התיאור גלוי לכל שחקן שנכנס לפרופיל שלך
+            {t("תווים · התיאור גלוי לכל שחקן שנכנס לפרופיל שלך")}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <SubmitButton pendingText="שומר...">שמור</SubmitButton>
+            <SubmitButton pendingText={t("שומר...")}>{t("שמור")}</SubmitButton>
             <button
               type="button"
               onClick={() => {
@@ -113,7 +115,7 @@ export function EmpireBio({
               }}
               className="btn btn-ghost px-3 py-2 text-sm"
             >
-              ביטול
+              {t("ביטול")}
             </button>
           </div>
         </form>
@@ -123,7 +125,7 @@ export function EmpireBio({
         </p>
       ) : (
         <p className="text-sm text-zinc-500">
-          עוד לא כתבת כלום על עצמך. כל מי שנכנס לפרופיל שלך יראה כאן את מה שתכתוב.
+          {t("עוד לא כתבת כלום על עצמך. כל מי שנכנס לפרופיל שלך יראה כאן את מה שתכתוב.")}
         </p>
       )}
 

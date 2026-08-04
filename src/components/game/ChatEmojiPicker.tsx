@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useT } from "@/i18n/client";
 
 /**
  * The chat's emoji tray.
@@ -76,6 +77,7 @@ const MARGIN = 8;
  * instead of to whatever box happens to contain the button.
  */
 export function ChatEmojiPicker({ onPick }: { onPick: (emoji: string) => void }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [group, setGroup] = useState(GROUPS[0]!.key);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -173,7 +175,7 @@ export function ChatEmojiPicker({ onPick }: { onPick: (emoji: string) => void })
         ref={buttonRef}
         type="button"
         onClick={() => setOpen((was) => !was)}
-        aria-label="אימוג׳ים"
+        aria-label={t("אימוג׳ים")}
         aria-expanded={open}
         className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg transition-colors ${
           open

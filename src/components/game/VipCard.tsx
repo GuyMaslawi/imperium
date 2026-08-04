@@ -37,7 +37,7 @@ export function VipCard({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
           <Icon name="crown" size={20} className="text-crimson-bright" />
-          {VIP_LABEL}
+          {t(VIP_LABEL)}
           <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
             VIP
           </span>
@@ -51,16 +51,13 @@ export function VipCard({
           </span>
         ) : (
           <span className="text-[11px] text-zinc-500">
-            רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד
+            {t("רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד")}
           </span>
         )}
       </div>
 
       <p className="mt-2 text-sm text-zinc-300">
-        פותח את כפתורי ״הכל״ שכבר קיימים במשחק — בבנק, במחסנים ובמכרות — ואת
-        כפתור ״מפקדה״ בסרגל העליון שמפעיל אותם מכל מסך. אין כאן פעולה חדשה: כל
-        מצב שהם מגיעים אליו, אפשר להגיע אליו גם ידנית. לא נותן משאבים, לא נותן
-        עוצמה ולא מגן על האימפריה.
+        {t("פותח את כפתורי ״הכל״ שכבר קיימים במשחק — בבנק, במחסנים ובמכרות — ואת כפתור ״מפקדה״ בסרגל העליון שמפעיל אותם מכל מסך. אין כאן פעולה חדשה: כל מצב שהם מגיעים אליו, אפשר להגיע אליו גם ידנית. לא נותן משאבים, לא נותן עוצמה ולא מגן על האימפריה.")}
       </p>
 
       <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -73,10 +70,10 @@ export function VipCard({
             />
             <span className="min-w-0">
               <span className="block text-sm font-bold text-gold-bright">
-                {perk.title}
+                {t(perk.title)}
               </span>
               <span className="block text-[11px] leading-snug text-zinc-400">
-                {perk.desc}
+                {t(perk.desc)}
               </span>
             </span>
           </div>
@@ -86,7 +83,7 @@ export function VipCard({
       {owned ? (
         <p className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-400">
           <Icon name="crown" size={16} />
-          הפעולות המהירות פתוחות — פתח את ״מפקדה״ בסרגל העליון
+          {t("הפעולות המהירות פתוחות — פתח את ״מפקדה״ בסרגל העליון")}
         </p>
       ) : (
         <form className="mt-4">
@@ -94,11 +91,11 @@ export function VipCard({
             className="btn btn-gold w-full px-4 py-2.5 font-black"
             formAction={action}
             disabled={diamonds < VIP_COST}
-            pendingText="רוכש..."
+            pendingText={t("רוכש...")}
           >
             <span className="flex items-center justify-center gap-1.5">
               <Icon name="crown" size={16} />
-              רכוש {VIP_LABEL} ·
+              {t("רכוש {pass} ·", { pass: t(VIP_LABEL) })}
               <span className="nums inline-flex items-center gap-1" dir="ltr">
                 {VIP_COST}
                 <Icon name="diamond" size={14} className="text-cyan-100" />

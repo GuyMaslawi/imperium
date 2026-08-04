@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useT } from "@/i18n/client";
 
 /**
  * The chains and the padlock that seal the diamond store while real-money
@@ -36,11 +37,12 @@ export function StoreSeal({
   const uid = useId().replace(/:/g, "");
   const [tugs, setTugs] = useState(0);
 
+  const t = useT();
   return (
     <button
       type="button"
       onClick={() => setTugs((n) => n + 1)}
-      aria-label={`חנות היהלומים נעולה — ${note}`}
+      aria-label={t("חנות היהלומים נעולה — {note}", { note })}
       className="seal"
     >
       {/* Keyed on the tug count so an impatient player gets a rattle per

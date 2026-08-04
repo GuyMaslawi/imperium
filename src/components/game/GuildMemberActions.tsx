@@ -10,6 +10,7 @@ import {
 import type { ActionState } from "@/server/actions/game";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export interface GuildMemberActionsProps {
   targetEmpireId: string;
@@ -29,6 +30,7 @@ export function GuildMemberActions({
   targetRole,
   viewerRole,
 }: GuildMemberActionsProps) {
+  const t = useT();
   const [kickState, kickAction] = useActionState<ActionState, FormData>(
     kickGuildMember,
     {}
@@ -72,11 +74,13 @@ export function GuildMemberActions({
           >
             {targetRole === "DEPUTY" ? (
               <>
-                <Icon name="army" size={13} className="inline-block align-text-bottom" /> הורד לחבר
+                <Icon name="army" size={13} className="inline-block align-text-bottom" />{" "}
+                {t("הורד לחבר")}
               </>
             ) : (
               <>
-                <Icon name="spark" size={13} className="inline-block align-text-bottom" /> מנה לסגן
+                <Icon name="spark" size={13} className="inline-block align-text-bottom" />{" "}
+                {t("מנה לסגן")}
               </>
             )}
           </SubmitButton>
@@ -85,11 +89,12 @@ export function GuildMemberActions({
             className="btn btn-ghost px-2 py-1 text-[11px]"
             formAction={transferAction}
             onClick={confirmClick(
-              `להעביר את הנהגת הברית ל־${targetName}? אתה תהפוך לסגן.`
+              t("להעביר את הנהגת הברית ל־{name}? אתה תהפוך לסגן.", { name: targetName })
             )}
             pendingText="..."
           >
-            <Icon name="crown" size={13} className="inline-block align-text-bottom" /> העבר הנהגה
+            <Icon name="crown" size={13} className="inline-block align-text-bottom" />{" "}
+            {t("העבר הנהגה")}
           </SubmitButton>
         </>
       )}
@@ -98,10 +103,10 @@ export function GuildMemberActions({
           variant="danger"
           className="px-2 py-1 text-[11px]"
           formAction={kickAction}
-          onClick={confirmClick(`להרחיק את ${targetName} מהברית?`)}
+          onClick={confirmClick(t("להרחיק את {name} מהברית?", { name: targetName }))}
           pendingText="..."
         >
-          ❌ הרחק
+          {t("❌ הרחק")}
         </SubmitButton>
       )}
       {error && <span className="text-[10px] text-red-400">{error}</span>}

@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useT } from "@/i18n/client";
 
 /**
  * Loading-state primitives.
@@ -46,8 +49,9 @@ export function SkeletonPage({
   children: ReactNode;
   className?: string;
 }) {
+  const t = useT();
   return (
-    <div role="status" aria-busy="true" aria-label="טוען" className={className}>
+    <div role="status" aria-busy="true" aria-label={t("טוען")} className={className}>
       {children}
     </div>
   );

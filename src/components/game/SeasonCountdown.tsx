@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useT } from "@/i18n/client";
 
 /**
  * The countdown to the next season, on the sealed-season screen.
@@ -59,20 +60,22 @@ export function SeasonCountdown({
     };
   }, [arrived, router]);
 
+  const t = useT();
+
   if (arrived) {
     return (
       <p className="ssn-opening text-sm font-bold text-gold-bright">
-        {arrivedLabel}
+        {t(arrivedLabel)}
       </p>
     );
   }
 
   const total = Math.floor(remaining / 1000);
   const parts = [
-    { label: "ימים", value: Math.floor(total / 86400) },
-    { label: "שעות", value: Math.floor((total % 86400) / 3600) },
-    { label: "דקות", value: Math.floor((total % 3600) / 60) },
-    { label: "שניות", value: total % 60 },
+    { label: t("ימים"), value: Math.floor(total / 86400) },
+    { label: t("שעות"), value: Math.floor((total % 86400) / 3600) },
+    { label: t("דקות"), value: Math.floor((total % 3600) / 60) },
+    { label: t("שניות"), value: total % 60 },
   ];
 
   return (

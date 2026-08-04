@@ -2,6 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useT } from "@/i18n/client";
 
 const VARIANTS = {
   primary:
@@ -25,6 +26,7 @@ export function SubmitButton({
   variant?: keyof typeof VARIANTS;
   pendingText?: string;
 }) {
+  const t = useT();
   const { pending, action } = useFormStatus();
   // When several buttons in one form each carry their own formAction, only
   // the button whose action is actually submitting shows its pending text.
@@ -37,7 +39,7 @@ export function SubmitButton({
       disabled={pending || disabled}
       className={`rounded-lg px-4 py-2 text-sm transition-colors cursor-pointer disabled:cursor-not-allowed ${VARIANTS[variant]} ${className}`}
     >
-      {showPending ? pendingText : children}
+      {showPending ? t(pendingText) : children}
     </button>
   );
 }

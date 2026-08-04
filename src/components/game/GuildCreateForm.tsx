@@ -10,6 +10,7 @@ import {
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export interface GuildCreateFormProps {
   /** The player's diamond balance — the form disables when it can't cover the cost. */
@@ -20,6 +21,7 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
   const [state, action] = useActionState<ActionState, FormData>(createGuild, {});
   const canAfford = diamonds >= GUILD_CREATION_COST_DIAMONDS;
 
+  const t = useT();
   return (
     <form action={action} className="mt-4 space-y-4">
       <div>
@@ -27,7 +29,7 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
           htmlFor="guild-name"
           className="mb-1.5 block text-sm font-semibold text-gold"
         >
-          שם הברית
+          {t("שם הברית")}
         </label>
         <input
           id="guild-name"
@@ -35,7 +37,7 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
           type="text"
           required
           maxLength={GUILD_NAME_MAX_LENGTH}
-          placeholder="לדוגמה: אבירי השולחן"
+          placeholder={t("לדוגמה: אבירי השולחן")}
           className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none"
         />
       </div>
@@ -43,21 +45,23 @@ export function GuildCreateForm({ diamonds }: GuildCreateFormProps) {
       <SubmitButton
         className="btn btn-dark w-full py-3"
         disabled={!canAfford}
-        pendingText="מקים ברית..."
+        pendingText={t("מקים ברית...")}
       >
-        ⚒️ שלם {GUILD_CREATION_COST_DIAMONDS} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" /> והקם ברית
+        {t("⚒️ שלם {cost}", { cost: GUILD_CREATION_COST_DIAMONDS })}{" "}
+        <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />{" "}
+        {t("והקם ברית")}
       </SubmitButton>
 
       {!canAfford && (
         <p className="text-center text-xs text-red-400">
-          אין לך מספיק יהלומים להקמת ברית.
+          {t("אין לך מספיק יהלומים להקמת ברית.")}
         </p>
       )}
 
       <FormMessage error={state.error} success={state.success} />
 
       <p className="text-center text-[11px] leading-relaxed text-zinc-500">
-        הקמת ברית דורשת משאבים ורצינות. בחר שם בתבונה.
+        {t("הקמת ברית דורשת משאבים ורצינות. בחר שם בתבונה.")}
       </p>
     </form>
   );

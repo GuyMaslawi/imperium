@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { ExpiryCountdown } from "@/components/game/ExpiryCountdown";
 import { useServerNow } from "@/components/game/HeroPotions";
+import { useT } from "@/i18n/client";
 
 export interface SpyEffectRow {
   id: string;
@@ -33,12 +34,13 @@ export function SpyEffectsBoard({
   const now = useServerNow(serverNow);
   const active = rows.filter((row) => row.expiresAt > now);
 
+  const t = useT();
   return (
     <div className="panel-gold w-full max-w-[19rem] rounded-xl p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="flex items-center gap-1.5 text-sm font-bold tracking-wide text-gold-bright">
           <Icon name="spark" size={16} className="text-crimson-bright" />
-          קסמים פעילים
+          {t("קסמים פעילים")}
         </h3>
         {active.length > 0 && (
           <span
@@ -51,7 +53,7 @@ export function SpyEffectsBoard({
       </div>
       {active.length === 0 ? (
         <p className="panel-inset rounded-lg px-3 py-2 text-center text-[11px] text-zinc-400">
-          שום אפקט לא פועל עליו כרגע.
+          {t("שום אפקט לא פועל עליו כרגע.")}
         </p>
       ) : (
         <ul className="space-y-1.5">

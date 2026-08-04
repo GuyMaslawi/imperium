@@ -1,4 +1,7 @@
+"use client";
+
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 /**
  * The one way the site links out to the community channel.
@@ -39,6 +42,7 @@ export function DiscordLink({
   /** Layout only — margins and sizing. Colour belongs to the variant. */
   className?: string;
 }) {
+  const t = useT();
   if (!url) return null;
 
   const base =
@@ -74,9 +78,9 @@ export function DiscordLink({
         // The label is a desktop luxury, exactly as on the inbox pills: below
         // md the bar is already carrying the hamburger, the pills and the
         // emblem, and the mark alone is unmistakable.
-        <span className="hidden md:inline">{label}</span>
+        <span className="hidden md:inline">{t(label)}</span>
       ) : (
-        label
+        t(label)
       )}
     </a>
   );

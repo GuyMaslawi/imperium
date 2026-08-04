@@ -5,6 +5,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useAfterFirstPaint, useCountUp } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import { useBankPulse } from "./BankFx";
+import { useT } from "@/i18n/client";
 
 export interface BankVaultProps {
   /** Whole gold currently in the bank. */
@@ -88,6 +89,7 @@ export function BankVault({
 
   const shownBalance = useCountUp(bankGold);
 
+  const t = useT();
   return (
     <div className="panel-gold rounded-xl p-5">
       <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-stretch sm:gap-7">
@@ -95,7 +97,10 @@ export function BankVault({
         <div
           className={`vault ${pulse ? "vault-active" : ""}`}
           role="img"
-          aria-label={`כספת הבנק — ${formatNumber(bankGold)} זהב, ${pct}% מהזהב שלך`}
+          aria-label={t("כספת הבנק — {gold} זהב, {pct}% מהזהב שלך", {
+            gold: formatNumber(bankGold),
+            pct,
+          })}
         >
           <div className="vault-frame">
             <div className="vault-door">
@@ -141,7 +146,7 @@ export function BankVault({
                 </div>
 
                 {bankGold === 0 && (
-                  <span className="vault-empty">הכספת ריקה</span>
+                  <span className="vault-empty">{t("הכספת ריקה")}</span>
                 )}
                 <span className="vault-glare" />
               </div>
@@ -183,10 +188,10 @@ export function BankVault({
           <div className="flex items-center justify-center gap-3 sm:justify-start">
             <Icon name="bank" size={30} className="text-crimson-bright" />
             <div>
-              <h2 className="text-xl font-black text-gold-bright">הבנק המרכזי</h2>
+              <h2 className="text-xl font-black text-gold-bright">{t("הבנק המרכזי")}</h2>
               <p className="mt-1 flex items-center justify-center gap-1.5 text-xs font-semibold text-emerald-400 sm:justify-start">
                 <span className="vault-live-dot" aria-hidden />
-                פעיל · דרגה{" "}
+                {t("פעיל · דרגה")}{" "}
                 <span className="nums" dir="ltr">
                   {interestLevel}
                 </span>
@@ -196,7 +201,7 @@ export function BankVault({
 
           <div>
             <p className="text-xs uppercase tracking-widest text-gold-dim">
-              יתרה בבנק
+              {t("יתרה בבנק")}
             </p>
             <p
               className="nums text-4xl font-black leading-tight text-gold-bright"
@@ -218,7 +223,7 @@ export function BankVault({
               <span className="nums font-bold text-gold" dir="ltr">
                 {pct}%
               </span>{" "}
-              מהזהב שלך מוגן בכספת · חשוף:{" "}
+              {t("מהזהב שלך מוגן בכספת · חשוף:")}{" "}
               <span className="nums font-bold text-zinc-300" dir="ltr">
                 {formatNumber(looseGold)}
               </span>
@@ -227,7 +232,7 @@ export function BankVault({
 
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-zinc-400 sm:justify-start">
             <span>
-              ריבית:{" "}
+              {t("ריבית:")}{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
                 {ratePercent}
               </span>
@@ -236,7 +241,7 @@ export function BankVault({
               <span className="vault-rise" aria-hidden>
                 ▲
               </span>
-              בעדכון הבא:{" "}
+              {t("בעדכון הבא:")}{" "}
               <span className="nums font-bold text-emerald-400" dir="ltr">
                 +{formatNumber(nextInterest)}
               </span>

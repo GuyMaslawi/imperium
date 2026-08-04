@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { WheelOfFortune } from "./WheelOfFortune";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 /** The base-screen "גלגל המזל" card that opens the wheel modal. */
 export function WheelCard({
@@ -14,6 +15,7 @@ export function WheelCard({
   seasonCycle?: number;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useT();
   return (
     <>
       {/* Laid out as a band, not a tower: it shares a row with the season
@@ -31,11 +33,13 @@ export function WheelCard({
           )}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-black leading-tight text-gold-bright">גלגל המזל</p>
-          <p className="text-[11px] leading-tight text-zinc-400">נסה את מזלך!</p>
+          <p className="text-sm font-black leading-tight text-gold-bright">
+            {t("גלגל המזל")}
+          </p>
+          <p className="text-[11px] leading-tight text-zinc-400">{t("נסה את מזלך!")}</p>
         </div>
         <button onClick={() => setOpen(true)} className="btn btn-dark flex shrink-0 items-center gap-1 px-4 py-1.5 text-xs">
-          <Icon name="wheel" size={14} /> סובב
+          <Icon name="wheel" size={14} /> {t("סובב")}
         </button>
       </div>
       {open && (

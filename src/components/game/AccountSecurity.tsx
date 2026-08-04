@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 /**
  * Account security panel: rotate the password, and revoke every session.
@@ -24,17 +25,18 @@ export function AccountSecurity({ hasPassword }: { hasPassword: boolean }) {
     {}
   );
 
+  const t = useT();
   return (
     <>
       {hasPassword && (
         <div className="panel rounded-xl p-4">
-          <CardTitle icon="🔑">שינוי סיסמה</CardTitle>
+          <CardTitle icon="🔑">{t("שינוי סיסמה")}</CardTitle>
           <p className="mb-4 text-sm text-zinc-400">
-            שינוי הסיסמה מנתק את כל המכשירים האחרים המחוברים לחשבון.
+            {t("שינוי הסיסמה מנתק את כל המכשירים האחרים המחוברים לחשבון.")}
           </p>
           <form action={action} className="space-y-4">
             <Input
-              label="סיסמה נוכחית"
+              label={t("סיסמה נוכחית")}
               name="currentPassword"
               type="password"
               required
@@ -43,28 +45,27 @@ export function AccountSecurity({ hasPassword }: { hasPassword: boolean }) {
               dir="ltr"
             />
             <Input
-              label="סיסמה חדשה"
+              label={t("סיסמה חדשה")}
               name="newPassword"
               type="password"
               required
               minLength={8}
               autoComplete="new-password"
-              placeholder="לפחות 8 תווים"
+              placeholder={t("לפחות 8 תווים")}
               dir="ltr"
             />
             <FormMessage error={state.error} success={state.success} />
-            <SubmitButton className="w-full" pendingText="מעדכן...">
-              עדכן סיסמה
+            <SubmitButton className="w-full" pendingText={t("מעדכן...")}>
+              {t("עדכן סיסמה")}
             </SubmitButton>
           </form>
         </div>
       )}
 
       <div className="panel rounded-xl p-4">
-        <CardTitle icon="🛡️">אבטחת החשבון</CardTitle>
+        <CardTitle icon="🛡️">{t("אבטחת החשבון")}</CardTitle>
         <p className="mb-4 text-sm text-zinc-400">
-          חושד שמישהו אחר נכנס לחשבון שלך? ניתוק מכל המכשירים מבטל מיד כל
-          התחברות קיימת, בכל מכשיר, כולל זה — תצטרך להתחבר מחדש.
+          {t("חושד שמישהו אחר נכנס לחשבון שלך? ניתוק מכל המכשירים מבטל מיד כל התחברות קיימת, בכל מכשיר, כולל זה — תצטרך להתחבר מחדש.")}
         </p>
         <form action={signOutEverywhere}>
           <button
@@ -76,7 +77,7 @@ export function AccountSecurity({ hasPassword }: { hasPassword: boolean }) {
               size={16}
               className="inline-block align-text-bottom"
             />{" "}
-            נתק מכל המכשירים
+            {t("נתק מכל המכשירים")}
           </button>
         </form>
       </div>

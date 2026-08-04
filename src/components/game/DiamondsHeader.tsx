@@ -1,7 +1,10 @@
+"use client";
+
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 
 /**
  * Flecks of light off the cut stone. Fixed positions and delays, like every
@@ -38,6 +41,7 @@ export function DiamondsHeader({
   /** One-line pitch under the switch (optional). */
   note?: string;
 }) {
+  const t = useT();
   return (
     <div className="panel-gold dia-vault rounded-2xl px-4 py-3.5">
       <span className="dia-rays" aria-hidden />
@@ -62,7 +66,7 @@ export function DiamondsHeader({
             </span>
             <div className="leading-none">
               <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-zinc-500">
-                היתרה שלך
+                {t("היתרה שלך")}
               </p>
               <p className="nums dia-balance mt-1.5 text-2xl font-black text-sky-300" dir="ltr">
                 {formatNumber(diamonds)}
@@ -72,8 +76,18 @@ export function DiamondsHeader({
 
           {/* spend / buy switch */}
           <nav className="flex gap-1 rounded-xl border border-border-subtle bg-panel-inset p-1">
-            <Tab href="/game/diamonds" icon="shop" label="הוצאת יהלומים" active={active === "spend"} />
-            <Tab href="/game/diamonds/buy" icon="gift" label="רכישת יהלומים" active={active === "buy"} />
+            <Tab
+              href="/game/diamonds"
+              icon="shop"
+              label={t("הוצאת יהלומים")}
+              active={active === "spend"}
+            />
+            <Tab
+              href="/game/diamonds/buy"
+              icon="gift"
+              label={t("רכישת יהלומים")}
+              active={active === "buy"}
+            />
           </nav>
         </div>
 

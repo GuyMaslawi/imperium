@@ -834,7 +834,7 @@ export function ChatDock({
               {partner.name}
             </Link>
             <span className="shrink-0 text-[10px] text-bone-dim">
-              {partnerOnline ? t("מחובר") : t("לא מחובר")}
+              {partnerOnline ? t("מחובר") : t("לא מחובר עכשיו")}
             </span>
           </>
         ) : (

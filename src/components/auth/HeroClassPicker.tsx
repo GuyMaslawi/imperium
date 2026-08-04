@@ -9,6 +9,7 @@ import {
   heroClassImage,
 } from "@/lib/game/hero";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
+import { useT } from "@/i18n/client";
 
 /**
  * Visual character picker for signup/onboarding: one card per hero class with
@@ -17,15 +18,16 @@ import { LivingPortrait } from "@/components/game/LivingPortrait";
  * wiring. Marked required so the browser blocks submit until one is chosen.
  */
 export function HeroClassPicker() {
+  const t = useT();
   const [selected, setSelected] = useState<HeroClass | null>(null);
 
   return (
     <fieldset>
       <legend className="mb-1 block text-sm font-semibold text-zinc-300">
-        בחר את הגיבור שלך
+        {t("בחר את הגיבור שלך")}
       </legend>
       <p className="mb-3 text-xs text-zinc-500">
-        לכל דמות יתרון קבוע משלה — הבחירה מלווה את האימפריה שלך לאורך הדרך.
+        {t("לכל דמות יתרון קבוע משלה — הבחירה מלווה את האימפריה שלך לאורך הדרך.")}
       </p>
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {HERO_CLASS_ORDER.map((key, i) => {

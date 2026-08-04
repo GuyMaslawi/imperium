@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useT } from "@/i18n/client";
 
 /**
  * A player's name, always a door into his dossier.
@@ -43,12 +46,18 @@ export function PlayerLink({
 }) {
   // The gradient fill replaces the colour utilities a caller passes, so the
   // staff class goes last and the two are never both meaningful.
+  const t = useT();
   const cls = `${className} ${staff ? "staff-name" : ""}`.trim();
   if (!empireId) return <span className={cls}>{name}</span>;
   return (
     <Link
       href={`/game/empires/${empireId}`}
-      title={title ?? (staff ? `הנהלת המשחק — ${name}` : `הפרופיל של ${name}`)}
+      title={
+        title ??
+        (staff
+          ? t("הנהלת המשחק — {name}", { name })
+          : t("הפרופיל של {name}", { name }))
+      }
       className={`underline-offset-4 hover:text-gold-bright hover:underline ${cls}`}
     >
       {name}

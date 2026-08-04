@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { LiveAlert } from "@/server/actions/messages";
 import { Icon } from "@/components/ui/Icon";
 import { useInboxPulse } from "./inboxPulse";
+import { useT } from "@/i18n/client";
 
 const TOAST_MS = 12_000;
 const MAX_VISIBLE = 4;
@@ -21,6 +22,7 @@ type KindStyle = {
   tagClass: string;
 };
 
+/** `tag` stays in Hebrew and is translated where the toast is drawn. */
 const KIND_STYLE: Record<LiveAlert["kind"], KindStyle> = {
   BATTLE: {
     icon: <Icon name="attack" size={22} />,
@@ -109,6 +111,7 @@ function playHorn(kind: LiveAlert["kind"]) {
  * always the same round trip.
  */
 export function WarAlerts() {
+  const t = useT();
   const router = useRouter();
   const pulse = useInboxPulse();
   const [toasts, setToasts] = useState<LiveAlert[]>([]);
@@ -218,7 +221,7 @@ export function WarAlerts() {
                   <span
                     className={`rounded px-1.5 py-px text-[10px] font-black uppercase tracking-wider ${style.tagClass}`}
                   >
-                    {style.tag}
+                    {t(style.tag)}
                   </span>
                   <span className="truncate text-sm font-black text-gold-bright">
                     {toast.title}
@@ -230,7 +233,7 @@ export function WarAlerts() {
               </div>
               <button
                 type="button"
-                aria-label="סגירה"
+                aria-label={t("סגירה")}
                 onClick={(event) => {
                   event.preventDefault();
                   event.stopPropagation();

@@ -11,6 +11,7 @@ import {
 import { ATTACK_TURN_COST, SPY_TURN_COST } from "@/lib/game/constants";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 /** A big prominent submit button that shows a pending label while its form runs. */
 function ActionButton({
@@ -60,6 +61,7 @@ export function RankActions({
   const canSpy = currentTurns >= SPY_TURN_COST;
   const canAttack = currentTurns >= ATTACK_TURN_COST && !attackBlockedReason;
 
+  const t = useT();
   return (
     <div className="w-full space-y-2 sm:w-80">
       <div className="grid grid-cols-2 gap-2.5">
@@ -67,37 +69,44 @@ export function RankActions({
           <input type="hidden" name="targetEmpireId" value={targetEmpireId} />
           <ActionButton
             tone="attack"
-            pendingText="תוקף…"
+            pendingText={t("תוקף…")}
             disabled={!canAttack}
             title={
               attackBlockedReason ??
               (canAttack
-                ? `עלות תקיפה: ${ATTACK_TURN_COST} תורות`
-                : "אין לך מספיק תורות לתקיפה")
+                ? t("עלות תקיפה: {turns} תורות", { turns: ATTACK_TURN_COST })
+                : t("אין לך מספיק תורות לתקיפה"))
             }
           >
-            <Icon name="attack" size={16} className="inline-block align-middle" /> תקיפה
+            <Icon name="attack" size={16} className="inline-block align-middle" />{" "}
+            {t("תקיפה")}
           </ActionButton>
           {/* No dir="ltr" here: the line is Hebrew with a number in it, and
               forcing LTR throws the digits to the far side of the word. */}
           <p
             className={`mt-1 text-center text-[10px] ${attackBlockedReason ? "text-emerald-400/80" : "text-zinc-500 nums"}`}
           >
-            {attackBlockedReason ?? <>{ATTACK_TURN_COST} תורות</>}
+            {attackBlockedReason ??
+              t("{turns} תורות", { turns: ATTACK_TURN_COST })}
           </p>
         </form>
         <form action={spyAction}>
           <input type="hidden" name="targetEmpireId" value={targetEmpireId} />
           <ActionButton
             tone="spy"
-            pendingText="מרגל…"
+            pendingText={t("מרגל…")}
             disabled={!canSpy}
-            title={canSpy ? `עלות ריגול: ${SPY_TURN_COST} תורות` : "אין לך מספיק תורות לריגול"}
+            title={
+              canSpy
+                ? t("עלות ריגול: {turns} תורות", { turns: SPY_TURN_COST })
+                : t("אין לך מספיק תורות לריגול")
+            }
           >
-            <Icon name="spy" size={16} className="inline-block align-middle" /> ריגול
+            <Icon name="spy" size={16} className="inline-block align-middle" />{" "}
+            {t("ריגול")}
           </ActionButton>
           <p className="mt-1 text-center text-[10px] text-zinc-500 nums">
-            {SPY_TURN_COST} תורות
+            {t("{turns} תורות", { turns: SPY_TURN_COST })}
           </p>
         </form>
       </div>

@@ -11,6 +11,7 @@ import {
 import { formatBonus } from "@/lib/game/format";
 import { Icon } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
+import { useT } from "@/i18n/client";
 
 /**
  * The three point-allocatable stats (attack/defense/resources). Each one is a
@@ -42,10 +43,11 @@ export function HeroStatsCards({
     {}
   );
 
+  const t = useT();
   return (
     <div className="flex w-full flex-col gap-2">
       {!readOnly && unspentPoints > 0 && (
-        <Tip tip="נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בשורת התכונה מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).">
+        <Tip tip={t("נקודות שהתקבלו מעליות רמה וטרם הוקצו. לחיצה על +1 / +5 בשורת התכונה מקצה אותן לצמיתות (הן חוזרות רק באיפוס ברמה 100).")}>
           {/* One line, not a stacked hero block: every row this costs pushes
               the stat rows down. */}
           <div className="points-pulse flex w-full flex-wrap items-center justify-center gap-x-2 rounded-lg border bg-gold/10 px-2 py-1 text-center">
@@ -54,7 +56,7 @@ export function HeroStatsCards({
               <span className="nums text-sm font-black" dir="ltr">
                 {unspentPoints}
               </span>{" "}
-              נקודות פנויות — כל נקודה ‎+1%
+              {t("נקודות פנויות — כל נקודה ‎+1%")}
             </p>
           </div>
         </Tip>
@@ -72,26 +74,21 @@ export function HeroStatsCards({
             <Tip
               tip={
                 <>
-                  {meta.description}
+                  {t(meta.description)}
                   <br />
-                  {readOnly ? (
-                    <>
-                      אחוז זה מגיע אך ורק מהנקודות שהקצה ({formatBonus(pointsPct)}
-                      %). חפצי הגיבור אינם משפיעים עליו — הם נספרים בנפרד.
-                    </>
-                  ) : (
-                    <>
-                      אחוז זה מגיע אך ורק מהנקודות שהקצית ({formatBonus(pointsPct)}
-                      %). חפצי הגיבור אינם משפיעים עליו — ראה &quot;סך הכל
-                      מהגיבור&quot; למטה.
-                    </>
-                  )}
+                  {readOnly
+                    ? t("אחוז זה מגיע אך ורק מהנקודות שהקצה ({pct}%). חפצי הגיבור אינם משפיעים עליו — הם נספרים בנפרד.", {
+                        pct: formatBonus(pointsPct),
+                      })
+                    : t("אחוז זה מגיע אך ורק מהנקודות שהקצית ({pct}%). חפצי הגיבור אינם משפיעים עליו — ראה ״סך הכל מהגיבור״ למטה.", {
+                        pct: formatBonus(pointsPct),
+                      })}
                 </>
               }
             >
               <p className="cursor-help whitespace-nowrap text-[11px] text-zinc-400">
                 <Icon name={meta.icon} size={13} className="inline align-[-2px]" />{" "}
-                {meta.label}
+                {t(meta.label)}
               </p>
             </Tip>
             <p
@@ -126,10 +123,13 @@ export function HeroStatsCards({
                   <input type="hidden" name="amount" value={unspentPoints} />
                   <button
                     type="submit"
-                    title={`שים את כל ${unspentPoints} הנקודות ב${meta.label}`}
+                    title={t("שים את כל {count} הנקודות ב{stat}", {
+                      count: unspentPoints,
+                      stat: t(meta.label),
+                    })}
                     className="btn btn-ghost px-2 py-0.5 text-[11px]"
                   >
-                    הכל
+                    {t("הכל")}
                   </button>
                 </form>
               </div>

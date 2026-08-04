@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useAfterFirstPaint } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import { GUILD_AID_MAX_LEVEL } from "@/lib/game/guild";
+import { useT } from "@/i18n/client";
 
 export interface GuildAidCardProps {
   /** Current aid percent (= aid level). */
@@ -28,12 +29,13 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
   // place if the first painted frame draws it empty.
   const painted = useAfterFirstPaint();
 
+  const t = useT();
   return (
     <div className="panel-inset gd-up flex flex-col gap-3 rounded-lg p-3">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name="shield" size={16} className="text-crimson" />
-          עזרת הברית
+          {t("עזרת הברית")}
         </p>
         <span className="nums rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-black text-gold-bright" dir="ltr">
           +{aidPct}%
@@ -41,10 +43,10 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
       </div>
 
       <p className="text-xs leading-relaxed text-zinc-400">
-        כל חבר נלחם עם תוספת כוח בקרב — גם כשהוא תוקף וגם כשתוקפים אותו.
+        {t("כל חבר נלחם עם תוספת כוח בקרב — גם כשהוא תוקף וגם כשתוקפים אותו.")}
       </p>
       <p className="text-[11px] text-gold-dim">
-        +{aidPct}% מסך הכוח הכולל של הברית להתקפה ולהגנה
+        {t("+{pct}% מסך הכוח הכולל של הברית להתקפה ולהגנה", { pct: aidPct })}
       </p>
 
       {/* How far the guild has walked towards the ceiling. */}
@@ -56,7 +58,7 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
         />
       </div>
       <p className="text-[11px] text-zinc-500">
-        כל חבר יכול לשדרג — משולם מהזהב הזמין שלך.
+        {t("כל חבר יכול לשדרג — משולם מהזהב הזמין שלך.")}
       </p>
 
       <form action={action} className="mt-auto">
@@ -64,14 +66,15 @@ export function GuildAidCard({ aidPct, upgradeCost, availableGold }: GuildAidCar
           <SubmitButton
             className="btn btn-dark w-full"
             disabled={availableGold < upgradeCost}
-            pendingText="משדרג..."
+            pendingText={t("משדרג...")}
           >
-            שדרג ל־{aidPct + 1}% · {formatNumber(upgradeCost)}{" "}
+            {t("שדרג ל־{pct}%", { pct: aidPct + 1 })} · {formatNumber(upgradeCost)}{" "}
             <Icon name="gold" size={14} className="inline-block align-text-bottom text-gold-bright" />
           </SubmitButton>
         ) : (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-            <Icon name="rankings" size={14} /> עזרה מקסימלית ({GUILD_AID_MAX_LEVEL}%)
+            <Icon name="rankings" size={14} />{" "}
+            {t("עזרה מקסימלית ({max}%)", { max: GUILD_AID_MAX_LEVEL })}
           </span>
         )}
       </form>

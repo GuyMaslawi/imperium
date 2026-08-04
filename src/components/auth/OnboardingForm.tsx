@@ -10,6 +10,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { HeroClassPicker } from "@/components/auth/HeroClassPicker";
+import { useT } from "@/i18n/client";
 
 export function OnboardingForm({ userName }: { userName: string }) {
   const [state, action] = useActionState<AuthState, FormData>(
@@ -17,28 +18,29 @@ export function OnboardingForm({ userName }: { userName: string }) {
     {}
   );
 
+  const t = useT();
   return (
     <form action={action} className="space-y-4">
       <h2 className="text-xl font-bold text-zinc-100">
-        ברוך הבא, {userName}
+        {t("ברוך הבא, {name}", { name: userName })}
       </h2>
       <p className="text-sm text-zinc-400">
-        עוד צעד אחד — בחר שם לאימפריה ואת הגיבור שיוביל אותה לקרב.
+        {t("עוד צעד אחד — בחר שם לאימפריה ואת הגיבור שיוביל אותה לקרב.")}
       </p>
       <Input
-        label="שם האימפריה"
+        label={t("שם האימפריה")}
         name="empireName"
         type="text"
         required
         minLength={2}
         maxLength={40}
-        placeholder="למשל: ממלכת הברזל"
+        placeholder={t("למשל: ממלכת הברזל")}
         autoFocus
       />
       <HeroClassPicker />
       <FormMessage error={state.error} />
-      <SubmitButton className="w-full" pendingText="מקים אימפריה...">
-        הקם אימפריה{" "}
+      <SubmitButton className="w-full" pendingText={t("מקים אימפריה...")}>
+        {t("הקם אימפריה")}{" "}
         <Icon name="crown" size={16} className="inline-block align-text-bottom" />
       </SubmitButton>
     </form>

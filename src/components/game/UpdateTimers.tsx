@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Tip } from "@/components/ui/Tip";
+import { useT } from "@/i18n/client";
 
 function formatCountdown(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -60,14 +61,15 @@ export function UpdateTimers({
     };
   }, [expired, router]);
 
+  const t = useT();
   return (
     <div className="flex items-center gap-3 text-xs">
       <Tip
         side="bottom"
-        tip="פעמיים ביום (07:30 / 19:30) מגיעים אזרחים חדשים, יהלומים וריבית בבנק, ונפתחות הפקדות חדשות."
+        tip={t("פעמיים ביום (07:30 / 19:30) מגיעים אזרחים חדשים, יהלומים וריבית בבנק, ונפתחות הפקדות חדשות.")}
       >
         <span className="flex cursor-help items-center gap-1.5 text-zinc-400">
-          עדכון יומי:
+          {t("עדכון יומי:")}
           <span className="font-bold tabular-nums text-gold-bright" dir="ltr">
             {nextDailyLabel}
           </span>
@@ -76,12 +78,12 @@ export function UpdateTimers({
       <span aria-hidden className="h-4 w-px bg-border-subtle" />
       <Tip
         side="bottom"
-        tip="כל 5 דקות: המכרות מייצרים משאבים (לפי עבדי המכרות המוצבים) ומתקבלות תורות."
+        tip={t("כל 5 דקות: המכרות מייצרים משאבים (לפי עבדי המכרות המוצבים) ומתקבלות תורות.")}
       >
         <span className="flex cursor-help items-center gap-1.5 text-zinc-400">
-          עדכון דירוג:
+          {t("עדכון דירוג:")}
           <span className="font-bold tabular-nums text-gold-bright" dir="ltr">
-            {expired ? "מתעדכן…" : formatCountdown(regularRemaining)}
+            {expired ? t("מתעדכן…") : formatCountdown(regularRemaining)}
           </span>
         </span>
       </Tip>

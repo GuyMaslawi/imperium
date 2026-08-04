@@ -3,6 +3,8 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { attackCityBoss, type BossActionState } from "@/server/actions/boss";
+import { formatNumber } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 
 function SubmitButton({
   bossName,
@@ -16,6 +18,7 @@ function SubmitButton({
   /** Whether the tyrant is already carrying wounds from an earlier assault. */
   wounded: boolean;
 }) {
+  const t = useT();
   const { pending } = useFormStatus();
   return (
     <button
@@ -31,10 +34,10 @@ function SubmitButton({
       />
       <span className="relative">
         {pending
-          ? "הצבא יוצא לדרך…"
+          ? t("הצבא יוצא לדרך…")
           : wounded
-            ? `תקוף שוב את ${bossName}`
-            : `תקוף את ${bossName}`}
+            ? t("תקוף שוב את {boss}", { boss: bossName })
+            : t("תקוף את {boss}", { boss: bossName })}
       </span>
     </button>
   );
@@ -63,6 +66,7 @@ export function BossAttackButton({
   turnCost: number;
   wounded?: boolean;
 }) {
+  const t = useT();
   const [state, formAction] = useActionState<BossActionState, FormData>(
     () => attackCityBoss(),
     {}
@@ -76,8 +80,10 @@ export function BossAttackButton({
         wounded={wounded}
         title={
           disabled
-            ? (disabledReason ?? "לא ניתן לתקוף כרגע")
-            : `עלות התקיפה: ${turnCost.toLocaleString("he-IL")} תורות · הקרב רץ כדקה`
+            ? (disabledReason ?? t("לא ניתן לתקוף כרגע"))
+            : t("עלות התקיפה: {turns} תורות · הקרב רץ כדקה", {
+                turns: formatNumber(turnCost),
+              })
         }
       />
       {state.error && (
