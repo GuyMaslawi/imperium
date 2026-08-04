@@ -1,3 +1,12 @@
+"use client";
+
+// Client, because it translates with `useT()`. It reads no request state of its
+// own — the whole banner is computed server-side into the serializable
+// `CityBossState` prop — but a hook is a hook: without this directive the
+// component renders on the server and `useT()` is a client reference there,
+// which throws ("Attempted to call useT() from the server") and takes the whole
+// rankings screen down with it.
+
 import Link from "next/link";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";

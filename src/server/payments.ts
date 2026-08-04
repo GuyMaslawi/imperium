@@ -106,6 +106,37 @@ export type CaptureResult =
     }
   | { ok: false; reason: string; /** Buyer-facing hint, already in Hebrew. */ message?: string };
 
+/**
+ * One tax document the gateway's invoicing company issued against a payment.
+ *
+ * The link is **signed and short-lived** (PayPlus proxies Green Invoice, whose
+ * download URLs carry their own expiring token), so it is fetched when someone
+ * asks for it and never written to a row. A stored copy would be a dead link the
+ * day a buyer clicks it, which is worse than no link at all.
+ */
+export interface PaymentDocument {
+  /** Kind, as the invoicing company names it: "Invoice Receipt", "Credit Invoice". */
+  type: string;
+  /** Issue date, in whatever shape the provider formats it. Displayed, never parsed. */
+  date: string;
+  /** The document itself. */
+  url: string;
+  /** The "נאמן למקור" copy, when the provider distinguishes one. */
+  copyUrl?: string | null;
+}
+
+export type DocumentsResult =
+  | { ok: true; documents: PaymentDocument[] }
+  | { ok: false; reason: string };
+
+/** Which payment to ask the invoicing company about. */
+export interface DocumentQuery {
+  /** Provider-side id of the money movement — `captureRef` on the purchase row. */
+  captureId: string;
+  /** When the charge settled, to bound the provider's date-range search. */
+  paidAt?: Date | null;
+}
+
 interface ProviderBase {
   /** Stable identifier stored on every purchase row ("mock" today). */
   readonly name: string;
@@ -170,6 +201,18 @@ export interface OrderPaymentProvider extends ProviderBase {
    * duplicate callback, which the settlement guard swallows.
    */
   acknowledge?(ref: OrderRef, captureId: string): Promise<void>;
+  /**
+   * Optional: ask the gateway which tax documents were issued for a settled
+   * payment. Never throws.
+   *
+   * Separate from `captureOrder` because it answers a different question and
+   * fails differently. Capture asks *did the money move* — it gates crediting and
+   * must fail closed. This asks *was a receipt issued*, which is a legal
+   * obligation the gateway discharges asynchronously through a third party, and
+   * whose absence must never hold up a payment. A provider with no invoicing
+   * module simply does not implement it.
+   */
+  fetchDocuments?(query: DocumentQuery): Promise<DocumentsResult>;
 }
 
 export type PaymentProvider = DirectPaymentProvider | OrderPaymentProvider;

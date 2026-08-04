@@ -6,6 +6,8 @@ import { STORE_CURRENCY } from "@/lib/game/diamondStore";
 import { appBaseUrl } from "@/server/mailer";
 import type {
   CaptureResult,
+  DocumentQuery,
+  DocumentsResult,
   OrderInput,
   OrderPaymentProvider,
   OrderRef,
@@ -203,13 +205,13 @@ function str(value: unknown): string {
 }
 
 /**
- * POST one PayPlus call. JSON body, credentials in headers.
+ * POST one PayPlus call and hand back the parsed JSON, whatever shape it is.
  *
  * Never throws: a gateway that is down, slow or shouting HTML is a `reason`
  * string, because every caller is on a path where an exception would either
  * abandon a PENDING row or 500 a webhook PayPlus would then retry.
  */
-async function payplusPost(
+async function payplusFetch(
   config: PayPlusConfig,
   endpoint: string,
   body: unknown
@@ -233,13 +235,31 @@ async function payplusPost(
     return { ok: false, reason: `${endpoint}: הבקשה לספק נכשלה (${str(err)})` };
   }
 
-  let payload: PayPlusEnvelope;
   try {
-    payload = (await res.json()) as PayPlusEnvelope;
+    return { ok: true, data: await res.json() };
   } catch {
     // i18n-exempt: an operator-side `reason` — see above.
     return { ok: false, reason: `${endpoint}: תשובה לא תקינה מהספק (HTTP ${res.status})` };
   }
+}
+
+/**
+ * The same call, unwrapped from PayPlus's `{ results, data }` envelope.
+ *
+ * Most endpoints answer in it — but not all: `Invoice/GetDocuments` returns a
+ * bare `{ invoices: [...] }` with no `results` at all, which is why the envelope
+ * check lives here rather than in the transport, where it would reject a
+ * perfectly good answer.
+ */
+async function payplusPost(
+  config: PayPlusConfig,
+  endpoint: string,
+  body: unknown
+): Promise<PayPlusCall> {
+  const call = await payplusFetch(config, endpoint, body);
+  if (!call.ok) return call;
+
+  const payload = (call.data ?? {}) as PayPlusEnvelope;
 
   // PayPlus answers HTTP 200 with a failing `results.status` for business
   // errors, so the envelope — not the status line — decides.
@@ -268,6 +288,29 @@ export function payplusText(value: string, max = 80): string {
     .trim()
     .slice(0, max);
 }
+
+/**
+ * `YYYY-MM-DD`, in UTC.
+ *
+ * The format PayPlus documents for its other date-range searches; the invoice
+ * endpoint's own schema types `fromDate`/`untilDate` as bare strings and gives no
+ * example, so this follows the rest of the API rather than inventing a shape.
+ */
+function payplusDate(at: Date): string {
+  return at.toISOString().slice(0, 10);
+}
+
+/** A day either side of the payment, to absorb a timezone the docs never state. */
+const DOC_WINDOW_BEFORE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * How far past a payment a document search still looks.
+ *
+ * Generous on purpose. A receipt is issued within seconds, but a **credit
+ * invoice** for a refund can be raised weeks later, and it belongs on the same
+ * payment — so the window has to outlive the sale, not the checkout.
+ */
+const DOC_WINDOW_AFTER_MS = 400 * 24 * 60 * 60 * 1000;
 
 /** Extract the transaction rows from a `Transactions/View` answer. */
 function transactionRows(data: unknown): Record<string, unknown>[] {
@@ -439,6 +482,67 @@ export class PayPlusProvider implements OrderPaymentProvider {
       currency: str(paid.currency) || STORE_CURRENCY,
       purchaseId: str(paid.more_info) || reference,
     };
+  }
+
+  /**
+   * Which tax documents were issued against a settled payment.
+   *
+   * `Invoice/GetDocuments` is a *reporting* endpoint over whatever invoicing
+   * company is connected in the panel — it does not issue anything, it reports.
+   * So an empty list is a legitimate answer with two very different meanings:
+   * the document has not been generated **yet** (issuing is asynchronous), or the
+   * invoicing module was never switched on for this payment page and never will
+   * generate one. The caller shows the difference as "not yet"; the operator
+   * tells them apart by looking at the panel, which is the only place that
+   * knows.
+   *
+   * Two shape notes, both of which cost a debugging session if missed:
+   * the response is **not** wrapped in the usual `{ results, data }` envelope
+   * (hence `payplusFetch`), and `filter.fromDate`/`untilDate` are required by the
+   * schema even when a `transaction_uid` pins the search to one transaction.
+   */
+  async fetchDocuments(query: DocumentQuery): Promise<DocumentsResult> {
+    if (!query.captureId) {
+      // i18n-exempt: an operator-side `reason`.
+      return { ok: false, reason: "אין מזהה עסקה לשליפת מסמכים" };
+    }
+
+    const paidAt = query.paidAt ?? new Date();
+    const call = await payplusFetch(this.config, "Invoice/GetDocuments", {
+      transaction_uid: query.captureId,
+      filter: {
+        fromDate: payplusDate(new Date(paidAt.getTime() - DOC_WINDOW_BEFORE_MS)),
+        untilDate: payplusDate(new Date(paidAt.getTime() + DOC_WINDOW_AFTER_MS)),
+      },
+    });
+    if (!call.ok) return call;
+
+    const payload = (call.data ?? {}) as { invoices?: unknown; results?: PayPlusEnvelope["results"] };
+
+    // No `invoices` key at all is an error answer, not an empty result — and the
+    // difference matters: "none issued yet" is a normal state a buyer is shown,
+    // while a rejected request is something the operator has to fix. When the
+    // envelope *is* present (an error), it carries the reason.
+    if (!Array.isArray(payload.invoices)) {
+      // i18n-exempt: an operator-side `reason`.
+      const detail = payload.results?.description || "תשובה ללא רשימת מסמכים";
+      return { ok: false, reason: `Invoice/GetDocuments: ${detail}` };
+    }
+
+    const documents = payload.invoices
+      .filter((row): row is Record<string, unknown> => !!row && typeof row === "object")
+      .map((row) => ({
+        type: str(row.type),
+        date: str(row.date),
+        url: str(row.original_doc_url),
+        copyUrl: str(row.copy_doc_url) || null,
+      }))
+      // A row with no link is not a document anyone can be handed. PayPlus marks
+      // a failed issuance with its own `status`, and the honest rendering of that
+      // is "no receipt yet" rather than a button that goes nowhere.
+      .filter((doc) => doc.url.startsWith("https://"));
+
+    return { ok: true, documents };
   }
 
   // No `acknowledge`: PayPlus treats the callback's HTTP 200 as delivery, so

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getSessionUserId, requireEmpire } from "@/lib/auth";
 import { Icon } from "@/components/ui/Icon";
+import { ReceiptButton } from "@/components/ui/ReceiptButton";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { formatNumber } from "@/lib/game/format";
 import { settleOrderReturn, type OrderReturnStatus } from "@/server/orderSettle";
@@ -34,17 +35,22 @@ const VIEWS: Record<
   OrderReturnStatus,
   { emoji: string; title: string; tone: string; body: string }
 > = {
+  // Nothing here promises a receipt *arrived*. The document is issued by the
+  // gateway's invoicing company moments after the charge, and telling a buyer to
+  // go and look in an inbox that has nothing in it yet is how a working payment
+  // reads as a broken one. The button below fetches the real thing when it
+  // exists, and says so plainly when it does not.
   credited: {
     emoji: "✅",
     title: "התשלום בוצע!",
     tone: "text-emerald-300",
-    body: "היהלומים נזקפו לחשבונך. קבלה נשלחה לכתובת האימייל שלך.",
+    body: "היהלומים נזקפו לחשבונך. הקבלה נשלחת לכתובת האימייל שלך ואפשר גם להציג אותה כאן.",
   },
   already: {
     emoji: "✅",
     title: "התשלום בוצע!",
     tone: "text-emerald-300",
-    body: "היהלומים כבר נזקפו לחשבונך. קבלה נשלחה לכתובת האימייל שלך.",
+    body: "היהלומים כבר נזקפו לחשבונך. הקבלה נשלחת לכתובת האימייל שלך ואפשר גם להציג אותה כאן.",
   },
   pending: {
     emoji: "⏳",
@@ -65,7 +71,7 @@ export default async function PurchaseSuccessPage() {
   const userId = await getSessionUserId();
   const result = userId
     ? await settleOrderReturn(userId)
-    : ({ status: "none", diamonds: 0 } as const);
+    : ({ status: "none", diamonds: 0, purchaseId: null } as const);
 
   const view = VIEWS[result.status];
 
@@ -92,6 +98,13 @@ export default async function PurchaseSuccessPage() {
         )}
 
         <p className="text-sm leading-relaxed text-zinc-400">{view.body}</p>
+
+        {/* Only once the money is booked: a PENDING row has no capture to look
+            a document up by, so the button would only ever say "not yet". */}
+        {result.purchaseId &&
+          (result.status === "credited" || result.status === "already") && (
+            <ReceiptButton purchaseId={result.purchaseId} />
+          )}
 
         <p className="text-sm text-zinc-500">
           יתרה נוכחית:{" "}

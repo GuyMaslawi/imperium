@@ -171,7 +171,7 @@ const RETURN_WINDOW_MS = 2 * 60 * 60 * 1000;
  */
 export async function settleOrderReturn(
   userId: string
-): Promise<{ status: OrderReturnStatus; diamonds: number }> {
+): Promise<{ status: OrderReturnStatus; diamonds: number; purchaseId: string | null }> {
   const recent = await prisma.diamondPurchase.findFirst({
     where: {
       userId,
@@ -187,17 +187,25 @@ export async function settleOrderReturn(
     orderBy: { createdAt: "desc" },
     select: { id: true, status: true, diamonds: true },
   });
-  if (!recent) return { status: "none", diamonds: 0 };
-  if (recent.status === "PAID") return { status: "already", diamonds: recent.diamonds };
+  if (!recent) return { status: "none", diamonds: 0, purchaseId: null };
+  // The row id travels back so the page can offer the receipt for *this*
+  // purchase. It is not a capability — `getPurchaseReceipt` re-checks ownership
+  // — but it does save the buyer hunting for a purchase they just made.
+  const purchaseId = recent.id;
+  if (recent.status === "PAID") {
+    return { status: "already", diamonds: recent.diamonds, purchaseId };
+  }
 
   const settled = await settleOrder({ purchaseId: recent.id, userId });
-  if (settled.outcome === "credited") return { status: "credited", diamonds: settled.diamonds };
+  if (settled.outcome === "credited") {
+    return { status: "credited", diamonds: settled.diamonds, purchaseId };
+  }
   if (settled.outcome === "already-settled") {
-    return { status: "already", diamonds: recent.diamonds };
+    return { status: "already", diamonds: recent.diamonds, purchaseId };
   }
   // Anything else — unverified, mismatch, a gateway that is down — leaves the
   // row PENDING for the callback and its retries. The buyer is told it is being
   // confirmed rather than that it failed, because from here we genuinely do not
   // know that it did.
-  return { status: "pending", diamonds: 0 };
+  return { status: "pending", diamonds: 0, purchaseId };
 }

@@ -123,8 +123,16 @@ external invoicing company) is subscribed in the panel *and* enabled on this
 specific payment page, with a document numbering series configured. `sendEmailApproval`
 sends a payment confirmation, which is not a receipt. Once a document does get
 issued, `Invoice/GetDocuments` returns its PDF links (`original_doc_url` /
-`copy_doc_url`) keyed by `transaction_uid` — the way to prove issuance without
-waiting on the buyer's inbox.
+`copy_doc_url`) keyed by `transaction_uid`.
+
+That lookup **is wired** (`fetchDocuments` on the provider seam →
+`getPurchaseReceipt` → the `ReceiptButton` in the **קבלה** column of
+`/admin/purchases` and on `/game/diamonds/buy/success`). It is the way to prove
+issuance without waiting on a buyer's inbox, and the way to tell the two silences
+apart: **"עדיין לא הונפק מסמך"** means PayPlus answered and the invoicing company
+has produced nothing — go and look at the panel. An error means the call itself
+failed. Nothing is stored: the links are signed and expiring, so they are fetched
+on the click and never written to a row.
 
 Order of operations for go-live: page UID → staging test purchase (PayPlus
 publishes sandbox card numbers) → check the row in `/admin/purchases` and that a

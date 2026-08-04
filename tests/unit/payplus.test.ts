@@ -370,6 +370,89 @@ describe("captureOrder", () => {
   });
 });
 
+/* ------------------------------ fetchDocuments ----------------------------- */
+
+/**
+ * The receipt lookup, which fails in a way none of the other calls do.
+ *
+ * `Invoice/GetDocuments` answers with a bare `{ invoices: [...] }` and **no
+ * `results` envelope**, so routing it through the ordinary poster would reject
+ * every successful answer as a business error. And its empty case is not a
+ * failure at all: no document yet — the state the store is in for as long as the
+ * חשבונית+ module is unsubscribed — has to read as "none", never as an error, or
+ * the operator goes looking at the code instead of at the panel.
+ */
+describe("fetchDocuments", () => {
+  const docRow = (over: Record<string, unknown> = {}) => ({
+    status: "success",
+    type: "Invoice Receipt",
+    date: "16/02/2021 11:21",
+    original_doc_url: "https://invoice.example/doc/1",
+    copy_doc_url: "https://invoice.example/doc/1-copy",
+    ...over,
+  });
+
+  it("asks by transaction uid, inside a date window, and maps the documents", async () => {
+    configure();
+    const calls = stubPayPlus({ invoices: [docRow()] });
+
+    const result = await payplusProvider()!.fetchDocuments!({
+      captureId: "tx-1",
+      paidAt: new Date("2026-08-04T12:00:00Z"),
+    });
+
+    expect(calls[0].url).toBe("https://restapidev.payplus.co.il/api/v1.0/Invoice/GetDocuments");
+    const sent = calls[0].body as { transaction_uid: string; filter: Record<string, string> };
+    expect(sent.transaction_uid).toBe("tx-1");
+    // A day earlier, because the docs never state which timezone the range is in.
+    expect(sent.filter.fromDate).toBe("2026-08-03");
+    // And far ahead, because a credit invoice for a refund lands weeks later and
+    // belongs to the same payment.
+    expect(sent.filter.untilDate > "2027-08-01").toBe(true);
+
+    expect(result).toEqual({
+      ok: true,
+      documents: [
+        {
+          type: "Invoice Receipt",
+          date: "16/02/2021 11:21",
+          url: "https://invoice.example/doc/1",
+          copyUrl: "https://invoice.example/doc/1-copy",
+        },
+      ],
+    });
+  });
+
+  it("reads an empty list as 'none issued yet', not as an error", async () => {
+    configure();
+    stubPayPlus({ invoices: [] });
+    const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
+    expect(result).toEqual({ ok: true, documents: [] });
+  });
+
+  it("drops rows with no usable link rather than offering a dead button", async () => {
+    configure();
+    stubPayPlus({ invoices: [docRow({ original_doc_url: null }), docRow()] });
+    const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
+    expect(result.ok && result.documents).toHaveLength(1);
+  });
+
+  it("treats a response with no invoices key as a failure, quoting the provider", async () => {
+    configure();
+    stubPayPlus({ results: { status: "error", description: "invoice module is not active" } });
+    const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false && result.reason).toContain("invoice module is not active");
+  });
+
+  it("never calls the gateway without a capture id", async () => {
+    configure();
+    const calls = stubPayPlus({ invoices: [docRow()] });
+    expect((await payplusProvider()!.fetchDocuments!({ captureId: "" })).ok).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
 /* ------------------------------- field mapping ----------------------------- */
 
 describe("payplusText", () => {

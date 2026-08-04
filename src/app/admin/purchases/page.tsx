@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { ReceiptButton } from "@/components/ui/ReceiptButton";
 import { formatIls } from "@/lib/game/diamondStore";
 
 export const dynamic = "force-dynamic";
@@ -86,6 +87,10 @@ export default async function AdminPurchasesPage() {
         isTest: true,
         provider: true,
         providerRef: true,
+        // Not displayed — it only decides whether a row has a receipt worth
+        // asking the gateway about, so the column renders nothing for the rows
+        // that could never have one.
+        captureRef: true,
         failureReason: true,
       },
     }),
@@ -134,7 +139,7 @@ export default async function AdminPurchasesPage() {
       </p>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] border-collapse text-sm">
+        <table className="w-full min-w-[960px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border-subtle text-right text-[11px] uppercase tracking-wider text-gold-dim">
               <th className="p-2 font-semibold">זמן</th>
@@ -145,6 +150,7 @@ export default async function AdminPurchasesPage() {
               <th className="p-2 font-semibold">סטטוס</th>
               <th className="p-2 font-semibold">ספק</th>
               <th className="p-2 font-semibold">אסמכתא</th>
+              <th className="p-2 font-semibold">קבלה</th>
             </tr>
           </thead>
           <tbody>
@@ -229,12 +235,22 @@ export default async function AdminPurchasesPage() {
                   <td className="p-2 text-[10px] text-zinc-600 font-mono" dir="ltr">
                     {p.providerRef ? p.providerRef.slice(0, 20) : "—"}
                   </td>
+                  {/* The one place issuance can be checked without waiting on
+                      the buyer's inbox — and the fastest way to catch a gateway
+                      whose invoicing module was never switched on. */}
+                  <td className="p-2 text-center">
+                    {p.captureRef ? (
+                      <ReceiptButton purchaseId={p.id} compact />
+                    ) : (
+                      <span className="text-[10px] text-zinc-600">—</span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
             {purchases.length === 0 && (
               <tr>
-                <td colSpan={8} className="p-6 text-center text-zinc-500">
+                <td colSpan={9} className="p-6 text-center text-zinc-500">
                   עדיין אין רכישות
                 </td>
               </tr>

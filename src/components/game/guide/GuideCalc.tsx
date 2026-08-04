@@ -32,7 +32,7 @@ import {
 } from "@/lib/game/hero";
 import { CITY_BOSSES, bossHeroXp, bossPower, bossReward, bossTurnCost } from "@/lib/game/bosses";
 import { bossSiegeMaxHp, bossSortiesToKill } from "@/lib/game/bossBattle";
-import { formatShort } from "./GuideUi";
+import { formatShort } from "@/lib/game/format";
 
 /* ========================================================================
    Shared calculator chrome

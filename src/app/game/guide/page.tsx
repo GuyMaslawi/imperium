@@ -44,7 +44,7 @@ import {
   type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { cityAt } from "@/lib/game/cities";
-import { formatNumber } from "@/lib/game/format";
+import { formatNumber, formatShort } from "@/lib/game/format";
 import {
   INITIAL_WEAPON_UNLOCKED_TIER,
   TIERS_PER_CATEGORY,
@@ -211,7 +211,6 @@ import {
   R,
   TableWrap,
   V,
-  formatShort,
   type GuideSectionMeta,
 } from "@/components/game/guide/GuideUi";
 

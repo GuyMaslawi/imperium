@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { formatShort } from "@/lib/game/format";
 import { useT } from "@/i18n/client";
 
 /**
@@ -264,38 +265,3 @@ const RESOURCE_TINT: Record<string, string> = {
   soldiers: "text-red-300",
 };
 
-const SHORT_UNITS: [number, string][] = [
-  [1e12, "T"],
-  [1e9, "B"],
-  [1e6, "M"],
-  [1e3, "K"],
-];
-
-/**
- * Compact money formatting for dense table cells. Mirrors `formatNumber` but
- * keeps three significant digits at every magnitude, which is what the weapon
- * and item ladders need once they run past a billion.
- *
- * The unit is chosen *after* rounding, for the same reason `formatNumber` does
- * it (see lib/game/format.ts): at three significant digits 999.6B rounds to a
- * four-digit mantissa, and "1000B" is not how anyone writes a trillion.
- */
-function formatShort(value: number): string {
-  const abs = Math.abs(value);
-  let index = SHORT_UNITS.findIndex(([size]) => abs >= size);
-  if (index === -1) return Math.round(value).toLocaleString("he-IL");
-
-  const print = (i: number) => {
-    const scaled = value / SHORT_UNITS[i][0];
-    const magnitude = Math.abs(scaled);
-    return scaled.toFixed(magnitude < 10 ? 2 : magnitude < 100 ? 1 : 0);
-  };
-  let text = print(index);
-  if (Math.abs(Number(text)) >= 1000 && index > 0) text = print(--index);
-  // Only ever trim a fractional tail. Trimming unconditionally eats real
-  // trailing zeros in the integer part — 610.351M rendered as "61M".
-  const trimmed = text.includes(".") ? text.replace(/\.?0+$/, "") : text;
-  return `${trimmed}${SHORT_UNITS[index][1]}`;
-}
-
-export { formatShort };
