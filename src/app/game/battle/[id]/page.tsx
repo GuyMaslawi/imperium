@@ -20,9 +20,12 @@ import {
 import { sharedGuild } from "@/lib/game/guildAllies";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 import { shieldMeta } from "@/lib/game/diamondShop";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "תוצאת קרב | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("תוצאת קרב | KRALDOR") };
+}
 
 const RES = [
   { key: "stolenGold", icon: <Icon name="gold" size={14} className="inline-block align-middle text-gold-bright" />, label: "זהב" },
@@ -123,52 +126,52 @@ export default async function BattleResultPage({
     switch (row.kind) {
       case "soldiers":
         return {
-          label: "כוח חיילים",
+          label: t("כוח חיילים"),
           value: formatNumber(row.value),
-          tip: "כוח הלחימה של החיילים בלבד (10 כוח לחייל).",
+          tip: t("כוח הלחימה של החיילים בלבד (10 כוח לחייל)."),
         };
       case "weapons":
         return {
-          label: "כוח נשקים",
+          label: t("כוח נשקים"),
           value: formatNumber(row.value),
-          tip: "תוספת הכוח מהנשקים במחסן — נשקי התקפה לתוקף, נשקי הגנה למגן. נשק מהקטגוריה הלא־נכונה לא משתתף בקרב הזה.",
+          tip: t("תוספת הכוח מהנשקים במחסן — נשקי התקפה לתוקף, נשקי הגנה למגן. נשק מהקטגוריה הלא־נכונה לא משתתף בקרב הזה."),
         };
       case "subtotal":
         return {
-          label: "סך כוח בסיס",
+          label: t("סך כוח בסיס"),
           value: formatNumber(row.value),
-          tip: "חיילים + נשקים. כל הבונוסים שמתחת מוכפלים על הסכום הזה, בזה אחר זה.",
+          tip: t("חיילים + נשקים. כל הבונוסים שמתחת מוכפלים על הסכום הזה, בזה אחר זה."),
           strong: true,
         };
       case "defense":
         return {
-          label: `יתרון המגן +${pct}%`,
+          label: t("יתרון המגן +{pct}%", { pct }),
           value: `+${formatNumber(row.value)}`,
-          tip: `הצד המתגונן נלחם בשטח שלו ומקבל תוספת קבועה של ${pct}% על כוח הבסיס — לפני הגיבור ולפני קסמי הברית. התוקף לא מקבל אותה.`,
+          tip: t("הצד המתגונן נלחם בשטח שלו ומקבל תוספת קבועה של {pct}% על כוח הבסיס — לפני הגיבור ולפני קסמי הברית. התוקף לא מקבל אותה.", { pct }),
         };
       case "hero":
         return {
-          label: `בונוס גיבור +${pct}%`,
+          label: t("בונוס גיבור +{pct}%", { pct }),
           value: `+${formatNumber(row.value)}`,
-          tip: "הגיבור מגדיל את כל כוח הצד שלו: נקודות התקפה/הגנה שהוקצו + אחוזי החפצים הלבושים (כל נקודה ואחוז = 1%). גיבור מת תורם 0%.",
+          tip: t("הגיבור מגדיל את כל כוח הצד שלו: נקודות התקפה/הגנה שהוקצו + אחוזי החפצים הלבושים (כל נקודה ואחוז = 1%). גיבור מת תורם 0%."),
         };
       case "guildSpell":
         return {
-          label: `קסם ברית +${pct}%`,
+          label: t("קסם ברית +{pct}%", { pct }),
           value: `+${formatNumber(row.value)}`,
-          tip: "קסם ברית פעיל שהוטל מראש — קסם התקפה לתוקף, קסם הגנה למגן. פועל 24 שעות מרגע ההטלה.",
+          tip: t("קסם ברית פעיל שהוטל מראש — קסם התקפה לתוקף, קסם הגנה למגן. פועל 24 שעות מרגע ההטלה."),
         };
       case "guildAid":
         return {
-          label: "עזרת ברית",
+          label: t("עזרת ברית"),
           value: `+${formatNumber(row.value)}`,
-          tip: `עזרה פסיבית: הברית מחזקת כל חבר בקרב ב־${pct}% מהכוח הצבאי המשולב של כל חבריה. זו תוספת שטוחה שנוספת בסוף, אחרי כל הכפולות — ולכן היא גדלה עם הברית, לא עם הצבא שלך.`,
+          tip: t("עזרה פסיבית: הברית מחזקת כל חבר בקרב ב־{pct}% מהכוח הצבאי המשולב של כל חבריה. זו תוספת שטוחה שנוספת בסוף, אחרי כל הכפולות — ולכן היא גדלה עם הברית, לא עם הצבא שלך.", { pct }),
         };
       case "residual":
         return {
-          label: "לא פורט בדוח זה",
+          label: t("לא פורט בדוח זה"),
           value: `${row.value > 0 ? "+" : ""}${formatNumber(row.value)}`,
-          tip: "הקרב הזה נרשם לפני שהדוח התחיל לתעד את כל מרכיבי הכוח (יתרון המגן ועזרת הברית). ההפרש מוצג כדי שהסכום יישאר נכון.",
+          tip: t("הקרב הזה נרשם לפני שהדוח התחיל לתעד את כל מרכיבי הכוח (יתרון המגן ועזרת הברית). ההפרש מוצג כדי שהסכום יישאר נכון."),
         };
     }
   };

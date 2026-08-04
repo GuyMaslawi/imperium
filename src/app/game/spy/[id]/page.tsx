@@ -37,9 +37,12 @@ import { ItemTile } from "@/components/game/ItemTile";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SpyEffectsBoard, type SpyEffectRow } from "@/components/game/SpyEffectsBoard";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
-import { getI18n, type T } from "@/i18n/server";
+import { getI18n, getT, type T } from "@/i18n/server";
 
-export const metadata = { title: "דוח ריגול | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("דוח ריגול | KRALDOR") };
+}
 
 /* ============================ presentational atoms ============================ */
 
@@ -720,19 +723,21 @@ function FullDossier({
                     </>
                   }
                   value={
-                    shieldedResources ? "0 — מוגן" : formatNumber(Math.floor(intel.resources[key] * plunderRate))
+                    shieldedResources
+                      ? t("0 — מוגן")
+                      : formatNumber(Math.floor(intel.resources[key] * plunderRate))
                   }
                   tone={shieldedResources ? "text-zinc-500" : "text-gold-bright"}
                 />
               );
             })}
             <Line
-              label={<><Icon name="army" size={15} className="inline-block align-middle" /> חיילים לשבי</>}
+              label={<><Icon name="army" size={15} className="inline-block align-middle" /> {t("חיילים לשבי")}</>}
               value={
                 shieldedSoldiers
-                  ? "0 — מוגן"
+                  ? t("0 — מוגן")
                   : intel.army.soldiers < enslaveMinSoldiers
-                    ? `0 — פחות מ־${enslaveMinSoldiers} חיילים`
+                    ? t("0 — פחות מ־{min} חיילים", { min: enslaveMinSoldiers })
                     : formatNumber(Math.floor(intel.army.soldiers * enslaveRate))
               }
               tone={shieldedSoldiers ? "text-zinc-500" : "text-zinc-100"}
@@ -744,9 +749,9 @@ function FullDossier({
       {/* ---------------- arsenal ---------------- */}
       <Card
         icon="factory"
-        title="מחסן הנשק"
+        title={t("מחסן הנשק")}
         gold
-        hint="כל פריט נשק שנמצא במחסני היעד — כמות, דרגה וכוח. סכום הכוח לפי קטגוריה הוא בדיוק מה שיעמוד מולך בקרב."
+        hint={t("כל פריט נשק שנמצא במחסני היעד — כמות, דרגה וכוח. סכום הכוח לפי קטגוריה הוא בדיוק מה שיעמוד מולך בקרב.")}
       >
         <div className="space-y-4">
           {WEAPON_CATEGORIES.map((category) => (
@@ -757,7 +762,11 @@ function FullDossier({
 
       {/* ---------------- buildings & upgrades ---------------- */}
       <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Card icon="mine" title="מבנים ומכרות" hint="רמת המבנה ומספר העבדים שהוצבו בו — יחד הם התפוקה שלו בכל עדכון רגיל.">
+        <Card
+          icon="mine"
+          title={t("מבנים ומכרות")}
+          hint={t("רמת המבנה ומספר העבדים שהוצבו בו — יחד הם התפוקה שלו בכל עדכון רגיל.")}
+        >
           <div className="grid gap-2 sm:grid-cols-2">
             {intel.buildings.map((building) => {
               const meta = BUILDING_META[building.type];
@@ -771,11 +780,11 @@ function FullDossier({
                         meta.producedResource ? resourceIcon(meta.producedResource).className : undefined
                       }
                     />
-                    {meta.label}
+                    {t(meta.label)}
                   </span>
                   <span className="flex items-center gap-2">
                     <span className="nums rounded-md border border-gold/40 bg-gold/10 px-1.5 text-xs font-bold text-gold-bright">
-                      רמה <span dir="ltr">{building.level}</span>
+                      {t("רמה")} <span dir="ltr">{building.level}</span>
                     </span>
                     {meta.supportsSlaves && (
                       <span className="nums inline-flex items-center gap-1 text-xs text-zinc-400" dir="ltr">
@@ -787,12 +796,16 @@ function FullDossier({
               );
             })}
             {intel.buildings.length === 0 && (
-              <p className="text-sm text-zinc-500">לא נמצאו מבנים.</p>
+              <p className="text-sm text-zinc-500">{t("לא נמצאו מבנים.")}</p>
             )}
           </div>
         </Card>
 
-        <Card icon="upgrades" title="שדרוגי אימפריה" hint="הרמות שהיעד קנה — מודיעין גבוה מסביר ריגול נגדי מוצלח, ותורות גבוהות מסבירות כמה תקיפות הוא יכול לספוג ולהחזיר.">
+        <Card
+          icon="upgrades"
+          title={t("שדרוגי אימפריה")}
+          hint={t("הרמות שהיעד קנה — מודיעין גבוה מסביר ריגול נגדי מוצלח, ותורות גבוהות מסבירות כמה תקיפות הוא יכול לספוג ולהחזיר.")}
+        >
           <dl className="space-y-2 text-sm">
             {intel.upgrades
               .filter((u): u is { type: ActiveEmpireUpgradeType; level: number } =>
@@ -806,14 +819,14 @@ function FullDossier({
                     label={
                       <span className="flex flex-col">
                         <span className="flex items-center gap-1.5 text-zinc-300">
-                          <Icon name={meta.icon} size={15} /> {meta.label}
+                          <Icon name={meta.icon} size={15} /> {t(meta.label)}
                         </span>
                         <span className="text-[11px] text-zinc-500">
                           {meta.effectLabel(t, upgrade.level)}
                         </span>
                       </span>
                     }
-                    value={`רמה ${upgrade.level}`}
+                    value={t("רמה {level}", { level: upgrade.level })}
                     tone="text-gold-bright"
                   />
                 );
@@ -826,11 +839,11 @@ function FullDossier({
       {intel.hero && (
         <Card
           icon="hero"
-          title="הגיבור"
+          title={t("הגיבור")}
           gold
           aside={
             <span className="nums inline-flex items-center gap-1 rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-bold text-gold">
-              רמה <span dir="ltr">{intel.hero.level}</span>
+              {t("רמה")} <span dir="ltr">{intel.hero.level}</span>
               {intel.hero.resets > 0 && (
                 <span className="text-purple-300" dir="ltr">↻×{intel.hero.resets}</span>
               )}
@@ -839,8 +852,9 @@ function FullDossier({
         >
           {intel.hero.dead && (
             <p className="mb-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300">
-              <Icon name="heart" size={14} className="inline-block align-middle" /> הגיבור מוטל
-              מת — כל הבונוסים שלו מנוטרלים, כולל אחוזי ההגנה. זה החלון לתקוף.
+              <Icon name="heart" size={14} className="inline-block align-middle" />{" "}
+              {t("הגיבור מוטל מת — כל הבונוסים שלו מנוטרלים, כולל אחוזי ההגנה. זה החלון לתקוף.")}
+
             </p>
           )}
 
@@ -849,7 +863,8 @@ function FullDossier({
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs">
                   <span className="text-zinc-400">
-                    <Icon name="heart" size={14} className="inline-block align-middle text-red-400" /> חיים
+                    <Icon name="heart" size={14} className="inline-block align-middle text-red-400" />{" "}
+                    {t("חיים")}
                   </span>
                   <span className="nums font-bold text-red-400" dir="ltr">
                     {intel.hero.health} / {HERO_MAX_HEALTH}
@@ -860,7 +875,8 @@ function FullDossier({
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs">
                   <span className="text-zinc-400">
-                    <Icon name="spark" size={14} className="inline-block align-middle" /> ניסיון
+                    <Icon name="spark" size={14} className="inline-block align-middle" />{" "}
+                    {t("ניסיון")}
                   </span>
                   <span className="nums font-bold text-gold" dir="ltr">
                     {formatNumber(intel.hero.xp)} / {formatNumber(xpToNextLevel(intel.hero.level))}
@@ -870,16 +886,19 @@ function FullDossier({
               </div>
 
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <Tile label="נק׳ התקפה" value={formatNumber(intel.hero.attackPoints)} tone="text-red-400" />
-                <Tile label="נק׳ הגנה" value={formatNumber(intel.hero.defensePoints)} tone="text-sky-300" />
-                <Tile label="נק׳ משאבים" value={formatNumber(intel.hero.resourcePoints)} tone="text-emerald-400" />
-                <Tile label="לא הושקעו" value={formatNumber(intel.hero.unspentPoints)} tone="text-zinc-400" />
+                <Tile label={t("נק׳ התקפה")} value={formatNumber(intel.hero.attackPoints)} tone="text-red-400" />
+                <Tile label={t("נק׳ הגנה")} value={formatNumber(intel.hero.defensePoints)} tone="text-sky-300" />
+                <Tile label={t("נק׳ משאבים")} value={formatNumber(intel.hero.resourcePoints)} tone="text-emerald-400" />
+                <Tile label={t("לא הושקעו")} value={formatNumber(intel.hero.unspentPoints)} tone="text-zinc-400" />
               </div>
             </div>
 
             <div>
               <h4 className="mb-2 text-xs font-bold tracking-wide text-gold">
-                בונוסים מלאים {intel.hero.dead && <span className="text-red-400">(מושהים — הגיבור מת)</span>}
+                {t("בונוסים מלאים")}{" "}
+                {intel.hero.dead && (
+                  <span className="text-red-400">{t("(מושהים — הגיבור מת)")}</span>
+                )}
               </h4>
               <dl className="space-y-2 text-sm">
                 <Line
@@ -898,23 +917,23 @@ function FullDossier({
                   tone="text-gold"
                 />
                 <Line
-                  label={<><Icon name="mine" size={15} className="inline-block align-middle" /> תפוקת מכרות</>}
+                  label={<><Icon name="mine" size={15} className="inline-block align-middle" /> {t("תפוקת מכרות")}</>}
                   value={`+${Math.round(intel.hero.pct.resources)}%`}
                   tone="text-emerald-400"
                 />
                 <Line
-                  label={<><Icon name="turns" size={15} className="inline-block align-middle text-emerald-400" /> תורות מציוד</>}
+                  label={<><Icon name="turns" size={15} className="inline-block align-middle text-emerald-400" /> {t("תורות מציוד")}</>}
                   value={`+${formatNumber(intel.hero.flat.turns)}`}
                 />
                 <Line
-                  label={<><Icon name="citizens" size={15} className="inline-block align-middle" /> אזרחים מציוד</>}
+                  label={<><Icon name="citizens" size={15} className="inline-block align-middle" /> {t("אזרחים מציוד")}</>}
                   value={`+${formatNumber(intel.hero.flat.citizens)}`}
                 />
               </dl>
             </div>
           </div>
 
-          <h4 className="mb-2 mt-4 text-xs font-bold tracking-wide text-gold">ציוד לבוש</h4>
+          <h4 className="mb-2 mt-4 text-xs font-bold tracking-wide text-gold">{t("ציוד לבוש")}</h4>
           <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-9">
             {SLOT_ORDER.map((slot) => {
               const meta = SLOT_META[slot];
@@ -945,7 +964,7 @@ function FullDossier({
             })}
           </div>
           {equippedBySlot.size === 0 && (
-            <p className="mt-3 text-xs text-zinc-600">הגיבור של היעד אינו לובש ציוד כלל.</p>
+            <p className="mt-3 text-xs text-zinc-600">{t("הגיבור של היעד אינו לובש ציוד כלל.")}</p>
           )}
         </Card>
       )}

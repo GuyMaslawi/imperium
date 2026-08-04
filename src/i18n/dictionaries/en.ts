@@ -3019,6 +3019,106 @@ export const EN: Record<string, string> = {
   "מחובר עכשיו": "online now",
   "לא מחובר עכשיו": "offline",
 
+  /* ------------------------------------------------------------------ */
+  /* the spy report — the dossier a successful mission brings back       */
+  /* ------------------------------------------------------------------ */
+  "דוח ריגול | KRALDOR": "Spy report | KRALDOR",
+  "דוח ריגול": "Spy report",
+  "הריגול על {foe} הצליח! ✅": "The run on {foe} succeeded ✅",
+  "המרגל נתפס! המשימה נכשלה 🚨": "The spy was caught. The mission failed 🚨",
+  "כח המודיעין שלך גבר על היעד — התיק המלא לפניך.":
+    "Your intelligence power beat theirs — the full dossier is below.",
+  "כח המודיעין של היעד גבר — המרגל אבד. שדרג מודיעין, גייס מרגלים או נשקי ריגול.":
+    "Their intelligence power won — the spy is lost. Upgrade intelligence, train spies or buy spy weapons.",
+  "המודיעין שלך": "Your intelligence",
+  "המודיעין שלו": "Their intelligence",
+  "תקוף את {foe}": "Attack {foe}",
+  "חזרה לבסיס": "Back to the base",
+
+  "חסינות שחקן חדש": "New-player protection",
+  "לא ניתן לתקוף או לרגל אותו כלל": "they cannot be attacked or spied on at all",
+  "ניצחון עליו לא יניב שלל": "beating them yields no plunder",
+  "ניצחון עליו לא ישעבד חיילים": "beating them enslaves no soldiers",
+  "כל בונוסי הגיבור מנוטרלים עד שיקום":
+    "every hero bonus is off until he rises",
+  "מסע הגיבור · דרגה {tier}": "Hero expedition · rung {tier}",
+  "הגיבור בדרכים — שלל צפוי לחזור אליו":
+    "the hero is on the road — a haul is due back to him",
+  "האצת מכרה זהב": "Gold mine boost",
+  "האצת מכרה עץ": "Wood mine boost",
+  "האצת מכרה ברזל": "Iron mine boost",
+  "האצת מחצבת אבן": "Stone quarry boost",
+  "הנחת חנות": "Shop discount",
+  "+{pct}% תפוקת זהב": "+{pct}% gold output",
+  "+{pct}% תפוקת עץ": "+{pct}% wood output",
+  "+{pct}% תפוקת ברזל": "+{pct}% iron output",
+  "+{pct}% תפוקת אבן": "+{pct}% stone output",
+  "{pct}% הנחה על רכישות": "{pct}% off purchases",
+
+  "אוכלוסייה": "Population",
+  "אוכלוסייה ומלאי": "Population and stock",
+  "סיבובי גלגל": "Wheel spins",
+  "משאבים זמינים": "Available resources",
+  "משאבים אלה זמינים לביזה — משאבים במחסן מוגנים מפני תקיפה.":
+    "These are open to plunder — anything in a warehouse is safe from attack.",
+  "דוח ישן — נאסף לפני שהמרגלים למדו להביא את התיק המלא. רגל שוב כדי לקבל דוח מלא.":
+    "An old report — gathered before the spies learned to bring back the full dossier. Run it again for a complete one.",
+  "אוצר גלוי — זמין לביזה": "Exposed treasury — open to plunder",
+  "רק המשאבים שמחוץ למחסן נלקחים בקרב — {pct}% מהם לתוקף המנצח.":
+    "Only what sits outside the warehouses is taken in battle — {pct}% of it to the winning attacker.",
+  "מוגן במגן משאבים": "under a resource shield",
+  "שלל צפוי {amount}": "expected plunder {amount}",
+  "מחסנים — מחוץ להישג יד": "Warehouses — out of reach",
+  "מה שנמצא במחסן לא נבזז לעולם. הרמה קובעת את הקיבולת — מחסן מלא מסמן שהיעד עומד לגלוש החוצה.":
+    "Nothing in a warehouse is ever plundered. The level sets the capacity — a full one means the target is about to spill out into the open.",
+  "סה״כ": "Total",
+  "אין ליעד מחסנים.": "The target has no warehouses.",
+  "חשבון הבנק": "The bank account",
+  "זהב בבנק חסין מביזה לחלוטין — אבל הוא מגלה כמה שווה היעד באמת, וכמה הפקדות נשארו לו עד העדכון היומי הבא.":
+    "Gold in the bank is completely safe from plunder — but it tells you what the target is really worth, and how many deposits they have left before the next daily update.",
+  "הפקדות שנוצלו": "Deposits used",
+  "ריבית יומית": "Daily interest",
+  "כוח ריגול": "Spy power",
+  "כוח צבאי": "Military power",
+  "מודיעין אפקטיבי": "Effective intelligence",
+  "״מודיעין אפקטיבי״ הוא מה שריגול נגדי צריך לעבור — כוח הריגול שלו כפול שדרוג המודיעין.":
+    "\"Effective intelligence\" is what a counter-run has to beat — their spy power times their intelligence upgrade.",
+  "מה יש להרוויח": "What there is to win",
+  "הערכה לפי הכללים הנוכחיים, בהנחת ניצחון בקרב. מגנים בתוקף מאפסים את הרלוונטי מהם.":
+    "An estimate under the current rules, assuming you win the battle. A live shield zeroes whichever line it covers.",
+  "0 — מוגן": "0 — shielded",
+  "חיילים לשבי": "Soldiers enslaved",
+  "0 — פחות מ־{min} חיילים": "0 — fewer than {min} soldiers",
+  "מחסן הנשק": "The armoury",
+  "כל פריט נשק שנמצא במחסני היעד — כמות, דרגה וכוח. סכום הכוח לפי קטגוריה הוא בדיוק מה שיעמוד מולך בקרב.":
+    "Every weapon in the target's stores — count, tier and power. The category totals are exactly what will face you in battle.",
+  "פריטים · דרגה פתוחה": "items · tier unlocked",
+  "אין ליעד ולו נשק אחד בקטגוריה הזו.":
+    "The target has not one weapon in this category.",
+  "נשק": "Weapon",
+  "דרגה": "Tier",
+  "כוח ליחידה": "Power each",
+  "כוח כולל": "Total power",
+  "מבנים ומכרות": "Buildings and mines",
+  "רמת המבנה ומספר העבדים שהוצבו בו — יחד הם התפוקה שלו בכל עדכון רגיל.":
+    "The building's level and the crew standing on it — together they are its output on every regular update.",
+  "לא נמצאו מבנים.": "No buildings found.",
+  "שדרוגי אימפריה": "Empire upgrades",
+  "הרמות שהיעד קנה — מודיעין גבוה מסביר ריגול נגדי מוצלח, ותורות גבוהות מסבירות כמה תקיפות הוא יכול לספוג ולהחזיר.":
+    "The levels the target has bought — high intelligence explains a successful counter-run, and high turns explain how many attacks they can absorb and answer.",
+  "הגיבור": "The hero",
+  "הגיבור מוטל מת — כל הבונוסים שלו מנוטרלים, כולל אחוזי ההגנה. זה החלון לתקוף.":
+    "The hero lies dead — every bonus he carries is off, defence percentages included. This is the window.",
+  "נק׳ התקפה": "Attack pts",
+  "נק׳ הגנה": "Defence pts",
+  "נק׳ משאבים": "Resource pts",
+  "לא הושקעו": "Unspent",
+  "בונוסים מלאים": "Full bonuses",
+  "(מושהים — הגיבור מת)": "(suspended — the hero is dead)",
+  "תורות מציוד": "Turns from gear",
+  "אזרחים מציוד": "Citizens from gear",
+  "הגיבור של היעד אינו לובש ציוד כלל.": "The target's hero wears no gear at all.",
+
   /* hero gear */
   "ברשותך מאז": "Yours since",
   "לבש {item}": "Equip {item}",
