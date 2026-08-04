@@ -3119,6 +3119,81 @@ export const EN: Record<string, string> = {
   "אזרחים מציוד": "Citizens from gear",
   "הגיבור של היעד אינו לובש ציוד כלל.": "The target's hero wears no gear at all.",
 
+  /* ------------------------------------------------------------------ */
+  /* the battle report                                                   */
+  /* ------------------------------------------------------------------ */
+  "תוצאת קרב | KRALDOR": "Battle result | KRALDOR",
+  "ניסיון לגיבור מהקרב הזה. רק תקיפה מנצחת מזכה בניסיון — הדפת התקפה לא, הפרס עליה הוא שלא נלקח ממך דבר. הכמות תלויה בפער הרמות (כל איפוס של היריב נחשב 100 רמות, ולכן גם יריב ברמה 1 אחרי איפוס משלם יפה) ובעד כמה הקרב היה צמוד: מחיקת יריב חלש ונמוך ממך מזכה במעט, ניצחון מול יריב שווה או גבוה ממך מזכה בהרבה. כשמצטבר מספיק — הגיבור עולה רמה ומקבל נקודת גיבור ו-25 אזרחים לאימפריה.":
+    "Hero experience from this battle. Only a won attack pays it — holding off an attack does not; the reward for that is that nothing was taken from you. The amount follows the level gap (each of the rival's resets counts as 100 levels, so even a level 1 rival after a reset pays well) and how close the fight was: erasing a weak, low rival pays little, beating an equal or stronger one pays a lot. Enough of it and the hero levels, earning a hero point and 25 citizens for the empire.",
+  "כוח חיילים": "Soldier power",
+  "כוח הלחימה של החיילים בלבד (10 כוח לחייל).":
+    "The soldiers' fighting power alone (10 power each).",
+  "כוח נשקים": "Weapon power",
+  "תוספת הכוח מהנשקים במחסן — נשקי התקפה לתוקף, נשקי הגנה למגן. נשק מהקטגוריה הלא־נכונה לא משתתף בקרב הזה.":
+    "The power the stored weapons add — attack weapons for the attacker, defence weapons for the defender. A weapon from the wrong category takes no part in this battle.",
+  "סך כוח בסיס": "Base power total",
+  "חיילים + נשקים. כל הבונוסים שמתחת מוכפלים על הסכום הזה, בזה אחר זה.":
+    "Soldiers + weapons. Every bonus below multiplies this total, one after another.",
+  "יתרון המגן +{pct}%": "Defender's edge +{pct}%",
+  "הצד המתגונן נלחם בשטח שלו ומקבל תוספת קבועה של {pct}% על כוח הבסיס — לפני הגיבור ולפני קסמי הברית. התוקף לא מקבל אותה.":
+    "The defending side fights on its own ground and gets a flat {pct}% on its base power — before the hero and before any guild spell. The attacker gets none of it.",
+  "בונוס גיבור +{pct}%": "Hero bonus +{pct}%",
+  "הגיבור מגדיל את כל כוח הצד שלו: נקודות התקפה/הגנה שהוקצו + אחוזי החפצים הלבושים (כל נקודה ואחוז = 1%). גיבור מת תורם 0%.":
+    "The hero lifts his whole side: allocated attack/defence points plus the percentages on his worn gear (each point and each percent is 1%). A dead hero contributes 0%.",
+  "קסם ברית +{pct}%": "Guild spell +{pct}%",
+  "קסם ברית פעיל שהוטל מראש — קסם התקפה לתוקף, קסם הגנה למגן. פועל 24 שעות מרגע ההטלה.":
+    "A guild spell cast in advance — the attack spell for the attacker, the defence spell for the defender. It runs 24 hours from the cast.",
+  "עזרה פסיבית: הברית מחזקת כל חבר בקרב ב־{pct}% מהכוח הצבאי המשולב של כל חבריה. זו תוספת שטוחה שנוספת בסוף, אחרי כל הכפולות — ולכן היא גדלה עם הברית, לא עם הצבא שלך.":
+    "Passive aid: the guild strengthens every member in battle by {pct}% of its members' combined military power. It is a flat amount added last, after every multiplier — so it grows with the guild, not with your army.",
+  "לא פורט בדוח זה": "Not itemised in this report",
+  "הקרב הזה נרשם לפני שהדוח התחיל לתעד את כל מרכיבי הכוח (יתרון המגן ועזרת הברית). ההפרש מוצג כדי שהסכום יישאר נכון.":
+    "This battle was recorded before the report started itemising every power term (the defender's edge and guild aid). The difference is shown so the total still adds up.",
+  "אתם בברית {guild} מאז הקרב הזה — אין תקיפות בין חברי ברית.":
+    "You have both been in {guild} since this battle — guildmates cannot attack each other.",
+  "⚔️ תקוף שוב": "⚔️ Attack again",
+  "⚔️ נקום": "⚔️ Take revenge",
+  "לפרופיל היריב": "To their profile",
+  "תוקף": "Attacker",
+  "מתגונן": "Defender",
+  "תבוסה": "Defeat",
+  "מול": "against",
+  "כוח קרב": "Battle power",
+  "ניסיון לגיבור": "hero XP",
+  "היעד היה מוגן": "The target was shielded",
+  "המגן שלך עמד": "Your shield held",
+  "חסמו": "blocked",
+  "את הביזה": "the plunder",
+  "את השעבוד": "the enslavement",
+  " — הקרב נוצח, אך לא נלקח דבר.": " — the battle was won, but nothing was taken.",
+  " — לא נלקח ממך דבר.": " — nothing was taken from you.",
+  "שלל הביזה": "The plunder",
+  "💸 נבזז ממך": "💸 Plundered from you",
+  "אבדות שלך": "Your losses",
+  "אבדות היריב": "Their losses",
+  "אין": "none",
+  "קרבות אינם גורמים לאבדות בחיילים — לא מול שחקנים ולא מול בוס עיר. חייל שמשועבד לא נהרג: הוא עובר לעבדי המכרות של התוקף.":
+    "Battles cost no soldiers at all — not against players and not against a city boss. An enslaved soldier is not killed: he joins the attacker's mine slaves.",
+  "שועבדו למכרות": "Enslaved to the mines",
+  "ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים).":
+    "Beating a defender with 20+ soldiers enslaves some of them — the bigger their army, the more are taken. They join the attacker's free mine slaves (not their citizens).",
+  "🎡 זכית בסיבוב גלגל מזל!": "🎡 You won a wheel spin!",
+  "נלכד בקרב": "Taken in battle",
+  "נלכד שיקוי: {potion}": "Potion taken: {potion}",
+  "נוסף לתרמיל": "added to the satchel",
+  "לשיקויים": "To the potions",
+  "נלכד חפץ: {item}": "Gear taken: {item}",
+  "רמת פריט": "Item level",
+  "נוסף לתיק הגיבור": "added to the hero's pack",
+  "לציוד הגיבור": "To the hero's gear",
+  "מאיזה כוח הורכב הקרב": "What the battle's power was made of",
+  "כוח ההתקפה שלך": "Your attack power",
+  "כוח ההגנה שלך": "Your defence power",
+  "כוח ההגנה של היריב": "Their defence power",
+  "כוח ההתקפה של היריב": "Their attack power",
+  "סה״כ כוח בקרב": "Total battle power",
+  "הקרב הוכרע בהשוואה ישירה בין שני הסכומים — התוקף מנצח רק אם כוחו גדול ממש מכוח המגן. שוויון נחשב הדיפה.":
+    "The battle came down to a straight comparison of the two totals — the attacker wins only if his power is strictly greater. A tie counts as a repulse.",
+
   /* hero gear */
   "ברשותך מאז": "Yours since",
   "לבש {item}": "Equip {item}",

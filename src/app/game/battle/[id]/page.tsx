@@ -230,20 +230,20 @@ export default async function BattleResultPage({
           {allied ? (
             <p className="flex items-center gap-1.5 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-xs text-gold-bright">
               <Icon name="guild" size={14} />
-              אתם בברית {allied.name} מאז הקרב הזה — אין תקיפות בין חברי ברית.
+              {t("אתם בברית {guild} מאז הקרב הזה — אין תקיפות בין חברי ברית.", { guild: allied.name })}
             </p>
           ) : (
             <AttackAgainButton
               targetEmpireId={foe.id}
               currentTurns={me.turns}
-              label={iAmAttacker ? "⚔️ תקוף שוב" : "⚔️ נקום"}
+              label={iAmAttacker ? t("⚔️ תקוף שוב") : t("⚔️ נקום")}
             />
           )}
           <Link href={`/game/empires/${foe.id}`} className="btn btn-ghost px-5 py-2 text-sm">
-            <Icon name="crown" size={16} className="inline-block align-middle" /> לפרופיל היריב
+            <Icon name="crown" size={16} className="inline-block align-middle" /> {t("לפרופיל היריב")}
           </Link>
-          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס</Link>
-          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="reports" size={16} className="inline-block align-middle" /> היסטוריה</Link>
+          <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="base" size={16} className="inline-block align-middle" /> {t("חזרה לבסיס")}</Link>
+          <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="reports" size={16} className="inline-block align-middle" /> {t("היסטוריה")}</Link>
         </div>
         <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt, locale)}</p>
       </div>
@@ -260,7 +260,7 @@ export default async function BattleResultPage({
               <Icon name="hero" size={36} className="text-emerald-300" />
             </div>
             <p className="w-full break-words font-black text-emerald-300">{myName}</p>
-            <p className="text-[11px] text-zinc-500">{iAmAttacker ? "תוקף" : "מגן"}</p>
+            <p className="text-[11px] text-zinc-500">{iAmAttacker ? t("תוקף") : t("מתגונן")}</p>
           </div>
 
           {/* verdict */}
@@ -271,9 +271,9 @@ export default async function BattleResultPage({
               }`}
               style={{ textShadow: "0 2px 18px rgba(0,0,0,0.8)" }}
             >
-              {iWon ? "ניצחון" : "תבוסה"}
+              {iWon ? t("ניצחון") : t("תבוסה")}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">מול</p>
+            <p className="mt-1 text-xs text-zinc-500">{t("מול")}</p>
           </div>
 
           {/* foe side */}
@@ -284,7 +284,7 @@ export default async function BattleResultPage({
             <p className="w-full break-words font-black text-red-300">
               <PlayerLink empireId={foe.id} name={foe.name} />
             </p>
-            <p className="text-[11px] text-zinc-500">{iAmAttacker ? "מגן" : "תוקף"}</p>
+            <p className="text-[11px] text-zinc-500">{iAmAttacker ? t("מתגונן") : t("תוקף")}</p>
           </div>
         </div>
 
@@ -296,7 +296,7 @@ export default async function BattleResultPage({
           </div>
           <div className="mt-1.5 flex justify-between text-xs">
             <span className="nums font-bold text-emerald-300" dir="ltr">{formatNumber(myPower)}</span>
-            <span className="text-zinc-500">כוח קרב</span>
+            <span className="text-zinc-500">{t("כוח קרב")}</span>
             <span className="nums font-bold text-red-300" dir="ltr">{formatNumber(foePower)}</span>
           </div>
         </div>
@@ -306,13 +306,13 @@ export default async function BattleResultPage({
             the plunder panel alone pushed the strip off the first screen. */}
         {myHeroXp > 0 && (
           <div className="mt-4 flex justify-center">
-            <Tip tip={HERO_XP_TIP}>
+            <Tip tip={t(HERO_XP_TIP)}>
               <span className="inline-flex cursor-help items-center gap-2 rounded-full border border-purple-400/40 bg-purple-500/10 px-4 py-1.5 shadow-[0_0_24px_-10px_rgba(192,132,252,0.9)]">
                 <Icon name="spark" size={16} className="text-purple-300" />
                 <span className="nums text-base font-black text-purple-200" dir="ltr">
                   +{formatNumber(myHeroXp)}
                 </span>
-                <span className="text-xs font-bold text-purple-300/90">ניסיון לגיבור</span>
+                <span className="text-xs font-bold text-purple-300/90">{t("ניסיון לגיבור")}</span>
               </span>
             </Tip>
           </div>
@@ -330,14 +330,14 @@ export default async function BattleResultPage({
               <ShieldGlyph key={key} shieldKey={key} size={14} />
             ))}
             <span className="font-bold text-emerald-300">
-              {iAmAttacker ? "היעד היה מוגן" : "המגן שלך עמד"}
+              {iAmAttacker ? t("היעד היה מוגן") : t("המגן שלך עמד")}
             </span>
             <span className="text-zinc-400">
-              {shieldsHeld.map((key) => shieldMeta(key).label).join(" ו")} חסמו{" "}
+              {shieldsHeld.map((key) => t(shieldMeta(key).label)).join(t(" ו"))} {t("חסמו")}{" "}
               {shieldsHeld
-                .map((key) => (key === "resources" ? "את הביזה" : "את השעבוד"))
-                .join(" ו")}
-              {iAmAttacker ? " — הקרב נוצח, אך לא נלקח דבר." : " — לא נלקח ממך דבר."}
+                .map((key) => (key === "resources" ? t("את הביזה") : t("את השעבוד")))
+                .join(t(" ו"))}
+              {iAmAttacker ? t(" — הקרב נוצח, אך לא נלקח דבר.") : t(" — לא נלקח ממך דבר.")}
             </span>
           </div>
         </div>
@@ -347,15 +347,15 @@ export default async function BattleResultPage({
         <div className="panel-gold rounded-xl p-4">
           <h3 className="mb-3 text-sm font-bold text-gold-bright">
             {iAmAttacker ? (
-              <><Icon name="gold" size={16} className="inline-block align-middle text-gold-bright" /> שלל הביזה</>
+              <><Icon name="gold" size={16} className="inline-block align-middle text-gold-bright" /> {t("שלל הביזה")}</>
             ) : (
-              "💸 נבזז ממך"
+              t("💸 נבזז ממך")
             )}
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {RES.map((r) => (
               <div key={r.key} className="panel-inset rounded-lg p-3 text-center">
-                <p className="text-[11px] text-zinc-400">{r.icon} {r.label}</p>
+                <p className="text-[11px] text-zinc-400">{r.icon} {t(r.label)}</p>
                 <p className={`nums mt-0.5 font-black ${iAmAttacker ? "text-emerald-400" : "text-red-400"}`} dir="ltr">
                   {iAmAttacker ? "+" : "−"}{formatNumber(report[r.key])}
                 </p>
@@ -370,28 +370,28 @@ export default async function BattleResultPage({
           of height above the report that actually matters, so they ride in a
           single strip; the explanations moved into their tooltips. */}
       <div className="panel flex flex-wrap items-center justify-center gap-x-5 gap-y-2 rounded-xl px-4 py-2.5">
-        <StatChip icon="turns" label="תורות" value={formatNumber(report.turnsSpent)} tone="text-gold" />
+        <StatChip icon="turns" label={t("תורות")} value={formatNumber(report.turnsSpent)} tone="text-gold" />
         {hadCasualties ? (
           <>
-            <StatChip icon="army" label="אבדות שלך" value={`−${formatNumber(mySoldiersLost)}`} tone="text-red-400" />
-            <StatChip icon="army" label="אבדות היריב" value={`−${formatNumber(foeSoldiersLost)}`} tone="text-emerald-400" />
+            <StatChip icon="army" label={t("אבדות שלך")} value={`−${formatNumber(mySoldiersLost)}`} tone="text-red-400" />
+            <StatChip icon="army" label={t("אבדות היריב")} value={`−${formatNumber(foeSoldiersLost)}`} tone="text-emerald-400" />
           </>
         ) : (
           <StatChip
             icon="army"
-            label="אבדות"
-            value="אין"
+            label={t("אבדות")}
+            value={t("אין")}
             tone="text-zinc-400"
-            tip="קרבות אינם גורמים לאבדות בחיילים — לא מול שחקנים ולא מול בוס עיר. חייל שמשועבד לא נהרג: הוא עובר לעבדי המכרות של התוקף."
+            tip={t("קרבות אינם גורמים לאבדות בחיילים — לא מול שחקנים ולא מול בוס עיר. חייל שמשועבד לא נהרג: הוא עובר לעבדי המכרות של התוקף.")}
           />
         )}
         {report.enslavedSoldiers > 0 && (
           <StatChip
             icon="mine"
-            label="שועבדו למכרות"
+            label={t("שועבדו למכרות")}
             value={`${iAmAttacker ? "+" : "−"}${formatNumber(report.enslavedSoldiers)}`}
             tone={iAmAttacker ? "text-emerald-400" : "text-red-400"}
-            tip="ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים)."
+            tip={t("ניצחון על מגן עם 20+ חיילים משעבד חלק מהם — ככל שצבאו גדול יותר, כך נשבים יותר. המשועבדים מצטרפים לעבדי המכרות הפנויים של התוקף (לא לאזרחים).")}
           />
         )}
         {wonWheelSpin && (
@@ -399,7 +399,7 @@ export default async function BattleResultPage({
             href="/game/base"
             className="inline-flex items-center gap-1.5 text-sm font-black text-gold-bright transition hover:text-gold"
           >
-            🎡 זכית בסיבוב גלגל מזל!
+            {t("🎡 זכית בסיבוב גלגל מזל!")}
           </Link>
         )}
       </div>
@@ -407,7 +407,7 @@ export default async function BattleResultPage({
       {/* -------- what the battle dropped (only when something did) -------- */}
       {(capturedItem || capturedPotion) && (
         <div className="panel rounded-xl p-4">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="gift" size={18} className="text-crimson-bright" /> נלכד בקרב</h3>
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright"><Icon name="gift" size={18} className="text-crimson-bright" /> {t("נלכד בקרב")}</h3>
           <div className="flex flex-wrap items-center gap-4">
             {capturedPotion && (
               <div className="flex items-center gap-3">
@@ -419,14 +419,14 @@ export default async function BattleResultPage({
                     className={`text-sm font-black ${POTION_META[capturedPotion].tone}`}
                   >
                     <Icon name="potion" size={16} className="inline-block align-middle" />{" "}
-                    נלכד שיקוי: {POTION_META[capturedPotion].label}
+                    {t("נלכד שיקוי: {potion}", { potion: t(POTION_META[capturedPotion].label) })}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     {POTION_META[capturedPotion].tagline} ·{" "}
-                    {potionDurationLabel(t, capturedPotion)} · נוסף לתרמיל
+                    {potionDurationLabel(t, capturedPotion)} · {t("נוסף לתרמיל")}
                   </p>
                   <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
-                    <Icon name="potion" size={14} className="inline-block align-middle" /> לשיקויים
+                    <Icon name="potion" size={14} className="inline-block align-middle" /> {t("לשיקויים")}
                   </Link>
                 </div>
               </div>
@@ -444,17 +444,17 @@ export default async function BattleResultPage({
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
-                    <Icon name="gift" size={16} className="inline-block align-middle" /> נלכד חפץ: {itemDisplayName(t, capturedItem.slot, capturedItem.level)}
+                    <Icon name="gift" size={16} className="inline-block align-middle" /> {t("נלכד חפץ: {item}", { item: itemDisplayName(t, capturedItem.slot, capturedItem.level) })}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
-                    רמת פריט{" "}
+                    {t("רמת פריט")}{" "}
                     <span className="nums" dir="ltr">
                       {capturedItem.level}
                     </span>{" "}
-                    · נוסף לתיק הגיבור
+                    · {t("נוסף לתיק הגיבור")}
                   </p>
                   <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
-                    <Icon name="attack" size={14} className="inline-block align-middle" /> לציוד הגיבור
+                    <Icon name="attack" size={14} className="inline-block align-middle" /> {t("לציוד הגיבור")}
                   </Link>
                 </div>
               </div>
@@ -467,7 +467,7 @@ export default async function BattleResultPage({
       <div>
         <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name="attack" size={18} className="text-crimson-bright" />
-          מאיזה כוח הורכב הקרב
+          {t("מאיזה כוח הורכב הקרב")}
         </h3>
         {/* Both columns, itemised — the attacker's attack and the defender's
             defence, each term with the power it actually added. Reading them
@@ -478,14 +478,14 @@ export default async function BattleResultPage({
           {[
             {
               title: myName,
-              role: iAmAttacker ? "כוח ההתקפה שלך" : "כוח ההגנה שלך",
+              role: iAmAttacker ? t("כוח ההתקפה שלך") : t("כוח ההגנה שלך"),
               tone: "emerald",
               rows: mySide,
               total: myPower,
             },
             {
               title: foe.name,
-              role: iAmAttacker ? "כוח ההגנה של היריב" : "כוח ההתקפה של היריב",
+              role: iAmAttacker ? t("כוח ההגנה של היריב") : t("כוח ההתקפה של היריב"),
               tone: "red",
               rows: foeSide,
               total: foePower,
@@ -530,7 +530,7 @@ export default async function BattleResultPage({
                   </div>
                 ))}
                 <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-                  <dt className="font-bold text-zinc-300">סה״כ כוח בקרב</dt>
+                  <dt className="font-bold text-zinc-300">{t("סה״כ כוח בקרב")}</dt>
                   <dd className="nums font-black text-gold-bright" dir="ltr">
                     {formatNumber(side.total)}
                   </dd>
@@ -540,8 +540,8 @@ export default async function BattleResultPage({
           ))}
         </div>
         <p className="mt-2 text-center text-[11px] text-zinc-500">
-          הקרב הוכרע בהשוואה ישירה בין שני הסכומים — התוקף מנצח רק אם כוחו גדול
-          ממש מכוח המגן. שוויון נחשב הדיפה.
+          {t("הקרב הוכרע בהשוואה ישירה בין שני הסכומים — התוקף מנצח רק אם כוחו גדול ממש מכוח המגן. שוויון נחשב הדיפה.")}
+
         </p>
       </div>
 
