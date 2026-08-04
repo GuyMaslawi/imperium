@@ -56,23 +56,6 @@ export const HAPPY_HOUR_PRESETS = [50, 100, 200, 400, 900] as const;
 /** One-click durations for the launcher, in minutes. */
 export const HAPPY_HOUR_DURATIONS = [15, 30, 60, 120, 180, 360, 720, 1440] as const;
 
-/**
- * "45 דק׳" / "3 שעות" / "יום שלם" — a length as an admin says it out loud.
- *
- * Lives here rather than next to the launcher because the admin *list* renders
- * on the server: a helper exported from a "use client" module reaches a server
- * component as a client reference, and calling it there throws.
- */
-export function durationLabel(minutes: number): string {
-  if (minutes <= 0) return "ללא הגבלה";
-  if (minutes < 60) return `${minutes} דק׳`;
-  if (minutes === 1440) return "יום שלם";
-  const hours = Number((minutes / 60).toFixed(1));
-  if (hours === 1) return "שעה";
-  if (hours === 2) return "שעתיים";
-  return `${hours} שעות`;
-}
-
 /** What a bonus percent multiplies a gain by: 100% more = ×2. */
 export function happyHourMultiplier(bonusPct: number): number {
   return 1 + Math.max(0, bonusPct) / 100;

@@ -14,6 +14,7 @@ import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
 import { appBaseUrl, sendMail } from "@/server/mailer";
 import { seasonClosedError } from "@/server/seasonGuard";
+import { getI18n, getT } from "@/i18n/server";
 import {
   LOGIN_TIMING_DUMMY_HASH,
   hashPassword,
@@ -90,15 +91,26 @@ async function sendVerificationEmail(user: {
   ]);
 
   const link = `${appBaseUrl()}/verify-email?token=${encodeURIComponent(raw)}`;
+  // The letter goes to one reader, and this runs on their own request — the
+  // sign-up or the resend — so `getT()` resolves *their* language. The `dir`
+  // has to follow it: an English letter laid out RTL is unreadable.
+  const { t, dir } = await getI18n();
   return sendMail({
     to: user.email,
-    subject: "אימות כתובת האימייל שלך בקראלדור",
-    text: `שלום ${user.name},\n\nכדי להפעיל את החשבון שלך בקראלדור, פתח את הקישור:\n${link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.`,
-    html: `<div dir="rtl" style="font-family:system-ui,sans-serif;line-height:1.6">
-      <h2>ברוך הבא לקראלדור, ${escapeHtml(user.name)}</h2>
-      <p>כדי להפעיל את החשבון ולהתחיל לשחק, אשר את כתובת האימייל שלך:</p>
-      <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#b8892b;color:#fff;border-radius:8px;text-decoration:none">אימות האימייל</a></p>
-      <p style="color:#666;font-size:13px">הקישור תקף ל-24 שעות. אם לא נרשמת לקראלדור, אפשר להתעלם מההודעה.</p>
+    subject: t("אימות כתובת האימייל שלך בקראלדור"),
+    text: t(
+      "שלום {name},\n\nכדי להפעיל את החשבון שלך בקראלדור, פתח את הקישור:\n{link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.",
+      { name: user.name, link }
+    ),
+    html: `<div dir="${dir}" style="font-family:system-ui,sans-serif;line-height:1.6">
+      <h2>${escapeHtml(t("ברוך הבא לקראלדור, {name}", { name: user.name }))}</h2>
+      <p>${escapeHtml(t("כדי להפעיל את החשבון ולהתחיל לשחק, אשר את כתובת האימייל שלך:"))}</p>
+      <p><a href="${link}" style="display:inline-block;padding:10px 18px;background:#b8892b;color:#fff;border-radius:8px;text-decoration:none">${escapeHtml(
+        t("אימות האימייל")
+      )}</a></p>
+      <p style="color:#666;font-size:13px">${escapeHtml(
+        t("הקישור תקף ל-24 שעות. אם לא נרשמת לקראלדור, אפשר להתעלם מההודעה.")
+      )}</p>
     </div>`,
   });
 }
@@ -454,7 +466,7 @@ export async function login(
     return { error: "אימייל או סיסמה שגויים" };
   }
   if (isBanned(user)) {
-    return { error: banNotice(user) };
+    return { error: banNotice(await getT(), user) };
   }
 
   // Successful sign-in clears the streak (and any expired lock), and is also the
@@ -706,7 +718,7 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
   }
 
   if (isBanned(user)) {
-    return { error: banNotice(user) };
+    return { error: banNotice(await getT(), user) };
   }
 
   // Stamp the login address on every Google sign-in, returning users included —

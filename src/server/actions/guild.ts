@@ -27,6 +27,7 @@ import {
 } from "@/lib/game/guild";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT, type T } from "@/i18n/server";
 import {
   announceSuccession,
   ensureGuildLeader,
@@ -35,6 +36,8 @@ import {
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — the action shells catch it and
+  // return the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -91,9 +94,12 @@ async function runMemberAction(
   perform: (
     membership: MembershipWithGuild,
     tx: Prisma.TransactionClient,
-    empireId: string
+    empireId: string,
+    /** The reader's translator, resolved once for the whole action. */
+    t: T
   ) => Promise<ActionState>
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -103,7 +109,7 @@ async function runMemberAction(
         where: { empireId },
         include: { guild: true },
       });
-      if (!membership) return { error: "אינך חבר בברית." };
+      if (!membership) return { error: t("אינך חבר בברית.") };
 
       // Seat a leader before the action runs, so a guild left headless can
       // still be governed — every role gate below reads the repaired roster.
@@ -114,14 +120,14 @@ async function runMemberAction(
         if (heir.id === membership.id) membership.role = "LEADER";
       }
 
-      return perform(membership, tx, empireId);
+      return perform(membership, tx, empireId, t);
     });
 
     revalidateGuild();
     return result;
   } catch (err) {
     await logError("guild.unknown", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -130,6 +136,10 @@ async function runMemberAction(
 const guildNameSchema = z
   .string()
   .trim()
+  // The two messages below are surfaced verbatim (see createGuild), so they are
+  // keyed through the dictionary at the point they are read rather than here —
+  // a zod schema is built once at module load, with no request to read a
+  // language from.
   .min(GUILD_NAME_MIN_LENGTH, "שם הברית קצר מדי")
   .max(GUILD_NAME_MAX_LENGTH, "שם הברית ארוך מדי");
 
@@ -137,9 +147,11 @@ export async function createGuild(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = guildNameSchema.safeParse(formData.get("name"));
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "שם ברית לא תקין" };
+    const issue = parsed.error.issues[0]?.message;
+    return { error: issue ? t(issue) : t("שם ברית לא תקין") };
   }
   const name = parsed.data;
 
@@ -152,20 +164,19 @@ export async function createGuild(
       const existingMembership = await tx.guildMember.findUnique({
         where: { empireId },
       });
-      if (existingMembership) return { error: "אתה כבר חבר בברית." };
+      if (existingMembership) return { error: t("אתה כבר חבר בברית.") };
 
       const nameTaken = await tx.guild.findUnique({ where: { name } });
-      if (nameTaken) return { error: "שם הברית כבר תפוס — בחר שם אחר." };
+      if (nameTaken) return { error: t("שם הברית כבר תפוס — בחר שם אחר.") };
 
-      if (empire.diamonds < GUILD_CREATION_COST_DIAMONDS) {
-        return {
-          error: `הקמת ברית עולה ${GUILD_CREATION_COST_DIAMONDS} יהלומים — אין לך מספיק.`,
-        };
-      }
+      const tooPoor = {
+        error: t("הקמת ברית עולה {cost} יהלומים — אין לך מספיק.", {
+          cost: GUILD_CREATION_COST_DIAMONDS,
+        }),
+      };
+      if (empire.diamonds < GUILD_CREATION_COST_DIAMONDS) return tooPoor;
       if (!(await spendDiamonds(tx, empireId, GUILD_CREATION_COST_DIAMONDS))) {
-        return {
-          error: `הקמת ברית עולה ${GUILD_CREATION_COST_DIAMONDS} יהלומים — אין לך מספיק.`,
-        };
+        return tooPoor;
       }
 
       // Founder becomes the leader; every spell opens at level 1 (=1%).
@@ -183,14 +194,14 @@ export async function createGuild(
         },
       });
 
-      return { success: `הברית "${name}" הוקמה — אתה המנהיג!` };
+      return { success: t('הברית "{guild}" הוקמה — אתה המנהיג!', { guild: name }) };
     });
 
     revalidateGuild();
     return result;
   } catch (err) {
     await logError("guild.createGuild", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -210,8 +221,9 @@ export async function joinGuild(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = guildIdSchema.safeParse({ guildId: formData.get("guildId") });
-  if (!parsed.success) return { error: "ברית לא תקינה" };
+  if (!parsed.success) return { error: t("ברית לא תקינה") };
   const { guildId } = parsed.data;
 
   try {
@@ -223,7 +235,7 @@ export async function joinGuild(
       const existingMembership = await tx.guildMember.findUnique({
         where: { empireId },
       });
-      if (existingMembership) return { error: "אתה כבר חבר בברית." };
+      if (existingMembership) return { error: t("אתה כבר חבר בברית.") };
 
       // Lock the guild row so concurrent joins serialize. Under READ COMMITTED
       // two joins into the last seat each insert their own row and neither sees
@@ -234,7 +246,7 @@ export async function joinGuild(
       await tx.$queryRaw`SELECT id FROM "Guild" WHERE id = ${guildId} FOR UPDATE`;
 
       const guild = await tx.guild.findUnique({ where: { id: guildId } });
-      if (!guild) return { error: "הברית לא נמצאה." };
+      if (!guild) return { error: t("הברית לא נמצאה.") };
 
       // Consume the invitation. deleteMany with the expiry in the WHERE makes
       // the check and the burn one statement, so a doubled click cannot spend
@@ -244,7 +256,10 @@ export async function joinGuild(
       });
       if (claimed.count === 0) {
         return {
-          error: `הצטרפות ל"${guild.name}" אפשרית רק בהזמנה — בקש ממנהיג הברית או מסגן להזמין אותך.`,
+          error: t(
+            'הצטרפות ל"{guild}" אפשרית רק בהזמנה — בקש ממנהיג הברית או מסגן להזמין אותך.',
+            { guild: guild.name }
+          ),
         };
       }
 
@@ -261,13 +276,13 @@ export async function joinGuild(
       // they would only misfire on the day this player leaves.
       await tx.guildInvite.deleteMany({ where: { empireId } });
 
-      return { success: `הצטרפת לברית "${guild.name}"!` };
+      return { success: t('הצטרפת לברית "{guild}"!', { guild: guild.name }) };
     });
 
     revalidateGuild();
     return result;
   } catch {
-    return { error: "הברית מלאה או שאירעה שגיאה — נסה שוב." };
+    return { error: t("הברית מלאה או שאירעה שגיאה — נסה שוב.") };
   }
 }
 
@@ -276,23 +291,24 @@ export async function declineGuildInvite(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = guildIdSchema.safeParse({ guildId: formData.get("guildId") });
-  if (!parsed.success) return { error: "ברית לא תקינה" };
+  if (!parsed.success) return { error: t("ברית לא תקינה") };
   const { guildId } = parsed.data;
 
   try {
     const empireId = await requireOwnEmpireId();
     await prisma.guildInvite.deleteMany({ where: { guildId, empireId } });
     revalidateGuild();
-    return { success: "ההזמנה נדחתה." };
+    return { success: t("ההזמנה נדחתה.") };
   } catch (err) {
     await logError("guild.declineGuildInvite", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
 export async function leaveGuild(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     const { guild } = membership;
 
     // Lock the guild row before counting. GuildMember cascades on guild
@@ -312,7 +328,7 @@ export async function leaveGuild(): Promise<ActionState> {
     // against every future founder.
     if (memberCount <= 1) {
       await tx.guild.delete({ where: { id: guild.id } });
-      return { success: `הברית "${guild.name}" פורקה.` };
+      return { success: t('הברית "{guild}" פורקה.', { guild: guild.name }) };
     }
 
     await tx.guildMember.delete({ where: { empireId } });
@@ -324,13 +340,15 @@ export async function leaveGuild(): Promise<ActionState> {
       if (heir) await announceSuccession(tx, heir.empireId, guild.name);
     }
 
-    return { success: `עזבת את הברית "${guild.name}".` };
+    return { success: t('עזבת את הברית "{guild}".', { guild: guild.name }) };
   });
 }
 
 /* ------------------------------ roster: add / kick / roles ------------------------------ */
 
 const addMemberSchema = z.object({
+  // Surfaced verbatim by addGuildMember, which translates it there — a schema
+  // is built at module load, with no request to read a language from.
   name: z.string().trim().min(1, "הזן שם אימפריה").max(60),
 });
 
@@ -355,15 +373,17 @@ export async function addGuildMember(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = addMemberSchema.safeParse({ name: formData.get("name") });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "שם לא תקין" };
+    const issue = parsed.error.issues[0]?.message;
+    return { error: issue ? t(issue) : t("שם לא תקין") };
   }
   const { name } = parsed.data;
 
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים לצרף שחקנים לברית." };
+      return { error: t("רק מנהיג או סגן יכולים לצרף שחקנים לברית.") };
     }
 
     // Case-insensitive so leaders don't have to match capitalization exactly;
@@ -372,10 +392,10 @@ export async function addGuildMember(
       where: { name: { equals: name, mode: "insensitive" } },
       select: { id: true, name: true, guildMembership: { select: { id: true } } },
     });
-    if (!target) return { error: `לא נמצאה אימפריה בשם "${name}".` };
-    if (target.id === empireId) return { error: "אתה כבר חבר בברית." };
+    if (!target) return { error: t('לא נמצאה אימפריה בשם "{name}".', { name }) };
+    if (target.id === empireId) return { error: t("אתה כבר חבר בברית.") };
     if (target.guildMembership) {
-      return { error: `${target.name} כבר חבר בברית אחרת.` };
+      return { error: t("{name} כבר חבר בברית אחרת.", { name: target.name }) };
     }
 
     const guild = await tx.guild.findUniqueOrThrow({
@@ -389,7 +409,7 @@ export async function addGuildMember(
       where: { guildId: membership.guildId },
     });
     if (memberCount >= guildCapacity(guild.capacityLevel)) {
-      return { error: "הברית מלאה — הרחב את הקיבולת קודם." };
+      return { error: t("הברית מלאה — הרחב את הקיבולת קודם.") };
     }
 
     // Upsert so re-inviting refreshes the clock instead of failing on the
@@ -417,7 +437,12 @@ export async function addGuildMember(
       },
     });
 
-    return { success: `נשלחה הזמנה ל${target.name} (תקפה ${GUILD_INVITE_TTL_HOURS} שעות).` };
+    return {
+      success: t("נשלחה הזמנה ל{name} (תקפה {hours} שעות).", {
+        name: target.name,
+        hours: GUILD_INVITE_TTL_HOURS,
+      }),
+    };
   });
 }
 
@@ -441,21 +466,22 @@ export async function kickGuildMember(
   const parsed = targetMemberSchema.safeParse({
     targetEmpireId: formData.get("targetEmpireId"),
   });
-  if (!parsed.success) return { error: "חבר לא תקין" };
+  const t = await getT();
+  if (!parsed.success) return { error: t("חבר לא תקין") };
   const { targetEmpireId } = parsed.data;
 
-  return runMemberAction(async (membership, tx) => {
+  return runMemberAction(async (membership, tx, _empireId, t) => {
     if (targetEmpireId === membership.empireId) {
-      return { error: "לא ניתן להרחיק את עצמך — השתמש בעזיבת הברית." };
+      return { error: t("לא ניתן להרחיק את עצמך — השתמש בעזיבת הברית.") };
     }
     const target = await loadTargetMember(tx, membership.guildId, targetEmpireId);
-    if (!target) return { error: "החבר לא נמצא בברית." };
+    if (!target) return { error: t("החבר לא נמצא בברית.") };
 
     // Leaders kick anyone; deputies kick plain members only.
     const mayKick =
       membership.role === "LEADER" ||
       (membership.role === "DEPUTY" && target.role === "MEMBER");
-    if (!mayKick) return { error: "אין לך הרשאה להרחיק את החבר הזה." };
+    if (!mayKick) return { error: t("אין לך הרשאה להרחיק את החבר הזה.") };
 
     await tx.guildMember.delete({ where: { id: target.id } });
     await tx.message.create({
@@ -468,7 +494,7 @@ export async function kickGuildMember(
       },
     });
 
-    return { success: `${target.empire.name} הורחק מהברית.` };
+    return { success: t("{name} הורחק מהברית.", { name: target.empire.name }) };
   });
 }
 
@@ -485,18 +511,19 @@ export async function setGuildRole(
     targetEmpireId: formData.get("targetEmpireId"),
     role: formData.get("role"),
   });
-  if (!parsed.success) return { error: "בקשה לא תקינה" };
+  const t = await getT();
+  if (!parsed.success) return { error: t("בקשה לא תקינה") };
   const { targetEmpireId, role } = parsed.data;
 
-  return runMemberAction(async (membership, tx) => {
+  return runMemberAction(async (membership, tx, _empireId, t) => {
     if (membership.role !== "LEADER") {
-      return { error: "רק המנהיג יכול לשנות תפקידים." };
+      return { error: t("רק המנהיג יכול לשנות תפקידים.") };
     }
     if (targetEmpireId === membership.empireId) {
-      return { error: "לא ניתן לשנות את התפקיד של עצמך." };
+      return { error: t("לא ניתן לשנות את התפקיד של עצמך.") };
     }
     const target = await loadTargetMember(tx, membership.guildId, targetEmpireId);
-    if (!target) return { error: "החבר לא נמצא בברית." };
+    if (!target) return { error: t("החבר לא נמצא בברית.") };
 
     await tx.guildMember.update({
       where: { id: target.id },
@@ -506,8 +533,8 @@ export async function setGuildRole(
     return {
       success:
         role === "DEPUTY"
-          ? `${target.empire.name} מונה לסגן.`
-          : `${target.empire.name} הורד לחבר מן השורה.`,
+          ? t("{name} מונה לסגן.", { name: target.empire.name })
+          : t("{name} הורד לחבר מן השורה.", { name: target.empire.name }),
     };
   });
 }
@@ -519,18 +546,19 @@ export async function transferGuildLeadership(
   const parsed = targetMemberSchema.safeParse({
     targetEmpireId: formData.get("targetEmpireId"),
   });
-  if (!parsed.success) return { error: "חבר לא תקין" };
+  const t = await getT();
+  if (!parsed.success) return { error: t("חבר לא תקין") };
   const { targetEmpireId } = parsed.data;
 
-  return runMemberAction(async (membership, tx) => {
+  return runMemberAction(async (membership, tx, _empireId, t) => {
     if (membership.role !== "LEADER") {
-      return { error: "רק המנהיג יכול להעביר את ההנהגה." };
+      return { error: t("רק המנהיג יכול להעביר את ההנהגה.") };
     }
     if (targetEmpireId === membership.empireId) {
-      return { error: "אתה כבר מנהיג הברית." };
+      return { error: t("אתה כבר מנהיג הברית.") };
     }
     const target = await loadTargetMember(tx, membership.guildId, targetEmpireId);
-    if (!target) return { error: "החבר לא נמצא בברית." };
+    if (!target) return { error: t("החבר לא נמצא בברית.") };
 
     // Step down first, guarded on still holding the crown. Two concurrent
     // transfers by the same leader (to different members) both read role=LEADER
@@ -542,7 +570,7 @@ export async function transferGuildLeadership(
       data: { role: "DEPUTY" },
     });
     if (steppedDown.count === 0) {
-      return { error: "רק המנהיג יכול להעביר את ההנהגה." };
+      return { error: t("רק המנהיג יכול להעביר את ההנהגה.") };
     }
     // Guarded on the role we read, so the promotion cannot clobber a concurrent
     // kick/role change of the target; throwing rolls the step-down back.
@@ -561,7 +589,9 @@ export async function transferGuildLeadership(
       },
     });
 
-    return { success: `${target.empire.name} הוא מנהיג הברית החדש.` };
+    return {
+      success: t("{name} הוא מנהיג הברית החדש.", { name: target.empire.name }),
+    };
   });
 }
 
@@ -575,25 +605,26 @@ export async function upgradeGuildSpell(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = spellTypeSchema.safeParse({ type: formData.get("type") });
-  if (!parsed.success) return { error: "קסם לא תקין" };
+  if (!parsed.success) return { error: t("קסם לא תקין") };
   const type = parsed.data.type as GuildSpellType;
 
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     const spell = await tx.guildSpell.findUnique({
       where: { guildId_type: { guildId: membership.guildId, type } },
     });
-    if (!spell) return { error: "הקסם לא נמצא." };
+    if (!spell) return { error: t("הקסם לא נמצא.") };
     // Every spell has its own ceiling — attack, defence and resources stop at
     // 10%, spying still runs to 30%.
     const maxLevel = guildSpellMaxLevel(type);
     if (spell.level >= maxLevel) {
-      return { error: `הקסם כבר ברמה המקסימלית (${maxLevel}%).` };
+      return { error: t("הקסם כבר ברמה המקסימלית ({max}%).", { max: maxLevel }) };
     }
 
     const cost = spellUpgradeCostDiamonds(spell.level);
     if (!(await spendDiamonds(tx, empireId, cost))) {
-      return { error: `השדרוג עולה ${cost} יהלומים — אין לך מספיק.` };
+      return { error: t("השדרוג עולה {cost} יהלומים — אין לך מספיק.", { cost }) };
     }
 
     // Guarded on the current level so two concurrent upgrades can't both
@@ -606,22 +637,27 @@ export async function upgradeGuildSpell(
 
     const meta = GUILD_SPELL_META[type];
     return {
-      success: `${meta.label} שודרג ל־${guildSpellBonusPct(type, spell.level + 1)}% עבור כל הברית!`,
+      success: t("{spell} שודרג ל־{pct}% עבור כל הברית!", {
+        spell: t(meta.label),
+        pct: guildSpellBonusPct(type, spell.level + 1),
+      }),
     };
   });
 }
 
 export async function upgradeGuildCapacity(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     const { guild } = membership;
     // Roster size is a leadership call, so only a leader or deputy may buy a
     // seat — out of their own pocket, since the guild has no treasury.
     if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים להרחיב את הברית." };
+      return { error: t("רק מנהיג או סגן יכולים להרחיב את הברית.") };
     }
     if (guild.capacityLevel >= GUILD_CAPACITY_MAX_LEVEL) {
       return {
-        error: `הברית כבר בקיבולת המקסימלית (${guildCapacity(GUILD_CAPACITY_MAX_LEVEL)} חברים).`,
+        error: t("הברית כבר בקיבולת המקסימלית ({max} חברים).", {
+          max: guildCapacity(GUILD_CAPACITY_MAX_LEVEL),
+        }),
       };
     }
 
@@ -630,7 +666,11 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
     // member bought the same level first.
     const cost = capacityUpgradeCostGold(guild.capacityLevel);
     if (!(await spendOwnGold(tx, empireId, cost))) {
-      return { error: `ההרחבה עולה ${cost.toLocaleString("he-IL")} זהב מהזהב הזמין שלך — אין לך מספיק.` };
+      return {
+        error: t("ההרחבה עולה {cost} זהב מהזהב הזמין שלך — אין לך מספיק.", {
+          cost: cost.toLocaleString("en-US"),
+        }),
+      };
     }
 
     const upgraded = await tx.guild.updateMany({
@@ -640,25 +680,33 @@ export async function upgradeGuildCapacity(): Promise<ActionState> {
     if (upgraded.count === 0) throw new Error("capacity upgrade conflict");
 
     return {
-      success: `הברית הורחבה ל־${guildCapacity(guild.capacityLevel + 1)} חברים!`,
+      success: t("הברית הורחבה ל־{max} חברים!", {
+        max: guildCapacity(guild.capacityLevel + 1),
+      }),
     };
   });
 }
 
 export async function upgradeGuildAid(): Promise<ActionState> {
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     const { guild } = membership;
     // Open to every member: whoever wants more aid pays for it from their own
     // available gold — there is no treasury to drain, so no role gate.
     if (guild.aidLevel >= GUILD_AID_MAX_LEVEL) {
       return {
-        error: `עזרת הברית כבר ברמה המקסימלית (${GUILD_AID_MAX_LEVEL}%).`,
+        error: t("עזרת הברית כבר ברמה המקסימלית ({max}%).", {
+          max: GUILD_AID_MAX_LEVEL,
+        }),
       };
     }
 
     const cost = aidUpgradeCostGold(guild.aidLevel);
     if (!(await spendOwnGold(tx, empireId, cost))) {
-      return { error: `השדרוג עולה ${cost.toLocaleString("he-IL")} זהב מהזהב הזמין שלך — אין לך מספיק.` };
+      return {
+        error: t("השדרוג עולה {cost} זהב מהזהב הזמין שלך — אין לך מספיק.", {
+          cost: cost.toLocaleString("en-US"),
+        }),
+      };
     }
 
     const upgraded = await tx.guild.updateMany({
@@ -668,7 +716,9 @@ export async function upgradeGuildAid(): Promise<ActionState> {
     if (upgraded.count === 0) throw new Error("aid upgrade conflict");
 
     return {
-      success: `עזרת הברית שודרגה ל־${guildAidPct(guild.aidLevel + 1)}% מהכוח הכולל של הברית!`,
+      success: t("עזרת הברית שודרגה ל־{pct}% מהכוח הכולל של הברית!", {
+        pct: guildAidPct(guild.aidLevel + 1),
+      }),
     };
   });
 }
@@ -677,15 +727,16 @@ export async function castGuildSpell(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = spellTypeSchema.safeParse({ type: formData.get("type") });
-  if (!parsed.success) return { error: "קסם לא תקין" };
+  if (!parsed.success) return { error: t("קסם לא תקין") };
   const type = parsed.data.type as GuildSpellType;
 
-  return runMemberAction(async (membership, tx, empireId) => {
+  return runMemberAction(async (membership, tx, empireId, t) => {
     const spell = await tx.guildSpell.findUnique({
       where: { guildId_type: { guildId: membership.guildId, type } },
     });
-    if (!spell) return { error: "הקסם לא נמצא." };
+    if (!spell) return { error: t("הקסם לא נמצא.") };
 
     // Serialize this player's own casts before the "already active" check.
     // Read-check-write under READ COMMITTED let two taps on the button both see
@@ -699,11 +750,11 @@ export async function castGuildSpell(
     const active = await tx.guildSpellBuff.findFirst({
       where: { empireId, type, expiresAt: { gt: now } },
     });
-    if (active) return { error: "הקסם הזה כבר פעיל עליך." };
+    if (active) return { error: t("הקסם הזה כבר פעיל עליך.") };
 
     const cost = spellCastCostDiamonds(type, spell.level);
     if (!(await spendDiamonds(tx, empireId, cost))) {
-      return { error: `הקסם עולה ${cost} יהלומים — אין לך מספיק.` };
+      return { error: t("הקסם עולה {cost} יהלומים — אין לך מספיק.", { cost }) };
     }
 
     // Expired rows of this type are dead weight — clean them as we cast.
@@ -721,7 +772,11 @@ export async function castGuildSpell(
 
     const meta = GUILD_SPELL_META[type];
     return {
-      success: `${meta.icon} ${meta.label} הופעל — ${meta.effectLabel(guildSpellBonusPct(type, spell.level))}!`,
+      success: t("{icon} {spell} הופעל — {effect}!", {
+        icon: meta.icon,
+        spell: t(meta.label),
+        effect: meta.effectLabel(t, guildSpellBonusPct(type, spell.level)),
+      }),
     };
   });
 }

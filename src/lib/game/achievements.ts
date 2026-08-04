@@ -1,4 +1,6 @@
 import type { IconName } from "@/components/ui/Icon";
+import { LOCALE_TAG, type Locale } from "@/i18n/locale";
+import type { TranslateParams } from "@/i18n/translate";
 import {
   MAX_CITIES,
   MINE_MAX_LEVEL,
@@ -251,9 +253,17 @@ export interface AchievementDefinition {
   /** Stable id persisted in EmpireAchievement.key — never reuse or rename. */
   key: string;
   category: AchievementCategory;
+  /**
+   * Translation source for the title. A rung of a chain carries the *pattern*
+   * ("{goal} תקיפות"), not the rendered text, so a ladder of seven rungs needs
+   * one dictionary entry rather than seven — and the goal itself is filled from
+   * `params` at the render site. See src/i18n/translate.ts.
+   */
   name: string;
-  /** One-line hint telling the player how to earn it. */
+  /** One-line hint telling the player how to earn it — a pattern, like `name`. */
   hint: string;
+  /** Fills the `{placeholders}` in both `name` and `hint`. */
+  params?: TranslateParams;
   icon: IconName;
   reward: { kind: AchievementRewardKind; amount: number };
   /** Value of `progress` that unlocks the reward. */
@@ -271,6 +281,8 @@ type Rung = {
   /** Overrides the generated name — used for the first and last rungs. */
   name?: string;
   hint?: string;
+  /** Extra placeholders for an overridden wording, merged over `{goal}`. */
+  params?: TranslateParams;
 };
 
 /**
@@ -281,22 +293,29 @@ type Rung = {
  * `${prefix}_${goal}` so a rung can be retuned without orphaning a claim — the
  * goal is part of the identity, and changing a goal deliberately mints a new
  * achievement rather than silently re-locking a collected one.
+ *
+ * `label` and `hint` are translation *patterns* rather than functions of the
+ * goal: one dictionary entry then covers every rung of the ladder, and the
+ * number is substituted from `params` after the language is known.
  */
 function chain(
   prefix: string,
   category: AchievementCategory,
   icon: IconName,
   stat: (s: AchievementStats) => number,
-  label: (goal: number) => string,
-  hint: (goal: number) => string,
-  rungs: readonly Rung[]
+  label: string,
+  hint: string,
+  rungs: readonly Rung[],
+  /** Placeholders every rung shares — a game constant quoted in the wording. */
+  shared?: TranslateParams
 ): AchievementDefinition[] {
   return rungs.map((r) => ({
     key: `${prefix}_${r.goal}`,
     category,
     icon,
-    name: r.name ?? label(r.goal),
-    hint: r.hint ?? hint(r.goal),
+    name: r.name ?? label,
+    hint: r.hint ?? hint,
+    params: { goal: num(r.goal), ...shared, ...r.params },
     reward: { kind: r.reward[0], amount: r.reward[1] },
     goal: r.goal,
     progress: stat,
@@ -312,7 +331,8 @@ function one(
   hint: string,
   goal: number,
   reward: Reward,
-  progress: (s: AchievementStats) => number
+  progress: (s: AchievementStats) => number,
+  params?: TranslateParams
 ): AchievementDefinition {
   return {
     key,
@@ -320,13 +340,20 @@ function one(
     icon,
     name,
     hint,
+    params,
     goal,
     reward: { kind: reward[0], amount: reward[1] },
     progress,
   };
 }
 
-const he = (n: number) => n.toLocaleString("he-IL");
+/**
+ * Group a goal for display. Both languages the site speaks use Western digits
+ * and a comma separator, so this is one function rather than a per-locale one —
+ * and a goal baked into `params` at module load has no request to read a
+ * language from anyway.
+ */
+const num = (n: number) => n.toLocaleString("en-US");
 
 /** Total distinct weapon models in the game — 30 tiers × 3 categories. */
 const WEAPON_TOTAL = 90;
@@ -370,8 +397,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "attack",
     (s) => s.attacksLaunched,
-    (g) => `${he(g)} תקיפות`,
-    (g) => `פתח ב-${he(g)} תקיפות, בניצחון או בהפסד`,
+    "{goal} תקיפות",
+    "פתח ב-{goal} תקיפות, בניצחון או בהפסד",
     [
       { goal: 1, reward: ["citizens", 40], name: "תקיפה ראשונה", hint: "תקוף אימפריה אחת מהדירוג" },
       { goal: 10, reward: ["turns", 30] },
@@ -387,8 +414,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "rankings",
     (s) => s.attackWins,
-    (g) => `${he(g)} ניצחונות`,
-    (g) => `נצח ב-${he(g)} תקיפות`,
+    "{goal} ניצחונות",
+    "נצח ב-{goal} תקיפות",
     [
       { goal: 1, reward: ["citizens", 40], name: "ניצחון ראשון", hint: "נצח בתקיפה אחת" },
       { goal: 10, reward: ["turns", 60] },
@@ -403,8 +430,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "shield",
     (s) => s.defenseWins,
-    (g) => `${he(g)} הדיפות`,
-    (g) => `הדוף ${he(g)} תקיפות על האימפריה שלך`,
+    "{goal} הדיפות",
+    "הדוף {goal} תקיפות על האימפריה שלך",
     [
       { goal: 1, reward: ["stone", 8_000], name: "חומה ראשונה", hint: "הדוף תקיפה אחת על האימפריה שלך" },
       { goal: 10, reward: ["stone", 60_000] },
@@ -417,8 +444,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "army",
     (s) => s.soldiersSlain,
-    (g) => `${he(g)} חיילי אויב`,
-    (g) => `חסל ${he(g)} חיילי אויב בקרב`,
+    "{goal} חיילי אויב",
+    "חסל {goal} חיילי אויב בקרב",
     [
       { goal: 100, reward: ["citizens", 50] },
       { goal: 1_000, reward: ["iron", 40_000] },
@@ -431,8 +458,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "citizens",
     (s) => s.soldiersEnslaved,
-    (g) => `${he(g)} שבויים`,
-    (g) => `שבה ${he(g)} חיילי אויב לעבדות מכרות`,
+    "{goal} שבויים",
+    "שבה {goal} חיילי אויב לעבדות מכרות",
     [
       { goal: 10, reward: ["citizens", 50] },
       { goal: 100, reward: ["citizens", 120] },
@@ -444,8 +471,8 @@ const WAR: AchievementDefinition[] = [
     "war",
     "gold",
     (s) => s.goldPlundered,
-    (g) => `שוד ${he(g)} זהב`,
-    (g) => `שדוד ${he(g)} זהב מאימפריות אחרות`,
+    "שוד {goal} זהב",
+    "שדוד {goal} זהב מאימפריות אחרות",
     [
       { goal: 10_000, reward: ["gold", 10_000] },
       { goal: 100_000, reward: ["gold", 80_000] },
@@ -461,8 +488,8 @@ const ESPIONAGE: AchievementDefinition[] = [
     "espionage",
     "spy",
     (s) => s.spyMissions,
-    (g) => `${he(g)} משימות ריגול`,
-    (g) => `שלח ${he(g)} משימות ריגול`,
+    "{goal} משימות ריגול",
+    "שלח {goal} משימות ריגול",
     [
       { goal: 1, reward: ["citizens", 40], name: "ריגול ראשון", hint: "שלח מרגלים לאימפריה אחת" },
       { goal: 10, reward: ["turns", 30] },
@@ -476,8 +503,8 @@ const ESPIONAGE: AchievementDefinition[] = [
     "espionage",
     "reports",
     (s) => s.spySuccesses,
-    (g) => `${he(g)} דוחות ריגול`,
-    (g) => `חזור עם ${he(g)} דוחות ריגול מוצלחים`,
+    "{goal} דוחות ריגול",
+    "חזור עם {goal} דוחות ריגול מוצלחים",
     [
       { goal: 1, reward: ["citizens", 40], name: "דוח ראשון", hint: "חזור עם דוח ריגול מוצלח אחד" },
       { goal: 25, reward: ["turns", 60] },
@@ -490,8 +517,8 @@ const ESPIONAGE: AchievementDefinition[] = [
     "espionage",
     "spy",
     (s) => s.spies,
-    (g) => `${he(g)} מרגלים`,
-    (g) => `אמן ${he(g)} מרגלים`,
+    "{goal} מרגלים",
+    "אמן {goal} מרגלים",
     [
       { goal: 100, reward: ["citizens", 60] },
       { goal: 1_000, reward: ["gold", 200_000] },
@@ -506,8 +533,8 @@ const HERO: AchievementDefinition[] = [
     "hero",
     "hero",
     (s) => s.heroLevel,
-    (g) => `גיבור ברמה ${he(g)}`,
-    (g) => `העלה את הגיבור שלך לרמה ${he(g)}`,
+    "גיבור ברמה {goal}",
+    "העלה את הגיבור שלך לרמה {goal}",
     [
       { goal: 5, reward: ["citizens", 50] },
       { goal: 10, reward: ["turns", 60] },
@@ -518,7 +545,7 @@ const HERO: AchievementDefinition[] = [
         goal: HERO_MAX_LEVEL,
         reward: ["diamonds", 250],
         name: "גיבור בשיא",
-        hint: `העלה את הגיבור שלך לרמה ${HERO_MAX_LEVEL} — הרמה המרבית`,
+        hint: "העלה את הגיבור שלך לרמה {goal} — הרמה המרבית",
       },
     ]
   ),
@@ -527,8 +554,8 @@ const HERO: AchievementDefinition[] = [
     "hero",
     "spark",
     (s) => s.heroResets,
-    (g) => `${he(g)} איפוסי גיבור`,
-    (g) => `אפס את הגיבור ${he(g)} פעמים לאחר שהגיע לשיא`,
+    "{goal} איפוסי גיבור",
+    "אפס את הגיבור {goal} פעמים לאחר שהגיע לשיא",
     [
       {
         goal: 1,
@@ -545,8 +572,8 @@ const HERO: AchievementDefinition[] = [
     "hero",
     "shop",
     (s) => s.heroItems,
-    (g) => `${he(g)} פריטי ציוד`,
-    (g) => `אסוף ${he(g)} פריטי ציוד לגיבור`,
+    "{goal} פריטי ציוד",
+    "אסוף {goal} פריטי ציוד לגיבור",
     [
       {
         goal: 1,
@@ -564,8 +591,8 @@ const HERO: AchievementDefinition[] = [
     "hero",
     "potion",
     (s) => s.epicItems,
-    (g) => `${he(g)} פריטים אפיים`,
-    (g) => `זכה ב-${he(g)} פריטים בדרגת נדירות אפי`,
+    "{goal} פריטים אפיים",
+    "זכה ב-{goal} פריטים בדרגת נדירות אפי",
     [
       { goal: 1, reward: ["turns", 60], name: "חפץ אפי", hint: "זכה בפריט אחד בדרגת נדירות אפי" },
       { goal: 10, reward: ["turns", 200] },
@@ -576,8 +603,8 @@ const HERO: AchievementDefinition[] = [
     "hero",
     "spark",
     (s) => s.legendaryItems,
-    (g) => `${he(g)} פריטים אגדיים`,
-    (g) => `זכה ב-${he(g)} פריטים בדרגת נדירות אגדי`,
+    "{goal} פריטים אגדיים",
+    "זכה ב-{goal} פריטים בדרגת נדירות אגדי",
     [
       {
         goal: 1,
@@ -607,30 +634,31 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "mine",
     (s) => s.minesBuilt,
-    (g) => `${he(g)} מכרות`,
-    (g) => `שדרג ${he(g)} מכרות מעל רמה ${he(MINE_START_LEVEL)}`,
+    "{goal} מכרות",
+    "שדרג {goal} מכרות מעל רמה {start}",
     [
       {
         goal: 1,
         reward: ["wood", 5_000],
         name: "לשדרג מכרה",
-        hint: `שדרג מכרה אחד מעל רמה ${he(MINE_START_LEVEL)}`,
+        hint: "שדרג מכרה אחד מעל רמה {start}",
       },
       {
         goal: 4,
         reward: ["wood", 40_000],
         name: "לשדרג את כל המכרות",
-        hint: `שדרג את ארבעת המכרות מעל רמה ${he(MINE_START_LEVEL)}`,
+        hint: "שדרג את ארבעת המכרות מעל רמה {start}",
       },
-    ]
+    ],
+    { start: num(MINE_START_LEVEL) }
   ),
   ...chain(
     "minelvl",
     "economy",
     "factory",
     (s) => s.minMineLevel,
-    (g) => `כל המכרות ברמה ${he(g)}`,
-    (g) => `שדרג את ארבעת המכרות לרמה ${he(g)} ומעלה`,
+    "כל המכרות ברמה {goal}",
+    "שדרג את ארבעת המכרות לרמה {goal} ומעלה",
     [
       { goal: 10, reward: ["wood", 80_000] },
       { goal: 25, reward: ["wood", 300_000] },
@@ -640,7 +668,7 @@ const ECONOMY: AchievementDefinition[] = [
         goal: MINE_MAX_LEVEL,
         reward: ["diamonds", 150],
         name: "תעשייה בשיא",
-        hint: `שדרג את ארבעת המכרות לרמה ${he(MINE_MAX_LEVEL)} — הרמה המרבית`,
+        hint: "שדרג את ארבעת המכרות לרמה {goal} — הרמה המרבית",
       },
     ]
   ),
@@ -649,8 +677,8 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "storage",
     (s) => s.minStorageLevel,
-    (g) => `כל המחסנים ברמה ${he(g)}`,
-    (g) => `שדרג את ארבעת המחסנים לרמה ${he(g)} ומעלה`,
+    "כל המחסנים ברמה {goal}",
+    "שדרג את ארבעת המחסנים לרמה {goal} ומעלה",
     [
       { goal: 5, reward: ["stone", 40_000] },
       { goal: 10, reward: ["stone", 150_000] },
@@ -662,8 +690,8 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "gold",
     (s) => s.gold,
-    (g) => `${he(g)} זהב`,
-    (g) => `החזק ${he(g)} זהב בבת אחת`,
+    "{goal} זהב",
+    "החזק {goal} זהב בבת אחת",
     [
       { goal: 1_000_000, reward: ["turns", 150], name: "מיליונר ראשון", hint: "החזק 1,000,000 זהב בבת אחת" },
       { goal: 10_000_000, reward: ["turns", 300] },
@@ -675,8 +703,8 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "bank",
     (s) => s.bankDeposits,
-    (g) => `${he(g)} הפקדות`,
-    (g) => `בצע ${he(g)} הפקדות בבנק`,
+    "{goal} הפקדות",
+    "בצע {goal} הפקדות בבנק",
     [
       { goal: 1, reward: ["gold", 10_000], name: "הפקדה ראשונה בבנק", hint: "הפקד זהב בבנק פעם אחת" },
       { goal: 25, reward: ["gold", 80_000] },
@@ -688,8 +716,8 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "bank",
     (s) => s.bankBalance,
-    (g) => `${he(g)} זהב בבנק`,
-    (g) => `החזק ${he(g)} זהב בחשבון הבנק`,
+    "{goal} זהב בבנק",
+    "החזק {goal} זהב בחשבון הבנק",
     [
       { goal: 100_000, reward: ["gold", 25_000] },
       { goal: 1_000_000, reward: ["turns", 150] },
@@ -701,8 +729,8 @@ const ECONOMY: AchievementDefinition[] = [
     "economy",
     "bank",
     (s) => s.interestPayments,
-    (g) => `${he(g)} תשלומי ריבית`,
-    (g) => `קבל ${he(g)} תשלומי ריבית מהבנק`,
+    "{goal} תשלומי ריבית",
+    "קבל {goal} תשלומי ריבית מהבנק",
     [
       { goal: 1, reward: ["gold", 15_000], name: "ריבית ראשונה", hint: "קבל תשלום ריבית אחד מהבנק" },
       { goal: 30, reward: ["gold", 200_000] },
@@ -729,8 +757,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "base",
     (s) => s.cities,
-    (g) => `${he(g)} ערים`,
-    (g) => `ייסד אימפריה בת ${he(g)} ערים`,
+    "{goal} ערים",
+    "ייסד אימפריה בת {goal} ערים",
     [
       { goal: 2, reward: ["gold", 50_000], name: "לעלות עיר", hint: "ייסד עיר שנייה" },
       { goal: 3, reward: ["gold", 150_000] },
@@ -740,7 +768,7 @@ const EMPIRE: AchievementDefinition[] = [
         goal: MAX_CITIES,
         reward: ["diamonds", 300],
         name: "קיסרות",
-        hint: `החזק את כל ${he(MAX_CITIES)} הערים — האימפריה המלאה`,
+        hint: "החזק את כל {goal} הערים — האימפריה המלאה",
       },
     ]
   ),
@@ -749,8 +777,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "citizens",
     (s) => s.citizenGrowthLevel,
-    (g) => `קבלת מגויסים ${he(g)}`,
-    (g) => `שדרג את "קבלת מגויסים" לרמה ${he(g)}`,
+    "קבלת מגויסים {goal}",
+    'שדרג את "קבלת מגויסים" לרמה {goal}',
     [
       { goal: 2, reward: ["citizens", 60], name: "לשדרג קבלת מגויסים", hint: 'שדרג את "קבלת מגויסים" לרמה 2' },
       { goal: 5, reward: ["citizens", 150] },
@@ -762,9 +790,7 @@ const EMPIRE: AchievementDefinition[] = [
         goal: CITIZEN_GROWTH_500,
         reward: ["citizens", 1_000],
         name: "500 אזרחים ביום",
-        hint: `שדרג את "קבלת מגויסים" לרמה ${he(
-          CITIZEN_GROWTH_500
-        )} — 500 אזרחים בכל עדכון יומי`,
+        hint: 'שדרג את "קבלת מגויסים" לרמה {goal} — 500 אזרחים בכל עדכון יומי',
       },
       // Rule 3: a chain's top rung is pinned to the real ceiling. This one
       // stopped at 10 while the upgrade actually runs to 10 levels *per city*,
@@ -774,9 +800,8 @@ const EMPIRE: AchievementDefinition[] = [
         goal: CITIZEN_GROWTH_CAP,
         reward: ["citizens", 1_500],
         name: "עיר שוקקת",
-        hint: `שדרג את "קבלת מגויסים" לרמה ${he(CITIZEN_GROWTH_CAP)} — ${he(
-          citizensPerDailyUpdate(CITIZEN_GROWTH_CAP)
-        )} אזרחים בכל עדכון יומי`,
+        hint: 'שדרג את "קבלת מגויסים" לרמה {goal} — {citizens} אזרחים בכל עדכון יומי',
+        params: { citizens: num(citizensPerDailyUpdate(CITIZEN_GROWTH_CAP)) },
       },
     ]
   ),
@@ -785,8 +810,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "upgrades",
     (s) => s.minUpgradeLevel,
-    (g) => `כל השדרוגים ברמה ${he(g)}`,
-    (g) => `העלה כל אחד משדרוגי האימפריה לרמה ${he(g)} ומעלה`,
+    "כל השדרוגים ברמה {goal}",
+    "העלה כל אחד משדרוגי האימפריה לרמה {goal} ומעלה",
     [
       { goal: 2, reward: ["gold", 60_000] },
       { goal: 3, reward: ["gold", 250_000] },
@@ -803,8 +828,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "army",
     (s) => s.soldiers,
-    (g) => `צבא של ${he(g)}`,
-    (g) => `אמן ${he(g)} חיילים`,
+    "צבא של {goal}",
+    "אמן {goal} חיילים",
     [
       { goal: 1_000, reward: ["turns", 100] },
       { goal: 10_000, reward: ["iron", 300_000] },
@@ -817,8 +842,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "mine",
     (s) => s.mineSlaves,
-    (g) => `${he(g)} עבדי מכרות`,
-    (g) => `החזק ${he(g)} עבדי מכרות`,
+    "{goal} עבדי מכרות",
+    "החזק {goal} עבדי מכרות",
     [
       { goal: 100, reward: ["wood", 30_000] },
       { goal: 1_000, reward: ["wood", 200_000] },
@@ -860,8 +885,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "factory",
     (s) => s.distinctWeapons,
-    (g) => `${he(g)} דגמי נשק`,
-    (g) => `החזק ${he(g)} דגמי נשק שונים`,
+    "{goal} דגמי נשק",
+    "החזק {goal} דגמי נשק שונים",
     [
       { goal: 10, reward: ["iron", 50_000] },
       { goal: 30, reward: ["iron", 250_000] },
@@ -870,7 +895,7 @@ const EMPIRE: AchievementDefinition[] = [
         goal: WEAPON_TOTAL,
         reward: ["diamonds", 200],
         name: "נשקייה מושלמת",
-        hint: `החזק את כל ${he(WEAPON_TOTAL)} דגמי הנשק במשחק`,
+        hint: "החזק את כל {goal} דגמי הנשק במשחק",
       },
     ]
   ),
@@ -879,8 +904,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "factory",
     (s) => s.totalWeapons,
-    (g) => `${he(g)} כלי נשק`,
-    (g) => `החזק ${he(g)} כלי נשק בסך הכל`,
+    "{goal} כלי נשק",
+    "החזק {goal} כלי נשק בסך הכל",
     [
       { goal: 100, reward: ["iron", 30_000] },
       { goal: 1_000, reward: ["iron", 200_000] },
@@ -892,8 +917,8 @@ const EMPIRE: AchievementDefinition[] = [
     "empire",
     "upgrades",
     (s) => s.minUnlockedTier,
-    (g) => `דרגת נשק ${he(g)} בכל הקטגוריות`,
-    (g) => `פתח את דרגה ${he(g)} בשלוש קטגוריות הנשק`,
+    "דרגת נשק {goal} בכל הקטגוריות",
+    "פתח את דרגה {goal} בשלוש קטגוריות הנשק",
     [
       { goal: 10, reward: ["iron", 80_000] },
       { goal: 20, reward: ["turns", 250] },
@@ -928,8 +953,8 @@ const LEGACY: AchievementDefinition[] = [
     "legacy",
     "crown",
     (s) => s.bossWins,
-    (g) => `${he(g)} ניצחונות על בוסים`,
-    (g) => `נצח את בוס העיר ${he(g)} פעמים`,
+    "{goal} ניצחונות על בוסים",
+    "נצח את בוס העיר {goal} פעמים",
     [
       { goal: 1, reward: ["iron", 30_000], name: "להביס את בוס העיר", hint: "נצח את הבוס של העיר שלך" },
       { goal: 5, reward: ["iron", 120_000] },
@@ -942,18 +967,19 @@ const LEGACY: AchievementDefinition[] = [
     "legacy",
     "crown",
     "צייד העריצים",
-    `הבס את הבוסים של כל ${he(MAX_CITIES)} דרגות הערים`,
+    "הבס את הבוסים של כל {cities} דרגות הערים",
     MAX_CITIES,
     ["diamonds", 250],
-    (s) => s.distinctBossesBeaten
+    (s) => s.distinctBossesBeaten,
+    { cities: num(MAX_CITIES) }
   ),
   ...chain(
     "minigame",
     "legacy",
     "dice",
     (s) => s.miniGameWins,
-    (g) => `${he(g)} ניצחונות במיני-משחק`,
-    (g) => `נצח ${he(g)} פעמים במיני-משחק`,
+    "{goal} ניצחונות במיני-משחק",
+    "נצח {goal} פעמים במיני-משחק",
     [
       { goal: 1, reward: ["citizens", 50], name: "ניצחון ראשון במיני-משחק", hint: "נצח פעם אחת במיני-משחק" },
       { goal: 10, reward: ["turns", 120] },
@@ -965,8 +991,8 @@ const LEGACY: AchievementDefinition[] = [
     "legacy",
     "messages",
     (s) => s.messagesSent,
-    (g) => `${he(g)} מכתבים`,
-    (g) => `שלח ${he(g)} מכתבים לשחקנים אחרים`,
+    "{goal} מכתבים",
+    "שלח {goal} מכתבים לשחקנים אחרים",
     [
       { goal: 1, reward: ["citizens", 30], name: "מכתב ראשון", hint: "שלח מכתב לשחקן אחר" },
       { goal: 25, reward: ["turns", 100] },
@@ -1010,17 +1036,17 @@ export function needsRankScan(claimedKeys: ReadonlySet<string>): boolean {
 
 /* ------------------------------ view model ------------------------------ */
 
-const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
-
 /** One row as the achievements screen renders it. */
 export interface AchievementView {
   key: string;
   category: AchievementCategory;
+  /** Translation source — render as `t(name, params)`. */
   name: string;
+  /** Translation source — render as `t(hint, params)`. */
   hint: string;
+  /** Fills the `{placeholders}` in `name` and `hint`. */
+  params?: TranslateParams;
   icon: IconName;
-  /** e.g. "40 אזרחים" — pre-formatted so the client stays presentational. */
-  rewardLabel: string;
   rewardKind: AchievementRewardKind;
   rewardAmount: number;
   goal: number;
@@ -1036,10 +1062,6 @@ export interface AchievementsState {
   collectable: number;
   claimed: number;
   total: number;
-}
-
-export function achievementRewardLabel(a: AchievementDefinition): string {
-  return `${heNum(a.reward.amount)} ${ACHIEVEMENT_REWARD_LABEL[a.reward.kind]}`;
 }
 
 /* ------------------------------ hall of glory ------------------------------ */
@@ -1106,8 +1128,20 @@ export const GLORY_TAGLINE: Record<string, string> = {
   cities_10: "האימפריה המלאה, כל עשר הערים",
   [`citizenup_${CITIZEN_GROWTH_500}`]: 'שדרוג "קבלת מגויסים" עד 500 אזרחים בכל עדכון',
   herolvl_100: "הרמה האחרונה של הגיבור",
-  minelvl_250: `ארבעת המכרות ברמה ${MINE_MAX_LEVEL}`,
-  arsenal_90: `כל ${WEAPON_TOTAL} הדגמים במחסן`,
+  minelvl_250: "ארבעת המכרות ברמה {mines}",
+  arsenal_90: "כל {models} הדגמים במחסן",
+};
+
+/**
+ * Placeholders for the two taglines that quote a game ceiling.
+ *
+ * Kept beside the wording rather than baked into it so retuning MINE_MAX_LEVEL
+ * or the weapon count does not silently orphan a dictionary key — the English
+ * entry is keyed on "ארבעת המכרות ברמה {mines}", which never changes.
+ */
+const GLORY_PARAMS: Record<string, TranslateParams> = {
+  minelvl_250: { mines: num(MINE_MAX_LEVEL) },
+  arsenal_90: { models: num(WEAPON_TOTAL) },
 };
 
 /**
@@ -1150,11 +1184,18 @@ export interface GloryRecord {
   isMe: boolean;
 }
 
-const gloryDate = new Intl.DateTimeFormat("he-IL", {
-  day: "2-digit",
-  month: "2-digit",
-  year: "2-digit",
-});
+/**
+ * Short date in the reader's language. Built per call rather than once at
+ * module load because the language is a per-request cookie — dd.MM.yy for a
+ * Hebrew reader, MM/DD/YY for an English one, and neither is a good default for
+ * the other.
+ */
+const gloryDate = (locale: Locale) =>
+  new Intl.DateTimeFormat(LOCALE_TAG[locale], {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
 
 /** One capstone as the showcase renders it. */
 export interface GloryView extends AchievementView {
@@ -1178,9 +1219,11 @@ export function selectGlory(
     string,
     { empireId: string; empireName: string; awardedAt: Date }
   >,
-  viewerEmpireId: string
+  viewerEmpireId: string,
+  locale: Locale
 ): GloryView[] {
   const byKey = new Map(state.items.map((i) => [i.key, i]));
+  const date = gloryDate(locale);
   return GLORY_KEYS.flatMap((key) => {
     const item = byKey.get(key);
     if (!item) return [];
@@ -1197,11 +1240,12 @@ export function selectGlory(
           : null),
         name: GLORY_NAME[key] ?? item.name,
         tagline: GLORY_TAGLINE[key] ?? item.hint,
+        params: { ...item.params, ...GLORY_PARAMS[key] },
         record: held
           ? {
               empireId: held.empireId,
               empireName: held.empireName,
-              awardedLabel: gloryDate.format(held.awardedAt),
+              awardedLabel: date.format(held.awardedAt),
               isMe: held.empireId === viewerEmpireId,
             }
           : null,
@@ -1242,9 +1286,12 @@ const MEDAL_NAME: Record<string, string> = {
 /** One record held, ready to render. */
 export interface MedalView {
   key: string;
+  /** Translation source — render as `t(name, params)`. */
   name: string;
   /** The one-line feat, short enough for a narrow column. */
   tagline: string;
+  /** Fills the `{placeholders}` in `name` and `tagline`. */
+  params?: TranslateParams;
   icon: IconName;
   /** "12.07.26" — when this empire got there first. */
   earnedLabel: string;
@@ -1261,8 +1308,10 @@ export interface MedalView {
  */
 export function selectWorldMedals(
   champions: ReadonlyMap<string, { empireId: string; awardedAt: Date }>,
-  empireId: string
+  empireId: string,
+  locale: Locale
 ): MedalView[] {
+  const date = gloryDate(locale);
   return GLORY_KEYS.flatMap((key) => {
     const held = champions.get(key);
     if (!held || held.empireId !== empireId) return [];
@@ -1273,8 +1322,9 @@ export function selectWorldMedals(
         key,
         name: MEDAL_NAME[key] ?? item.name,
         tagline: GLORY_TAGLINE[key] ?? item.hint,
+        params: { ...item.params, ...GLORY_PARAMS[key] },
         icon: item.icon,
-        earnedLabel: gloryDate.format(held.awardedAt),
+        earnedLabel: date.format(held.awardedAt),
       },
     ];
   });
@@ -1326,8 +1376,8 @@ export function buildAchievementsState(
       category: a.category,
       name: a.name,
       hint: a.hint,
+      params: a.params,
       icon: a.icon,
-      rewardLabel: achievementRewardLabel(a),
       rewardKind: a.reward.kind,
       rewardAmount: a.reward.amount,
       goal: a.goal,

@@ -12,7 +12,7 @@ import type {
 import { prisma } from "@/lib/prisma";
 import { getActiveEmpireId } from "@/lib/auth";
 import { isBanned } from "@/lib/ban";
-import { isStaffEmpire, STAFF_TARGET_REFUSAL } from "@/lib/staff";
+import { isStaffEmpire, staffTargetRefusal } from "@/lib/staff";
 import { awardSeasonPassXp } from "@/server/seasonPassXp";
 import { captureSpyIntel } from "@/server/spyIntelCapture";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
@@ -43,7 +43,7 @@ import {
 } from "@/lib/game/constants";
 import { getTunables } from "@/lib/game/config";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
-import { VIP_REQUIRED_ERROR, isVip } from "@/lib/game/vip";
+import { vipRequiredError, isVip } from "@/lib/game/vip";
 import { grantCitizens } from "@/lib/game/grants";
 import { getActiveGuildBuffPct } from "@/lib/game/guildBuffs";
 import { getGuildAidBonus } from "@/lib/game/guildAid";
@@ -240,7 +240,7 @@ export async function upgradeMineToMax(
       if (building.level >= MINE_MAX_LEVEL) {
         return { error: t("המכרה כבר ברמה המקסימלית") };
       }
-      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
+      if (!isVip(empire)) return { error: vipRequiredError(t) };
 
       const discountPct = await getShopDiscountPct(empireId, tx);
 
@@ -488,7 +488,7 @@ export async function assignAllMineSlavesToResource(
     const empireId = await requireOwnEmpireId();
     let total = 0;
     const result = await applyAssignments(empireId, (totalSlaves, _current, empire) => {
-      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
+      if (!isVip(empire)) return { error: vipRequiredError(t) };
       total = totalSlaves;
       const next = new Map<BuildingType, number>(
         PRODUCTION_BUILDING_TYPES.map((type) => [type, 0])
@@ -517,7 +517,7 @@ export async function splitMineSlavesEqually(): Promise<ActionState> {
   try {
     const empireId = await requireOwnEmpireId();
     const result = await applyAssignments(empireId, (totalSlaves, _current, empire) => {
-      if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
+      if (!isVip(empire)) return { error: vipRequiredError(t) };
       const base = Math.floor(totalSlaves / PRODUCTION_BUILDING_TYPES.length);
       let remainder = totalSlaves % PRODUCTION_BUILDING_TYPES.length;
       const next = new Map<BuildingType, number>();
@@ -690,11 +690,12 @@ async function spendTurns(
 async function targetBlockedReason(
   tx: Prisma.TransactionClient,
   target: { id: string; protectedUntil: Date | null; isStaff: boolean },
-  now: Date
+  now: Date,
+  t: T
 ): Promise<string | null> {
-  if (isStaffEmpire(target)) return STAFF_TARGET_REFUSAL;
+  if (isStaffEmpire(target)) return staffTargetRefusal(t);
   if (target.protectedUntil && target.protectedUntil > now) {
-    return "האימפריה הזו מוגנת (שחקן חדש) — לא ניתן לתקוף או לרגל אותה עדיין.";
+    return t("האימפריה הזו מוגנת (שחקן חדש) — לא ניתן לתקוף או לרגל אותה עדיין.");
   }
   const owner = await tx.empire.findUnique({
     where: { id: target.id },
@@ -770,7 +771,7 @@ export async function spyOnEmpire(
 
       // Shielded newcomers and banned accounts are off-limits.
       const now = new Date();
-      const blocked = await targetBlockedReason(tx, defender, now);
+      const blocked = await targetBlockedReason(tx, defender, now, t);
       if (blocked) return { error: blocked };
 
       // All validations passed — the mission launches, so it costs turns
@@ -957,7 +958,7 @@ export async function attackEmpire(
 
       // Shielded newcomers and banned accounts can't be attacked.
       const now = new Date();
-      const blocked = await targetBlockedReason(tx, defender, now);
+      const blocked = await targetBlockedReason(tx, defender, now, t);
       if (blocked) return { error: blocked };
 
       // Potions in force on either side. Each is an hour in which one rule of
@@ -1711,7 +1712,7 @@ export async function depositAllToStorage(
   if (!parsed.success) return { error: t("סוג מחסן לא תקין") };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
-    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
+    if (!ctx.isVip) return { error: vipRequiredError(t) };
     if (ctx.freeSpace < 1) return { error: t("המחסן מלא — שדרג אותו כדי לאחסן עוד") };
     const amount = Math.min(ctx.available, ctx.freeSpace);
     if (amount < 1) return { error: t("אין משאבים זמינים לאחסון") };
@@ -1729,7 +1730,7 @@ export async function withdrawAllFromStorage(
   if (!parsed.success) return { error: t("סוג מחסן לא תקין") };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
-    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
+    if (!ctx.isVip) return { error: vipRequiredError(t) };
     if (ctx.storedAmount < 1) return { error: t("המחסן ריק") };
     return transferFromStorage(ctx, tx, empireId, ctx.storedAmount);
   });

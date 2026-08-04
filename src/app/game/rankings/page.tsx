@@ -17,6 +17,7 @@ import { PresenceDot } from "@/components/ui/PresenceDot";
 import { PlayerLink } from "@/components/ui/PlayerLink";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "דירוג | קראלדור" };
 
@@ -105,6 +106,7 @@ export default async function RankingsPage({
 }: {
   searchParams: Promise<{ page?: string }>;
 }) {
+  const { t, locale } = await getI18n();
   const myEmpire = await requireEmpire();
   const requestedPage = Number((await searchParams).page);
 
@@ -112,7 +114,7 @@ export default async function RankingsPage({
   // spy) empires that hold the same number of cities as you.
   const myCity = myEmpire.cities;
   // The bucket *is* one city, so every row on this page belongs to this one.
-  const myCityName = cityName(myCity);
+  const myCityName = cityName(t, myCity);
 
   // The game clock is lazy — every empire settles its own backlog when its owner
   // loads a page or acts. We deliberately do NOT settle other empires here:
@@ -186,7 +188,7 @@ export default async function RankingsPage({
                 prototype that referred to nothing in the game. The ladder is
                 one city's, so it is named after that city. */}
             דירוג {myCityName}
-            <Tip tip={`${cityFullName(myCity)} — הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.`}>
+            <Tip tip={`${cityFullName(t, myCity)} — הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.`}>
               <span className="cursor-help rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] font-normal text-zinc-300">
                 <Icon name="base" size={12} className="inline-block align-middle text-crimson-bright" />{" "}
                 עיר{" "}
@@ -439,7 +441,7 @@ export default async function RankingsPage({
           {hall ? (
             <>
               כך הסתיימה <span className="font-bold text-gold-dim">{hall.seasonName}</span>{" "}
-              ב־{formatDate(hall.endsAt)}. העונה הנוכחית אינה משפיעה על הלוחות
+              ב־{formatDate(hall.endsAt, locale)}. העונה הנוכחית אינה משפיעה על הלוחות
               האלה — הם נחרתו ברגע שהעונה ננעלה.
             </>
           ) : (

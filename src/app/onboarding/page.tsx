@@ -4,8 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { requireOpenSeason } from "@/server/seasonGuard";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { OnboardingForm } from "@/components/auth/OnboardingForm";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "הקמת אימפריה | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("הקמת אימפריה | קראלדור") };
+}
+
 export const dynamic = "force-dynamic";
 
 // Where a signed-in user without an empire (typically a fresh Google sign-up)

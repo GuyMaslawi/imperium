@@ -35,6 +35,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { SHIELD_ICON, SHIELD_TONE } from "@/components/game/ShieldBadges";
 import { formatNumber } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 
 /**
  * Date + time of an ISO timestamp, e.g. "20.07 · 14:30" — the day is shown so a
@@ -487,6 +488,7 @@ function CityDowngradeCard({
   readyAt: string | null;
   diamonds: number;
 }) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     castCityDowngradeSpell,
     {}
@@ -510,8 +512,8 @@ function CityDowngradeCard({
         <>
           {/* The name already carries its own "(tier)" — printing the bare
               number again here would nest one parenthesis inside another. */}
-          מוריד אותך עיר אחת בלבד — מעיר {cityName(cities)} ל
-          {cityName(eligible ? target : cities)}. אין החזר משאבים, והדרך חזרה היא
+          מוריד אותך עיר אחת בלבד — מעיר {cityName(t, cities)} ל
+          {cityName(t, eligible ? target : cities)}. אין החזר משאבים, והדרך חזרה היא
           ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{CITY_DOWNGRADE_COOLDOWN_HOURS}{" "}
           שעה.
         </>

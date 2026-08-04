@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { isOnline } from "@/lib/game/chat";
 import { notStaffOrBot } from "@/lib/bot";
+import { getT } from "@/i18n/server";
 
 /**
  * Staff empires are not contestants and are absent from every board in this
@@ -367,6 +368,7 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
  * the board as soon as it is fought.
  */
 export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
+  const t = await getT();
   const sums = await prisma.battleReport.groupBy({
     by: ["attackerEmpireId"],
     // Staff raids are excluded at the source rather than filtered out of the
@@ -390,14 +392,14 @@ export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
   });
   const byId = new Map(named.map((e) => [e.id, e]));
   const now = new Date();
-  return sums.map((t) => ({
-    empireId: t.attackerEmpireId,
-    name: byId.get(t.attackerEmpireId)?.name ?? "אימפריה",
-    value: Math.floor(t._sum.stolenGold ?? 0),
+  return sums.map((row) => ({
+    empireId: row.attackerEmpireId,
+    name: byId.get(row.attackerEmpireId)?.name ?? t("אימפריה"),
+    value: Math.floor(row._sum.stolenGold ?? 0),
     // A raider whose empire row has since been deleted reads as away, which is
     // the truthful answer for a name that is no longer anybody — and holds no
     // city at all, rather than a made-up one.
-    online: isOnline(byId.get(t.attackerEmpireId), now),
-    cities: byId.get(t.attackerEmpireId)?.cities ?? null,
+    online: isOnline(byId.get(row.attackerEmpireId), now),
+    cities: byId.get(row.attackerEmpireId)?.cities ?? null,
   }));
 }

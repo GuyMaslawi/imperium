@@ -1,5 +1,6 @@
 import type { Hero, HeroClass, HeroItem, HeroItemSlot, HeroRarity } from "@prisma/client";
 import type { IconName } from "@/components/ui/Icon";
+import type { T, TranslateParams } from "@/i18n/translate";
 import { RESOURCE_META, type StorableResource } from "./constants";
 import { secureRandom } from "./random";
 
@@ -1014,8 +1015,10 @@ export interface ItemBonusLine {
    * gold/wood/iron/stone individually instead of saying "משאבים" four times.
    */
   resource?: StorableResource;
-  /** Display word for this line. */
+  /** Translation source for this line's word. */
   label: string;
+  /** Fills the `{placeholders}` in `label`. */
+  labelParams?: TranslateParams;
 }
 
 /**
@@ -1050,7 +1053,10 @@ export function itemBonusLines(
           value,
           primary,
           resource,
-          label: `${RESOURCE_META[resource].label} לעדכון רגיל`,
+          // A pattern, not a rendered name: the resource word and the word
+          // order around it both change with the language.
+          label: "{resource} לעדכון רגיל",
+          labelParams: { resource: RESOURCE_META[resource].label },
         });
       }
       continue;
@@ -1477,9 +1483,18 @@ export function rollGuaranteedItem(
   return itemOfRarity(attackerHeroLevel, "COMMON", random);
 }
 
-/** Display name, e.g. "חרב מתקדם" — the tier follows from the item's level. */
-export function itemDisplayName(slot: HeroItemSlot, level: number): string {
-  return `${SLOT_META[slot].label} ${RARITY_META[tierForLevel(level)].label}`;
+/**
+ * Display name, e.g. "חרב מתקדם" / "Advanced Sword".
+ *
+ * Takes the translator because the two halves swap order between the languages:
+ * Hebrew names the object then its grade, English the grade then the object.
+ * The tier itself follows from the item's level.
+ */
+export function itemDisplayName(t: T, slot: HeroItemSlot, level: number): string {
+  return t("{slot} {rarity}", {
+    slot: t(SLOT_META[slot].label),
+    rarity: t(RARITY_META[tierForLevel(level)].label),
+  });
 }
 
 /* ------------------------------ discard → wheel spin ------------------------------ */

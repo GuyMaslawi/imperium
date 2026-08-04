@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { useAfterFirstPaint } from "@/components/ui/motion";
 import { claimAchievements } from "@/server/actions/achievements";
+import { useT } from "@/i18n/client";
+import type { T } from "@/i18n/translate";
 import {
   ACHIEVEMENT_CATEGORIES,
   ACHIEVEMENT_CATEGORY_META,
@@ -13,7 +15,7 @@ import {
   type AchievementView,
 } from "@/lib/game/achievements";
 
-const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
+const heNum = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /** Compact form for the big numbers the late ladder deals in. */
 function short(n: number): string {
@@ -84,17 +86,19 @@ function Medallion({ item }: { item: AchievementView }) {
   );
 }
 
-function LockedCard({ item }: { item: AchievementView }) {
+function LockedCard({ item, t }: { item: AchievementView; t: T }) {
   const pct = Math.min(100, ratio(item) * 100);
   return (
     <div className="panel flex items-start gap-3 rounded-xl p-3.5">
       <Medallion item={item} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <p className="font-bold text-zinc-300">{item.name}</p>
+          <p className="font-bold text-zinc-300">{t(item.name, item.params)}</p>
           <RewardPill item={item} tone="locked" />
         </div>
-        <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">{item.hint}</p>
+        <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
+          {t(item.hint, item.params)}
+        </p>
         {/* A 1-of-1 milestone has no meaningful progress to draw. */}
         {item.goal > 1 && (
           <div className="mt-2">
@@ -114,14 +118,14 @@ function LockedCard({ item }: { item: AchievementView }) {
   );
 }
 
-function ReadyCard({ item }: { item: AchievementView }) {
+function ReadyCard({ item, t }: { item: AchievementView; t: T }) {
   return (
     <div className="panel flex items-center gap-3 rounded-xl border-gold/60 bg-gradient-to-l from-amber-950/40 to-transparent p-3.5 shadow-[0_0_20px_-10px_var(--gold)]">
       <Medallion item={item} />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-black text-zinc-100">{item.name}</p>
+        <p className="truncate font-black text-zinc-100">{t(item.name, item.params)}</p>
         <p className="flex items-center gap-1 text-[11px] font-bold text-gold-bright">
-          <Icon name="gift" size={12} /> מוכן לאיסוף
+          <Icon name="gift" size={12} /> {t("מוכן לאיסוף")}
         </p>
       </div>
       <RewardPill item={item} />
@@ -129,24 +133,24 @@ function ReadyCard({ item }: { item: AchievementView }) {
   );
 }
 
-function ClaimedCard({ item }: { item: AchievementView }) {
+function ClaimedCard({ item, t }: { item: AchievementView; t: T }) {
   return (
     <div className="flex items-center gap-2.5 rounded-lg border border-white/5 bg-black/20 px-3 py-2">
       <Icon name={item.icon} size={16} className="shrink-0 text-emerald-400/60" />
       <span className="min-w-0 flex-1 truncate text-xs font-semibold text-zinc-500">
-        {item.name}
+        {t(item.name, item.params)}
       </span>
       <RewardPill item={item} tone="claimed" />
-      <span className="shrink-0 text-xs font-bold text-emerald-400/70" aria-label="נאסף">
+      <span className="shrink-0 text-xs font-bold text-emerald-400/70" aria-label={t("נאסף")}>
         ✓
       </span>
     </div>
   );
 }
 
-function Card({ item }: { item: AchievementView }) {
-  if (item.claimed) return <ClaimedCard item={item} />;
-  return item.unlocked ? <ReadyCard item={item} /> : <LockedCard item={item} />;
+function Card({ item, t }: { item: AchievementView; t: T }) {
+  if (item.claimed) return <ClaimedCard item={item} t={t} />;
+  return item.unlocked ? <ReadyCard item={item} t={t} /> : <LockedCard item={item} t={t} />;
 }
 
 /** One chip in the category filter row. */
@@ -181,38 +185,40 @@ function PayoutSummary({
   count,
   totals,
   onDismiss,
+  t,
 }: {
   count: number;
   totals: AchievementRewardTotal[];
   onDismiss: () => void;
+  t: T;
 }) {
   return (
     <div className="mx-auto max-w-xl rounded-xl border border-gold/50 bg-gradient-to-b from-amber-950/60 to-black/60 p-3">
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm font-black text-gold-bright">
-          <Icon name="gift" size={15} /> נאספו {count} הישגים
+          <Icon name="gift" size={15} /> {t("נאספו {count} הישגים", { count })}
         </p>
         <button
           onClick={onDismiss}
-          aria-label="סגירה"
+          aria-label={t("סגירה")}
           className="flex h-6 w-6 items-center justify-center rounded-full border border-border-subtle text-zinc-500 hover:text-zinc-200"
         >
           ✕
         </button>
       </div>
       <div className="mt-2.5 flex flex-wrap justify-center gap-2">
-        {totals.map((t) => (
+        {totals.map((total) => (
           <span
-            key={t.kind}
+            key={total.kind}
             className="nums flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-sm font-black text-emerald-200"
           >
             <Icon
-              name={RESOURCE_ICON[t.kind]}
+              name={RESOURCE_ICON[total.kind]}
               size={16}
-              className={RESOURCE_ICON_COLOR[t.kind]}
+              className={RESOURCE_ICON_COLOR[total.kind]}
               aria-hidden
             />
-            <span dir="ltr">+{heNum(t.amount)}</span>
+            <span dir="ltr">+{heNum(total.amount)}</span>
           </span>
         ))}
       </div>
@@ -223,6 +229,7 @@ function PayoutSummary({
 /* ------------------------------ screen ------------------------------ */
 
 export function AchievementList({ state }: { state: AchievementsState }) {
+  const t = useT();
   const [payout, setPayout] = useState<{ count: number; totals: AchievementRewardTotal[] } | null>(
     null
   );
@@ -246,7 +253,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
       if (res.ok) {
         setPayout({ count: res.count ?? 0, totals: res.totals ?? [] });
       } else {
-        setError(res.error ?? "האיסוף נכשל");
+        setError(res.error ?? t("האיסוף נכשל"));
       }
     });
   }
@@ -279,7 +286,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
       <div className="mx-auto max-w-xl">
         <div className="flex items-end justify-between gap-3 text-sm">
           <span className="font-bold text-zinc-400">
-            הושלמו{" "}
+            {t("הושלמו")}{" "}
             <span className="nums font-black text-gold-bright" dir="ltr">
               {claimed}/{total}
             </span>
@@ -301,7 +308,9 @@ export function AchievementList({ state }: { state: AchievementsState }) {
         <div className="mx-auto max-w-xl rounded-xl border-2 border-gold/60 bg-gradient-to-br from-amber-900/40 via-amber-950/50 to-black p-4 text-center shadow-[0_0_30px_-8px_var(--gold)]">
           <p className="flex items-center justify-center gap-1.5 text-lg font-black text-gold-bright">
             <Icon name="gift" size={18} />
-            {collectable === 1 ? "פרס אחד ממתין לך" : `${collectable} פרסים ממתינים לך`}
+            {collectable === 1
+              ? t("פרס אחד ממתין לך")
+              : t("{count} פרסים ממתינים לך", { count: collectable })}
           </p>
           <button
             onClick={handleClaim}
@@ -311,10 +320,10 @@ export function AchievementList({ state }: { state: AchievementsState }) {
             }`}
           >
             {pending ? (
-              "אוסף..."
+              t("אוסף...")
             ) : (
               <span className="inline-flex items-center gap-1.5">
-                <Icon name="gift" size={16} /> אסוף הכל
+                <Icon name="gift" size={16} /> {t("אסוף הכל")}
               </span>
             )}
           </button>
@@ -326,6 +335,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
           count={payout.count}
           totals={payout.totals}
           onDismiss={() => setPayout(null)}
+          t={t}
         />
       )}
       {error && (
@@ -337,7 +347,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
       {/* ---------- categories ---------- */}
       <div className="flex flex-wrap justify-center gap-1.5">
         <Chip active={category === "all"} onClick={() => setCategory("all")}>
-          הכל
+          {t("הכל")}
           <span className="nums opacity-60" dir="ltr">
             {total}
           </span>
@@ -345,7 +355,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
         {ACHIEVEMENT_CATEGORIES.filter((c) => (categoryCounts.get(c) ?? 0) > 0).map((c) => (
           <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
             <Icon name={ACHIEVEMENT_CATEGORY_META[c].icon} size={12} />
-            {ACHIEVEMENT_CATEGORY_META[c].label}
+            {t(ACHIEVEMENT_CATEGORY_META[c].label)}
             <span className="nums opacity-60" dir="ltr">
               {categoryCounts.get(c)}
             </span>
@@ -355,7 +365,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
 
       {/* ---------- the list ---------- */}
       {visible.length === 0 ? (
-        <p className="py-6 text-center text-xs text-zinc-500">אין הישגים בקטגוריה הזו</p>
+        <p className="py-6 text-center text-xs text-zinc-500">{t("אין הישגים בקטגוריה הזו")}</p>
       ) : (
         <div className="grid gap-2.5 lg:grid-cols-2">
           {/* The stagger is capped at the first screenful: the ladder runs to
@@ -367,7 +377,7 @@ export function AchievementList({ state }: { state: AchievementsState }) {
               className="tro-card"
               style={{ "--i": Math.min(i, 12) } as CSSProperties}
             >
-              <Card item={a} />
+              <Card item={a} t={t} />
             </div>
           ))}
         </div>

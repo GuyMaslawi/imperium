@@ -1,7 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
 import { DEFAULT_TUNABLES, getTunables } from "@/lib/game/config";
-import { BREAK_UNITS, formatBreakHours, splitBreakHours } from "@/lib/game/seasonCycle";
+import { splitBreakHours } from "@/lib/game/seasonCycle";
+import { BREAK_UNITS, formatBreakHours } from "@/components/admin/seasonBreak";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledBool, LabeledInput, EditorSection } from "@/components/admin/fields";

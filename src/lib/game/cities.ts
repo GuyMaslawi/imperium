@@ -1,3 +1,4 @@
+import type { T } from "@/i18n/translate";
 import { MAX_CITIES } from "./constants";
 
 /**
@@ -56,12 +57,15 @@ export function cityAt(cities: number): CityName {
  * already print the number themselves, like the guide's city table) reach for
  * `cityAt(n).name`.
  */
-export function cityName(cities: number): string {
+export function cityName(t: T, cities: number): string {
   const city = cityAt(cities);
-  return `${city.name} (${city.tier})`;
+  return t("{city} ({tier})", { city: t(city.name), tier: city.tier });
 }
 
 /** "אשמורן (1) · משמר הגבול" — for tooltips that have room for the whole title. */
-export function cityFullName(cities: number): string {
-  return `${cityName(cities)} · ${cityAt(cities).epithet}`;
+export function cityFullName(t: T, cities: number): string {
+  return t("{city} · {epithet}", {
+    city: cityName(t, cities),
+    epithet: t(cityAt(cities).epithet),
+  });
 }

@@ -37,6 +37,7 @@ import { ItemTile } from "@/components/game/ItemTile";
 import { itemDetails, uiRarityForLevel } from "@/components/game/heroItemView";
 import { SpyEffectsBoard, type SpyEffectRow } from "@/components/game/SpyEffectsBoard";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
+import { getI18n, type T } from "@/i18n/server";
 
 export const metadata = { title: "דוח ריגול | KRALDOR" };
 
@@ -157,7 +158,7 @@ interface EffectRow extends SpyEffectRow {
   critical?: boolean;
 }
 
-function collectEffects(intel: SpyIntel, now: number): EffectRow[] {
+function collectEffects(t: T, intel: SpyIntel, now: number): EffectRow[] {
   const rows: EffectRow[] = [];
 
   // The new-player shield outranks everything: while it holds, there is no
@@ -213,7 +214,7 @@ function collectEffects(intel: SpyIntel, now: number): EffectRow[] {
       id: `spell-${spell.type}`,
       icon: meta.icon,
       label: meta.label,
-      effect: meta.effectLabel(Math.round(spell.pct)),
+      effect: meta.effectLabel(t, Math.round(spell.pct)),
       expiresAt: Date.parse(spell.expiresAt),
       tone: "border-violet-400/40 bg-violet-500/10 text-violet-300",
       critical: spell.type === "DEFENSE",
@@ -277,6 +278,7 @@ export default async function SpyResultPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t, locale } = await getI18n();
   const { id } = await params;
   const me = await requireEmpire();
 
@@ -311,6 +313,7 @@ export default async function SpyResultPage({
             plunderRate={plunderRate}
             enslaveRate={enslaveRate}
             enslaveMinSoldiers={enslaveMinSoldiers}
+            t={t}
           />
         ) : (
           <LegacyDossier report={report} />
@@ -320,7 +323,7 @@ export default async function SpyResultPage({
       <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
         <p className="nums text-xs text-zinc-500">
           <Icon name="turns" size={13} className="inline-block align-middle" />{" "}
-          <span dir="ltr">{formatDate(report.createdAt)}</span> · {report.turnsSpent} תורות
+          <span dir="ltr">{formatDate(report.createdAt, locale)}</span> · {report.turnsSpent} תורות
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href={`/game/empires/${foe.id}`} className="btn btn-gold px-5 py-2 text-sm">
@@ -458,14 +461,16 @@ function FullDossier({
   plunderRate,
   enslaveRate,
   enslaveMinSoldiers,
+  t,
 }: {
   intel: SpyIntel;
   serverNow: number;
   plunderRate: number;
   enslaveRate: number;
   enslaveMinSoldiers: number;
+  t: T;
 }) {
-  const effects = collectEffects(intel, serverNow);
+  const effects = collectEffects(t, intel, serverNow);
   const resourceKeys = ["gold", "wood", "iron", "stone"] as const;
   const shieldedResources = intel.shields.some((s) => s.key === "resources");
   const shieldedSoldiers = intel.shields.some((s) => s.key === "soldiers");
@@ -759,7 +764,7 @@ function FullDossier({
                           <Icon name={meta.icon} size={15} /> {meta.label}
                         </span>
                         <span className="text-[11px] text-zinc-500">
-                          {meta.effectLabel(upgrade.level)}
+                          {meta.effectLabel(t, upgrade.level)}
                         </span>
                       </span>
                     }
@@ -889,7 +894,7 @@ function FullDossier({
                   level={item.level}
                   name={meta.label}
                   rarity={uiRarityForLevel(item.level)}
-                  details={itemDetails(item, intel.hero!.level, { worn: true })}
+                  details={itemDetails(t, item, intel.hero!.level, { worn: true })}
                 />
               );
             })}

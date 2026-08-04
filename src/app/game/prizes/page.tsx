@@ -12,6 +12,7 @@ import { SeasonCountdown } from "@/components/game/SeasonCountdown";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { PlayerLink } from "@/components/ui/PlayerLink";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "פרסי העונה | KRALDOR" };
 
@@ -56,6 +57,7 @@ const MEDALS = ["🥇", "🥈", "🥉"];
 const STEPS = ["4.5rem", "2.75rem", "1.75rem"];
 
 export default async function PrizesPage() {
+  const { t, locale } = await getI18n();
   const me = await requireEmpire();
 
   const [podium, season, ahead] = await Promise.all([
@@ -165,7 +167,7 @@ export default async function PrizesPage() {
               startsAt={season.endsAt.getTime()}
               arrivedLabel="העונה ננעלת…"
             />
-            <p className="mt-3 text-[11px] text-zinc-500">{formatDate(season.endsAt)}</p>
+            <p className="mt-3 text-[11px] text-zinc-500">{formatDate(season.endsAt, locale)}</p>
           </>
         ) : (
           <p className="text-sm text-zinc-400">
@@ -264,7 +266,7 @@ export default async function PrizesPage() {
                           {formatCompact(champ.power)}
                         </p>
                         <p className="text-[11px] text-zinc-500">
-                          כוח צבאי · {cityFullName(champ.cities)}
+                          כוח צבאי · {cityFullName(t, champ.cities)}
                           {champ.guildName ? ` · ${champ.guildName}` : ""}
                         </p>
                       </>

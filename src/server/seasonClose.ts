@@ -15,6 +15,8 @@ import {
   seasonLengthMs,
 } from "@/lib/game/seasonCycle";
 import { restartWorld } from "@/server/seasonRestart";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 
 /**
  * The season cycle: the end of one season, the break, and the start of the next.
@@ -300,6 +302,9 @@ async function buildHallBoards(
         empireId: e.id,
         name: e.name,
         playerName: e.user?.name ?? null,
+        // i18n-exempt: written into an archived SeasonBoardEntry / season recap at
+        // closing time and read back verbatim for good — the row is a record of what
+        // happened, not a view of it. Same reasoning as a season's name.
         note: `${e.cities} ערים`,
         value: Math.floor(e.militaryPower),
       }))
@@ -323,6 +328,9 @@ async function buildHallBoards(
       empireId: null,
       name: g.name,
       playerName: null,
+      // i18n-exempt: written into an archived SeasonBoardEntry / season recap at
+      // closing time and read back verbatim for good — the row is a record of what
+      // happened, not a view of it. Same reasoning as a season's name.
       note: `${Number(g.members)} חברים`,
       value: Math.floor(g.power ?? 0),
     }))
@@ -435,6 +443,10 @@ async function buildRecap(
     ).map((e) => [e.id, e.name])
   );
 
+  // i18n-exempt-start: frozen into the season's recap JSON at closing time and
+  // reprinted from it forever — a record of the season, not a view of it. The
+  // Discord post reads the same rows, and that goes to one channel with many
+  // readers.
   const boards: RecapBoard[] = [
     {
       key: "military",
@@ -486,7 +498,7 @@ async function buildRecap(
       icon: "bank",
       rows: named(bank, (e) => e.bankAccount?.goldBalance ?? 0),
     },
-  ].filter((b) => b.rows.length > 0);
+  ].filter((b) => b.rows.length > 0); // i18n-exempt-end
 
   return {
     version: 1,
@@ -514,6 +526,9 @@ async function buildRecap(
  * "לזוכים" over one name is the kind of small lie players notice.
  */
 function podiumIntro(count: number): string {
+  // i18n-exempt: a stored Message row / a Discord post. Both go out once for
+  // every reader, so there is no single reader whose language to resolve —
+  // see the note in `attackEmpire`.
   return count === 1 ? "ברכות לזוכה 👑" : "ברכות לזוכים 👑";
 }
 
@@ -548,13 +563,15 @@ export async function announceSeasonStart(
   await announceToDiscord({
     kind: "season",
     channel: "events",
+    // i18n-exempt-start: a Discord post — one channel, many readers, so there is
+    // no single reader whose language to resolve. See the note in `attackEmpire`.
     title: `🚀 ${seasonHeadline(season.name)} נפתחה!`,
     body:
       "בהצלחה לכולם! 🔥\n\n" +
       (restarted
         ? "העולם אופס — כל אימפריה מתחילה מאפס והגילדות התפרקו. רק היהלומים נשארים איתכם. 💎\n"
         : "") +
-      `⏳ נגמרת ב-${formatGameDateTime(season.endsAt)}`,
+      `⏳ נגמרת ב-${formatGameDateTime(season.endsAt)}`, // i18n-exempt-end
     url: gameLink("/game/base"),
   });
 }
@@ -758,10 +775,13 @@ async function payPodiumPrizes(
       data: {
         empireId: champ.empireId,
         kind: "SYSTEM",
+        // i18n-exempt-start: a stored Message row, written off the season's own
+        // clock with nobody's request to read a language from — see the note in
+        // `attackEmpire`.
         title: `🏆 פרס העונה — מקום ${champ.rank}`,
         body:
           `סיימת את ${seasonName} במקום ${champ.rank}. ` +
-          `${formatNumber(diamonds)} יהלומים נכנסו לחשבונך אוטומטית. כל הכבוד!`,
+          `${formatNumber(diamonds)} יהלומים נכנסו לחשבונך אוטומטית. כל הכבוד!`, // i18n-exempt-end
         href: "/game/prizes",
         createdAt: now,
       },
@@ -879,6 +899,7 @@ export async function closeSeason(
     await announceToDiscord({
       kind: "season",
       channel: "events",
+      // i18n-exempt-start: a Discord post — one channel, many readers.
       title: `🏆 ${seasonHeadline(closed.name)} הסתיימה!`,
       body:
         (podium.length > 0
@@ -903,8 +924,8 @@ export async function closeSeason(
         // in hours from this very moment, so that is the shape it is understood
         // in, and the exact time is on /season for anyone who wants it.
         (closed.next
-          ? `ניפגש בעונה הבאה בעוד ${formatWaitDuration(closed.next.startsAt.getTime() - now.getTime())} 🔄`
-          : "ניפגש בעונה הבאה בקרוב 🔄"),
+          ? `ניפגש בעונה הבאה בעוד ${formatWaitDuration(makeT(DEFAULT_LOCALE), closed.next.startsAt.getTime() - now.getTime())} 🔄`
+          : "ניפגש בעונה הבאה בקרוב 🔄"), // i18n-exempt-end
       url: gameLink("/game/rankings"),
     });
   }
@@ -1143,6 +1164,8 @@ const HALL_BOARD_META: Record<
   SeasonBoardKind,
   { title: string; icon: string; unit: string }
 > = {
+  // Translation sources: the hall renders these live from the catalog, unlike
+  // the recap above, which is frozen into a row.
   POWER: { title: "כוח כללי", icon: "attack", unit: "כוח צבאי" },
   SPY: { title: "ריגול", icon: "spy", unit: "כוח מודיעין" },
   GUILD: { title: "הברית החזקה", icon: "guild", unit: "כוח חברי הברית" },

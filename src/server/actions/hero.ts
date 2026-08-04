@@ -31,6 +31,7 @@ import { forgeDiscountedCost } from "@/lib/game/potions";
 import { isPotionActive } from "@/lib/game/potionEffects";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 /**
  * Serialize concurrent hero mutations by taking a row lock on the hero.
@@ -50,6 +51,8 @@ async function lockHero(
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — each action catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -73,15 +76,16 @@ export async function allocateHeroPoints(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = allocateSchema.safeParse({
     stat: formData.get("stat"),
     amount: formData.get("amount") ?? 1,
   });
-  if (!parsed.success) return { error: "בחירה לא תקינה" };
+  if (!parsed.success) return { error: t("בחירה לא תקינה") };
   const { stat, amount } = parsed.data;
   const meta = HERO_STAT_META[stat];
   const pointsField = meta.pointsField;
-  if (!pointsField) return { error: "בחירה לא תקינה" }; // item-only stat
+  if (!pointsField) return { error: t("בחירה לא תקינה") }; // item-only stat
 
   try {
     const empireId = await requireOwnEmpireId();
@@ -89,7 +93,7 @@ export async function allocateHeroPoints(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       // Guarded decrement — a concurrent allocation can never overspend.
       const spent = await tx.hero.updateMany({
@@ -99,16 +103,21 @@ export async function allocateHeroPoints(
           [pointsField]: { increment: amount },
         },
       });
-      if (spent.count === 0) return { error: "אין מספיק נקודות גיבור פנויות" };
+      if (spent.count === 0) return { error: t("אין מספיק נקודות גיבור פנויות") };
 
-      return { success: `+${amount}% ${meta.label} — הנקודות הוקצו!` };
+      return {
+        success: t("+{amount}% {stat} — הנקודות הוקצו!", {
+          amount,
+          stat: t(meta.label),
+        }),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("hero.allocateHeroPoints", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -123,13 +132,14 @@ export async function allocateHeroPoints(
  * and so on, each carried all the way back up to the cap.
  */
 export async function resetHero(): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       // The new pool is a function of the reset the hero is about to complete,
       // so it has to be computed from a `resets` we can trust — hence the guard
@@ -152,7 +162,9 @@ export async function resetHero(): Promise<ActionState> {
         },
       });
       if (reset.count === 0) {
-        return { error: `איפוס גיבור זמין רק ברמה ${HERO_MAX_LEVEL}` };
+        return {
+          error: t("איפוס גיבור זמין רק ברמה {level}", { level: HERO_MAX_LEVEL }),
+        };
       }
 
       // The worn set is *grandfathered* through the reset: stripping a
@@ -178,7 +190,14 @@ export async function resetHero(): Promise<ActionState> {
       });
 
       return {
-        success: `הגיבור אופס! קיבלת ${HERO_RESET_CITIZENS.toLocaleString("he-IL")} אזרחים, ${HERO_RESET_TURNS.toLocaleString("he-IL")} תורות ו-${freshPoints} נקודות גיבור`,
+        success: t(
+          "הגיבור אופס! קיבלת {citizens} אזרחים, {turns} תורות ו-{points} נקודות גיבור",
+          {
+            citizens: HERO_RESET_CITIZENS.toLocaleString("en-US"),
+            turns: HERO_RESET_TURNS.toLocaleString("en-US"),
+            points: freshPoints,
+          }
+        ),
       };
     });
 
@@ -186,7 +205,7 @@ export async function resetHero(): Promise<ActionState> {
     return result;
   } catch (err) {
     await logError("hero.resetHero", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -198,8 +217,9 @@ export async function equipHeroItem(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemSchema.safeParse({ itemId: formData.get("itemId") });
-  if (!parsed.success) return { error: "פריט לא תקין" };
+  if (!parsed.success) return { error: t("פריט לא תקין") };
   const { itemId } = parsed.data;
 
   try {
@@ -208,14 +228,17 @@ export async function equipHeroItem(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const item = hero.items.find((i) => i.id === itemId);
-      if (!item) return { error: "הפריט לא נמצא בתיק שלך" };
-      if (item.equipped) return { error: "הפריט כבר לבוש" };
+      if (!item) return { error: t("הפריט לא נמצא בתיק שלך") };
+      if (item.equipped) return { error: t("הפריט כבר לבוש") };
       if (!canEquipItem(hero.level, item.level)) {
         return {
-          error: `דרוש גיבור רמה ${item.level} כדי ללבוש את הפריט (אתה ברמה ${hero.level})`,
+          error: t("דרוש גיבור רמה {required} כדי ללבוש את הפריט (אתה ברמה {level})", {
+            required: item.level,
+            level: hero.level,
+          }),
         };
       }
 
@@ -236,14 +259,18 @@ export async function equipHeroItem(
         data: { equipped: true },
       });
 
-      return { success: `${itemDisplayName(item.slot, item.level)} נלבש!` };
+      return {
+        success: t("{item} נלבש!", {
+          item: itemDisplayName(t, item.slot, item.level),
+        }),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("hero.equipHeroItem", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -251,8 +278,9 @@ export async function unequipHeroItem(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemSchema.safeParse({ itemId: formData.get("itemId") });
-  if (!parsed.success) return { error: "פריט לא תקין" };
+  if (!parsed.success) return { error: t("פריט לא תקין") };
   const { itemId } = parsed.data;
 
   try {
@@ -261,10 +289,10 @@ export async function unequipHeroItem(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const item = hero.items.find((i) => i.id === itemId);
-      if (!item || !item.equipped) return { error: "הפריט אינו לבוש" };
+      if (!item || !item.equipped) return { error: t("הפריט אינו לבוש") };
 
       // Serialize with other hero item mutations, then re-count the bag *under
       // the lock* — the snapshot count from applyPendingUpdates was read before
@@ -276,7 +304,7 @@ export async function unequipHeroItem(
         where: { heroId: hero.id, equipped: false },
       });
       if (bagCount >= HERO_BAG_CAPACITY) {
-        return { error: "התיק מלא — לא ניתן להסיר את הפריט" };
+        return { error: t("התיק מלא — לא ניתן להסיר את הפריט") };
       }
 
       await tx.heroItem.update({
@@ -284,14 +312,18 @@ export async function unequipHeroItem(
         data: { equipped: false },
       });
 
-      return { success: `${itemDisplayName(item.slot, item.level)} הוסר לתיק` };
+      return {
+        success: t("{item} הוסר לתיק", {
+          item: itemDisplayName(t, item.slot, item.level),
+        }),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("hero.unequipHeroItem", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -302,8 +334,9 @@ export async function discardHeroItem(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemSchema.safeParse({ itemId: formData.get("itemId") });
-  if (!parsed.success) return { error: "פריט לא תקין" };
+  if (!parsed.success) return { error: t("פריט לא תקין") };
   const { itemId } = parsed.data;
 
   try {
@@ -312,10 +345,10 @@ export async function discardHeroItem(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const item = hero.items.find((i) => i.id === itemId);
-      if (!item) return { error: "הפריט לא נמצא בתיק שלך" };
+      if (!item) return { error: t("הפריט לא נמצא בתיק שלך") };
 
       // Scope the delete to this hero so a stale id can't touch another's gear.
       // Gate the reward on an *actual* deletion: two concurrent discards of the
@@ -325,7 +358,7 @@ export async function discardHeroItem(
       const { count: deleted } = await tx.heroItem.deleteMany({
         where: { id: item.id, heroId: hero.id },
       });
-      if (deleted === 0) return { error: "הפריט לא נמצא בתיק שלך" };
+      if (deleted === 0) return { error: t("הפריט לא נמצא בתיק שלך") };
 
       // The fates may reward parting with gear — rarer items pay far more often
       // (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to +15% on top.
@@ -341,11 +374,11 @@ export async function discardHeroItem(
         });
       }
 
-      const name = itemDisplayName(item.slot, item.level);
+      const name = itemDisplayName(t, item.slot, item.level);
       return {
         success: wonSpin
-          ? `${name} נזרק — ומזל טוב! 🎡 זכית בסיבוב גלגל מזל!`
-          : `${name} נזרק`,
+          ? t("{item} נזרק — ומזל טוב! 🎡 זכית בסיבוב גלגל מזל!", { item: name })
+          : t("{item} נזרק", { item: name }),
       };
     });
 
@@ -353,7 +386,7 @@ export async function discardHeroItem(
     return result;
   } catch (err) {
     await logError("hero.discardHeroItem", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -371,6 +404,8 @@ const itemIdsSchema = z.object({
     .min(1)
     .max(MAX_BULK_ITEM_IDS * 40)
     .transform((s) => s.split(",").map((id) => id.trim()).filter(Boolean))
+    // i18n-exempt: zod's own message, never surfaced — a failed parse returns
+    // the translated "no items selected" below.
     .refine((ids) => ids.length <= MAX_BULK_ITEM_IDS, "נבחרו יותר מדי פריטים"),
 });
 
@@ -379,9 +414,10 @@ export async function discardHeroItems(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemIdsSchema.safeParse({ itemIds: formData.get("itemIds") });
   if (!parsed.success || parsed.data.itemIds.length === 0) {
-    return { error: "לא נבחרו פריטים" };
+    return { error: t("לא נבחרו פריטים") };
   }
   const ids = new Set(parsed.data.itemIds);
 
@@ -391,10 +427,10 @@ export async function discardHeroItems(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const owned = hero.items.filter((i) => ids.has(i.id));
-      if (owned.length === 0) return { error: "הפריטים לא נמצאו בתיק שלך" };
+      if (owned.length === 0) return { error: t("הפריטים לא נמצאו בתיק שלך") };
 
       // Roll each thrown item independently — rarer gear pays a wheel spin far
       // more often (אגדי pays 1-in-10), and the wheel-luck upgrade adds up to
@@ -416,7 +452,7 @@ export async function discardHeroItems(
         count += del.count;
         if (rollDiscardWheelSpin(item.level, luckBonus)) spinsWon += 1;
       }
-      if (count === 0) return { error: "הפריטים לא נמצאו בתיק שלך" };
+      if (count === 0) return { error: t("הפריטים לא נמצאו בתיק שלך") };
       if (spinsWon > 0) {
         await tx.empire.update({
           where: { id: empireId },
@@ -427,8 +463,11 @@ export async function discardHeroItems(
       return {
         success:
           spinsWon > 0
-            ? `${count} חפצים נזרקו — ומזל טוב! 🎡 זכית ב-${spinsWon} סיבובי גלגל מזל!`
-            : `${count} חפצים נזרקו`,
+            ? t("{count} חפצים נזרקו — ומזל טוב! 🎡 זכית ב-{spins} סיבובי גלגל מזל!", {
+                count,
+                spins: spinsWon,
+              })
+            : t("{count} חפצים נזרקו", { count }),
       };
     });
 
@@ -436,7 +475,7 @@ export async function discardHeroItems(
     return result;
   } catch (err) {
     await logError("hero.discardHeroItems", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -447,8 +486,9 @@ export async function upgradeHeroItem(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemSchema.safeParse({ itemId: formData.get("itemId") });
-  if (!parsed.success) return { error: "פריט לא תקין" };
+  if (!parsed.success) return { error: t("פריט לא תקין") };
   const { itemId } = parsed.data;
 
   try {
@@ -457,10 +497,10 @@ export async function upgradeHeroItem(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const item = hero.items.find((i) => i.id === itemId);
-      if (!item) return { error: "הפריט לא נמצא בתיק שלך" };
+      if (!item) return { error: t("הפריט לא נמצא בתיק שלך") };
 
       const targetLevel = nextTierLevel(item.level);
       // An אגדי closes its set: there is no higher rung inside the decade, and
@@ -468,15 +508,20 @@ export async function upgradeHeroItem(
       if (targetLevel === null) {
         return {
           error: atSetCeiling(item.level)
-            ? `אגדי הוא שיא הסט "${itemSetForLevel(item.level).label}" — הסט הבא מגיע כשלל בקרב`
-            : "הפריט כבר ברמה הגבוהה ביותר",
+            ? t('אגדי הוא שיא הסט "{set}" — הסט הבא מגיע כשלל בקרב', {
+                set: t(itemSetForLevel(item.level).label),
+              })
+            : t("הפריט כבר ברמה הגבוהה ביותר"),
         };
       }
 
       // Can't push an item above the hero's own level.
       if (hero.level < targetLevel) {
         return {
-          error: `דרוש גיבור רמה ${targetLevel} כדי לשדרג (אתה ברמה ${hero.level})`,
+          error: t("דרוש גיבור רמה {required} כדי לשדרג (אתה ברמה {level})", {
+            required: targetLevel,
+            level: hero.level,
+          }),
         };
       }
 
@@ -485,9 +530,10 @@ export async function upgradeHeroItem(
       const cost = forgeDiscountedCost(itemUpgradeCost(item.level) ?? 0, forgeDiscount);
       if (empire.gold < cost) {
         return {
-          error: `דרוש ${cost.toLocaleString("he-IL")} זהב לשדרוג (יש לך ${Math.floor(
-            empire.gold
-          ).toLocaleString("he-IL")})`,
+          error: t("דרוש {cost} זהב לשדרוג (יש לך {gold})", {
+            cost: cost.toLocaleString("en-US"),
+            gold: Math.floor(empire.gold).toLocaleString("en-US"),
+          }),
         };
       }
 
@@ -496,7 +542,7 @@ export async function upgradeHeroItem(
         where: { id: empireId, gold: { gte: cost } },
         data: { gold: { decrement: cost } },
       });
-      if (paid.count === 0) return { error: "אין מספיק זהב לשדרוג" };
+      if (paid.count === 0) return { error: t("אין מספיק זהב לשדרוג") };
 
       // Level drives the item's stats and tier; keep the stored tier in sync.
       // Guard on the level we read and paid for: if a concurrent upgrade already
@@ -509,7 +555,11 @@ export async function upgradeHeroItem(
       if (upgraded.count === 0) throw new Error("item upgrade conflict");
 
       return {
-        success: `${itemDisplayName(item.slot, item.level)} שודרג לרמה ${targetLevel} (${RARITY_META[tierForLevel(targetLevel)].label})!`,
+        success: t("{item} שודרג לרמה {level} ({rarity})!", {
+          item: itemDisplayName(t, item.slot, item.level),
+          level: targetLevel,
+          rarity: t(RARITY_META[tierForLevel(targetLevel)].label),
+        }),
       };
     });
 
@@ -517,7 +567,7 @@ export async function upgradeHeroItem(
     return result;
   } catch (err) {
     await logError("hero.upgradeHeroItem", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -529,9 +579,10 @@ export async function upgradeHeroItems(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = itemIdsSchema.safeParse({ itemIds: formData.get("itemIds") });
   if (!parsed.success || parsed.data.itemIds.length === 0) {
-    return { error: "לא נבחרו פריטים" };
+    return { error: t("לא נבחרו פריטים") };
   }
   const ids = new Set(parsed.data.itemIds);
 
@@ -541,7 +592,7 @@ export async function upgradeHeroItems(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       // Only upgradeable items (not at max level, and whose next level the hero
       // is high enough to reach), cheapest first so a limited gold budget buys
@@ -558,7 +609,7 @@ export async function upgradeHeroItems(
         .sort((a, b) => a.cost - b.cost);
 
       if (upgradeable.length === 0) {
-        return { error: "אין פריטים לשדרוג מבין הנבחרים" };
+        return { error: t("אין פריטים לשדרוג מבין הנבחרים") };
       }
 
       // First build the upgrade plan WITHOUT mutating anything, so payment can
@@ -578,9 +629,9 @@ export async function upgradeHeroItems(
       if (plan.length === 0) {
         const cheapest = upgradeable[0].cost;
         return {
-          error: `אין מספיק זהב — השדרוג הזול ביותר עולה ${cheapest.toLocaleString(
-            "he-IL"
-          )} זהב`,
+          error: t("אין מספיק זהב — השדרוג הזול ביותר עולה {cost} זהב", {
+            cost: cheapest.toLocaleString("en-US"),
+          }),
         };
       }
 
@@ -589,7 +640,7 @@ export async function upgradeHeroItems(
         where: { id: empireId, gold: { gte: spent } },
         data: { gold: { decrement: spent } },
       });
-      if (paid.count === 0) return { error: "אין מספיק זהב לשדרוג" };
+      if (paid.count === 0) return { error: t("אין מספיק זהב לשדרוג") };
 
       // Guard each write on the level we read and paid for. If a concurrent
       // upgrade already advanced an item, throw to roll back the whole batch
@@ -605,9 +656,14 @@ export async function upgradeHeroItems(
 
       const upgraded = plan.length;
       const skipped = upgradeable.length - upgraded;
-      const suffix = skipped > 0 ? ` (${skipped} לא שודרגו — חסר זהב)` : "";
+      const suffix =
+        skipped > 0 ? t(" ({count} לא שודרגו — חסר זהב)", { count: skipped }) : "";
       return {
-        success: `${upgraded} חפצים שודרגו תמורת ${spent.toLocaleString("he-IL")} זהב${suffix}`,
+        success: t("{count} חפצים שודרגו תמורת {gold} זהב{suffix}", {
+          count: upgraded,
+          gold: spent.toLocaleString("en-US"),
+          suffix,
+        }),
       };
     });
 
@@ -615,6 +671,6 @@ export async function upgradeHeroItems(
     return result;
   } catch (err) {
     await logError("hero.upgradeHeroItems", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

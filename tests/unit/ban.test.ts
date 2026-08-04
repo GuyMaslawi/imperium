@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { makeT } from "@/i18n/translate";
 import { banLabel, banNotice, bannedWhere, isBanned, notBannedWhere } from "@/lib/ban";
 
 /**
@@ -78,9 +80,19 @@ describe("ban filters mirror isBanned", () => {
 });
 
 describe("copy", () => {
+  // Hebrew is the source language, so its translator hands back the source
+  // text — the assertions below read as the sentence a banned player is shown.
+  const he = makeT("he");
+
   it("names the hour a timed ban lifts, and stays silent for a permanent one", () => {
-    expect(banNotice({ bannedAt: PAST, bannedUntil: FUTURE })).toContain("עד");
-    expect(banNotice({ bannedAt: PAST, bannedUntil: null })).not.toContain("עד");
+    expect(banNotice(he, { bannedAt: PAST, bannedUntil: FUTURE })).toContain("עד");
+    expect(banNotice(he, { bannedAt: PAST, bannedUntil: null })).not.toContain("עד");
+  });
+
+  it("says the same thing in English", () => {
+    const en = makeT("en");
+    expect(en && banNotice(en, { bannedAt: PAST, bannedUntil: FUTURE })).toContain("until");
+    expect(banNotice(en, { bannedAt: PAST, bannedUntil: null })).not.toContain("until");
   });
 
   it("labels a lapsed ban as active", () => {

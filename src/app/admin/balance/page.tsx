@@ -1,6 +1,7 @@
 import { requireAdmin } from "@/lib/admin";
-import { getTunables, TUNABLE_META, DEFAULT_TUNABLES, type GameTunables } from "@/lib/game/config";
+import { getTunables, DEFAULT_TUNABLES, type GameTunables } from "@/lib/game/config";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { TUNABLE_META } from "@/components/admin/tunableMeta";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { EditorSection } from "@/components/admin/fields";
 import { saveTunables, resetTunables } from "@/server/actions/admin";

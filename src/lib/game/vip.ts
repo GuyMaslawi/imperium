@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/ui/Icon";
+import type { T } from "@/i18n/translate";
 
 /**
  * ------------------------------ VIP · חותם המלוכה ------------------------------
@@ -48,7 +49,11 @@ export function isVip(empire: VipHolder | null | undefined): boolean {
  * Shared, because the gate lives in three files (bank, game, vip) and a player
  * who hits it from two different screens must be told the same thing.
  */
-export const VIP_REQUIRED_ERROR = `הפעולה הזו נפתחת עם ${VIP_LABEL} — ניתן לרכוש בעמוד היהלומים`;
+export function vipRequiredError(t: T): string {
+  return t("הפעולה הזו נפתחת עם {vip} — לחיצה על הכפתור הנעול פותחת את הרכישה", {
+    vip: t(VIP_LABEL),
+  });
+}
 
 /** The perks, as the shop card and the guide list them. */
 export interface VipPerk {
@@ -81,4 +86,6 @@ export const VIP_PERKS: VipPerk[] = [
 ];
 
 /** The one-liner shown wherever a locked VIP control explains itself. */
-export const VIP_LOCK_HINT = `נעול · נפתח עם ${VIP_LABEL}`;
+export function vipLockHint(t: T): string {
+  return t("נעול · נפתח עם {vip}", { vip: t(VIP_LABEL) });
+}

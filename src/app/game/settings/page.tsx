@@ -7,11 +7,16 @@ import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { logout } from "@/server/actions/auth";
 import { AccountSecurity } from "@/components/game/AccountSecurity";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "הגדרות | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("הגדרות | קראלדור") };
+}
 
 export default async function SettingsPage() {
   const empire = await requireEmpire();
+  const { t, locale } = await getI18n();
 
   // Asked as a count rather than a `select: { passwordHash: true }`, so the
   // digest is never loaded into the render at all — the page only ever needed
@@ -25,7 +30,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="הגדרות"
+        title={t("הגדרות")}
         ornament={<Icon name="settings" size={22} className="text-crimson" />}
       />
 
@@ -37,32 +42,32 @@ export default async function SettingsPage() {
         <span className="cog-wheel cog-wheel-b" aria-hidden />
 
         <div className="panel cog-panel rounded-xl p-4" style={{ "--i": 0 } as CSSProperties}>
-          <CardTitle icon="👑">שם האימפריה</CardTitle>
+          <CardTitle icon="👑">{t("שם האימפריה")}</CardTitle>
           <p className="panel-inset rounded-lg px-3 py-2 text-sm font-bold text-zinc-100">
             {empire.name}
           </p>
           <p className="mt-2 text-xs text-zinc-500">
-            שם האימפריה נעול למשך העונה ולא ניתן לשינוי.
+            {t("שם האימפריה נעול למשך העונה ולא ניתן לשינוי.")}
           </p>
         </div>
 
         <div className="panel cog-panel rounded-xl p-4" style={{ "--i": 1 } as CSSProperties}>
-          <CardTitle icon="👤">פרטי חשבון</CardTitle>
+          <CardTitle icon="👤">{t("פרטי חשבון")}</CardTitle>
           <dl className="space-y-2.5 text-sm">
             <div className="flex justify-between border-b border-border-subtle pb-2.5">
-              <dt className="text-zinc-400">שם</dt>
+              <dt className="text-zinc-400">{t("שם")}</dt>
               <dd className="font-medium text-zinc-100">{empire.user.name}</dd>
             </div>
             <div className="flex justify-between border-b border-border-subtle pb-2.5">
-              <dt className="text-zinc-400">אימייל</dt>
+              <dt className="text-zinc-400">{t("אימייל")}</dt>
               <dd dir="ltr" className="nums font-medium text-zinc-100">
                 {empire.user.email}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-zinc-400">האימפריה נוסדה</dt>
+              <dt className="text-zinc-400">{t("האימפריה נוסדה")}</dt>
               <dd className="nums font-medium text-zinc-100" dir="ltr">
-                {formatDate(empire.createdAt)}
+                {formatDate(empire.createdAt, locale)}
               </dd>
             </div>
           </dl>
@@ -74,16 +79,16 @@ export default async function SettingsPage() {
         </div>
 
         <div className="panel-gold cog-panel rounded-xl p-4" style={{ "--i": 3 } as CSSProperties}>
-          <CardTitle icon="🚪">התנתקות</CardTitle>
+          <CardTitle icon="🚪">{t("התנתקות")}</CardTitle>
           <p className="mb-4 text-sm text-zinc-400">
-            התנתקות מהחשבון במכשיר הזה. ההתקדמות שלך נשמרת.
+            {t("התנתקות מהחשבון במכשיר הזה. ההתקדמות שלך נשמרת.")}
           </p>
           <form action={logout}>
             <button
               type="submit"
               className="btn btn-ghost px-4 py-2 text-sm text-red-400"
             >
-              <Icon name="logout" size={16} className="inline-block align-text-bottom" /> התנתק מהמשחק
+              <Icon name="logout" size={16} className="inline-block align-text-bottom" /> {t("התנתק מהמשחק")}
             </button>
           </form>
         </div>

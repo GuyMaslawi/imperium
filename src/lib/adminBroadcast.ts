@@ -24,6 +24,9 @@
  * player is being told something happened, not addressed.
  */
 export const BROADCAST_DEFAULTS = {
+  // i18n-exempt-start: the default text of a broadcast. An admin edits it in
+  // the control centre before sending, and it then lands in one stored Message
+  // row per player — one text, every reader. See the note in `attackEmpire`.
   title: "📣 עדכון חדש עלה לאוויר",
   body:
     "יש חדש בקראלדור. 🚀\n" +
@@ -34,7 +37,7 @@ export const GIFT_DEFAULTS = {
   title: "🎁 נחת לכם באוצר",
   body:
     "המתנה כבר אצלכם — לא צריך לעשות כלום. 💰\n" +
-    "תשרפו את זה חכם. ⚔️",
+    "תשרפו את זה חכם. ⚔️", // i18n-exempt-end
 } as const;
 
 /* ------------------------------- audiences ------------------------------- */

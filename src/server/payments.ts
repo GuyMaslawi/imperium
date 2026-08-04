@@ -231,6 +231,10 @@ export function arePurchasesLive(): boolean {
  * which of the three conditions is the one still missing.
  */
 export function purchaseBlockers(): string[] {
+  // i18n-exempt-start: every line here is shown to an admin on the buy screen
+  // and names an env var to go and set — the control centre stays Hebrew on
+  // purpose. A player never sees any of it; they see a store that is simply
+  // not open yet.
   const blockers: string[] = [];
   if (process.env.DIAMOND_PURCHASES_LIVE !== "true") {
     blockers.push('DIAMOND_PURCHASES_LIVE אינו "true"');
@@ -254,7 +258,7 @@ export function purchaseBlockers(): string[] {
   if (missing.length > 0) {
     blockers.push(`פרטי המפעיל לא פורסמו — חסר: ${missing.join(", ")}`);
   }
-  return blockers;
+  return blockers; // i18n-exempt-end
 }
 
 /** Everything the checkout UI needs to know about the active provider. */

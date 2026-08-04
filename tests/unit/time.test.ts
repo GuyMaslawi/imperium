@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+
+import { makeT } from "@/i18n/translate";
 import {
   formatWaitDuration,
   lastWallTime,
@@ -116,37 +118,40 @@ describe("the two agree", () => {
  * picks and the direction it rounds are both player-facing decisions.
  */
 describe("formatWaitDuration", () => {
+  // Hebrew is the source language, so its translator returns the source text
+  // untouched — these assertions read as the sentence a player is shown.
+  const t = makeT("he");
   const MINUTE = 60_000;
   const HOUR = 60 * MINUTE;
   const DAY = 24 * HOUR;
 
   it("says hours for an hours-long wait and days for a days-long one", () => {
-    expect(formatWaitDuration(3 * HOUR)).toBe("3 שעות");
-    expect(formatWaitDuration(23 * HOUR)).toBe("23 שעות");
-    expect(formatWaitDuration(DAY)).toBe("יום");
-    expect(formatWaitDuration(3 * DAY)).toBe("3 ימים");
+    expect(formatWaitDuration(t, 3 * HOUR)).toBe("3 שעות");
+    expect(formatWaitDuration(t, 23 * HOUR)).toBe("23 שעות");
+    expect(formatWaitDuration(t, DAY)).toBe("יום");
+    expect(formatWaitDuration(t, 3 * DAY)).toBe("3 ימים");
   });
 
   it("uses the Hebrew dual", () => {
     // "2 שעות" is not something anybody says.
-    expect(formatWaitDuration(2 * HOUR)).toBe("שעתיים");
-    expect(formatWaitDuration(2 * DAY)).toBe("יומיים");
-    expect(formatWaitDuration(HOUR)).toBe("שעה");
-    expect(formatWaitDuration(2 * MINUTE)).toBe("שתי דקות");
+    expect(formatWaitDuration(t, 2 * HOUR)).toBe("שעתיים");
+    expect(formatWaitDuration(t, 2 * DAY)).toBe("יומיים");
+    expect(formatWaitDuration(t, HOUR)).toBe("שעה");
+    expect(formatWaitDuration(t, 2 * MINUTE)).toBe("שתי דקות");
   });
 
   it("rounds down, never up", () => {
     // The wait is a countdown to an opening: rounding up would send a player
     // back after it has already started.
-    expect(formatWaitDuration(3 * HOUR + 59 * MINUTE)).toBe("3 שעות");
-    expect(formatWaitDuration(2 * DAY - MINUTE)).toBe("יום");
-    expect(formatWaitDuration(30 * HOUR)).toBe("יום");
+    expect(formatWaitDuration(t, 3 * HOUR + 59 * MINUTE)).toBe("3 שעות");
+    expect(formatWaitDuration(t, 2 * DAY - MINUTE)).toBe("יום");
+    expect(formatWaitDuration(t, 30 * HOUR)).toBe("יום");
   });
 
   it("does not run out of words on the edges", () => {
-    expect(formatWaitDuration(45 * MINUTE)).toBe("45 דקות");
-    expect(formatWaitDuration(30_000)).toBe("רגע");
-    expect(formatWaitDuration(0)).toBe("רגע");
-    expect(formatWaitDuration(-5 * HOUR)).toBe("רגע");
+    expect(formatWaitDuration(t, 45 * MINUTE)).toBe("45 דקות");
+    expect(formatWaitDuration(t, 30_000)).toBe("רגע");
+    expect(formatWaitDuration(t, 0)).toBe("רגע");
+    expect(formatWaitDuration(t, -5 * HOUR)).toBe("רגע");
   });
 });

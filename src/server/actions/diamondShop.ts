@@ -24,10 +24,13 @@ import {
 } from "@/server/diamondEffects";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT, type T } from "@/i18n/server";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — each action catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -59,12 +62,17 @@ async function spendDiamonds(
  * admin player editor, which casts the same spells for free — see that module
  * for what the two callers do and don't have in common.
  */
-function playerCast(tx: Prisma.TransactionClient, empireId: string): CastContext {
+function playerCast(
+  tx: Prisma.TransactionClient,
+  empireId: string,
+  t: T
+): CastContext {
   return {
     tx,
     empireId,
     now: new Date(),
     charge: (cost) => spendDiamonds(tx, empireId, cost),
+    t,
   };
 }
 
@@ -77,22 +85,23 @@ export async function buyResourceBoost(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = resourceSchema.safeParse(formData.get("resource"));
-  if (!parsed.success) return { error: "משאב לא תקין" };
+  if (!parsed.success) return { error: t("משאב לא תקין") };
 
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
-      return castResourceBoost(playerCast(tx, empireId), parsed.data);
+      return castResourceBoost(playerCast(tx, empireId, t), parsed.data);
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.buyResourceBoost", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -103,19 +112,20 @@ export async function buyShopDiscount(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
-      return castShopDiscount(playerCast(tx, empireId));
+      return castShopDiscount(playerCast(tx, empireId, t));
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.buyShopDiscount", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -135,11 +145,12 @@ export async function buyRaidShield(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = shieldSchema.safeParse({
     shield: formData.get("shield"),
     hours: formData.get("hours"),
   });
-  if (!parsed.success) return { error: "מגן לא תקין" };
+  if (!parsed.success) return { error: t("מגן לא תקין") };
 
   try {
     const empireId = await requireOwnEmpireId();
@@ -147,7 +158,7 @@ export async function buyRaidShield(
       await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
       return castRaidShield(
-        playerCast(tx, empireId),
+        playerCast(tx, empireId, t),
         parsed.data.shield,
         parsed.data.hours
       );
@@ -157,7 +168,7 @@ export async function buyRaidShield(
     return result;
   } catch (err) {
     await logError("diamondShop.buyRaidShield", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -180,22 +191,23 @@ export async function buyTurns(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = packageSchema.safeParse({ packageIndex: formData.get("packageIndex") });
-  if (!parsed.success) return { error: "חבילה לא תקינה" };
+  if (!parsed.success) return { error: t("חבילה לא תקינה") };
 
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       await applyPendingUpdates(empireId, tx);
-      return castTurnPackage(playerCast(tx, empireId), parsed.data.packageIndex);
+      return castTurnPackage(playerCast(tx, empireId, t), parsed.data.packageIndex);
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.buyTurns", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -206,13 +218,14 @@ export async function resetHeroPointsWithDiamonds(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
 
       const activeSeason = await tx.gameSeason.findFirst({
         where: { isActive: true },
@@ -220,14 +233,14 @@ export async function resetHeroPointsWithDiamonds(
       });
       const seasonId = activeSeason?.id ?? "none";
       if (hero.pointsResetSeasonId === seasonId) {
-        return { error: "כבר אפסת נקודות גיבור העונה" };
+        return { error: t("כבר אפסת נקודות גיבור העונה") };
       }
 
       const allocated = hero.attackPoints + hero.defensePoints + hero.resourcePoints;
-      if (allocated === 0) return { error: "אין נקודות מוקצות לאיפוס" };
+      if (allocated === 0) return { error: t("אין נקודות מוקצות לאיפוס") };
 
       if (!(await spendDiamonds(tx, empireId, HERO_POINTS_RESET_COST))) {
-        return { error: "אין מספיק יהלומים" };
+        return { error: t("אין מספיק יהלומים") };
       }
 
       await tx.hero.update({
@@ -241,14 +254,18 @@ export async function resetHeroPointsWithDiamonds(
         },
       });
 
-      return { success: `${allocated} נקודות גיבור שוחררו מחדש להקצאה!` };
+      return {
+        success: t("{count} נקודות גיבור שוחררו מחדש להקצאה!", {
+          count: allocated,
+        }),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.resetHeroPointsWithDiamonds", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -263,6 +280,7 @@ export async function reviveHeroWithDiamonds(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
@@ -274,11 +292,17 @@ export async function reviveHeroWithDiamonds(
       // player is never charged for an hour that has quietly passed.
       const empire = await applyPendingUpdates(empireId, tx);
       const hero = empire.hero;
-      if (!hero) return { error: "הגיבור לא נמצא" };
-      if (!isHeroDead(hero)) return { error: "הגיבור בחיים — אין צורך בהחייאה" };
+      if (!hero) return { error: t("הגיבור לא נמצא") };
+      if (!isHeroDead(hero)) {
+        return { error: t("הגיבור בחיים — אין צורך בהחייאה") };
+      }
 
       if (!(await spendDiamonds(tx, empireId, HERO_REVIVE_COST))) {
-        return { error: `דרושים ${HERO_REVIVE_COST} יהלומים להחייאת הגיבור` };
+        return {
+          error: t("דרושים {cost} יהלומים להחייאת הגיבור", {
+            cost: HERO_REVIVE_COST,
+          }),
+        };
       }
 
       // Guarded on "still dead": if anything raised him between the check and
@@ -289,14 +313,16 @@ export async function reviveHeroWithDiamonds(
       });
       if (raised.count === 0) throw new Error("hero revive conflict");
 
-      return { success: "הגיבור קם לתחייה עם 100% חיים — כל הבונוסים שלו חזרו!" };
+      return {
+        success: t("הגיבור קם לתחייה עם 100% חיים — כל הבונוסים שלו חזרו!"),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.reviveHeroWithDiamonds", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -307,19 +333,20 @@ export async function castBankInterestSpell(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
-      return castBankInterest(playerCast(tx, empireId), empire);
+      return castBankInterest(playerCast(tx, empireId, t), empire);
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.castBankInterestSpell", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -340,19 +367,20 @@ export async function castCityDowngradeSpell(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx) => {
       await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
-      return castCityDowngrade(playerCast(tx, empireId), empire);
+      return castCityDowngrade(playerCast(tx, empireId, t), empire);
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("diamondShop.castCityDowngradeSpell", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 

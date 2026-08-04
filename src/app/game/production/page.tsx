@@ -18,8 +18,12 @@ import { MineCard } from "@/components/game/MineCard";
 import { MineSlaveQuickActions } from "@/components/game/MineSlaveQuickActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "ייצור | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("ייצור | קראלדור") };
+}
 
 /** Furnace smoke behind the industry banner — fixed table, no randomness. */
 const SMOKE = [
@@ -39,6 +43,7 @@ const EMBERS = [
 ];
 
 export default async function ProductionPage() {
+  const t = await getT();
   const empire = await requireEmpire();
   const vip = isVip(empire);
 
@@ -64,15 +69,15 @@ export default async function ProductionPage() {
   const freeSlaves = Math.max(0, totalSlaves - assignedTotal);
 
   const summary = [
-    { label: "סה\"כ עבדי מכרות", value: totalSlaves },
-    { label: "עבדי מכרות מוצבים", value: assignedTotal },
-    { label: "עבדי מכרות פנויים", value: freeSlaves },
+    { label: t('סה"כ עבדי מכרות'), value: totalSlaves },
+    { label: t("עבדי מכרות מוצבים"), value: assignedTotal },
+    { label: t("עבדי מכרות פנויים"), value: freeSlaves },
   ];
 
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="מכונות"
+        title={t("מכונות")}
         ornament={<Icon name="mine" size={22} className="text-crimson" />}
       />
 
@@ -101,7 +106,7 @@ export default async function ProductionPage() {
         <div className="forge-body">
           <h2 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="mine" size={20} className="text-crimson-bright forge-cart" />
-            מפעלים ותעשייה
+            {t("מפעלים ותעשייה")}
           </h2>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {summary.map(({ label, value }, index) => (
@@ -139,13 +144,13 @@ export default async function ProductionPage() {
             <MineCard
               key={mine.type}
               resource={resource}
-              label={meta.label}
-              description={meta.description}
+              label={t(meta.label)}
+              description={t(meta.description)}
               level={mine.level}
               maxLevel={MINE_MAX_LEVEL}
               assignedSlaves={mine.assignedSlaves}
               freeSlaves={freeSlaves}
-              resourceLabel={RESOURCE_META[resource].label}
+              resourceLabel={t(RESOURCE_META[resource].label)}
               productionPerSlave={mineProductionValue(mine.level)}
               breakdown={breakdown}
               upgradeCost={mineUpgradeCost(mine.level, resource)}

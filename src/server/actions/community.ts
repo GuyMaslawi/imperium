@@ -6,6 +6,7 @@ import { getActiveEmpireId } from "@/lib/auth";
 import { logError } from "@/server/errorLog";
 import { discordInviteUrl } from "@/server/discord";
 import { DISCORD_JOIN_DIAMONDS } from "@/lib/community";
+import { getT } from "@/i18n/server";
 
 export interface ClaimDiscordResult {
   ok: boolean;
@@ -38,17 +39,18 @@ export interface ClaimDiscordResult {
  * loser of the race matches zero rows and is told it was already collected.
  */
 export async function claimDiscordReward(): Promise<ClaimDiscordResult> {
+  const t = await getT();
   try {
     // Also enforces the ban / email-verification gate on the action itself,
     // not merely on the page that renders the button.
     const empireId = await getActiveEmpireId();
-    if (empireId === null) return { ok: false, error: "לא מחובר" };
+    if (empireId === null) return { ok: false, error: t("לא מחובר") };
 
     // No channel, no reward. Without this the purse would be collectable during
     // exactly the window this whole feature was built for — the days before the
     // invite exists — by anyone who found the action.
     if (discordInviteUrl() === null) {
-      return { ok: false, error: "ערוץ הקהילה עדיין לא נפתח" };
+      return { ok: false, error: t("ערוץ הקהילה עדיין לא נפתח") };
     }
 
     const claimed = await prisma.empire.updateMany({
@@ -59,7 +61,11 @@ export async function claimDiscordReward(): Promise<ClaimDiscordResult> {
       },
     });
     if (claimed.count === 0) {
-      return { ok: false, alreadyClaimed: true, error: "כבר אספת את המתנה הזו" };
+      return {
+        ok: false,
+        alreadyClaimed: true,
+        error: t("כבר אספת את המתנה הזו"),
+      };
     }
 
     // The diamond counter lives in the command bar on every screen.
@@ -69,6 +75,6 @@ export async function claimDiscordReward(): Promise<ClaimDiscordResult> {
     // Never the raw message — it names models and sometimes the statement, and
     // this string is rendered straight into the browser.
     await logError("community.claimDiscordReward", err);
-    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
+    return { ok: false, error: t("אירעה שגיאה, נסה שוב") };
   }
 }

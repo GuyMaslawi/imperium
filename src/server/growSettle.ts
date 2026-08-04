@@ -89,6 +89,7 @@ export async function settleGrowOrder(ref: {
     // Credentials were pulled between opening the order and settling it. The
     // money may well have moved, so this is loud rather than silent — the row
     // stays PENDING and visible in /admin/purchases.
+    // i18n-exempt: an error-log line for the operator, never rendered.
     await logError("grow.settle", new Error("Grow אינו מוגדר בזמן סגירת עסקה"), {
       path: "/api/pay/grow",
       userId: purchase.userId,

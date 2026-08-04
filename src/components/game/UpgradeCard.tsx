@@ -10,6 +10,7 @@ import { usePulse } from "@/components/ui/motion";
 import { formatNumber } from "@/lib/game/format";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
 import type { AvailableResources } from "@/components/game/WeaponCard";
+import { useT } from "@/i18n/client";
 
 /** Shards thrown off the crest when an upgrade settles. */
 const BURST = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -46,6 +47,7 @@ export function UpgradeCard({
   available,
   isMaxLevel = false,
 }: UpgradeCardProps) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     upgradeEmpireUpgrade,
     {}
@@ -84,7 +86,7 @@ export function UpgradeCard({
         <div>
           <h3 className="font-bold text-gold-bright">{label}</h3>
           <p className="text-xs font-semibold text-gold">
-            רמה{" "}
+            {t("רמה")}{" "}
             <span className="nums crest-level" key={level} dir="ltr">
               {level}
             </span>
@@ -96,11 +98,11 @@ export function UpgradeCard({
 
       <div className="panel-inset space-y-1 rounded-lg p-3 text-xs">
         <p className="text-zinc-300">
-          <span className="font-semibold text-gold-dim">כעת:</span> {currentEffect}
+          <span className="font-semibold text-gold-dim">{t("כעת:")}</span> {currentEffect}
         </p>
         {!isMaxLevel && (
           <p className="text-emerald-400">
-            <span className="font-semibold">אחרי שדרוג:</span> {nextEffect}
+            <span className="font-semibold">{t("אחרי שדרוג:")}</span> {nextEffect}
           </p>
         )}
       </div>
@@ -109,7 +111,7 @@ export function UpgradeCard({
         <input type="hidden" name="upgradeType" value={upgradeType} />
         {!isMaxLevel && (
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-            <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
+            <span className="font-semibold text-gold-dim">{t("עלות שדרוג:")}</span>
             {COST_RESOURCES.map(({ key, icon }) => {
               if (upgradeCost[key] <= 0) return null;
               const missing = available[key] < upgradeCost[key];
@@ -117,7 +119,7 @@ export function UpgradeCard({
                 <span
                   key={key}
                   className={missing ? "font-semibold text-red-400" : undefined}
-                  title={missing ? "אין מספיק מהמשאב הזה לשדרוג" : undefined}
+                  title={missing ? t("אין מספיק מהמשאב הזה לשדרוג") : undefined}
                 >
                   <Icon
                     name={icon}
@@ -134,10 +136,12 @@ export function UpgradeCard({
         )}
         <SubmitButton
           className={`w-full ${isMaxLevel ? "" : "btn btn-gold"}`}
-          pendingText="משדרג..."
+          pendingText={t("משדרג...")}
           disabled={isMaxLevel}
         >
-          {isMaxLevel ? "רמה מקסימלית" : `שדרג לרמה ${level + 1}`}
+          {isMaxLevel
+            ? t("רמה מקסימלית")
+            : t("שדרג לרמה {level}", { level: level + 1 })}
         </SubmitButton>
       </form>
 

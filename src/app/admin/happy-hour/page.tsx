@@ -4,7 +4,8 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { EditorSection } from "@/components/admin/fields";
 import { HappyHourLauncher } from "@/components/admin/HappyHourLauncher";
-import { activeEffects, durationLabel, multiplierLabel } from "@/lib/game/happyHour";
+import { activeEffects, multiplierLabel } from "@/lib/game/happyHour";
+import { durationLabel } from "@/components/admin/happyHourDuration";
 import {
   createHappyHour,
   startHappyHour,

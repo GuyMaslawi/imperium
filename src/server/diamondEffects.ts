@@ -2,6 +2,7 @@ import "server-only";
 import type { DiamondEffectKind, Prisma } from "@prisma/client";
 import { bankInterestRate, type StorableResource } from "@/lib/game/constants";
 import { cityName } from "@/lib/game/cities";
+import type { T } from "@/i18n/translate";
 import {
   BANK_INTEREST_COOLDOWN_MS,
   BANK_INTEREST_SPELL_COST,
@@ -50,6 +51,15 @@ export interface CastContext {
   empireId: string;
   /** One clock for the whole cast, so the guards and the stamps agree. */
   now: Date;
+  /**
+   * The reader's translator, for the one sentence every cast returns.
+   *
+   * Passed in rather than resolved here because the two callers read different
+   * languages: the player's cast runs on their own request, while an admin cast
+   * is written for the admin looking at the editor — the control centre stays
+   * Hebrew, so it hands in the source-language translator.
+   */
+  t: T;
   /**
    * Charge for the cast once every guard has passed and before the first write.
    * Returns false when the purse is short, which aborts the cast without a
@@ -120,10 +130,14 @@ export async function castResourceBoost(
   const activePct =
     existing?.activeUntil && existing.activeUntil > ctx.now ? existing.magnitude : 0;
   if (activePct >= BOOST_MAX_PCT) {
-    return { error: `הבונוס כבר בתקרה (+${BOOST_MAX_PCT}%)` };
+    return {
+      error: ctx.t("הבונוס כבר בתקרה (+{max}%)", { max: BOOST_MAX_PCT }),
+    };
   }
 
-  if (!(await paid(ctx, BOOST_STEP_COST))) return { error: "אין מספיק יהלומים" };
+  if (!(await paid(ctx, BOOST_STEP_COST))) {
+    return { error: ctx.t("אין מספיק יהלומים") };
+  }
 
   const magnitude = Math.min(BOOST_MAX_PCT, activePct + BOOST_STEP_PCT);
   const activeUntil = new Date(ctx.now.getTime() + BOOST_DURATION_MS);
@@ -133,7 +147,9 @@ export async function castResourceBoost(
     update: { magnitude, activeUntil, readyAt: null },
   });
 
-  return { success: `בונוס תפוקה עלה ל־+${magnitude}% ל־24 שעות!` };
+  return {
+    success: ctx.t("בונוס תפוקה עלה ל־+{pct}% ל־24 שעות!", { pct: magnitude }),
+  };
 }
 
 /* ------------------------------ shop discount ------------------------------ */
@@ -143,10 +159,12 @@ export async function castShopDiscount(ctx: CastContext): Promise<EffectResult> 
   const existing = await effectRow(ctx, "SHOP_DISCOUNT");
   // "Already running" is pacing, not legality: an admin cast refreshes it.
   if (!ctx.ignoreCooldown && existing?.activeUntil && existing.activeUntil > ctx.now) {
-    return { error: "ההנחה כבר פעילה" };
+    return { error: ctx.t("ההנחה כבר פעילה") };
   }
 
-  if (!(await paid(ctx, SHOP_DISCOUNT_COST))) return { error: "אין מספיק יהלומים" };
+  if (!(await paid(ctx, SHOP_DISCOUNT_COST))) {
+    return { error: ctx.t("אין מספיק יהלומים") };
+  }
 
   const activeUntil = new Date(ctx.now.getTime() + SHOP_DISCOUNT_DURATION_MS);
   await ctx.tx.diamondEffect.upsert({
@@ -160,7 +178,11 @@ export async function castShopDiscount(ctx: CastContext): Promise<EffectResult> 
     update: { magnitude: SHOP_DISCOUNT_PCT, activeUntil, readyAt: null },
   });
 
-  return { success: `הנחת ${SHOP_DISCOUNT_PCT}% על נשק ושדרוגים פעילה ל־24 שעות!` };
+  return {
+    success: ctx.t("הנחת {pct}% על נשק ושדרוגים פעילה ל־24 שעות!", {
+      pct: SHOP_DISCOUNT_PCT,
+    }),
+  };
 }
 
 /* ------------------------------ raid shields ------------------------------ */
@@ -179,7 +201,7 @@ export async function castRaidShield(
 ): Promise<EffectResult> {
   const meta = shieldMeta(key);
   const duration = meta.durations.find((d) => d.hours === hours);
-  if (!duration) return { error: "משך מגן לא תקין" };
+  if (!duration) return { error: ctx.t("משך מגן לא תקין") };
 
   // A shield has to run its course before it can be bought again: no renewing
   // and no extending while one is up, and then a further
@@ -189,16 +211,26 @@ export async function castRaidShield(
   if (!ctx.ignoreCooldown) {
     if (existing?.activeUntil && existing.activeUntil > ctx.now) {
       return {
-        error: `${meta.label} עדיין פעיל — ניתן לרכוש מחדש רק ${SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שיסתיים`,
+        error: ctx.t(
+          "{shield} עדיין פעיל — ניתן לרכוש מחדש רק {minutes} דקות אחרי שיסתיים",
+          { shield: ctx.t(meta.label), minutes: SHIELD_RENEW_COOLDOWN_MINUTES }
+        ),
       };
     }
     const cooling = minutesLeft(existing?.readyAt, ctx.now);
     if (cooling !== null) {
-      return { error: `${meta.label} בקירור — ניתן לחדש בעוד כ־${cooling} דקות` };
+      return {
+        error: ctx.t("{shield} בקירור — ניתן לחדש בעוד כ־{minutes} דקות", {
+          shield: ctx.t(meta.label),
+          minutes: cooling,
+        }),
+      };
     }
   }
 
-  if (!(await paid(ctx, duration.cost))) return { error: "אין מספיק יהלומים" };
+  if (!(await paid(ctx, duration.cost))) {
+    return { error: ctx.t("אין מספיק יהלומים") };
+  }
 
   // Both stamps are written together: `activeUntil` is the protection,
   // `readyAt` is when the next purchase unlocks — the exposed window is the gap
@@ -213,7 +245,12 @@ export async function castRaidShield(
     update: { activeUntil, readyAt },
   });
 
-  return { success: `${meta.label} פעיל ל־${duration.hours} השעות הבאות!` };
+  return {
+    success: ctx.t("{shield} פעיל ל־{hours} השעות הבאות!", {
+      shield: ctx.t(meta.label),
+      hours: duration.hours,
+    }),
+  };
 }
 
 /* ------------------------------ turn packages ------------------------------ */
@@ -224,7 +261,7 @@ export async function castTurnPackage(
   index: number
 ): Promise<EffectResult> {
   const pkg = TURN_PACKAGES[index];
-  if (!pkg) return { error: "חבילה לא תקינה" };
+  if (!pkg) return { error: ctx.t("חבילה לא תקינה") };
 
   // Each package has its own cooldown; the bigger the package the longer it
   // stays locked (largest → once per 12h).
@@ -232,12 +269,19 @@ export async function castTurnPackage(
   if (!ctx.ignoreCooldown) {
     const mins = minutesLeft(existing?.readyAt, ctx.now);
     if (mins !== null) {
-      const label = mins >= 60 ? `כ־${Math.ceil(mins / 60)} שעות` : `כ־${mins} דקות`;
-      return { error: `החבילה בקירור — זמינה בעוד ${label}` };
+      const label =
+        mins >= 60
+          ? ctx.t("כ־{count} שעות", { count: Math.ceil(mins / 60) })
+          : ctx.t("כ־{count} דקות", { count: mins });
+      return {
+        error: ctx.t("החבילה בקירור — זמינה בעוד {wait}", { wait: label }),
+      };
     }
   }
 
-  if (!(await paid(ctx, pkg.cost))) return { error: "אין מספיק יהלומים" };
+  if (!(await paid(ctx, pkg.cost))) {
+    return { error: ctx.t("אין מספיק יהלומים") };
+  }
 
   await ctx.tx.empire.update({
     where: { id: ctx.empireId },
@@ -251,7 +295,11 @@ export async function castTurnPackage(
     update: { readyAt, activeUntil: null },
   });
 
-  return { success: `נוספו ${pkg.turns.toLocaleString("he-IL")} תורות!` };
+  return {
+    success: ctx.t("נוספו {turns} תורות!", {
+      turns: pkg.turns.toLocaleString("en-US"),
+    }),
+  };
 }
 
 /* ------------------------------ bank interest spell ------------------------------ */
@@ -270,19 +318,25 @@ export async function castBankInterest(
   const existing = await effectRow(ctx, "BANK_INTEREST");
   if (!ctx.ignoreCooldown) {
     const mins = minutesLeft(existing?.readyAt, ctx.now);
-    if (mins !== null) return { error: `הקסם בקירור — זמין בעוד כ־${mins} דקות` };
+    if (mins !== null) {
+      return {
+        error: ctx.t("הקסם בקירור — זמין בעוד כ־{minutes} דקות", { minutes: mins }),
+      };
+    }
   }
 
   const bank = empire.bankAccount;
-  if (!bank || bank.goldBalance <= 0) return { error: "אין יתרה בבנק לצבירת ריבית" };
+  if (!bank || bank.goldBalance <= 0) {
+    return { error: ctx.t("אין יתרה בבנק לצבירת ריבית") };
+  }
 
   const interestLevel =
     empire.upgrades.find((u) => u.type === "BANK_DAILY_INTEREST")?.level ?? 1;
   const interest = Math.floor(bank.goldBalance * bankInterestRate(interestLevel));
-  if (interest <= 0) return { error: "הריבית הנוכחית אפסית" };
+  if (interest <= 0) return { error: ctx.t("הריבית הנוכחית אפסית") };
 
   if (!(await paid(ctx, BANK_INTEREST_SPELL_COST))) {
-    return { error: "אין מספיק יהלומים" };
+    return { error: ctx.t("אין מספיק יהלומים") };
   }
 
   const balanceAfter = bank.goldBalance + interest;
@@ -310,7 +364,11 @@ export async function castBankInterest(
     update: { readyAt, activeUntil: null },
   });
 
-  return { success: `נצברה ריבית של ${interest.toLocaleString("he-IL")} זהב לבנק!` };
+  return {
+    success: ctx.t("נצברה ריבית של {gold} זהב לבנק!", {
+      gold: interest.toLocaleString("en-US"),
+    }),
+  };
 }
 
 /* ------------------------------ city downgrade spell ------------------------------ */
@@ -338,18 +396,28 @@ export async function castCityDowngrade(
 ): Promise<EffectResult> {
   if (empire.cities < CITY_DOWNGRADE_MIN_CITIES) {
     return {
-      error: `הקסם זמין רק מעיר ${CITY_DOWNGRADE_MIN_CITIES} ומעלה — אין עיר לוותר עליה`,
+      error: ctx.t("הקסם זמין רק מעיר {min} ומעלה — אין עיר לוותר עליה", {
+        min: CITY_DOWNGRADE_MIN_CITIES,
+      }),
     };
   }
 
   const existing = await effectRow(ctx, "CITY_DOWNGRADE");
   if (!ctx.ignoreCooldown) {
     const mins = minutesLeft(existing?.readyAt, ctx.now);
-    if (mins !== null) return { error: `הקסם בקירור — זמין בעוד כ־${mins} דקות` };
+    if (mins !== null) {
+      return {
+        error: ctx.t("הקסם בקירור — זמין בעוד כ־{minutes} דקות", { minutes: mins }),
+      };
+    }
   }
 
   if (!(await paid(ctx, CITY_DOWNGRADE_COST))) {
-    return { error: `דרושים ${CITY_DOWNGRADE_COST} יהלומים להטלת הקסם` };
+    return {
+      error: ctx.t("דרושים {cost} יהלומים להטלת הקסם", {
+        cost: CITY_DOWNGRADE_COST,
+      }),
+    };
   }
 
   // Pinned to the snapshot tier: exactly one city, and only from the tier the
@@ -370,6 +438,10 @@ export async function castCityDowngrade(
   const to = empire.cities - 1;
   const tail = ctx.ignoreCooldown
     ? ""
-    : ` הקסם יהיה זמין שוב בעוד ${CITY_DOWNGRADE_COOLDOWN_HOURS} שעה.`;
-  return { success: `ירדת ל${cityName(to)}.${tail}` };
+    : ctx.t(" הקסם יהיה זמין שוב בעוד {hours} שעה.", {
+        hours: CITY_DOWNGRADE_COOLDOWN_HOURS,
+      });
+  return {
+    success: ctx.t("ירדת ל{city}.{tail}", { city: cityName(ctx.t, to), tail }),
+  };
 }

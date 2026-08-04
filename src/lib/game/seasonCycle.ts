@@ -36,12 +36,6 @@ const BREAK_UNIT_HOURS: Record<BreakUnit, number> = {
   days: 24,
 };
 
-export const BREAK_UNITS: { value: BreakUnit; label: string }[] = [
-  { value: "minutes", label: "דקות" },
-  { value: "hours", label: "שעות" },
-  { value: "days", label: "ימים" },
-];
-
 /** Is this string one of the three units? Anything else is not trusted. */
 export function isBreakUnit(value: unknown): value is BreakUnit {
   return value === "minutes" || value === "hours" || value === "days";
@@ -67,29 +61,6 @@ export function splitBreakHours(hours: number): { value: number; unit: BreakUnit
 }
 
 /**
- * The break as a Hebrew phrase — for the admin's own summary line and the audit
- * log, both of which are read by a person rather than parsed.
- *
- * Hebrew counts one and two differently from everything else ("יום אחד",
- * "יומיים", "3 ימים"), and a panel that says "1 ימים" reads as a bug in the
- * panel even when the number behind it is right.
- */
-export function formatBreakHours(hours: number): string {
-  if (hours <= 0) return "ללא הפסקה";
-  const { value, unit } = splitBreakHours(hours);
-  const rounded = Number(value.toFixed(2));
-  const forms: Record<BreakUnit, [string, string, string]> = {
-    minutes: ["דקה אחת", "שתי דקות", "דקות"],
-    hours: ["שעה אחת", "שעתיים", "שעות"],
-    days: ["יום אחד", "יומיים", "ימים"],
-  };
-  const [one, two, many] = forms[unit];
-  if (rounded === 1) return one;
-  if (rounded === 2) return two;
-  return `${rounded} ${many}`;
-}
-
-/**
  * The name the season after this one gets: the same name with its number moved
  * up by one — "עונה 7" becomes "עונה 8".
  *
@@ -110,6 +81,8 @@ export function nextSeasonName(previous: string, seasonCount: number): string {
     const raised = String(Number(digits) + 1);
     return `${prefix}${raised.padStart(digits.length, "0")}${suffix}`;
   }
+  // i18n-exempt: written into GameSeason.name, so it is a proper noun from the
+  // moment it lands — every recap, champion row and Discord post prints it.
   return `עונה ${Math.max(seasonCount, 0) + 1}`;
 }
 
@@ -130,6 +103,8 @@ export function nextSeasonName(previous: string, seasonCount: number): string {
 export function seasonHeadline(name: string): string {
   const trimmed = name.trim();
   const match = /^\D*?(\d+)\s*$/.exec(trimmed);
+  // i18n-exempt: goes into a stored Message title and a Discord post, both of
+  // which are written once for every reader — see the note in `attackEmpire`.
   return match ? `העונה ה-${Number(match[1])}` : trimmed;
 }
 

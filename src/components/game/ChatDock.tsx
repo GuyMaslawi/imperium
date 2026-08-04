@@ -22,6 +22,7 @@ import {
   typingLabel,
 } from "@/lib/game/chat";
 import { ChatEmojiPicker } from "@/components/game/ChatEmojiPicker";
+import { useT } from "@/i18n/client";
 import {
   getChatDirectory,
   getChatPulse,
@@ -136,6 +137,7 @@ export function ChatDock({
    */
   discordUrl?: string | null;
 }) {
+  const t = useT();
   const mounted = useSyncExternalStore(
     subscribeStore,
     hydratedSnapshot,
@@ -452,7 +454,7 @@ export function ChatDock({
   if (!mounted || typeof document === "undefined") return null;
 
   const badge = unread > 99 ? "99+" : String(unread);
-  const typingLine = typingLabel(typing);
+  const typingLine = typingLabel(t, typing);
   // Counted in characters: one emoji is two UTF-16 units and must not read as
   // two of the three hundred a player is allowed.
   const draftLength = [...draft].length;

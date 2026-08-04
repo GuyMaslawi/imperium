@@ -1,4 +1,5 @@
 import "server-only";
+import { DEFAULT_LOCALE, LOCALE_TAG, type Locale } from "@/i18n/locale";
 
 /**
  * Operator identity for the public legal pages (/terms, /refund, /privacy).
@@ -52,6 +53,8 @@ export interface LegalOperator {
  * LEGAL_CONTACT_EMAIL was forgotten on a deploy — exactly when a player who
  * needs to reach us still has to be able to.
  */
+// i18n-exempt: a legal operator identity, printed as filed rather than
+// translated — see the note above.
 const FALLBACK_NAME = "מפעיל השירות";
 const FALLBACK_EMAIL = "kraldorsupport@gmail.com";
 
@@ -101,9 +104,9 @@ export const LEGAL_UPDATED = {
   privacy: "2026-08-01",
 } as const;
 
-/** "31 ביולי 2026" — the date as the policy pages print it. */
-export function formatLegalDate(iso: string): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("he-IL", {
+/** "31 ביולי 2026" / "31 July 2026" — the date as the policy pages print it. */
+export function formatLegalDate(iso: string, locale: Locale = DEFAULT_LOCALE): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(LOCALE_TAG[locale], {
     day: "numeric",
     month: "long",
     year: "numeric",

@@ -7,8 +7,13 @@ import { requireOpenSeason } from "@/server/seasonGuard";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { ResendVerification } from "@/components/auth/ResendVerification";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "אימות אימייל | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("אימות אימייל | קראלדור") };
+}
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -32,6 +37,7 @@ export default async function VerifyEmailPage({
   // no game to be verified into yet, and "שלח לי שוב" is waiting for them the
   // moment the next season opens.
   await requireOpenSeason();
+  const t = await getT();
   const { token } = await searchParams;
 
   if (token) {
@@ -41,12 +47,12 @@ export default async function VerifyEmailPage({
         <AuthShell>
           <div className="space-y-4 text-center">
             <div className="text-4xl">✅</div>
-            <h2 className="text-xl font-bold text-zinc-100">האימייל אומת</h2>
+            <h2 className="text-xl font-bold text-zinc-100">{t("האימייל אומת")}</h2>
             <p className="text-sm text-zinc-400">
-              החשבון שלך פעיל. אפשר להיכנס ולהתחיל לבנות.
+              {t("החשבון שלך פעיל. אפשר להיכנס ולהתחיל לבנות.")}
             </p>
             <Link href="/game/base" className="btn btn-primary block w-full py-2">
-              כניסה למשחק
+              {t("כניסה למשחק")}
             </Link>
           </div>
         </AuthShell>
@@ -57,7 +63,7 @@ export default async function VerifyEmailPage({
       <AuthShell>
         <div className="space-y-4 text-center">
           <div className="text-4xl">⚠️</div>
-          <h2 className="text-xl font-bold text-zinc-100">האימות נכשל</h2>
+          <h2 className="text-xl font-bold text-zinc-100">{t("האימות נכשל")}</h2>
           <FormMessage error={result.error} />
           <VerifyHelp />
         </div>
@@ -79,33 +85,34 @@ export default async function VerifyEmailPage({
     <AuthShell>
       <div className="space-y-4 text-center">
         <div className="text-4xl">📬</div>
-        <h2 className="text-xl font-bold text-zinc-100">אמת את האימייל שלך</h2>
+        <h2 className="text-xl font-bold text-zinc-100">{t("אמת את האימייל שלך")}</h2>
         <p className="text-sm text-zinc-400">
-          שלחנו קישור אימות אל{" "}
+          {t("שלחנו קישור אימות אל")}{" "}
           <span dir="ltr" className="font-semibold text-zinc-200">
             {user.email}
           </span>
-          . פתח אותו כדי להפעיל את החשבון. הקישור תקף ל-24 שעות.
+          {t(". פתח אותו כדי להפעיל את החשבון. הקישור תקף ל-24 שעות.")}
         </p>
         <ResendVerification />
         <p className="text-xs text-zinc-500">
-          לא רואה את המייל? בדוק בתיקיית הספאם.
+          {t("לא רואה את המייל? בדוק בתיקיית הספאם.")}
         </p>
       </div>
     </AuthShell>
   );
 }
 
-function VerifyHelp() {
+async function VerifyHelp() {
+  const t = await getT();
   return (
     <>
       <ResendVerification />
       <p className="text-sm text-zinc-400">
-        אם אינך מחובר,{" "}
+        {t("אם אינך מחובר,")}{" "}
         <Link href="/login" className="font-semibold text-gold hover:text-gold-bright">
-          התחבר תחילה
+          {t("התחבר תחילה")}
         </Link>{" "}
-        ואז בקש קישור חדש.
+        {t("ואז בקש קישור חדש.")}
       </p>
     </>
   );

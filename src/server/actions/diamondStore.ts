@@ -17,6 +17,7 @@ import {
 import type { StoreActionState } from "@/lib/game/diamondStore";
 import { arePurchasesLive, getPaymentProvider } from "@/server/payments";
 import type { ChargeInput, PaymentProvider } from "@/server/payments";
+import { getT } from "@/i18n/server";
 
 // The `StoreActionState` type and the `STORE_IDLE` idle constant live in the
 // client-safe `@/lib/game/diamondStore` module — a `"use server"` file may only
@@ -50,12 +51,15 @@ type Preflight =
  * here from the package id and the live tunables — never taken from the client.
  */
 async function preflight(packageId: string, limiterKey: string): Promise<Preflight> {
+  const t = await getT();
   const pkg = DIAMOND_PACKAGES.find((p) => p.id === packageId);
-  if (!pkg) return { ok: false, status: "error", message: "חבילה לא תקינה" };
+  if (!pkg) return { ok: false, status: "error", message: t("חבילה לא תקינה") };
 
   const user = await getSessionUser();
-  if (!user) return { ok: false, status: "error", message: "יש להתחבר כדי לרכוש" };
-  if (isBanned(user)) return { ok: false, status: "error", message: "החשבון חסום" };
+  if (!user) return { ok: false, status: "error", message: t("יש להתחבר כדי לרכוש") };
+  if (isBanned(user)) {
+    return { ok: false, status: "error", message: t("החשבון חסום") };
+  }
   // Every other player-facing action resolves its actor through
   // `getActiveEmpireId`, which refuses unverified accounts. This one resolves
   // the empire itself, so it has to repeat the check — without it, an account
@@ -64,7 +68,11 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
   // DiamondPurchase audit row (the record a chargeback is argued from) would
   // name an unproven address.
   if (!user.emailVerified) {
-    return { ok: false, status: "error", message: "יש לאמת את כתובת האימייל לפני רכישה" };
+    return {
+      ok: false,
+      status: "error",
+      message: t("יש לאמת את כתובת האימייל לפני רכישה"),
+    };
   }
 
   // Rate-limit the checkout itself: every attempt writes a PENDING
@@ -75,7 +83,7 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
     return {
       ok: false,
       status: "error",
-      message: "יותר מדי נסיונות רכישה. נסה שוב מאוחר יותר.",
+      message: t("יותר מדי נסיונות רכישה. נסה שוב מאוחר יותר."),
     };
   }
 
@@ -83,7 +91,7 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
     where: { userId: user.id },
     select: { id: true, name: true },
   });
-  if (!empire) return { ok: false, status: "error", message: "לא נמצאה אימפריה" };
+  if (!empire) return { ok: false, status: "error", message: t("לא נמצאה אימפריה") };
 
   // Interim gate: until a real payment provider is live, only admins may run a
   // (test) purchase — so no regular player earns free diamonds meanwhile.
@@ -91,7 +99,7 @@ async function preflight(packageId: string, limiterKey: string): Promise<Preflig
     return {
       ok: false,
       status: "unavailable",
-      message: "רכישות יהלומים ייפתחו ברגע שנחבר את מערכת התשלומים. תודה על הסבלנות!",
+      message: t("רכישות יהלומים ייפתחו ברגע שנחבר את מערכת התשלומים. תודה על הסבלנות!"),
     };
   }
 
@@ -153,6 +161,7 @@ async function logTestPurchase(input: {
       action: "diamondStore.testPurchase",
       targetType: "empire",
       targetId: input.empireId ?? "",
+      // i18n-exempt: an admin audit-log line, read only in the control centre.
       summary: `רכישת בדיקה: ${input.diamonds} יהלומים (${input.packageId}) תמורת ${formatIls(input.priceIls)}`,
       details: {
         packageId: input.packageId,
@@ -179,6 +188,7 @@ export async function purchaseDiamondPackage(
   _prev: StoreActionState,
   formData: FormData
 ): Promise<StoreActionState> {
+  const t = await getT();
   try {
     const gate = await preflight(String(formData.get("packageId") ?? ""), "purchase");
     if (!gate.ok) return { status: gate.status, message: gate.message };
@@ -191,7 +201,7 @@ export async function purchaseDiamondPackage(
     if (ctx.provider.kind !== "direct") {
       return {
         status: "error",
-        message: "יש להשלים את התשלום בעמוד הסליקה. רענן את הדף ונסה שוב.",
+        message: t("יש להשלים את התשלום בעמוד הסליקה. רענן את הדף ונסה שוב."),
       };
     }
 
@@ -203,6 +213,8 @@ export async function purchaseDiamondPackage(
       empireId: ctx.empire.id,
       packageId: ctx.pkg.id,
       amountIls: ctx.amountIls,
+      // i18n-exempt: the line the payment provider prints on the charge, in
+      // the operator's language — not something the buyer reads in the game.
       description: `רכישת ${ctx.total} יהלומים (${ctx.pkg.id})`,
     };
     const result = await ctx.provider.charge(charge);
@@ -212,7 +224,7 @@ export async function purchaseDiamondPackage(
         where: { id: purchase.id },
         data: { status: "FAILED", failureReason: result.reason },
       });
-      return { status: "error", message: "התשלום נכשל — לא חויבת. נסה שוב." };
+      return { status: "error", message: t("התשלום נכשל — לא חויבת. נסה שוב.") };
     }
 
     // Settle atomically, guarding the PENDING→PAID transition so the diamonds
@@ -250,11 +262,15 @@ export async function purchaseDiamondPackage(
       status: "success",
       diamonds: ctx.total,
       message: ctx.provider.isTestMode
-        ? `רכישת בדיקה: נזקפו ${ctx.total.toLocaleString("he-IL")} יהלומים.`
-        : `נזקפו ${ctx.total.toLocaleString("he-IL")} יהלומים לחשבונך!`,
+        ? t("רכישת בדיקה: נזקפו {diamonds} יהלומים.", {
+            diamonds: ctx.total.toLocaleString("en-US"),
+          })
+        : t("נזקפו {diamonds} יהלומים לחשבונך!", {
+            diamonds: ctx.total.toLocaleString("en-US"),
+          }),
     };
   } catch {
-    return { status: "error", message: "אירעה שגיאה, נסה שוב" };
+    return { status: "error", message: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -277,6 +293,7 @@ export async function startDiamondCheckout(
   _prev: StoreActionState,
   formData: FormData
 ): Promise<StoreActionState> {
+  const t = await getT();
   try {
     const buyerName = String(formData.get("buyerName") ?? "").trim();
     const buyerPhone = String(formData.get("buyerPhone") ?? "").trim();
@@ -284,10 +301,13 @@ export async function startDiamondCheckout(
     // spends a token per attempt, and a rejected name would otherwise burn the
     // buyer's ten attempts on a missing surname.
     if (!isValidBuyerName(buyerName)) {
-      return { status: "error", message: "יש להזין שם פרטי ושם משפחה" };
+      return { status: "error", message: t("יש להזין שם פרטי ושם משפחה") };
     }
     if (!isValidBuyerPhone(buyerPhone)) {
-      return { status: "error", message: "מספר טלפון נייד לא תקין (למשל 0501234567)" };
+      return {
+        status: "error",
+        message: t("מספר טלפון נייד לא תקין (למשל 0501234567)"),
+      };
     }
 
     const gate = await preflight(String(formData.get("packageId") ?? ""), "checkout");
@@ -299,7 +319,7 @@ export async function startDiamondCheckout(
     if (ctx.provider.kind !== "order") {
       return {
         status: "error",
-        message: "אמצעי התשלום השתנה. רענן את הדף ונסה שוב.",
+        message: t("אמצעי התשלום השתנה. רענן את הדף ונסה שוב."),
       };
     }
 
@@ -310,6 +330,8 @@ export async function startDiamondCheckout(
       empireId: ctx.empire.id,
       packageId: ctx.pkg.id,
       amountIls: ctx.amountIls,
+      // i18n-exempt: the line the payment provider prints on the charge, in
+      // the operator's language — not something the buyer reads in the game.
       description: `${ctx.total} יהלומים KRALDOR`,
       buyer: { name: buyerName, phone: buyerPhone, email: ctx.user.email },
     });
@@ -322,7 +344,10 @@ export async function startDiamondCheckout(
       // The gateway's own wording is not shown: it is English, operational, and
       // occasionally quotes the request back. The reason is on the audit row for
       // /admin/purchases, which is where it belongs.
-      return { status: "error", message: "לא הצלחנו לפתוח את עמוד התשלום. נסה שוב." };
+      return {
+        status: "error",
+        message: t("לא הצלחנו לפתוח את עמוד התשלום. נסה שוב."),
+      };
     }
 
     // The order id and its lookup token are stored *before* the buyer is sent

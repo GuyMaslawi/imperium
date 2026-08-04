@@ -4,6 +4,7 @@
  * export async functions — the composer needs the length cap at render time.
  */
 
+import type { T } from "@/i18n/translate";
 import { clampChars, stripInvisible } from "./text";
 
 /** Longest single line. A chat line is a shout, not a letter — the inbox
@@ -136,11 +137,13 @@ const TYPING_MAX_NAMES = 2;
  * this stays with the masculine form the rest of the game uses ("מקליד"), and
  * switches to a count rather than listing a crowd.
  */
-export function typingLabel(names: string[]): string | null {
+export function typingLabel(t: T, names: string[]): string | null {
   if (names.length === 0) return null;
-  if (names.length === 1) return `${names[0]} מקליד…`;
-  if (names.length <= TYPING_MAX_NAMES) return `${names.join(" ו")} מקלידים…`;
-  return `${names.length} שחקנים מקלידים…`;
+  if (names.length === 1) return t("{name} מקליד…", { name: names[0] });
+  if (names.length <= TYPING_MAX_NAMES) {
+    return t("{names} מקלידים…", { names: names.join(t(" ו")) });
+  }
+  return t("{count} שחקנים מקלידים…", { count: names.length });
 }
 
 /**

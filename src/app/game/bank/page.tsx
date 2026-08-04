@@ -16,8 +16,12 @@ import { BankVault } from "@/components/game/BankVault";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "בנק | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("בנק | קראלדור") };
+}
 
 const TRANSACTION_META: Record<
   BankTransactionType,
@@ -32,6 +36,7 @@ const TRANSACTION_META: Record<
 
 export default async function BankPage() {
   const empire = await requireEmpire();
+  const { t, locale } = await getI18n();
 
   const availableGold = Math.floor(empire.gold);
   const bankGold = Math.floor(empire.bankAccount?.goldBalance ?? 0);
@@ -64,7 +69,7 @@ export default async function BankPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="בנק"
+        title={t("בנק")}
         ornament={<Icon name="bank" size={22} className="text-crimson" />}
       />
 
@@ -97,12 +102,12 @@ export default async function BankPage() {
             <Card variant="gold" className="space-y-3">
               <h3 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
                 <Icon name="upgrades" size={18} className="text-crimson" />
-                תשואה יומית
+                {t("תשואה יומית")}
               </h3>
               <p className="nums text-2xl font-black text-emerald-400">
                 <span dir="ltr">+{formatNumber(nextInterest)}</span>
                 <span className="mr-1 text-sm font-semibold text-emerald-400/70">
-                  זהב/יום
+                  {t("זהב/יום")}
                 </span>
               </p>
 
@@ -136,16 +141,16 @@ export default async function BankPage() {
 
               <div className="rule-gold" />
               <p className="text-sm text-zinc-300">
-                ריבית נוכחית:{" "}
+                {t("ריבית נוכחית:")}{" "}
                 <span className="nums font-bold text-gold" dir="ltr">
                   {ratePercent}
                 </span>
               </p>
               <p className="text-sm text-zinc-300">
-                הפקדות זמינות להיום:{" "}
+                {t("הפקדות זמינות להיום:")}{" "}
                 <span className="nums font-bold text-gold-bright" dir="ltr">
-                  {remainingDeposits.toLocaleString("he-IL")} /{" "}
-                  {allowedDeposits.toLocaleString("he-IL")}
+                  {remainingDeposits.toLocaleString("en-US")} /{" "}
+                  {allowedDeposits.toLocaleString("en-US")}
                 </span>
               </p>
               {/* one pip per deposit in the daily allowance */}
@@ -161,7 +166,7 @@ export default async function BankPage() {
                 ))}
               </div>
               <p className="text-sm text-zinc-300">
-                העדכון היומי הבא:{" "}
+                {t("העדכון היומי הבא:")}{" "}
                 <span className="nums font-bold text-gold-bright" dir="ltr">
                   {nextDailyLabel}
                 </span>
@@ -176,7 +181,7 @@ export default async function BankPage() {
         <Card>
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="upgrades" size={18} className="text-crimson" />
-            שדרוגי בנק
+            {t("שדרוגי בנק")}
           </h3>
           <ul className="space-y-3 text-sm">
             <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
@@ -186,13 +191,13 @@ export default async function BankPage() {
                   size={14}
                   className="inline align-[-2px] text-gold-bright"
                 />{" "}
-                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.label} — רמה{" "}
+                {t(EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.label)} — {t("רמה")}{" "}
                 <span className="nums" dir="ltr">
                   {depositLevel}
                 </span>
               </span>
               <span className="text-xs text-gold-dim">
-                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.effectLabel(depositLevel)}
+                {EMPIRE_UPGRADE_META.BANK_DEPOSIT_COUNT.effectLabel(t, depositLevel)}
               </span>
             </li>
             <li className="panel-inset flex flex-col gap-0.5 rounded-lg p-3">
@@ -202,13 +207,13 @@ export default async function BankPage() {
                   size={14}
                   className="inline align-[-2px] text-gold-bright"
                 />{" "}
-                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.label} — רמה{" "}
+                {t(EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.label)} — {t("רמה")}{" "}
                 <span className="nums" dir="ltr">
                   {interestLevel}
                 </span>
               </span>
               <span className="text-xs text-gold-dim">
-                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.effectLabel(interestLevel)}
+                {EMPIRE_UPGRADE_META.BANK_DAILY_INTEREST.effectLabel(t, interestLevel)}
               </span>
             </li>
           </ul>
@@ -216,17 +221,17 @@ export default async function BankPage() {
             href="/game/upgrades"
             className="btn btn-ghost mt-4 px-4 py-2 text-sm"
           >
-            עבור לשדרוגים
+            {t("עבור לשדרוגים")}
           </Link>
         </Card>
 
         <Card>
           <h3 className="mb-4 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="reports" size={18} className="text-crimson" />
-            תנועות אחרונות
+            {t("תנועות אחרונות")}
           </h3>
           {transactions.length === 0 ? (
-            <p className="text-sm text-zinc-500">אין עדיין תנועות בבנק.</p>
+            <p className="text-sm text-zinc-500">{t("אין עדיין תנועות בבנק.")}</p>
           ) : (
             <ul className="divide-y divide-border-subtle text-sm">
               {transactions.map((transaction, index) => {
@@ -239,7 +244,7 @@ export default async function BankPage() {
                   >
                     <span className="flex items-center gap-2 text-zinc-300">
                       <span aria-hidden>{meta.icon}</span>
-                      {meta.label}
+                      {t(meta.label)}
                     </span>
                     <span className="flex flex-col items-end">
                       <span className={`nums font-bold ${meta.color}`} dir="ltr">
@@ -247,7 +252,7 @@ export default async function BankPage() {
                         {formatNumber(transaction.amount)}
                       </span>
                       <span className="nums text-xs text-zinc-500">
-                        <span dir="ltr">{formatDate(transaction.createdAt)}</span> · יתרה:{" "}
+                        <span dir="ltr">{formatDate(transaction.createdAt, locale)}</span> · {t("יתרה:")}{" "}
                         <span dir="ltr">{formatNumber(transaction.balanceAfter)}</span>
                       </span>
                     </span>

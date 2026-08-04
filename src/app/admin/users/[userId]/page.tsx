@@ -75,6 +75,8 @@ import { PlayerEmpireState } from "@/components/admin/user/PlayerEmpireState";
 import { PlayerBuffs } from "@/components/admin/user/PlayerBuffs";
 import { PlayerProgress } from "@/components/admin/user/PlayerProgress";
 import { PlayerInbox } from "@/components/admin/user/PlayerInbox";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +139,8 @@ export default async function AdminUserDetail({
 }: {
   params: Promise<{ userId: string }>;
 }) {
+  // Admin chrome stays in the source language — see the i18n note.
+  const t = makeT(DEFAULT_LOCALE);
   await requireAdmin();
   const { userId } = await params;
 
@@ -322,7 +326,7 @@ export default async function AdminUserDetail({
                   min={1}
                   max={MAX_CITIES}
                   defaultValue={empire.cities}
-                  hint={`1–${MAX_CITIES} · כרגע: ${cityName(empire.cities)}`}
+                  hint={`1–${MAX_CITIES} · כרגע: ${cityName(t, empire.cities)}`}
                 />
               </div>
             </ActionForm>

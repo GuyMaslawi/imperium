@@ -1,5 +1,6 @@
 import "server-only";
 import { selectWorldMedals, type MedalView } from "@/lib/game/achievements";
+import { getLocale } from "@/i18n/server";
 import { getGloryChampions } from "@/server/gloryBoard";
 
 /**
@@ -27,5 +28,5 @@ import { getGloryChampions } from "@/server/gloryBoard";
  */
 export async function getEmpireMedals(empireId: string): Promise<MedalView[]> {
   const champions = await getGloryChampions();
-  return selectWorldMedals(champions, empireId);
+  return selectWorldMedals(champions, empireId, await getLocale());
 }

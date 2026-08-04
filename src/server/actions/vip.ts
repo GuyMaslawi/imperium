@@ -7,6 +7,7 @@ import { applyPendingUpdates } from "@/lib/game/updates";
 import { VIP_COST, VIP_LABEL, isVip } from "@/lib/game/vip";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 /**
  * Buying the VIP pass.
@@ -31,26 +32,38 @@ export async function buyVip(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     // Enforces the ban on the purchase too (not just page loads); see
     // getActiveEmpireId.
     const empireId = await getActiveEmpireId();
+    // i18n-exempt: thrown, never rendered — the catch below returns the
+    // translated "something went wrong" instead.
     if (empireId === null) throw new Error("לא מחובר");
 
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
-      if (isVip(empire)) return { error: `${VIP_LABEL} כבר ברשותך` };
+      if (isVip(empire)) {
+        return { error: t("{vip} כבר ברשותך", { vip: t(VIP_LABEL) }) };
+      }
 
       const paid = await tx.empire.updateMany({
         where: { id: empireId, diamonds: { gte: VIP_COST }, vipSince: null },
         data: { diamonds: { decrement: VIP_COST }, vipSince: new Date() },
       });
       if (paid.count === 0) {
-        return { error: `דרושים ${VIP_COST} יהלומים לרכישת ${VIP_LABEL}` };
+        return {
+          error: t("דרושים {cost} יהלומים לרכישת {vip}", {
+            cost: VIP_COST,
+            vip: t(VIP_LABEL),
+          }),
+        };
       }
 
       return {
-        success: `${VIP_LABEL} שלך! הפעולות המהירות פתוחות מעכשיו מכל מסך במשחק.`,
+        success: t("{vip} שלך! הפעולות המהירות פתוחות מעכשיו מכל מסך במשחק.", {
+          vip: t(VIP_LABEL),
+        }),
       };
     });
 
@@ -58,6 +71,6 @@ export async function buyVip(
     return result;
   } catch (err) {
     await logError("vip.buyVip", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

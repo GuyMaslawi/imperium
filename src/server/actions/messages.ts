@@ -27,10 +27,13 @@ import {
 import type { ActionState } from "./game";
 import { settleDueAssault } from "@/server/bossSiege";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — the callers catch it and return the
+  // translated "not signed in" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -256,18 +259,19 @@ export async function sendPlayerMessage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   let empireId: string;
   try {
     empireId = await requireOwnEmpireId();
   } catch {
-    return { error: "לא מחובר" };
+    return { error: t("לא מחובר") };
   }
 
   // How often the composer may fire. The budget that bounds actual delivery
   // volume is charged per addressee further down, once the recipients are
   // known — see MESSAGE_RECIPIENT_LIMIT.
   if (!(await rateLimit(`msg-send:${empireId}`, MESSAGE_SEND_LIMIT, MESSAGE_SEND_WINDOW_MS))) {
-    return { error: "שלחת יותר מדי הודעות — נסה שוב בעוד כמה דקות" };
+    return { error: t("שלחת יותר מדי הודעות — נסה שוב בעוד כמה דקות") };
   }
 
   const parsed = sendSchema.safeParse({
@@ -278,7 +282,14 @@ export async function sendPlayerMessage(
   });
   if (!parsed.success) {
     return {
-      error: `בחר עד ${MESSAGE_MAX_RECIPIENTS} נמענים ומלא נושא (עד ${MESSAGE_TITLE_MAX} תווים) ותוכן (עד ${MESSAGE_BODY_MAX} תווים)`,
+      error: t(
+        "בחר עד {recipients} נמענים ומלא נושא (עד {title} תווים) ותוכן (עד {body} תווים)",
+        {
+          recipients: MESSAGE_MAX_RECIPIENTS,
+          title: MESSAGE_TITLE_MAX,
+          body: MESSAGE_BODY_MAX,
+        }
+      ),
     };
   }
 
@@ -287,7 +298,7 @@ export async function sendPlayerMessage(
       where: { id: empireId },
       select: { name: true },
     });
-    if (!me) return { error: "לא מחובר" };
+    if (!me) return { error: t("לא מחובר") };
 
     // Only real, unbanned empires — and never yourself.
     const targets = await prisma.empire.findMany({
@@ -298,7 +309,7 @@ export async function sendPlayerMessage(
       select: { id: true, name: true },
     });
     if (targets.length === 0) {
-      return { error: "לא נבחרו נמענים תקינים" };
+      return { error: t("לא נבחרו נמענים תקינים") };
     }
 
     // Volume budget, charged per addressee — one send to ten players costs ten.
@@ -313,7 +324,7 @@ export async function sendPlayerMessage(
       ))
     ) {
       return {
-        error: "שלחת הודעות ליותר מדי שחקנים בזמן קצר — נסה שוב בעוד כמה דקות",
+        error: t("שלחת הודעות ליותר מדי שחקנים בזמן קצר — נסה שוב בעוד כמה דקות"),
       };
     }
 
@@ -322,9 +333,9 @@ export async function sendPlayerMessage(
     // addressees are dropped from this send rather than failing it, so one
     // over-mailed target does not block the rest of the list.
     const verdicts = await Promise.all(
-      targets.map((t) =>
+      targets.map((target) =>
         rateLimit(
-          `msg-pair:${empireId}:${t.id}`,
+          `msg-pair:${empireId}:${target.id}`,
           MESSAGE_PAIR_LIMIT,
           MESSAGE_PAIR_WINDOW_MS
         )
@@ -336,14 +347,16 @@ export async function sendPlayerMessage(
       return {
         error:
           targets.length === 1
-            ? `שלחת לאחרונה כמה הודעות אל ${targets[0]!.name} — המתן לפני שתשלח שוב`
-            : "שלחת לאחרונה כמה הודעות אל השחקנים האלה — המתן לפני שתשלח שוב",
+            ? t("שלחת לאחרונה כמה הודעות אל {name} — המתן לפני שתשלח שוב", {
+                name: targets[0]!.name,
+              })
+            : t("שלחת לאחרונה כמה הודעות אל השחקנים האלה — המתן לפני שתשלח שוב"),
       };
     }
 
     await prisma.message.createMany({
-      data: allowed.map((t) => ({
-        empireId: t.id,
+      data: allowed.map((target) => ({
+        empireId: target.id,
         senderEmpireId: empireId,
         kind: "PLAYER" as const,
         title: parsed.data.title,
@@ -356,17 +369,19 @@ export async function sendPlayerMessage(
     // named.
     const skipped =
       throttled.length > 0
-        ? ` (לא נשלחה אל ${throttled.map((t) => t.name).join(", ")} — יותר מדי הודעות אליהם לאחרונה)`
+        ? t(" (לא נשלחה אל {names} — יותר מדי הודעות אליהם לאחרונה)", {
+            names: throttled.map((target) => target.name).join(", "),
+          })
         : "";
     return {
       success:
         (allowed.length === 1
-          ? `ההודעה נשלחה אל ${allowed[0]!.name}`
-          : `ההודעה נשלחה אל ${allowed.length} שחקנים`) + skipped,
+          ? t("ההודעה נשלחה אל {name}", { name: allowed[0]!.name })
+          : t("ההודעה נשלחה אל {count} שחקנים", { count: allowed.length })) + skipped,
     };
   } catch (err) {
     await logError("messages.sendPlayerMessage", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 

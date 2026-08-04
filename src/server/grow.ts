@@ -2,6 +2,7 @@ import "server-only";
 
 import { STORE_CURRENCY } from "@/lib/game/diamondStore";
 import { appBaseUrl } from "@/server/mailer";
+import { getT } from "@/i18n/server";
 import type {
   CaptureResult,
   OrderInput,
@@ -223,6 +224,9 @@ async function growPost(
       cache: "no-store",
     });
   } catch (err) {
+    // i18n-exempt: a `reason` string, logged and shown only in the control
+    // centre when a charge is investigated — never rendered to the buyer, who
+    // gets the translated `message` instead.
     return { ok: false, reason: `${endpoint}: הבקשה לספק נכשלה (${str(err)})` };
   }
 
@@ -230,6 +234,7 @@ async function growPost(
   try {
     payload = (await res.json()) as GrowEnvelope;
   } catch {
+    // i18n-exempt: an operator-side `reason` — see above.
     return { ok: false, reason: `${endpoint}: תשובה לא תקינה מהספק (HTTP ${res.status})` };
   }
 
@@ -238,6 +243,7 @@ async function growPost(
   if (str(payload.status) !== "1") {
     const err = payload.err;
     const detail =
+      // i18n-exempt: an operator-side `reason` — see above.
       typeof err === "string" ? err : err ? JSON.stringify(err).slice(0, 300) : "ללא פירוט";
     return { ok: false, reason: `${endpoint}: ${detail}` };
   }
@@ -307,8 +313,10 @@ export class GrowProvider implements OrderPaymentProvider {
     // Validated here rather than only at the form, because this is the boundary
     // Grow actually enforces: a bad name reaches it as an opaque "process
     // failed" long after a PENDING row was opened.
+    // i18n-exempt-start: operator-side `reason` strings — the checkout form
+    // validates the same two fields and shows the buyer a translated refusal.
     if (!name) return { ok: false, reason: "שם מלא לא תקין (נדרשים שם פרטי ושם משפחה)" };
-    if (!phone) return { ok: false, reason: "מספר טלפון נייד לא תקין" };
+    if (!phone) return { ok: false, reason: "מספר טלפון נייד לא תקין" }; // i18n-exempt-end
 
     const base = appBaseUrl();
     const fields: Record<string, string | number> = {
@@ -342,6 +350,7 @@ export class GrowProvider implements OrderPaymentProvider {
     const orderId = str(call.data.processId);
     const token = str(call.data.processToken);
     if (!redirectUrl || !orderId || !token) {
+      // i18n-exempt: an operator-side `reason` — see above.
       return { ok: false, reason: "createPaymentProcess: חסרים url/processId/processToken בתשובה" };
     }
 
@@ -349,7 +358,9 @@ export class GrowProvider implements OrderPaymentProvider {
   }
 
   async captureOrder(ref: OrderRef): Promise<CaptureResult> {
+    const t = await getT();
     if (!ref.token) {
+      // i18n-exempt: an operator-side `reason` — see above.
       return { ok: false, reason: "אין processToken לאימות מול הספק" };
     }
 
@@ -369,18 +380,21 @@ export class GrowProvider implements OrderPaymentProvider {
     if (!PAID_STATUS_CODES.has(statusCode)) {
       return {
         ok: false,
+        // i18n-exempt: an operator-side `reason`; the buyer reads `message`.
         reason: `העסקה אינה במצב שולם (statusCode=${statusCode || "?"})`,
-        message: "התשלום לא הושלם. אם חויבת, פנה לתמיכה ונטפל בזה.",
+        message: t("התשלום לא הושלם. אם חויבת, פנה לתמיכה ונטפל בזה."),
       };
     }
 
     const captureId = str(call.data.transactionId);
     if (!captureId) {
+      // i18n-exempt: an operator-side `reason` — see above.
       return { ok: false, reason: "getPaymentProcessInfo: חסר transactionId בתשובה" };
     }
 
     const amount = Number(call.data.sum);
     if (!Number.isFinite(amount)) {
+      // i18n-exempt: an operator-side `reason` — see above.
       return { ok: false, reason: `getPaymentProcessInfo: sum לא מספרי (${str(call.data.sum)})` };
     }
 

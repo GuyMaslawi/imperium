@@ -15,6 +15,8 @@ import {
 import { SEASON_PASS_TIER_COUNT, tierForXp } from "@/lib/game/seasonPass";
 import { heroQuestDurationLabel } from "@/lib/game/heroQuests";
 import { formatNumber } from "@/lib/game/format";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 import {
   manageHeroQuest,
   toggleAchievement,
@@ -60,6 +62,9 @@ export function PlayerProgress({
   claimedAchievements,
   gloryKeys,
 }: PlayerProgressProps) {
+  // The control centre stays Hebrew on purpose, so this reads the source
+  // language rather than whatever the admin set the *game* to.
+  const t = makeT(DEFAULT_LOCALE);
   const claimed = new Set(claimedAchievements);
   const glory = new Set(gloryKeys);
   const passTier = seasonPass ? tierForXp(seasonPass.xp) : 0;
@@ -106,7 +111,7 @@ export function PlayerProgress({
               <div className="panel-inset space-y-1 rounded-lg p-3">
                 <StatLine
                   label="מסע"
-                  value={`דרגה ${heroQuest.tier} · ${heroQuestDurationLabel(heroQuest.tier)}`}
+                  value={`דרגה ${heroQuest.tier} · ${heroQuestDurationLabel(t, heroQuest.tier)}`}
                 />
                 <StatLine label="מסתיים" value={heroQuest.endsAt.toLocaleString("he-IL")} />
                 <StatLine label="תורות שהושקעו" value={heroQuest.turnsSpent} />

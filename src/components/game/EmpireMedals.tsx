@@ -1,4 +1,5 @@
 import { Icon } from "@/components/ui/Icon";
+import { getT } from "@/i18n/server";
 import type { MedalView } from "@/lib/game/achievements";
 
 /**
@@ -29,7 +30,7 @@ const SPARKS = [
   { angle: 206, delay: "1.9s" },
 ];
 
-export function EmpireMedals({
+export async function EmpireMedals({
   items,
   isMe,
   className = "",
@@ -40,17 +41,18 @@ export function EmpireMedals({
   /** Where the column sits; the case itself has no opinion about its width. */
   className?: string;
 }) {
+  const t = await getT();
   return (
     <aside className={`medal-case ${className}`}>
       <div className="medal-case-head">
         <h2 className="medal-case-title">
           <Icon name="crown" size={18} className="text-gold-bright" />
-          שיאי עולם
+          {t("שיאי עולם")}
         </h2>
         <p className="medal-case-sub">
           {isMe
-            ? "הישגים שאתה הראשון בעולם שהגיע אליהם"
-            : "הישגים שהאימפריה הזו הראשונה בעולם שהגיעה אליהם"}
+            ? t("הישגים שאתה הראשון בעולם שהגיע אליהם")
+            : t("הישגים שהאימפריה הזו הראשונה בעולם שהגיעה אליהם")}
         </p>
       </div>
 
@@ -77,11 +79,11 @@ export function EmpireMedals({
             </span>
 
             <div className="min-w-0 flex-1">
-              <h3 className="medal-name">{m.name}</h3>
-              <p className="medal-tagline">{m.tagline}</p>
+              <h3 className="medal-name">{t(m.name, m.params)}</h3>
+              <p className="medal-tagline">{t(m.tagline, m.params)}</p>
               <p className="medal-first">
                 <Icon name="crown" size={12} className="shrink-0" />
-                ראשון בעולם
+                {t("ראשון בעולם")}
               </p>
               {/* dir="ltr" on the digits, never on the block: on the block it
                   drags the whole line to the physical left while every other
@@ -98,7 +100,7 @@ export function EmpireMedals({
         <span className="nums font-bold text-gold-bright" dir="ltr">
           {items.length}
         </span>{" "}
-        {items.length === 1 ? "שיא עולם" : "שיאי עולם"}
+        {items.length === 1 ? t("שיא עולם") : t("שיאי עולם")}
       </p>
     </aside>
   );

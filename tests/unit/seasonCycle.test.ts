@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   breakToHours,
-  formatBreakHours,
   isBreakUnit,
   nextSeasonName,
   nextSeasonWindow,
@@ -9,6 +8,7 @@ import {
   seasonLengthMs,
   splitBreakHours,
 } from "@/lib/game/seasonCycle";
+import { formatBreakHours } from "@/components/admin/seasonBreak";
 import { DEFAULT_TUNABLES, mergeTunables } from "@/lib/game/config";
 
 /**

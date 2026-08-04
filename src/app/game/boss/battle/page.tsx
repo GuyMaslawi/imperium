@@ -4,8 +4,12 @@ import { requireEmpire } from "@/lib/auth";
 import { getBossArenaState, recentBossFightId } from "@/server/bossBattleState";
 import { BossArena } from "@/components/game/BossArena";
 import { Icon } from "@/components/ui/Icon";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "קרב בוס | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("קרב בוס | KRALDOR") };
+}
 
 /**
  * The arena — a running assault, watched.
@@ -21,6 +25,7 @@ export const metadata = { title: "קרב בוס | KRALDOR" };
  * pays out whether or not anyone opens this page.
  */
 export default async function BossBattlePage() {
+  const t = await getT();
   const me = await requireEmpire();
   const state = await getBossArenaState(me.id);
   if (!state) {
@@ -32,12 +37,12 @@ export default async function BossBattlePage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
-          מצור על {state.boss.name}
+          {t("מצור על {boss}", { boss: t(state.boss.name) })}
         </p>
         {/* Leaving costs nothing and the arena says so in its own copy too — the
             fight is on a server clock, not on this page being open. */}
         <Link href="/game/rankings" className="btn btn-ghost px-4 py-1.5 text-xs">
-          <Icon name="rankings" size={14} className="inline-block align-middle" /> חזרה לדירוג
+          <Icon name="rankings" size={14} className="inline-block align-middle" /> {t("חזרה לדירוג")}
         </Link>
       </div>
 

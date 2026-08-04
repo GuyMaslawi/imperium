@@ -36,6 +36,8 @@ import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 import { syncEmpirePower } from "@/server/empirePower";
 import { formatNumber } from "@/lib/game/format";
 import { RESOURCE_META } from "@/lib/game/constants";
+import { getI18n, getT, type T } from "@/i18n/server";
+import { LOCALE_TAG } from "@/i18n/locale";
 import {
   BOSS_ITEM_RARITY_FLOOR,
   BOSS_REVIVE_MS,
@@ -176,6 +178,7 @@ async function battlePower(
  * outcome is decided here rather than a round at a time.
  */
 export async function startBossAssault(empireId: string): Promise<BossSortieOutcome> {
+  const { t, locale } = await getI18n();
   // Read outside the transaction, on purpose. `getTunables` goes to the database
   // on its own connection; asking for one while already holding a transaction (and
   // therefore a connection) means two per caller, and on a serverless fleet with a
@@ -188,7 +191,7 @@ export async function startBossAssault(empireId: string): Promise<BossSortieOutc
     await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
 
     if (tunables.boss.enabled < 1) {
-      return { error: "בוס העיר אינו זמין כרגע." };
+      return { error: t("בוס העיר אינו זמין כרגע.") };
     }
 
     const empire = await applyPendingUpdates(empireId, tx);
@@ -218,34 +221,35 @@ export async function startBossAssault(empireId: string): Promise<BossSortieOutc
     );
     if ("revivesAt" in life) {
       return {
-        error: `${boss.name} מת — הוא קם לתחייה ב־${life.revivesAt.toLocaleTimeString("he-IL", {
-          hour: "2-digit",
-          minute: "2-digit",
-        })}.`,
+        error: t("{boss} מת — הוא קם לתחייה ב־{time}.", {
+          boss: t(boss.name),
+          time: life.revivesAt.toLocaleTimeString(LOCALE_TAG[locale], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        }),
       };
     }
     const siege = life.siege;
 
     const army = empire.army;
     if (!army || army.soldiers === 0) {
-      return { error: "אין לך צבא לתקיפה — אמן חיילים קודם" };
+      return { error: t("אין לך צבא לתקיפה — אמן חיילים קודם") };
     }
-    if (empire.turns < turnCost) {
-      return {
-        error: `נדרשות ${turnCost.toLocaleString("he-IL")} תורות כדי לצאת לקרב מול ${boss.name}.`,
-      };
-    }
+    const tooFewTurns = {
+      error: t("נדרשות {turns} תורות כדי לצאת לקרב מול {boss}.", {
+        turns: turnCost.toLocaleString("en-US"),
+        boss: t(boss.name),
+      }),
+    };
+    if (empire.turns < turnCost) return tooFewTurns;
 
     // Guarded debit: a concurrent action can never drive turns negative.
     const paid = await tx.empire.updateMany({
       where: { id: empireId, turns: { gte: turnCost } },
       data: { turns: { decrement: turnCost } },
     });
-    if (paid.count === 0) {
-      return {
-        error: `נדרשות ${turnCost.toLocaleString("he-IL")} תורות כדי לצאת לקרב מול ${boss.name}.`,
-      };
-    }
+    if (paid.count === 0) return tooFewTurns;
 
     const { power, heroBonusPct, guildBonusPct } = await battlePower(tx, empireId, empire);
     const heroAlive = empire.hero != null && !isHeroDead(empire.hero);
@@ -330,6 +334,7 @@ async function settleBattle(
   // asked for while one is held.
   tunables: GameTunables
 ): Promise<BossSettleResult> {
+  const t = await getT();
   const siege = await tx.bossSiege.findUnique({ where: { id: battle.siegeId } });
   const hero = await tx.hero.findUnique({
     where: { empireId },
@@ -553,14 +558,17 @@ async function settleBattle(
     data: {
       empireId,
       kind: "BATTLE",
+      // The reader is the player who sent the army — the same person whose
+      // request settled it — so the request's own language is theirs. (Unlike
+      // the mail an attack sends to its *victim*; see the note in `attackEmpire`.)
       title: killed
-        ? `👑 ${boss.name} הופל!`
+        ? t("👑 {boss} הופל!", { boss: t(boss.name) })
         : status === "ROUTED"
-          ? `💥 הצבא נשבר מול ${boss.name}`
+          ? t("💥 הצבא נשבר מול {boss}", { boss: t(boss.name) })
           : status === "EXPIRED"
-            ? `⚔️ הקרב מול ${boss.name} נסגר`
-            : `🩸 ${boss.name} נפצע אבל שרד`,
-      body: settleSummary(boss.name, status, reward, heroXp, siege, credited, soldiersLost),
+            ? t("⚔️ הקרב מול {boss} נסגר", { boss: t(boss.name) })
+            : t("🩸 {boss} נפצע אבל שרד", { boss: t(boss.name) }),
+      body: settleSummary(t, t(boss.name), status, reward, heroXp, siege, credited, soldiersLost),
       href: `/game/boss/${fight.id}`,
     },
   });
@@ -570,6 +578,7 @@ async function settleBattle(
 
 /** The one-paragraph "what you got and how much" that lands in the inbox. */
 function settleSummary(
+  t: T,
   bossName: string,
   status: Exclude<BossBattleStatus, "ACTIVE">,
   reward: BossReward,
@@ -578,24 +587,49 @@ function settleSummary(
   credited: number,
   soldiersLost: number
 ): string {
-  const spoils = BOSS_REWARD_RESOURCES.filter((res) => reward[res] > 0).map(
-    (res) => `${RESOURCE_META[res].label} ${formatNumber(reward[res])}`
+  const spoils = BOSS_REWARD_RESOURCES.filter((res) => reward[res] > 0).map((res) =>
+    t("{resource} {amount}", {
+      resource: t(RESOURCE_META[res].label),
+      amount: formatNumber(reward[res]),
+    })
   );
-  if (reward.slaves > 0) spoils.push(`${formatNumber(reward.slaves)} עבדים`);
-  if (heroXp > 0) spoils.push(`${formatNumber(heroXp)} ניסיון לגיבור`);
+  if (reward.slaves > 0) {
+    spoils.push(t("{count} עבדים", { count: formatNumber(reward.slaves) }));
+  }
+  if (heroXp > 0) {
+    spoils.push(t("{amount} ניסיון לגיבור", { amount: formatNumber(heroXp) }));
+  }
 
-  const haul = spoils.length > 0 ? `שלל: ${spoils.join(" · ")}.` : "בלי שלל.";
-  const cost = soldiersLost > 0 ? ` אבדות: ${formatNumber(soldiersLost)} חיילים.` : "";
+  const haul =
+    spoils.length > 0
+      ? t("שלל: {spoils}.", { spoils: spoils.join(" · ") })
+      : t("בלי שלל.");
+  const cost =
+    soldiersLost > 0
+      ? t(" אבדות: {count} חיילים.", { count: formatNumber(soldiersLost) })
+      : "";
   const left =
     siege && siege.killedAt == null && siege.hp - credited > 0
-      ? ` נותרו לו ${formatNumber(Math.round(Math.max(0, siege.hp - credited)))} חיים.`
+      ? t(" נותרו לו {hp} חיים.", {
+          hp: formatNumber(Math.round(Math.max(0, siege.hp - credited))),
+        })
       : "";
 
-  if (status === "KILLED") return `${haul}${cost} הבוס יקום לתחייה בעוד שעה.`;
-  if (status === "ROUTED")
-    return `הקו נשבר והצבא נסוג מוקדם.${left} ${haul}${cost}`;
-  if (status === "EXPIRED") return `הקרב נסגר לפני שהוכרע. ${haul}${cost}`;
-  return `${bossName} עוד עומד.${left} ${haul}${cost} צא שוב וסיים את העבודה.`;
+  if (status === "KILLED") {
+    return t("{haul}{cost} הבוס יקום לתחייה בעוד שעה.", { haul, cost });
+  }
+  if (status === "ROUTED") {
+    return t("הקו נשבר והצבא נסוג מוקדם.{left} {haul}{cost}", { left, haul, cost });
+  }
+  if (status === "EXPIRED") {
+    return t("הקרב נסגר לפני שהוכרע. {haul}{cost}", { haul, cost });
+  }
+  return t("{boss} עוד עומד.{left} {haul}{cost} צא שוב וסיים את העבודה.", {
+    boss: bossName,
+    left,
+    haul,
+    cost,
+  });
 }
 
 /**

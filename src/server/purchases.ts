@@ -100,6 +100,8 @@ export async function settleDiamondPurchase(input: SettleInput): Promise<SettleR
       where: { id: purchase.id, status: "PENDING" },
       data: {
         status: "FAILED",
+        // i18n-exempt: a `failureReason` stored on the audit row and read only
+        // in the control centre when a charge is investigated.
         failureReason: `סכום/מטבע לא תואם: התקבל ${input.amount} ${input.currency}, נדרש ${purchase.priceIls} ${purchase.currency}`,
       },
     });
@@ -119,6 +121,8 @@ export async function settleDiamondPurchase(input: SettleInput): Promise<SettleR
           // The empire can have been deleted between checkout and settlement;
           // the money still moved, so the row settles as PAID and says why no
           // balance moved rather than silently swallowing a paid purchase.
+          // i18n-exempt: same — an operator-side audit note, never rendered to
+          // the buyer.
           ...(empireId ? {} : { failureReason: "לא נזקפו יהלומים: האימפריה נמחקה" }),
         },
       });

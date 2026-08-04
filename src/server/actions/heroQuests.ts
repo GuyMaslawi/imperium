@@ -38,6 +38,7 @@ import {
 } from "@/lib/game/heroQuests";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 import { syncEmpirePower } from "@/server/empirePower";
 
 /**
@@ -60,6 +61,8 @@ async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban and the verification gate on every action, not just on
   // page loads; see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — each action catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -89,11 +92,12 @@ export async function startHeroQuest(
   formData: FormData
 ): Promise<ActionState> {
   const parsed = startSchema.safeParse({ tier: formData.get("tier") });
-  if (!parsed.success) return { error: "משימה לא תקינה" };
+  const t = await getT();
+  if (!parsed.success) return { error: t("משימה לא תקינה") };
   const { tier } = parsed.data;
 
   const quest = heroQuestByTier(tier);
-  if (!quest) return { error: "משימה לא תקינה" };
+  if (!quest) return { error: t("משימה לא תקינה") };
 
   try {
     const empireId = await requireOwnEmpireId();
@@ -106,7 +110,7 @@ export async function startHeroQuest(
       await tx.$queryRaw`SELECT id FROM "Empire" WHERE id = ${empireId} FOR UPDATE`;
 
       if (tunables.heroQuest.enabled < 1) {
-        return { error: "לוח המסעות סגור כרגע." };
+        return { error: t("לוח המסעות סגור כרגע.") };
       }
 
       // Settle first: the turn cost is paid out of the *current* balance, and a
@@ -116,14 +120,19 @@ export async function startHeroQuest(
 
       if (!heroQuestUnlocked(quest.tier, empire.cities)) {
         return {
-          error: `"${quest.name}" נפתחת עם העיר ה-${quest.tier} שלך.`,
+          error: t('"{quest}" נפתחת עם העיר ה-{tier} שלך.', {
+            quest: t(quest.name),
+            tier: quest.tier,
+          }),
         };
       }
 
       const hero = empire.hero;
-      if (!hero) return { error: "אין לך גיבור" };
+      if (!hero) return { error: t("אין לך גיבור") };
       if (isHeroDead(hero)) {
-        return { error: "הגיבור מת — אי אפשר לשלוח אותו למסע עד שיקום לתחייה." };
+        return {
+          error: t("הגיבור מת — אי אפשר לשלוח אותו למסע עד שיקום לתחייה."),
+        };
       }
 
       // One hero, one place. The unique index below would catch this too, but a
@@ -134,12 +143,15 @@ export async function startHeroQuest(
         select: { id: true },
       });
       if (running) {
-        return { error: "הגיבור כבר במסע — הוא יוצא רק לאחד בכל פעם." };
+        return { error: t("הגיבור כבר במסע — הוא יוצא רק לאחד בכל פעם.") };
       }
 
       const turnCost = heroQuestTurnCost(quest.tier);
       const notEnoughTurns = {
-        error: `נדרשות ${turnCost.toLocaleString("he-IL")} תורות כדי לשלוח את הגיבור ל"${quest.name}".`,
+        error: t('נדרשות {turns} תורות כדי לשלוח את הגיבור ל"{quest}".', {
+          turns: turnCost.toLocaleString("en-US"),
+          quest: t(quest.name),
+        }),
       };
       if (empire.turns < turnCost) return notEnoughTurns;
 
@@ -185,7 +197,10 @@ export async function startHeroQuest(
       await awardSeasonPassXp(tx, empireId, "heroQuest");
 
       return {
-        success: `הגיבור יצא ל"${quest.name}". הוא יחזור בעוד ${heroQuestDurationLabel(quest.tier)}.`,
+        success: t('הגיבור יצא ל"{quest}". הוא יחזור בעוד {duration}.', {
+          quest: t(quest.name),
+          duration: heroQuestDurationLabel(t, quest.tier),
+        }),
       };
     });
 
@@ -193,7 +208,7 @@ export async function startHeroQuest(
     return result;
   } catch (err) {
     await logError("heroQuests.startHeroQuest", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -239,6 +254,7 @@ export interface HeroQuestCollectState extends ActionState {
  * were always going to be read against.
  */
 export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -249,11 +265,15 @@ export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
       const now = new Date();
 
       const quest = await tx.heroQuest.findUnique({ where: { empireId } });
-      if (!quest) return { error: "הגיבור אינו במסע." };
+      if (!quest) return { error: t("הגיבור אינו במסע.") };
 
       const meta = heroQuestByTier(quest.tier);
       if (quest.endsAt > now) {
-        return { error: `${meta?.name ?? "המסע"} עדיין בעיצומו.` };
+        return {
+          error: t("{quest} עדיין בעיצומו.", {
+            quest: meta ? t(meta.name) : t("המסע"),
+          }),
+        };
       }
 
       // The delete IS the claim: whichever concurrent call removes the row pays
@@ -262,7 +282,7 @@ export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
       const claimed = await tx.heroQuest.deleteMany({
         where: { id: quest.id, endsAt: { lte: now } },
       });
-      if (claimed.count === 0) return { error: "המסע כבר נאסף." };
+      if (claimed.count === 0) return { error: t("המסע כבר נאסף.") };
 
       /* ---- the frozen haul ---- */
       await tx.empire.update({
@@ -365,15 +385,23 @@ export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
 
       const fortune = heroQuestFortuneByKey(quest.fortune);
       const spoils = [
-        ...entries.map(
-          (e) => `${formatNumber(e.amount)} ${HERO_QUEST_HAUL_LABEL[e.kind]}`
+        ...entries.map((e) =>
+          t("{amount} {resource}", {
+            amount: formatNumber(e.amount),
+            resource: t(HERO_QUEST_HAUL_LABEL[e.kind]),
+          })
         ),
-        droppedItem ? itemDisplayName(droppedItem.slot, droppedItem.level) : null,
-        droppedPotion ? POTION_META[droppedPotion].label : null,
+        droppedItem ? itemDisplayName(t, droppedItem.slot, droppedItem.level) : null,
+        droppedPotion ? t(POTION_META[droppedPotion].label) : null,
       ].filter(Boolean);
 
       return {
-        success: `${fortune.label}! הגיבור חזר מ"${meta?.name ?? "המסע"}" עם ${spoils.join(", ")}. ${fortune.lore}`,
+        success: t('{fortune}! הגיבור חזר מ"{quest}" עם {spoils}. {lore}', {
+          fortune: t(fortune.label),
+          quest: meta ? t(meta.name) : t("המסע"),
+          spoils: spoils.join(", "),
+          lore: t(fortune.lore),
+        }),
         haul: {
           tier: quest.tier,
           fortune: quest.fortune,
@@ -381,7 +409,7 @@ export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
           levelsGained,
           item: droppedItem
             ? {
-                label: itemDisplayName(droppedItem.slot, droppedItem.level),
+                label: itemDisplayName(t, droppedItem.slot, droppedItem.level),
                 rarity: droppedItem.rarity,
               }
             : null,
@@ -394,6 +422,6 @@ export async function collectHeroQuest(): Promise<HeroQuestCollectState> {
     return result;
   } catch (err) {
     await logError("heroQuests.collectHeroQuest", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

@@ -4,11 +4,16 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { ItemCatalog } from "@/components/game/ItemCatalog";
 import { catalogKey } from "@/components/game/heroItemView";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "כל הפריטים | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("כל הפריטים | KRALDOR") };
+}
 
 /** The complete hero item catalog: every tier level in every slot. */
 export default async function HeroItemsPage() {
+  const t = await getT();
   const empire = await requireEmpire();
   const hero = empire.hero;
   if (!hero) return null;
@@ -20,11 +25,11 @@ export default async function HeroItemsPage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="כל הפריטים" ornament="🗡" />
+      <SectionHeading title={t("כל הפריטים")} ornament="🗡" />
 
       <div className="flex justify-center">
         <Link href="/game/hero" className="btn btn-ghost px-4 py-2 text-sm">
-          <Icon name="attack" size={16} className="inline align-[-2px]" /> חזרה לגיבור
+          <Icon name="attack" size={16} className="inline align-[-2px]" /> {t("חזרה לגיבור")}
         </Link>
       </div>
 

@@ -13,6 +13,8 @@ import { guildAidPct } from "@/lib/game/guild";
 import { secureRandom } from "@/lib/game/random";
 import { announceToDiscord, gameLink } from "@/server/discord";
 import { notStaff } from "@/lib/staff";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 import {
   applySwing,
   GUILD_WAR_DEFENDER_SHIFT,
@@ -507,6 +509,9 @@ async function settleWar(warId: string, now: Date): Promise<void> {
             tx,
             members.map((m) => m.empireId),
             {
+              // i18n-exempt-start: stored Message rows, written by whichever
+              // player happens to trigger the lazy settle — never the reader.
+              // See the note in `attackEmpire`.
               title: "🏳️ מלחמת הבריתות בוטלה",
               body: `רק ברית אחת נרשמה למלחמה, ולכן היא לא התקיימה. אין מנצחת ואין פרסים. הירשמו שוב למחר — צריך לפחות ${GUILD_WAR_MIN_GUILDS} בריתות כדי שהקרב ייצא לדרך.`,
             }
@@ -526,7 +531,7 @@ async function settleWar(warId: string, now: Date): Promise<void> {
 
         await tx.guildWarEntry.update({
           where: { id: entry.id },
-          data: { rank, rewardLabel: prize ? prizeSummary(prize) : null },
+          data: { rank, rewardLabel: prize ? prizeSummary(makeT(DEFAULT_LOCALE), prize) : null },
         });
 
         const members = await tx.guildMember.findMany({
@@ -567,7 +572,7 @@ async function settleWar(warId: string, now: Date): Promise<void> {
         }
         await messageMembers(tx, memberIds, {
           title: rank === 1 ? "👑 הברית שלך ניצחה במלחמה!" : "🥈 הברית שלך עלתה לפודיום!",
-          body: `${entry.guildName} — ${prize.label} עם ${entry.score.toLocaleString("he-IL")} נקודות מתוך ${guildCount} בריתות. הפרס נכנס לאוצר שלך: ${prizeSummary(prize)}.`,
+          body: `${entry.guildName} — ${prize.label} עם ${entry.score.toLocaleString("he-IL")} נקודות מתוך ${guildCount} בריתות. הפרס נכנס לאוצר שלך: ${prizeSummary(makeT(DEFAULT_LOCALE), prize)}.`,
         });
       }
 
@@ -603,7 +608,7 @@ async function settleWar(warId: string, now: Date): Promise<void> {
             `${medals[row.rank - 1]} **${row.name}** — ${row.score.toLocaleString("he-IL")} נק׳`
         )
         .join("\n") +
-      `\n\n${podium.guildCount} בריתות ירדו לזירה הערב. ריוונץ׳ מחר ב-19:30. ⏰`,
+      `\n\n${podium.guildCount} בריתות ירדו לזירה הערב. ריוונץ׳ מחר ב-19:30. ⏰`, // i18n-exempt-end
     url: gameLink("/game/war"),
   });
 }

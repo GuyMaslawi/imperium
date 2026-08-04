@@ -9,6 +9,7 @@ import { GUILD_SPELL_META } from "@/lib/game/guild";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export interface GuildShopCardProps {
   type: GuildSpellType;
@@ -42,6 +43,7 @@ export function GuildShopCard({
   diamonds,
   index,
 }: GuildShopCardProps) {
+  const t = useT();
   const [castState, castAction] = useActionState<ActionState, FormData>(
     castGuildSpell,
     {}
@@ -66,30 +68,30 @@ export function GuildShopCard({
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2 text-sm font-bold text-gold-bright">
           <Icon name={meta.icon} size={15} className="gd-spell-icon text-gold-bright" />
-          {meta.label}
+          {t(meta.label)}
         </p>
         <span className="nums rounded-full border border-gold/40 bg-panel-inset px-2.5 py-0.5 text-xs font-black text-gold-bright" dir="ltr">
           +{bonusPct}%
         </span>
       </div>
 
-      <p className="text-xs leading-relaxed text-zinc-400">{meta.description}</p>
-      <p className="text-[11px] text-gold-dim">{meta.effectLabel(bonusPct)}</p>
+      <p className="text-xs leading-relaxed text-zinc-400">{t(meta.description)}</p>
+      <p className="text-[11px] text-gold-dim">{meta.effectLabel(t, bonusPct)}</p>
 
       <form className="mt-auto grid gap-2">
         <input type="hidden" name="type" value={type} />
         {isActive ? (
           <span className="gd-live flex items-center justify-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-center text-xs font-semibold text-emerald-400">
-            <Icon name="spark" size={14} /> פעיל עד {activeLabel}
+            <Icon name="spark" size={14} /> {t("פעיל עד {time}", { time: activeLabel })}
           </span>
         ) : (
           <SubmitButton
             className="btn btn-gold w-full"
             formAction={castAction}
             disabled={diamonds < castCost}
-            pendingText="מטיל קסם..."
+            pendingText={t("מטיל קסם...")}
           >
-            הטל קסם · {castCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
+            {t("הטל קסם")} · {castCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         )}
         {upgradeCost != null ? (
@@ -98,13 +100,13 @@ export function GuildShopCard({
             className="btn btn-ghost w-full"
             formAction={upgradeAction}
             disabled={diamonds < upgradeCost}
-            pendingText="משדרג..."
+            pendingText={t("משדרג...")}
           >
-            שדרג ל־{bonusPct + 1}% · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
+            {t("שדרג ל־{pct}%", { pct: bonusPct + 1 })} · {upgradeCost} <Icon name="diamond" size={14} className="inline-block align-text-bottom text-cyan-300" />
           </SubmitButton>
         ) : (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-            <Icon name="rankings" size={14} /> עזרה מקסימלית ({maxPct}%)
+            <Icon name="rankings" size={14} /> {t("עזרה מקסימלית ({max}%)", { max: maxPct })}
           </span>
         )}
       </form>

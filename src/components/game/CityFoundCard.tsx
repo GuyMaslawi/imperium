@@ -9,6 +9,7 @@ import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
 import { CITIZEN_GROWTH_LEVELS_PER_CITY } from "@/lib/game/constants";
 import { cityName } from "@/lib/game/cities";
+import { useT } from "@/i18n/client";
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -38,6 +39,7 @@ export function CityFoundCard({
   available,
   soldiersAvailable,
 }: CityFoundCardProps) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(foundCity, {});
 
   const isMax = cities >= maxCities;
@@ -54,26 +56,26 @@ export function CityFoundCard({
           <Icon name="base" size={26} className="text-crimson-bright" />
         </span>
         <div>
-          <h3 className="font-bold text-gold-bright">עליית עיר</h3>
+          <h3 className="font-bold text-gold-bright">{t("עליית עיר")}</h3>
           {/* Named first, numbered in the parentheses the name carries: the card
               is the moment the player decides to make the climb, and
               "אשמורן (3) → תרשיש (4)" is a destination in a way that "3 → 4"
               never was — while the tier is still what the costs and the hero
               gate are keyed to. */}
           <p className="text-xs font-semibold text-gold">
-            <span className="text-bone">{cityName(cities)}</span>
+            <span className="text-bone">{cityName(t, cities)}</span>
             {!isMax && (
               <>
                 {" → "}
-                <span className="text-bone">{cityName(cities + 1)}</span>
+                <span className="text-bone">{cityName(t, cities + 1)}</span>
               </>
             )}{" "}
             <span className="font-normal text-gold-dim">
-              (מתוך{" "}
+              {t("(מתוך")}{" "}
               <span className="nums" dir="ltr">
                 {maxCities}
               </span>{" "}
-              ערים)
+              {t("ערים)")}
             </span>
           </p>
         </div>
@@ -81,50 +83,51 @@ export function CityFoundCard({
 
       {isMax ? (
         <p className="text-sm text-zinc-400">
-          הגעת ל<span className="font-bold text-bone">{cityName(cities)}</span> — העיר
-          האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.
+          {t("הגעת ל")}
+          <span className="font-bold text-bone">{cityName(t, cities)}</span>{" "}
+          {t("— העיר האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.")}
         </p>
       ) : (
         <>
           <p className="text-sm text-zinc-400">
-            עליית עיר מכפילה את תפוקת המכרות ל־
+            {t("עליית עיר מכפילה את תפוקת המכרות ל־")}
             <span className="font-bold text-emerald-400 nums" dir="ltr">
               ×{cities + 1}
             </span>{" "}
-            ופותחת עוד{" "}
+            {t("ופותחת עוד")}{" "}
             <span className="font-bold text-emerald-400 nums" dir="ltr">
               {CITIZEN_GROWTH_LEVELS_PER_CITY}
             </span>{" "}
-            רמות לשדרוג קבלת האזרחים.
+            {t("רמות לשדרוג קבלת האזרחים.")}
           </p>
 
           {/* Requirements — these are gates the empire must meet; none are spent. */}
           <div className="panel-inset space-y-2 rounded-lg p-3 text-xs">
-            <p className="font-semibold text-gold-dim">דרישות (אינן נצרכות):</p>
+            <p className="font-semibold text-gold-dim">{t("דרישות (אינן נצרכות):")}</p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className={meetsHero ? "text-emerald-400" : "text-red-400"}>
-                <Icon name="hero" size={14} className="inline align-[-2px]" /> גיבור רמה{" "}
+                <Icon name="hero" size={14} className="inline align-[-2px]" /> {t("גיבור רמה")}{" "}
                 <span className="nums" dir="ltr">
                   {heroRequired}
                 </span>{" "}
-                (כעת{" "}
+                {t("(כעת")}{" "}
                 <span className="nums" dir="ltr">
                   {heroLevel}
                 </span>
-                ) {meetsHero ? "✓" : "✗"}
+                {t(")")} {meetsHero ? "✓" : "✗"}
               </span>
               <span className={enoughSoldiers ? "text-emerald-400" : "text-red-400"}>
                 <Icon name="army" size={14} className="inline align-[-2px]" />{" "}
                 <span className="nums" dir="ltr">
                   {formatNumber(cost.soldiers)}
                 </span>{" "}
-                חיילים בצבא {enoughSoldiers ? "✓" : "✗"}
+                {t("חיילים בצבא")} {enoughSoldiers ? "✓" : "✗"}
               </span>
             </div>
           </div>
 
           <div className="panel-inset space-y-2 rounded-lg p-3 text-xs">
-            <p className="font-semibold text-gold-dim">עלות עלייה (נצרכת):</p>
+            <p className="font-semibold text-gold-dim">{t("עלות עלייה (נצרכת):")}</p>
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-zinc-400">
               {COST_RESOURCES.map(({ key, icon }) => {
                 const missing = available[key] < cost[key];
@@ -132,7 +135,7 @@ export function CityFoundCard({
                   <span
                     key={key}
                     className={missing ? "font-semibold text-red-400" : undefined}
-                    title={missing ? "אין מספיק מהמשאב הזה" : undefined}
+                    title={missing ? t("אין מספיק מהמשאב הזה") : undefined}
                   >
                     <Icon
                       name={icon}
@@ -151,10 +154,10 @@ export function CityFoundCard({
           <form action={action} className="mt-auto">
             <SubmitButton
               className="btn btn-gold w-full"
-              pendingText="מעלה עיר..."
+              pendingText={t("מעלה עיר...")}
               disabled={!meetsHero || !enoughSoldiers}
             >
-              עלה עיר
+              {t("עלה עיר")}
             </SubmitButton>
           </form>
         </>

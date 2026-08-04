@@ -1,4 +1,11 @@
-const nf = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 0 });
+import { LOCALE_TAG, type Locale } from "@/i18n/locale";
+
+/**
+ * One formatter for both languages: Hebrew and English group thousands the same
+ * way and share Western digits, so a figure reads identically either side of the
+ * switch. Dates do not — see `formatDate`.
+ */
+const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
 
 // Suffixes for large numbers: million, billion, trillion, quadrillion, quintillion.
 const UNITS = [
@@ -75,8 +82,17 @@ export function formatBonus(value: number): string {
     : String(Number(value.toFixed(2)));
 }
 
-export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("he-IL", {
+/**
+ * A timestamp in the reader's language.
+ *
+ * The locale is a required argument rather than a default, because the two
+ * languages order the parts differently — 5.8.26 to a Hebrew reader is 8/5/26
+ * to an English one, and a date that silently picks the wrong one is read
+ * wrong rather than read as untranslated. Every caller is a server component or
+ * a client component under the locale provider, so both have it to hand.
+ */
+export function formatDate(date: Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(LOCALE_TAG[locale], {
     dateStyle: "short",
     timeStyle: "short",
   }).format(date);

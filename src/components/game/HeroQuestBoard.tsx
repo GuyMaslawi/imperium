@@ -14,6 +14,7 @@ import type { ActionState } from "@/server/actions/game";
 import { formatNumber } from "@/lib/game/format";
 import { RARITY_META } from "@/lib/game/hero";
 import { POTION_META } from "@/lib/game/potions";
+import { useT } from "@/i18n/client";
 import {
   HERO_QUESTS,
   HERO_QUEST_HAUL_LABEL,
@@ -445,6 +446,7 @@ function QuestRow({
   disabled: boolean;
   onSend: () => void;
 }) {
+  const t = useT();
   const quest = heroQuestByTier(tier);
   if (!quest) return null;
 
@@ -492,7 +494,7 @@ function QuestRow({
             <span aria-hidden>{quest.sigil}</span>
             {quest.name}
             <span className="rounded-md border border-border-subtle px-1.5 py-px text-[10px] font-bold text-zinc-400">
-              {heroQuestDurationLabel(tier)}
+              {heroQuestDurationLabel(t, tier)}
             </span>
           </h3>
           <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{quest.lore}</p>

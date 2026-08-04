@@ -19,6 +19,7 @@ import {
 } from "@/server/guildWarState";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 /**
  * The whole player-facing surface of the guild war: enrol, withdraw, watch.
@@ -31,6 +32,8 @@ import { logError } from "@/server/errorLog";
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — each action catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -50,6 +53,7 @@ function revalidateWar() {
  * half an hour, which is not a call any single member gets to make for the rest.
  */
 export async function registerGuildForWar(): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -57,9 +61,9 @@ export async function registerGuildForWar(): Promise<ActionState> {
       where: { empireId },
       include: { guild: { select: { id: true, name: true } } },
     });
-    if (!membership) return { error: "אינך חבר בברית." };
+    if (!membership) return { error: t("אינך חבר בברית.") };
     if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים לרשום את הברית למלחמה." };
+      return { error: t("רק מנהיג או סגן יכולים לרשום את הברית למלחמה.") };
     }
 
     const startsAt = registrationWarStart(new Date());
@@ -82,21 +86,29 @@ export async function registerGuildForWar(): Promise<ActionState> {
       });
     } catch {
       // The [warId, guildId] unique index is the double-click guard.
-      return { error: "הברית שלך כבר רשומה למלחמה הקרובה." };
+      return { error: t("הברית שלך כבר רשומה למלחמה הקרובה.") };
     }
 
     revalidateWar();
     return {
-      success: `${membership.guild.name} נרשמה למלחמת הבריתות! הקרב מתנהל אוטומטית בין ${GUILD_WAR_START_LABEL} ל־${GUILD_WAR_END_LABEL} — אין מה לעשות חוץ מלצפות.`,
+      success: t(
+        "{guild} נרשמה למלחמת הבריתות! הקרב מתנהל אוטומטית בין {start} ל־{end} — אין מה לעשות חוץ מלצפות.",
+        {
+          guild: membership.guild.name,
+          start: GUILD_WAR_START_LABEL,
+          end: GUILD_WAR_END_LABEL,
+        }
+      ),
     };
   } catch (err) {
     await logError("guildWar.registerGuildForWar", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
 /** Pull out of the upcoming war. Only ever touches a bell that has not rung. */
 export async function withdrawGuildFromWar(): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -104,9 +116,9 @@ export async function withdrawGuildFromWar(): Promise<ActionState> {
       where: { empireId },
       select: { role: true, guildId: true },
     });
-    if (!membership) return { error: "אינך חבר בברית." };
+    if (!membership) return { error: t("אינך חבר בברית.") };
     if (membership.role === "MEMBER") {
-      return { error: "רק מנהיג או סגן יכולים לבטל את ההרשמה." };
+      return { error: t("רק מנהיג או סגן יכולים לבטל את ההרשמה.") };
     }
 
     const startsAt = registrationWarStart(new Date());
@@ -114,7 +126,7 @@ export async function withdrawGuildFromWar(): Promise<ActionState> {
       where: { startsAt },
       select: { id: true },
     });
-    if (!war) return { error: "הברית שלך לא רשומה למלחמה הקרובה." };
+    if (!war) return { error: t("הברית שלך לא רשומה למלחמה הקרובה.") };
 
     // registrationWarStart is always in the future, so this can never cancel a
     // guild out of a war it is already fighting.
@@ -122,14 +134,14 @@ export async function withdrawGuildFromWar(): Promise<ActionState> {
       where: { warId: war.id, guildId: membership.guildId },
     });
     if (removed.count === 0) {
-      return { error: "הברית שלך לא רשומה למלחמה הקרובה." };
+      return { error: t("הברית שלך לא רשומה למלחמה הקרובה.") };
     }
 
     revalidateWar();
-    return { success: "ההרשמה למלחמה בוטלה." };
+    return { success: t("ההרשמה למלחמה בוטלה.") };
   } catch (err) {
     await logError("guildWar.withdrawGuildFromWar", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 

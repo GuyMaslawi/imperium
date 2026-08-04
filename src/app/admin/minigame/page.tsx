@@ -5,6 +5,8 @@ import { ActionForm } from "@/components/admin/ActionForm";
 import { EditorSection } from "@/components/admin/fields";
 import { MiniGameCreator } from "@/components/admin/MiniGameCreator";
 import { prizeText, MINIGAME_TYPE_META, MAX_LIVE_MINIGAMES } from "@/lib/game/minigame";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 import {
   createMiniGame,
   activateMiniGame,
@@ -13,6 +15,14 @@ import {
 } from "@/server/actions/admin";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * The control centre stays Hebrew on purpose (see src/i18n/), so the one helper
+ * here that now takes a translator is handed the source language explicitly
+ * rather than the reader's — an admin who switched the *game* to English still
+ * reads this panel in the language the rest of it is written in.
+ */
+const he = makeT(DEFAULT_LOCALE);
 
 export default async function AdminMiniGamePage() {
   await requireAdmin();
@@ -109,7 +119,7 @@ export default async function AdminMiniGamePage() {
                 <p className="text-[11px] text-zinc-400">
                   {MINIGAME_TYPE_META[g.type].label} · פרס:{" "}
                   <span className="text-amber-200" dir="ltr">
-                    {prizeText(g)}
+                    {prizeText(he, g)}
                   </span>{" "}
                   · {g.maxAttempts} ניסיונות ·{" "}
                   {g.maxWinners === 0 ? "זוכים ללא הגבלה" : `עד ${g.maxWinners} זוכים`} · זכו עד כה{" "}

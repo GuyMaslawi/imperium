@@ -4,8 +4,12 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { AchievementList } from "@/components/game/AchievementList";
 import { getAchievementsState } from "@/server/achievementState";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "הישגים | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("הישגים | KRALDOR") };
+}
 
 /** Dust settling through the case — fixed, so SSR and hydration agree. */
 const CASE_DUST = [
@@ -24,6 +28,7 @@ export default async function AchievementsPage() {
   // so a milestone crossed by an update the player has not collected yet
   // (citizens, production) already counts on this load.
   const empire = await requireEmpire();
+  const t = await getT();
 
   const state = await getAchievementsState(empire.id);
   if (!state) return null;
@@ -31,7 +36,7 @@ export default async function AchievementsPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="הישגים"
+        title={t("הישגים")}
         ornament={<Icon name="rankings" size={22} className="text-crimson" />}
       />
 
@@ -52,7 +57,7 @@ export default async function AchievementsPage() {
         <div className="tro-body text-center">
           <h2 className="flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="achievements" size={20} className="text-crimson-bright" />
-            היכל הפרסים
+            {t("היכל הפרסים")}
           </h2>
 
           <div className="mt-3 flex items-center justify-center gap-5">
@@ -78,14 +83,14 @@ export default async function AchievementsPage() {
                 <span className="nums font-bold text-gold-bright" dir="ltr">
                   {state.collectable}
                 </span>{" "}
-                פרסים מחכים על המדף
+                {t("פרסים מחכים על המדף")}
               </>
             ) : (
               <>
                 <span className="nums font-bold text-gold-bright" dir="ltr">
                   {state.claimed}/{state.total}
                 </span>{" "}
-                הישגים בהיכל — אין מה לאסוף כרגע
+                {t("הישגים בהיכל — אין מה לאסוף כרגע")}
               </>
             )}
           </p>

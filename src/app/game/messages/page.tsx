@@ -14,6 +14,7 @@ import { MarkSeen } from "@/components/game/MarkSeen";
 import { MessageCompose, type PlayerOption } from "@/components/game/MessageCompose";
 import type { MessageKind } from "@prisma/client";
 import type { CSSProperties, ReactNode } from "react";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "הודעות | קראלדור" };
 
@@ -42,6 +43,7 @@ const KIND_META: Record<MessageKind, { icon: ReactNode; label: string; tone: str
 };
 
 export default async function MessagesPage() {
+  const { locale } = await getI18n();
   const empire = await requireEmpire();
 
   const [messages, roster] = await Promise.all([
@@ -232,7 +234,7 @@ export default async function MessagesPage() {
                       </span>
                       <span className="text-zinc-600" aria-hidden>·</span>
                       <span className="nums text-zinc-500" dir="ltr">
-                        {formatDate(m.createdAt)}
+                        {formatDate(m.createdAt, locale)}
                       </span>
                       {m.href && (
                         <>

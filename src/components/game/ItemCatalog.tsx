@@ -19,6 +19,7 @@ import {
   slotPrimaryStat,
 } from "@/lib/game/hero";
 import { HERO_ITEM_SETS } from "@/lib/game/heroSets";
+import { useT } from "@/i18n/client";
 
 /** "12%" / "1.5%" — a decimal only when the odds are not a whole percent. */
 function formatDropChance(chance: number): string {
@@ -43,6 +44,7 @@ export function ItemCatalog({
   ownedKeys: string[];
   equippedKeys: string[];
 }) {
+  const t = useT();
   const owned = new Set(ownedKeys);
   const equipped = new Set(equippedKeys);
 
@@ -149,7 +151,7 @@ export function ItemCatalog({
                       icon={slotMeta.icon}
                       level={level}
                       rarity={uiRarityForLevel(level)}
-                      details={itemDetails({ slot, level }, heroLevel, {
+                      details={itemDetails(t, { slot, level }, heroLevel, {
                         owned: isOwned,
                         equipped: isEquipped,
                         hint: isOwned

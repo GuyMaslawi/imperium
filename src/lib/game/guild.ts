@@ -1,5 +1,6 @@
 import type { GuildRole, GuildSpellType } from "@prisma/client";
 import type { IconName } from "@/components/ui/Icon";
+import type { T } from "@/i18n/translate";
 
 /* ------------------------------ creation & capacity ------------------------------ */
 
@@ -77,8 +78,12 @@ export interface GuildSpellMeta {
   maxLevel: number;
   /** How long one cast holds on the caster. */
   buffHours: number;
-  /** Human-readable effect for a given bonus percent. */
-  effectLabel: (pct: number) => string;
+  /**
+   * Human-readable effect for a given bonus percent. Takes the translator
+   * rather than returning a source string — the sentence is built around a
+   * number that only exists at this level.
+   */
+  effectLabel: (t: T, pct: number) => string;
 }
 
 export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
@@ -88,7 +93,8 @@ export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
     description: "מגביר את כוח ההתקפה שלך בקרבות.",
     maxLevel: 10,
     buffHours: SPELL_HOURS,
-    effectLabel: (pct) => `+${pct}% לכוח ההתקפה למשך ${SPELL_HOURS} שעות`,
+    effectLabel: (t, pct) =>
+      t("+{pct}% לכוח ההתקפה למשך {hours} שעות", { pct, hours: SPELL_HOURS }),
   },
   DEFENSE: {
     label: "קסם הגנה",
@@ -96,7 +102,8 @@ export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
     description: "מגביר את כוח ההגנה שלך כשמתקיפים אותך.",
     maxLevel: 10,
     buffHours: SPELL_HOURS,
-    effectLabel: (pct) => `+${pct}% לכוח ההגנה למשך ${SPELL_HOURS} שעות`,
+    effectLabel: (t, pct) =>
+      t("+{pct}% לכוח ההגנה למשך {hours} שעות", { pct, hours: SPELL_HOURS }),
   },
   RESOURCES: {
     label: "קסם משאבים",
@@ -104,7 +111,8 @@ export const GUILD_SPELL_META: Record<GuildSpellType, GuildSpellMeta> = {
     description: "מאיץ את תפוקת המכרות של האימפריה שלך.",
     maxLevel: 10,
     buffHours: SPELL_HOURS,
-    effectLabel: (pct) => `+${pct}% לתפוקת המכרות למשך ${SPELL_HOURS} שעות`,
+    effectLabel: (t, pct) =>
+      t("+{pct}% לתפוקת המכרות למשך {hours} שעות", { pct, hours: SPELL_HOURS }),
   },
 };
 

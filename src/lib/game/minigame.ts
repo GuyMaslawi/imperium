@@ -1,4 +1,5 @@
 import type { MiniGameEvent, MiniGameType } from "@prisma/client";
+import type { T } from "@/i18n/translate";
 
 /** Prize bundle fields on a MiniGameEvent, in display order. */
 export const PRIZE_FIELDS = [
@@ -23,13 +24,20 @@ export const PRIZE_FIELDS = [
  * bodies and toasts, where an emoji would be a second, off-set drawing of a
  * resource the rest of the UI renders from the shared icon set.
  */
-export function prizeText(event: MiniGameEvent): string {
+export function prizeText(t: T, event: MiniGameEvent): string {
   const parts: string[] = [];
   for (const f of PRIZE_FIELDS) {
     const amount = Number(event[f.key] ?? 0);
-    if (amount > 0) parts.push(`${Math.round(amount).toLocaleString("he-IL")} ${f.label}`);
+    if (amount > 0) {
+      parts.push(
+        t("{amount} {resource}", {
+          amount: Math.round(amount).toLocaleString("en-US"),
+          resource: t(f.label),
+        })
+      );
+    }
   }
-  return parts.length ? parts.join(" · ") : "כבוד בלבד";
+  return parts.length ? parts.join(" · ") : t("כבוד בלבד");
 }
 
 export const MINIGAME_TYPE_META: Record<MiniGameType, { label: string; icon: string }> = {

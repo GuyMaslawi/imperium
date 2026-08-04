@@ -6,18 +6,23 @@ import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { markReportsSeen } from "@/server/actions/messages";
 import { MarkSeen } from "@/components/game/MarkSeen";
+import { getI18n, getT } from "@/i18n/server";
 import {
   ReportsTabs,
   type BattleRow,
   type SpyRow,
 } from "@/components/game/ReportsTabs";
 
-export const metadata = { title: "דוחות | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("דוחות | קראלדור") };
+}
 
 /** The stack of dispatches on the desk — how far each sheet is turned. */
 const PAPERS = ["-11deg", "6deg", "-2deg"];
 
 export default async function ReportsPage() {
+  const { t, locale } = await getI18n();
   const empire = await requireEmpire();
 
   const [battles, spies] = await Promise.all([
@@ -75,7 +80,7 @@ export default async function ReportsPage() {
 
     return {
       id: report.id,
-      createdAt: formatDate(report.createdAt),
+      createdAt: formatDate(report.createdAt, locale),
       isNew: isIncomingNew(report.createdAt, isAttacker),
       rival,
       rivalId,
@@ -102,7 +107,7 @@ export default async function ReportsPage() {
     const isAttacker = report.attackerEmpireId === empire.id;
     return {
       id: report.id,
-      createdAt: formatDate(report.createdAt),
+      createdAt: formatDate(report.createdAt, locale),
       isNew: isIncomingNew(report.createdAt, isAttacker),
       rival: isAttacker
         ? report.defenderEmpire.name
@@ -137,7 +142,7 @@ export default async function ReportsPage() {
   return (
     <div className="space-y-6">
       <MarkSeen action={markReportsSeen} clears="reports" />
-      <SectionHeading title="היסטוריה" ornament={<Icon name="reports" size={22} className="text-crimson" />} />
+      <SectionHeading title={t("היסטוריה")} ornament={<Icon name="reports" size={22} className="text-crimson" />} />
 
       {/* -------- the dispatch desk --------
           A candle, a stack of dispatches and the day's tally. The "מאז ביקורך
@@ -156,13 +161,13 @@ export default async function ReportsPage() {
         <div className="disp-body">
           <h2 className="mb-3 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="reports" size={20} className="text-crimson-bright" />
-            שולחן המבצעים
+            {t("שולחן המבצעים")}
           </h2>
           <div className="mx-auto grid max-w-lg grid-cols-3 gap-2.5">
             {[
-              { label: "דוחות קרב", value: battleRows.length },
-              { label: "משימות ריגול", value: spyRows.length },
-              { label: "מאז ביקורך האחרון", value: freshCount },
+              { label: t("דוחות קרב"), value: battleRows.length },
+              { label: t("משימות ריגול"), value: spyRows.length },
+              { label: t("מאז ביקורך האחרון"), value: freshCount },
             ].map(({ label, value }, index) => (
               <div
                 key={label}

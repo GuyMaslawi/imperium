@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Icon } from "@/components/ui/Icon";
 import { useAfterFirstPaint, useCountUp } from "@/components/ui/motion";
 import { formatCompact } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 import type { GloryView } from "@/lib/game/achievements";
 
 /**
@@ -44,6 +45,7 @@ const SPARKS = [
 ];
 
 function GloryCard({ item, index }: { item: GloryView; index: number }) {
+  const t = useT();
   const painted = useAfterFirstPaint();
   const crowned = item.record?.isMe === true;
   const won = item.unlocked;
@@ -96,16 +98,16 @@ function GloryCard({ item, index }: { item: GloryView; index: number }) {
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-2">
-          <h3 className="glory-name">{item.name}</h3>
+          <h3 className="glory-name">{t(item.name, item.params)}</h3>
           {won ? (
-            <span className="glory-ribbon">{crowned ? "השיא שלך" : "הושג"}</span>
+            <span className="glory-ribbon">{crowned ? t("השיא שלך") : t("הושג")}</span>
           ) : (
             <span className="nums shrink-0 text-[11px] text-zinc-500" dir="ltr">
               {formatCompact(rolled)} / {formatCompact(item.goal)}
             </span>
           )}
         </div>
-        <p className="glory-tagline">{item.tagline}</p>
+        <p className="glory-tagline">{t(item.tagline, item.params)}</p>
 
         {/* The reader's own progress. Stays on an earned card too — full and
             gold, it is the row of light that separates them from the rest. */}
@@ -119,7 +121,7 @@ function GloryCard({ item, index }: { item: GloryView; index: number }) {
         {item.record ? (
           <p className="glory-record">
             <Icon name="crown" size={12} className="shrink-0" />
-            <span className="shrink-0 text-zinc-600">ראשון בעולם:</span>
+            <span className="shrink-0 text-zinc-600">{t("ראשון בעולם:")}</span>
             <Link
               href={`/game/empires/${item.record.empireId}`}
               className="glory-holder"
@@ -133,7 +135,7 @@ function GloryCard({ item, index }: { item: GloryView; index: number }) {
         ) : (
           <p className="glory-record is-open">
             <Icon name="spark" size={12} className="shrink-0" />
-            השיא עדיין פנוי — אף אחד לא הגיע לכאן
+            {t("השיא עדיין פנוי — אף אחד לא הגיע לכאן")}
           </p>
         )}
       </div>
@@ -148,6 +150,7 @@ export function HallOfGlory({
   items: GloryView[];
   daysOnServer: number;
 }) {
+  const t = useT();
   const taken = items.filter((i) => i.record !== null).length;
   const mine = items.filter((i) => i.record?.isMe).length;
   const rolledTaken = useCountUp(taken, 1100);
@@ -158,10 +161,10 @@ export function HallOfGlory({
         <div className="min-w-0">
           <h2 className="glory-title">
             <Icon name="achievements" size={20} className="text-gold-bright" />
-            שיאי העולם
+            {t("שיאי העולם")}
           </h2>
           <p className="mt-0.5 text-xs text-zinc-500">
-            שיאי המשחק ומי כבש אותם ראשון — מכל השחקנים בעולם
+            {t("שיאי המשחק ומי כבש אותם ראשון — מכל השחקנים בעולם")}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-5">
@@ -170,19 +173,19 @@ export function HallOfGlory({
               {rolledTaken}
               <span className="text-base text-gold-dim">/{items.length}</span>
             </p>
-            <p className="text-[10px] text-zinc-500">שיאים שנכבשו</p>
+            <p className="text-[10px] text-zinc-500">{t("שיאים שנכבשו")}</p>
           </div>
           <div className="text-center">
             <p className="nums text-2xl font-black text-gold" dir="ltr">
               {mine}
             </p>
-            <p className="text-[10px] text-zinc-500">על שמך</p>
+            <p className="text-[10px] text-zinc-500">{t("על שמך")}</p>
           </div>
           <div className="text-center">
             <p className="nums text-2xl font-black text-bone-dim" dir="ltr">
               {daysOnServer}
             </p>
-            <p className="text-[10px] text-zinc-500">ימי שרת</p>
+            <p className="text-[10px] text-zinc-500">{t("ימי שרת")}</p>
           </div>
         </div>
       </div>

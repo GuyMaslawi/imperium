@@ -24,6 +24,7 @@ import { EmpireBio } from "@/components/game/EmpireBio";
 import { getEmpireMedals } from "@/server/empireMedals";
 import type { HeroItemView } from "@/components/game/heroItemView";
 import { formatNumber, formatDate } from "@/lib/game/format";
+import { getI18n } from "@/i18n/server";
 import {
   HERO_CLASS_META,
   heroClassImage,
@@ -110,6 +111,7 @@ export default async function EmpireProfilePage({
 }: {
   params: Promise<{ empireId: string }>;
 }) {
+  const { t, locale } = await getI18n();
   const { empireId } = await params;
   const myEmpire = await requireEmpire();
 
@@ -225,7 +227,7 @@ export default async function EmpireProfilePage({
                 war actions are dead on a dossier from another city. */}
             <Tip
               className="shrink-0"
-              tip={`${cityFullName(empire.cities)} — מתוך ${MAX_CITIES} ערים. ${
+              tip={`${cityFullName(t, empire.cities)} — מתוך ${MAX_CITIES} ערים. ${
                 isMe
                   ? "זו העיר שלך."
                   : sameCity
@@ -242,7 +244,7 @@ export default async function EmpireProfilePage({
               >
                 <Icon name="base" size={12} className="inline-block align-middle text-crimson-bright" />{" "}
                 עיר{" "}
-                <span className="font-bold text-bone">{cityName(empire.cities)}</span>
+                <span className="font-bold text-bone">{cityName(t, empire.cities)}</span>
               </span>
             </Tip>
             <PresenceDot online={online} label />
@@ -426,7 +428,7 @@ export default async function EmpireProfilePage({
             </h3>
             {lastClash && (
               <span className="text-xs text-zinc-500">
-                עימות אחרון: {formatDate(lastClash)}
+                עימות אחרון: {formatDate(lastClash, locale)}
               </span>
             )}
           </div>

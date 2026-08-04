@@ -16,6 +16,7 @@ import {
   type AchievementRewardTotal,
 } from "@/lib/game/achievements";
 import { gatherAchievementStats, getClaimedKeys } from "@/server/achievementState";
+import { getT } from "@/i18n/server";
 
 /**
  * No ladder is returned on success: `revalidatePath` re-renders the page from
@@ -65,10 +66,11 @@ async function grantReward(
  * land, so there is no case where a receipt exists but nothing was paid.
  */
 export async function claimAchievements(): Promise<ClaimAchievementsResult> {
+  const t = await getT();
   try {
     // Enforces the ban/verification gate on the action too, not just page loads.
     const empireId = await getActiveEmpireId();
-    if (empireId === null) return { ok: false, error: "לא מחובר" };
+    if (empireId === null) return { ok: false, error: t("לא מחובר") };
 
     const result = await prisma.$transaction(async (tx) => {
       // Settle pending updates first, so a milestone the player crossed via an
@@ -77,7 +79,7 @@ export async function claimAchievements(): Promise<ClaimAchievementsResult> {
 
       const claimedKeys = await getClaimedKeys(tx, empireId);
       const stats = await gatherAchievementStats(tx, empireId, claimedKeys);
-      if (!stats) return { ok: false as const, error: "האימפריה לא נמצאה" };
+      if (!stats) return { ok: false as const, error: t("האימפריה לא נמצאה") };
 
       const granted: { kind: AchievementRewardKind; amount: number }[] = [];
       for (const a of ACHIEVEMENTS) {
@@ -109,7 +111,7 @@ export async function claimAchievements(): Promise<ClaimAchievementsResult> {
       }
 
       if (granted.length === 0) {
-        return { ok: false as const, error: "אין הישגים חדשים לאיסוף" };
+        return { ok: false as const, error: t("אין הישגים חדשים לאיסוף") };
       }
       // One line per resource rather than one per achievement — collecting a
       // whole category at once otherwise prints dozens of fragments.
@@ -128,6 +130,6 @@ export async function claimAchievements(): Promise<ClaimAchievementsResult> {
     // the browser. Logged so the fault is visible in /admin/monitor instead of
     // only in one player's toast.
     await logError("achievements.claimAchievements", err);
-    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
+    return { ok: false, error: t("אירעה שגיאה, נסה שוב") };
   }
 }

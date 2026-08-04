@@ -4,6 +4,7 @@ import type {
   ResourceStorageType,
 } from "@prisma/client";
 import type { IconName } from "@/components/ui/Icon";
+import type { T, TranslateParams } from "@/i18n/translate";
 
 /**
  * The words for each balance. Deliberately icon-free: a resource's glyph and
@@ -382,13 +383,21 @@ export function storageUpgradeCost(level: number) {
 export interface EmpireUpgradeMeta {
   label: string;
   icon: IconName;
+  /** Translation source; `{placeholders}` are filled from `descriptionParams`. */
   description: string;
-  /** Human-readable effect for a given level. */
+  /** The ceilings and growth factors the description quotes. */
+  descriptionParams?: TranslateParams;
   /**
+   * Human-readable effect for a given level.
+   *
+   * Takes the translator rather than returning a source string, because the
+   * sentence is assembled around a number that only exists at this level — the
+   * pattern is the translatable part and the arithmetic stays here.
+   *
    * `rate` is only read by CITIZEN_GROWTH, whose effect is admin-tunable; every
    * other upgrade derives its label from deploy-time constants and ignores it.
    */
-  effectLabel: (level: number, rate?: CitizenRate) => string;
+  effectLabel: (t: T, level: number, rate?: CitizenRate) => string;
   /** Highest reachable level; undefined means uncapped. */
   maxLevel?: number;
 }
@@ -686,50 +695,77 @@ export const EMPIRE_UPGRADE_META: Record<
     label: "קבלת אזרחים",
     icon: "citizens",
     description: "מגדיל את כמות האזרחים שמתקבלת בכל עדכון יומי.",
-    effectLabel: (level, rate) =>
-      `${citizensPerDailyUpdate(level, rate)} אזרחים בכל עדכון יומי`,
+    effectLabel: (t, level, rate) =>
+      t("{citizens} אזרחים בכל עדכון יומי", {
+        citizens: citizensPerDailyUpdate(level, rate),
+      }),
   },
   INTELLIGENCE: {
     label: "מודיעין",
     icon: "spy",
     description:
       "מגדיל את כח המודיעין שלך. ריגול מצליח כשכח המודיעין שלך גדול מזה של היעד — בלי הגרלה.",
-    effectLabel: (level) =>
-      `+${Math.round((intelligencePowerMultiplier(level) - 1) * 100)}% כח מודיעין`,
+    effectLabel: (t, level) =>
+      t("+{pct}% כח מודיעין", {
+        pct: Math.round((intelligencePowerMultiplier(level) - 1) * 100),
+      }),
     maxLevel: INTELLIGENCE_MAX_LEVEL,
   },
   BANK_DEPOSIT_COUNT: {
     label: "כמות הפקדות בבנק",
     icon: "bank",
     description: "מגדיל את מספר ההפקדות שניתן לבצע בבנק בין עדכון יומי לעדכון יומי.",
-    effectLabel: (level) =>
-      `${allowedDepositsPerDailyPeriod(level).toLocaleString("he-IL")} הפקדות בין עדכון יומי לעדכון יומי`,
+    effectLabel: (t, level) =>
+      t("{count} הפקדות בין עדכון יומי לעדכון יומי", {
+        count: allowedDepositsPerDailyPeriod(level).toLocaleString("en-US"),
+      }),
     maxLevel: BANK_DEPOSIT_COUNT_MAX_LEVEL,
   },
   BANK_DAILY_INTEREST: {
     label: "ריבית בנק",
     icon: "gold",
     description:
-      `מוסיף 1% לריבית שמתקבלת בבנק בכל עדכון יומי — עד ${Math.round(BANK_INTEREST_MAX_RATE * 100)}% ברמה ${BANK_DAILY_INTEREST_MAX_LEVEL}. הריבית מצטברת פעמיים ביום על זהב שאי אפשר לבזוז, ולכן הסולם יקר: כל רמה עולה פי ${BANK_INTEREST_COST_GROWTH} מקודמתה.`,
-    effectLabel: (level) =>
-      `${Math.round(bankInterestRate(level) * 100)}% ריבית בכל עדכון יומי`,
+      "מוסיף 1% לריבית שמתקבלת בבנק בכל עדכון יומי — עד {max}% ברמה {maxLevel}. הריבית מצטברת פעמיים ביום על זהב שאי אפשר לבזוז, ולכן הסולם יקר: כל רמה עולה פי {growth} מקודמתה.",
+    descriptionParams: {
+      max: Math.round(BANK_INTEREST_MAX_RATE * 100),
+      maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
+      growth: BANK_INTEREST_COST_GROWTH,
+    },
+    effectLabel: (t, level) =>
+      t("{pct}% ריבית בכל עדכון יומי", {
+        pct: Math.round(bankInterestRate(level) * 100),
+      }),
     maxLevel: BANK_DAILY_INTEREST_MAX_LEVEL,
   },
   TURNS_PER_REGULAR_UPDATE: {
     label: "קבלת תורות",
     icon: "turns",
     description:
-      `מוסיף תור אחד לכל עדכון רגיל — כלומר ${TICKS_PER_DAY} תורות נוספות ביום, לתמיד. לכן הסולם יקר: כל רמה עולה פי ${TURNS_UPGRADE_COST_GROWTH} מקודמתה.`,
-    effectLabel: (level) =>
-      `+${turnsPerRegularUpdate(level)} תורות לעדכון רגיל (${(turnsPerRegularUpdate(level) * TICKS_PER_DAY).toLocaleString("he-IL")} ביום)`,
+      "מוסיף תור אחד לכל עדכון רגיל — כלומר {perDay} תורות נוספות ביום, לתמיד. לכן הסולם יקר: כל רמה עולה פי {growth} מקודמתה.",
+    descriptionParams: {
+      perDay: TICKS_PER_DAY,
+      growth: TURNS_UPGRADE_COST_GROWTH,
+    },
+    effectLabel: (t, level) =>
+      t("+{turns} תורות לעדכון רגיל ({perDay} ביום)", {
+        turns: turnsPerRegularUpdate(level),
+        perDay: (turnsPerRegularUpdate(level) * TICKS_PER_DAY).toLocaleString("en-US"),
+      }),
     maxLevel: TURNS_UPGRADE_MAX_LEVEL,
   },
   WHEEL_LUCK: {
     label: "מזל הגלגל",
     icon: "wheel",
     description:
-      `מוסיף 1% לסיכוי לזכות בסיבוב גלגל מזל — מזריקת חפץ ומתקיפה מנצחת — עד ${WHEEL_LUCK_MAX_LEVEL}% ברמה המקסימלית. השדרוג היקר במשחק: כל רמה עולה פי ${WHEEL_LUCK_COST_GROWTH} מקודמתה.`,
-    effectLabel: (level) => `+${Math.round(wheelLuckBonus(level) * 100)}% סיכוי לסיבוב גלגל מזל`,
+      "מוסיף 1% לסיכוי לזכות בסיבוב גלגל מזל — מזריקת חפץ ומתקיפה מנצחת — עד {max}% ברמה המקסימלית. השדרוג היקר במשחק: כל רמה עולה פי {growth} מקודמתה.",
+    descriptionParams: {
+      max: WHEEL_LUCK_MAX_LEVEL,
+      growth: WHEEL_LUCK_COST_GROWTH,
+    },
+    effectLabel: (t, level) =>
+      t("+{pct}% סיכוי לסיבוב גלגל מזל", {
+        pct: Math.round(wheelLuckBonus(level) * 100),
+      }),
     maxLevel: WHEEL_LUCK_MAX_LEVEL,
   },
 };

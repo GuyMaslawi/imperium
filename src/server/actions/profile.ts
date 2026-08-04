@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rateLimit";
 import { normalizeBio } from "@/lib/game/profile";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 /** Rewrites allowed per window. Generous for editing, useless for cycling slurs. */
 const BIO_SAVE_LIMIT = 12;
@@ -34,13 +35,16 @@ export async function saveEmpireBio(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const empireId = await getActiveEmpireId();
-  if (empireId === null) return { error: "לא מחובר" };
+  if (empireId === null) return { error: t("לא מחובר") };
 
   if (
     !(await rateLimit(`bio:${empireId}`, BIO_SAVE_LIMIT, BIO_SAVE_WINDOW_MS))
   ) {
-    return { error: "ערכת את התיאור יותר מדי פעמים — נסה שוב בעוד כמה דקות" };
+    return {
+      error: t("ערכת את התיאור יותר מדי פעמים — נסה שוב בעוד כמה דקות"),
+    };
   }
 
   const bio = normalizeBio(String(formData.get("bio") ?? ""));
@@ -53,10 +57,10 @@ export async function saveEmpireBio(
     // The blurb renders on one page — this player's own dossier.
     revalidatePath(`/game/empires/${empireId}`);
     return {
-      success: bio === "" ? "התיאור נמחק" : "התיאור נשמר",
+      success: bio === "" ? t("התיאור נמחק") : t("התיאור נשמר"),
     };
   } catch (err) {
     await logError("profile.saveEmpireBio", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

@@ -28,6 +28,7 @@ import {
 } from "@/lib/game/bossBattle";
 import type { BossRoundLogEntry } from "@/server/bossSiege";
 import { cityName } from "@/lib/game/cities";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "קרב בוס | KRALDOR" };
 
@@ -96,6 +97,7 @@ export default async function BossFightPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t, locale } = await getI18n();
   const { id } = await params;
   const me = await requireEmpire();
 
@@ -163,7 +165,7 @@ export default async function BossFightPage({
           </Link>
         </div>
         <p className="nums text-xs text-zinc-500" dir="ltr">
-          {formatDate(fight.createdAt)}
+          {formatDate(fight.createdAt, locale)}
         </p>
       </div>
 
@@ -238,7 +240,7 @@ export default async function BossFightPage({
               {boss.name}
             </p>
             <p className="text-[11px] text-zinc-500">
-              {boss.title} · עיר {cityName(fight.cityTier)}
+              {boss.title} · עיר {cityName(t, fight.cityTier)}
             </p>
           </div>
         </div>
@@ -465,13 +467,13 @@ export default async function BossFightPage({
                     icon={SLOT_META[droppedItem.slot].icon}
                     level={droppedItem.level}
                     rarity={uiRarityForLevel(droppedItem.level)}
-                    details={itemDetails(droppedItem, me.hero?.level ?? 1)}
+                    details={itemDetails(t, droppedItem, me.hero?.level ?? 1)}
                   />
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
                     <Icon name="gift" size={16} className="inline-block align-middle" /> שלל הבוס:{" "}
-                    {itemDisplayName(droppedItem.slot, droppedItem.level)}
+                    {itemDisplayName(t, droppedItem.slot, droppedItem.level)}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     רמת פריט{" "}

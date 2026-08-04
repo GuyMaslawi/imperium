@@ -9,6 +9,7 @@ import { SeasonCountdown } from "@/components/game/SeasonCountdown";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "העונה הסתיימה | קראלדור" };
 export const dynamic = "force-dynamic";
@@ -71,6 +72,7 @@ function Totals({ totals }: { totals: SeasonRecap["totals"] }) {
 }
 
 export default async function SeasonEndPage() {
+  const { locale } = await getI18n();
   const gate = await getSeasonGate();
 
   // A live season has no story to tell yet — send everyone back where they
@@ -136,7 +138,7 @@ export default async function SeasonEndPage() {
             </h1>
             {season && (
               <p className="text-xs text-zinc-500">
-                {formatDate(season.startsAt)} — {formatDate(season.endsAt)}
+                {formatDate(season.startsAt, locale)} — {formatDate(season.endsAt, locale)}
               </p>
             )}
             <p className="mx-auto max-w-xl text-sm text-zinc-400">
@@ -160,7 +162,7 @@ export default async function SeasonEndPage() {
                 startsAt={gate.nextStartsAt.getTime()}
               />
               <p className="mt-3 text-[11px] text-zinc-500">
-                {formatDate(gate.nextStartsAt)}
+                {formatDate(gate.nextStartsAt, locale)}
               </p>
               {/* Said here, before it happens, and only when it is actually
                   going to: the restart is the single biggest thing about the

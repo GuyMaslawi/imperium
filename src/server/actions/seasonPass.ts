@@ -8,6 +8,7 @@ import { logError } from "@/server/errorLog";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { grantCitizens } from "@/lib/game/grants";
 import { lastDailyUpdate, nextDailyUpdate } from "@/lib/game/time";
+import { getT, type T } from "@/i18n/server";
 import {
   SEASON_PASS_HAUL_ORDER as HAUL_ORDER,
   SEASON_PASS_PREMIUM_PRICE,
@@ -21,11 +22,13 @@ import {
   type SeasonPassRewardKind,
 } from "@/lib/game/seasonPass";
 
-const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
+const num = (n: number) => Math.round(n).toLocaleString("en-US");
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — each action catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -162,13 +165,17 @@ export interface SeasonPassState {
 function rewardView(
   reward: SeasonPassReward,
   day: number,
-  claimed: boolean
+  claimed: boolean,
+  t: T
 ): SeasonPassRewardView {
   const amount = seasonPassRewardAmount(reward, day);
   return {
     kind: reward.kind,
     amount,
-    label: `${heNum(amount)} ${SEASON_PASS_REWARD_LABEL[reward.kind]}`,
+    label: t("{amount} {resource}", {
+      amount: num(amount),
+      resource: t(SEASON_PASS_REWARD_LABEL[reward.kind]),
+    }),
     claimed,
   };
 }
@@ -177,17 +184,18 @@ function buildState(
   progress: SeasonPassProgress,
   diamonds: number,
   day: number,
-  now: Date
+  now: Date,
+  t: T
 ): SeasonPassState {
   const level = tierForXp(progress.xp);
   const claimedFree = new Set(progress.claimedFree);
   const claimedPremium = new Set(progress.claimedPremium);
 
-  const tiers = SEASON_PASS_TIERS.map((t) => ({
-    tier: t.tier,
-    reached: t.tier <= level,
-    free: rewardView(t.free, day, claimedFree.has(t.tier)),
-    premium: rewardView(t.premium, day, claimedPremium.has(t.tier)),
+  const tiers = SEASON_PASS_TIERS.map((tier) => ({
+    tier: tier.tier,
+    reached: tier.tier <= level,
+    free: rewardView(tier.free, day, claimedFree.has(tier.tier), t),
+    premium: rewardView(tier.premium, day, claimedPremium.has(tier.tier), t),
   }));
 
   const collectable = tiers.filter(
@@ -258,7 +266,7 @@ export async function getSeasonPassState(): Promise<SeasonPassState | null> {
 
   const progress = await loadCycle(prisma, empireId, season?.id ?? null, now);
   const day = seasonPassDay(season, now.getTime());
-  return buildState(progress, empire.diamonds, day, now);
+  return buildState(progress, empire.diamonds, day, now, await getT());
 }
 
 /* ------------------------------ premium purchase ------------------------------ */
@@ -301,6 +309,7 @@ export interface SeasonPassResult {
  * write makes the second click a no-op instead of a second charge.
  */
 export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const now = new Date();
@@ -321,7 +330,10 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
       // survives the activation rather than being confiscated by it.
       const progress = await loadCycle(tx, empireId, season?.id ?? null, now);
       if (progress.premium) {
-        return { ok: false as const, error: "כבר רכשת את מסלול הפרימיום לעונה הזו" };
+        return {
+          ok: false as const,
+          error: t("כבר רכשת את מסלול הפרימיום לעונה הזו"),
+        };
       }
 
       // Claim the flag first: if this loses the race it returns 0 and we bail
@@ -337,7 +349,10 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
         },
       });
       if (claimedFlag.count === 0) {
-        return { ok: false as const, error: "כבר רכשת את מסלול הפרימיום לעונה הזו" };
+        return {
+          ok: false as const,
+          error: t("כבר רכשת את מסלול הפרימיום לעונה הזו"),
+        };
       }
 
       const paid = await tx.empire.updateMany({
@@ -359,8 +374,8 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
       const day = seasonPassDay(season, now.getTime());
       return {
         ok: true as const,
-        message: "מסלול הפרימיום נפתח לכל העונה! 👑",
-        state: buildState(fresh, empire.diamonds, day, now),
+        message: t("מסלול הפרימיום נפתח לכל העונה! 👑"),
+        state: buildState(fresh, empire.diamonds, day, now, t),
       };
     });
 
@@ -368,14 +383,19 @@ export async function buySeasonPassPremium(): Promise<SeasonPassResult> {
     return result;
   } catch (err) {
     if (err instanceof InsufficientDiamonds) {
-      return { ok: false, error: `אין מספיק יהלומים (דרושים ${SEASON_PASS_PREMIUM_PRICE})` };
+      return {
+        ok: false,
+        error: t("אין מספיק יהלומים (דרושים {cost})", {
+          cost: SEASON_PASS_PREMIUM_PRICE,
+        }),
+      };
     }
     // Never the raw message. A Prisma failure names models, fields and
     // sometimes the statement itself, and this string is rendered straight into
     // the browser — so it is logged where the monitor can see it and the player
     // gets the same generic line every other action gives.
     await logError("seasonPass.buySeasonPassPremium", err);
-    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
+    return { ok: false, error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -415,6 +435,7 @@ async function grantReward(
  * flipped from unclaimed to claimed are then paid out.
  */
 export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const now = new Date();
@@ -430,7 +451,10 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
       const day = seasonPassDay(season, now.getTime());
       const level = tierForXp(progress.xp);
       if (level === 0) {
-        return { ok: false as const, error: "עדיין לא הגעת לאף דרגה במחזור הזה" };
+        return {
+          ok: false as const,
+          error: t("עדיין לא הגעת לאף דרגה במחזור הזה"),
+        };
       }
 
       // Totalled per kind rather than appended per tier — see SeasonPassResult.
@@ -471,7 +495,7 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
       if (granted.size === 0) {
         return {
           ok: false as const,
-          error: "אין תגמולים חדשים לאיסוף",
+          error: t("אין תגמולים חדשים לאיסוף"),
         };
       }
 
@@ -486,14 +510,21 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
         kind,
         amount: granted.get(kind)!,
       }));
-      const state = buildState(fresh, empire.diamonds, day, now);
+      const state = buildState(fresh, empire.diamonds, day, now, t);
       return {
         ok: true as const,
         // Kept as a plain-text fallback for anything that only reads `message`;
         // the modal renders `haul` instead.
-        message: `נאספו: ${haul
-          .map((h) => `${heNum(h.amount)} ${SEASON_PASS_REWARD_LABEL[h.kind]}`)
-          .join(" · ")}`,
+        message: t("נאספו: {haul}", {
+          haul: haul
+            .map((h) =>
+              t("{amount} {resource}", {
+                amount: num(h.amount),
+                resource: t(SEASON_PASS_REWARD_LABEL[h.kind]),
+              })
+            )
+            .join(" · "),
+        }),
         haul,
         haulTiers: tiersTaken.size,
         cycleHaul: state.cleared ? claimedHaul(fresh, day) : undefined,
@@ -506,6 +537,6 @@ export async function claimSeasonPassRewards(): Promise<SeasonPassResult> {
   } catch (err) {
     // Generic and logged — see buySeasonPassPremium.
     await logError("seasonPass.claimSeasonPassRewards", err);
-    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
+    return { ok: false, error: t("אירעה שגיאה, נסה שוב") };
   }
 }

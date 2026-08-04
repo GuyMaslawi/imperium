@@ -1,3 +1,4 @@
+import type { T } from "@/i18n/translate";
 import {
   DAILY_UPDATE_TIMES,
   GAME_TIMEZONE,
@@ -212,6 +213,10 @@ const DAY_MS = 24 * HOUR_MS;
  * "בעוד **3 ימים**" — the Hebrew a player would use out loud, duals included
  * (שעתיים, יומיים), never "2 שעות".
  *
+ * The dual is why this takes the translator rather than returning a source
+ * string: Hebrew has three number forms where English has two, so the *branch*
+ * is part of the language and cannot be moved into a dictionary value.
+ *
  * The unit is chosen by size, not by a fixed scale: under an hour it is minutes,
  * under a day it is hours, and from a day up it is days. A break of 30 hours is
  * therefore "בעוד יום" and not "בעוד 30 שעות", which is how the wait is actually
@@ -222,16 +227,22 @@ const DAY_MS = 24 * HOUR_MS;
  * *after* the thing has started. Down at worst brings them early, to a page that
  * is already telling them the exact time.
  */
-export function formatWaitDuration(ms: number): string {
-  if (ms < MINUTE_MS) return "רגע";
+export function formatWaitDuration(t: T, ms: number): string {
+  if (ms < MINUTE_MS) return t("רגע");
   if (ms < HOUR_MS) {
     const minutes = Math.floor(ms / MINUTE_MS);
-    return minutes === 1 ? "דקה" : minutes === 2 ? "שתי דקות" : `${minutes} דקות`;
+    if (minutes === 1) return t("דקה");
+    if (minutes === 2) return t("שתי דקות");
+    return t("{count} דקות", { count: minutes });
   }
   if (ms < DAY_MS) {
     const hours = Math.floor(ms / HOUR_MS);
-    return hours === 1 ? "שעה" : hours === 2 ? "שעתיים" : `${hours} שעות`;
+    if (hours === 1) return t("שעה");
+    if (hours === 2) return t("שעתיים");
+    return t("{count} שעות", { count: hours });
   }
   const days = Math.floor(ms / DAY_MS);
-  return days === 1 ? "יום" : days === 2 ? "יומיים" : `${days} ימים`;
+  if (days === 1) return t("יום");
+  if (days === 2) return t("יומיים");
+  return t("{count} ימים", { count: days });
 }

@@ -12,10 +12,13 @@ import {
 } from "@/lib/game/potions";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — the catch below returns the
+  // translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -43,8 +46,9 @@ export async function drinkPotion(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = drinkSchema.safeParse({ kind: formData.get("kind") });
-  if (!parsed.success) return { error: "שיקוי לא תקין" };
+  if (!parsed.success) return { error: t("שיקוי לא תקין") };
   const { kind } = parsed.data;
   const meta = POTION_META[kind];
 
@@ -64,7 +68,7 @@ export async function drinkPotion(
         data: { count: { decrement: 1 } },
       });
       if (spent.count === 0) {
-        return { error: `אין לך ${meta.label} בתרמיל` };
+        return { error: t("אין לך {potion} בתרמיל", { potion: t(meta.label) }) };
       }
 
       const existing = await tx.potionEffect.findUnique({
@@ -82,8 +86,15 @@ export async function drinkPotion(
 
       return {
         success: extending
-          ? `${meta.label} הוארך ב־${potionDurationLabel(kind)} נוספות!`
-          : `${meta.label} פועל! ${meta.tagline} למשך ${potionDurationLabel(kind)}.`,
+          ? t("{potion} הוארך ב־{duration} נוספות!", {
+              potion: t(meta.label),
+              duration: potionDurationLabel(t, kind),
+            })
+          : t("{potion} פועל! {tagline} למשך {duration}.", {
+              potion: t(meta.label),
+              tagline: t(meta.tagline),
+              duration: potionDurationLabel(t, kind),
+            }),
       };
     });
 
@@ -91,6 +102,6 @@ export async function drinkPotion(
     return result;
   } catch (err) {
     await logError("potions.drinkPotion", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

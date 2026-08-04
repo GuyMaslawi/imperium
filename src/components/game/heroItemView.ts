@@ -9,6 +9,7 @@ import {
   itemDisplayName,
   tierForLevel,
 } from "@/lib/game/hero";
+import type { T } from "@/i18n/translate";
 
 /**
  * Serializable item row passed from server pages to the client components.
@@ -44,13 +45,14 @@ export function catalogKey(slot: string, level: number): string {
  * of the UI spells resources out.
  */
 export function itemBonuses(
+  t: T,
   slot: HeroItemSlot,
   level: number
 ): ItemTileBonus[] {
   return itemBonusLines(slot, level).map((line) => ({
     icon: line.resource ? RESOURCE_ICON[line.resource] : HERO_STAT_META[line.stat].icon,
     iconClass: line.resource ? RESOURCE_ICON_COLOR[line.resource] : undefined,
-    label: line.label,
+    label: t(line.label, line.labelParams),
     value: line.value,
     flat: line.flat,
     primary: line.primary,
@@ -59,14 +61,15 @@ export function itemBonuses(
 
 /** Build the tooltip payload for an item at the given hero level. */
 export function itemDetails(
+  t: T,
   item: Pick<HeroItemView, "slot" | "level">,
   heroLevel: number,
   extras: Partial<ItemTileDetails> = {}
 ): ItemTileDetails {
   return {
-    name: itemDisplayName(item.slot, item.level),
-    rarityLabel: RARITY_META[tierForLevel(item.level)].label,
-    bonuses: itemBonuses(item.slot, item.level),
+    name: itemDisplayName(t, item.slot, item.level),
+    rarityLabel: t(RARITY_META[tierForLevel(item.level)].label),
+    bonuses: itemBonuses(t, item.slot, item.level),
     requiredLevel: item.level,
     meetsRequirement: canEquipItem(heroLevel, item.level),
     ...extras,

@@ -80,6 +80,10 @@ export async function announceSuccession(
     data: {
       empireId,
       kind: "SYSTEM",
+      // i18n-exempt: a stored Message row. `getT()` here would resolve whoever
+      // happened to trigger the repair — usually somebody else entirely — so it
+      // stays in the source language until Message carries its own template.
+      // See the note in `attackEmpire`.
       title: "👑 מונית למנהיג הברית",
       body: `הברית "${guildName}" נותרה ללא מנהיג ואתה הוותיק ביותר בה — ההנהגה עברה אליך.`,
       href: "/game/guild",

@@ -1,4 +1,5 @@
 import type { PotionKind } from "@prisma/client";
+import type { T } from "@/i18n/translate";
 import { secureRandom } from "./random";
 
 /**
@@ -173,11 +174,19 @@ export function potionExpiryAfterDrink(
   return new Date(base + POTION_META[kind].durationMs);
 }
 
-/** "שעה" / "חצי שעה" / "2 שעות" — the duration as a player reads it. */
-export function potionDurationLabel(kind: PotionKind): string {
+/**
+ * "שעה" / "חצי שעה" / "2 שעות" — the duration as a player reads it.
+ *
+ * Takes the translator rather than returning a source string: Hebrew names one
+ * hour and half an hour without a number at all, so which sentence to reach for
+ * is a decision the language makes, not the dictionary.
+ */
+export function potionDurationLabel(t: T, kind: PotionKind): string {
   const ms = POTION_META[kind].durationMs;
-  if (ms === HOUR) return "שעה";
-  if (ms === HOUR / 2) return "חצי שעה";
+  if (ms === HOUR) return t("שעה");
+  if (ms === HOUR / 2) return t("חצי שעה");
   const hours = ms / HOUR;
-  return Number.isInteger(hours) ? `${hours} שעות` : `${Math.round(ms / 60_000)} דקות`;
+  return Number.isInteger(hours)
+    ? t("{count} שעות", { count: hours })
+    : t("{count} דקות", { count: Math.round(ms / 60_000) });
 }

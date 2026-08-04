@@ -20,6 +20,7 @@ import {
 import { sharedGuild } from "@/lib/game/guildAllies";
 import { ShieldGlyph } from "@/components/game/ShieldBadges";
 import { shieldMeta } from "@/lib/game/diamondShop";
+import { getI18n } from "@/i18n/server";
 
 export const metadata = { title: "תוצאת קרב | KRALDOR" };
 
@@ -68,6 +69,7 @@ export default async function BattleResultPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const { t, locale } = await getI18n();
   const { id } = await params;
   const me = await requireEmpire();
 
@@ -240,7 +242,7 @@ export default async function BattleResultPage({
           <Link href="/game/base" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="base" size={16} className="inline-block align-middle" /> חזרה לבסיס</Link>
           <Link href="/game/reports" className="btn btn-ghost px-5 py-2 text-sm"><Icon name="reports" size={16} className="inline-block align-middle" /> היסטוריה</Link>
         </div>
-        <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt)}</p>
+        <p className="text-xs text-zinc-500 nums" dir="ltr">{formatDate(report.createdAt, locale)}</p>
       </div>
 
       {/* -------- VS banner -------- */}
@@ -418,7 +420,7 @@ export default async function BattleResultPage({
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     {POTION_META[capturedPotion].tagline} ·{" "}
-                    {potionDurationLabel(capturedPotion)} · נוסף לתרמיל
+                    {potionDurationLabel(t, capturedPotion)} · נוסף לתרמיל
                   </p>
                   <Link href="/game/hero" className="btn btn-ghost mt-2 px-3 py-1 text-xs">
                     <Icon name="potion" size={14} className="inline-block align-middle" /> לשיקויים
@@ -434,12 +436,12 @@ export default async function BattleResultPage({
                     icon={SLOT_META[capturedItem.slot].icon}
                     level={capturedItem.level}
                     rarity={uiRarityForLevel(capturedItem.level)}
-                    details={itemDetails(capturedItem, me.hero?.level ?? 1)}
+                    details={itemDetails(t, capturedItem, me.hero?.level ?? 1)}
                   />
                 </div>
                 <div>
                   <p className="text-sm font-black text-gold-bright">
-                    <Icon name="gift" size={16} className="inline-block align-middle" /> נלכד חפץ: {itemDisplayName(capturedItem.slot, capturedItem.level)}
+                    <Icon name="gift" size={16} className="inline-block align-middle" /> נלכד חפץ: {itemDisplayName(t, capturedItem.slot, capturedItem.level)}
                   </p>
                   <p className="mt-0.5 text-xs text-zinc-400">
                     רמת פריט{" "}

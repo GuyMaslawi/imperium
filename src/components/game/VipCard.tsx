@@ -8,6 +8,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { formatDate } from "@/lib/game/format";
 import { VIP_COST, VIP_LABEL, VIP_PERKS } from "@/lib/game/vip";
+import { useLocale, useT } from "@/i18n/client";
 
 /**
  * The pass, on the diamond shop's own screen — the widest card there, and the
@@ -26,6 +27,8 @@ export function VipCard({
   /** ISO stamp of when the pass was bought, or null for a player without it. */
   vipSince: string | null;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(buyVip, {});
   const owned = vipSince != null;
 
@@ -41,9 +44,9 @@ export function VipCard({
         </h2>
         {owned ? (
           <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-            ברשותך מאז{" "}
+            {t("ברשותך מאז")}{" "}
             <span className="nums" dir="ltr">
-              {formatDate(new Date(vipSince))}
+              {formatDate(new Date(vipSince), locale)}
             </span>
           </span>
         ) : (

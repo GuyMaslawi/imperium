@@ -1,3 +1,4 @@
+import type { T } from "@/i18n/translate";
 import type { StorableResource } from "./constants";
 import { MAX_CITIES } from "./constants";
 import { secureRandom } from "./random";
@@ -562,10 +563,15 @@ export function heroQuestXp(tier: number): number {
 
 /* ------------------------------ labels ------------------------------ */
 
-/** "שעה" / "שעתיים" / "12 שעות" — a quest's length as a player reads it. */
-export function heroQuestDurationLabel(tier: number): string {
+/**
+ * "שעה" / "שעתיים" / "12 שעות" — a quest's length as a player reads it.
+ *
+ * Takes the translator: Hebrew has a dual, so one, two and many hours are three
+ * different sentences rather than one sentence with a number in it.
+ */
+export function heroQuestDurationLabel(t: T, tier: number): string {
   const hours = heroQuestHours(tier);
-  if (hours === 1) return "שעה";
-  if (hours === 2) return "שעתיים";
-  return `${hours} שעות`;
+  if (hours === 1) return t("שעה");
+  if (hours === 2) return t("שעתיים");
+  return t("{count} שעות", { count: hours });
 }

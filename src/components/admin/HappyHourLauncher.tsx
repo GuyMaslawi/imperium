@@ -12,9 +12,9 @@ import {
   HAPPY_HOUR_MAX_PCT,
   HAPPY_HOUR_MIN_PCT,
   HAPPY_HOUR_PRESETS,
-  durationLabel,
   multiplierLabel,
 } from "@/lib/game/happyHour";
+import { durationLabel } from "@/components/admin/happyHourDuration";
 import type { AdminActionState } from "@/server/actions/admin";
 
 type Action = (

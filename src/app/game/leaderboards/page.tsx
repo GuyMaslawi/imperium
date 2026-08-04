@@ -13,6 +13,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { PresenceDot } from "@/components/ui/PresenceDot";
 import { Tip } from "@/components/ui/Tip";
+import { getT } from "@/i18n/server";
 
 export const metadata = { title: "טבלאות מובילים | KRALDOR" };
 
@@ -27,19 +28,22 @@ type Period = "day" | "week";
  * stands is what decides whether the reader can spy on him or raid him at all.
  * `null` is a raider whose empire no longer exists (see BoardRow.cities).
  */
-function CityChip({ cities }: { cities: number | null }) {
+async function CityChip({ cities }: { cities: number | null }) {
   if (cities === null) return null;
+  const t = await getT();
   // shrink-0 on the Tip wrapper too, not just the pill inside it: the wrapper
   // is the flex child, and without it the row squeezes the chip instead of
   // truncating the (already truncating) name.
   return (
     <Tip
       className="shrink-0"
-      tip={`${cityFullName(cities)} — ריגול ותקיפה אפשריים רק בתוך העיר שלך.`}
+      tip={t("{city} — ריגול ותקיפה אפשריים רק בתוך העיר שלך.", {
+        city: cityFullName(t, cities),
+      })}
     >
       <span className="shrink-0 cursor-help whitespace-nowrap rounded-full border border-border-subtle bg-panel-inset px-1.5 text-[10px] font-semibold text-zinc-400">
         <Icon name="base" size={10} className="inline-block align-middle text-crimson-bright" />{" "}
-        {cityName(cities)}
+        {cityName(t, cities)}
       </span>
     </Tip>
   );

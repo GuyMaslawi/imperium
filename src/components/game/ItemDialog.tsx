@@ -15,6 +15,7 @@ import {
 import type { ActionState } from "@/server/actions/game";
 import { FORGE_DISCOUNT_PCT, forgeDiscountedCost } from "@/lib/game/potions";
 import { itemSetForLevel } from "@/lib/game/heroSets";
+import { useT } from "@/i18n/client";
 import {
   HERO_STAT_META,
   RARITY_META,
@@ -56,6 +57,7 @@ export function ItemDialog({
   forgeDiscount?: boolean;
   onClose: () => void;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<ActionState>({});
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -148,7 +150,7 @@ export function ItemDialog({
         </div>
         <div className="flex-1 pt-1">
           <h2 id={titleId} className={`text-lg font-black ${rarityMeta.tone}`}>
-            {itemDisplayName(item.slot, level)}
+            {itemDisplayName(t, item.slot, level)}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
             דרגה: <span className={rarityMeta.tone}>{rarityMeta.label}</span>

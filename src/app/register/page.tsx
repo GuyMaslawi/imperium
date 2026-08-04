@@ -3,8 +3,13 @@ import { getSessionUserId } from "@/lib/auth";
 import { requireOpenSeason } from "@/server/seasonGuard";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { RegisterForm } from "@/components/auth/RegisterForm";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "הרשמה | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("הרשמה | קראלדור") };
+}
+
 export const dynamic = "force-dynamic";
 
 export default async function RegisterPage() {

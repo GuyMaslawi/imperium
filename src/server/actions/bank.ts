@@ -8,14 +8,17 @@ import { getActiveEmpireId } from "@/lib/auth";
 import { allowedDepositsPerDailyPeriod } from "@/lib/game/constants";
 import { applyPendingUpdates, type FullEmpire } from "@/lib/game/updates";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
-import { VIP_REQUIRED_ERROR, isVip } from "@/lib/game/vip";
+import { vipRequiredError, isVip } from "@/lib/game/vip";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { ActionState } from "./game";
 import { logError } from "@/server/errorLog";
+import { getT, type T } from "@/i18n/server";
 
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — runBankAction catches it and returns
+  // the translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -31,6 +34,8 @@ interface BankContext {
   remainingDeposits: number;
   /** Gates the two "all" transfers — the typed-amount ones are free. */
   isVip: boolean;
+  /** The reader's translator, resolved once per action. */
+  t: T;
 }
 
 /**
@@ -45,6 +50,7 @@ async function runBankAction(
     empireId: string
   ) => Promise<ActionState>
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -70,6 +76,7 @@ async function runBankAction(
           allowed - bankAccount.depositsUsedInCurrentPeriod
         ),
         isVip: isVip(empire),
+        t,
       };
       return perform(ctx, tx, empireId);
     });
@@ -78,7 +85,7 @@ async function runBankAction(
     return result;
   } catch (err) {
     await logError("bank.unknown", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -89,13 +96,13 @@ async function performDeposit(
   amount: number
 ): Promise<ActionState> {
   if (ctx.remainingDeposits < 1) {
-    return { error: "ניצלת את כל ההפקדות הזמינות עד העדכון היומי הבא." };
+    return { error: ctx.t("ניצלת את כל ההפקדות הזמינות עד העדכון היומי הבא.") };
   }
   if (amount > ctx.availableGold) {
     // Warehouse gold is protected — it must be withdrawn before banking it.
     return ctx.storedGold > 0
-      ? { error: "יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק." }
-      : { error: "אין מספיק זהב זמין להפקדה." };
+      ? { error: ctx.t("יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק.") }
+      : { error: ctx.t("אין מספיק זהב זמין להפקדה.") };
   }
 
   // Conditional updates so concurrent actions can never drive the available
@@ -105,7 +112,7 @@ async function performDeposit(
     data: { gold: { decrement: amount } },
   });
   if (debited.count === 0) {
-    return { error: "אין מספיק זהב זמין להפקדה." };
+    return { error: ctx.t("אין מספיק זהב זמין להפקדה.") };
   }
   const credited = await tx.bankAccount.updateMany({
     where: {
@@ -141,7 +148,9 @@ async function performDeposit(
   );
 
   return {
-    success: `הופקדו ${amount.toLocaleString("he-IL")} זהב בבנק`,
+    success: ctx.t("הופקדו {amount} זהב בבנק", {
+      amount: amount.toLocaleString("en-US"),
+    }),
   };
 }
 
@@ -156,7 +165,7 @@ async function performWithdraw(
     data: { goldBalance: { decrement: amount } },
   });
   if (withdrawn.count === 0) {
-    return { error: "אין מספיק זהב בבנק למשיכה." };
+    return { error: ctx.t("אין מספיק זהב בבנק למשיכה.") };
   }
   await tx.empire.update({
     where: { id: empireId },
@@ -174,7 +183,9 @@ async function performWithdraw(
   });
 
   return {
-    success: `נמשכו ${amount.toLocaleString("he-IL")} זהב מהבנק`,
+    success: ctx.t("נמשכו {amount} זהב מהבנק", {
+      amount: amount.toLocaleString("en-US"),
+    }),
   };
 }
 
@@ -184,8 +195,9 @@ export async function depositGoldToBank(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = amountSchema.safeParse(formData.get("amount"));
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const amount = parsed.data;
 
   return runBankAction((ctx, tx, empireId) =>
@@ -200,11 +212,11 @@ export async function depositGoldToBank(
  */
 export async function depositAllGoldToBank(): Promise<ActionState> {
   return runBankAction(async (ctx, tx, empireId) => {
-    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
+    if (!ctx.isVip) return { error: vipRequiredError(ctx.t) };
     if (ctx.availableGold < 1) {
       return ctx.storedGold > 0
-        ? { error: "יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק." }
-        : { error: "אין מספיק זהב זמין להפקדה." };
+        ? { error: ctx.t("יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק.") }
+        : { error: ctx.t("אין מספיק זהב זמין להפקדה.") };
     }
     return performDeposit(ctx, tx, empireId, ctx.availableGold);
   });
@@ -214,13 +226,14 @@ export async function withdrawGoldFromBank(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = amountSchema.safeParse(formData.get("amount"));
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const amount = parsed.data;
 
   return runBankAction(async (ctx, tx, empireId) => {
     if (amount > ctx.bankGold) {
-      return { error: "אין מספיק זהב בבנק למשיכה." };
+      return { error: ctx.t("אין מספיק זהב בבנק למשיכה.") };
     }
     return performWithdraw(ctx, tx, empireId, amount);
   });
@@ -229,9 +242,9 @@ export async function withdrawGoldFromBank(
 /** VIP: the whole balance out in one press. See depositAllGoldToBank. */
 export async function withdrawAllGoldFromBank(): Promise<ActionState> {
   return runBankAction(async (ctx, tx, empireId) => {
-    if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
+    if (!ctx.isVip) return { error: vipRequiredError(ctx.t) };
     if (ctx.bankGold < 1) {
-      return { error: "אין זהב למשיכה מהבנק." };
+      return { error: ctx.t("אין זהב למשיכה מהבנק.") };
     }
     return performWithdraw(ctx, tx, empireId, ctx.bankGold);
   });

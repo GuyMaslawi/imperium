@@ -12,8 +12,12 @@ import { oreVars } from "@/components/game/oreTint";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { isVip } from "@/lib/game/vip";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "מחסנים | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("מחסנים | קראלדור") };
+}
 
 /** Dust drifting through the warehouse district — fixed table, no randomness. */
 const DUST = [
@@ -24,6 +28,7 @@ const DUST = [
 ];
 
 export default async function StoragePage() {
+  const t = await getT();
   const empire = await requireEmpire();
   const vip = isVip(empire);
 
@@ -61,14 +66,14 @@ export default async function StoragePage() {
       : 0;
 
   const summaryTotals = [
-    { label: "משאבים מאוחסנים", value: formatNumber(Math.floor(totalStored)) },
-    { label: "קיבולת כוללת", value: formatNumber(totalCapacity) },
-    { label: "ניצול כולל", value: `${totalFillPct}%` },
+    { label: t("משאבים מאוחסנים"), value: formatNumber(Math.floor(totalStored)) },
+    { label: t("קיבולת כוללת"), value: formatNumber(totalCapacity) },
+    { label: t("ניצול כולל"), value: `${totalFillPct}%` },
   ];
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מחסנים" ornament="🏛️" />
+      <SectionHeading title={t("מחסנים")} ornament="🏛️" />
 
       {/* -------- warehouse network summary --------
           The four bins on the right are the network at a glance: each fills to
@@ -87,7 +92,7 @@ export default async function StoragePage() {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
               <Icon name="storage" size={20} className="text-crimson-bright wh-crate" />
-              מערך המחסנים
+              {t("מערך המחסנים")}
             </h2>
             {/* Full width on a phone so it drops below the heading: sharing the
                 row leaves each of the three columns ~40px, and a six-figure
@@ -141,7 +146,7 @@ export default async function StoragePage() {
             </div>
 
             <div className="hidden flex-[2] sm:block">
-              <p className="mb-1.5 text-[11px] text-gold-dim">ניצול כולל של המערך</p>
+              <p className="mb-1.5 text-[11px] text-gold-dim">{t("ניצול כולל של המערך")}</p>
               <span className="wh-bar">
                 <span
                   className="wh-bar-fill"
@@ -154,8 +159,8 @@ export default async function StoragePage() {
       </div>
 
       <p className="panel-inset rounded-xl p-4 text-sm text-zinc-400">
-        <Icon name="shield" size={16} className="inline align-[-2px]" /> המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים
-        ויכולים להיגנב בתקיפה.
+        <Icon name="shield" size={16} className="inline align-[-2px]" />{" "}
+        {t("המחסן מגן רק על משאבים שהפקדת אליו. משאבים זמינים אינם מוגנים ויכולים להיגנב בתקיפה.")}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

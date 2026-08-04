@@ -7,6 +7,7 @@ import { getActiveEmpireId } from "@/lib/auth";
 import { POLL_LIMIT, POLL_WINDOW_MS, localRateLimit } from "@/lib/rateLimit";
 import { grantCitizens } from "@/lib/game/grants";
 import { awardSeasonPassXp } from "../seasonPassXp";
+import { getT, type T } from "@/i18n/server";
 import {
   prizeText,
   publicConfig,
@@ -39,6 +40,7 @@ async function ownEmpireId(): Promise<string | null> {
 function toState(
   event: MiniGameEvent,
   entry: { attempts: number; solved: boolean; won: boolean; guesses?: unknown } | null,
+  t: T,
   board: Board = EMPTY_BOARD
 ): MiniGameState {
   const attempts = entry?.attempts ?? 0;
@@ -48,7 +50,7 @@ function toState(
     id: event.id,
     type: event.type,
     title: event.title,
-    prizeText: prizeText(event),
+    prizeText: prizeText(t, event),
     cups: pub.cups,
     digits: pub.digits,
     history: parseHistory(entry?.guesses),
@@ -117,7 +119,8 @@ async function loadLiveEvents(): Promise<MiniGameEvent[]> {
 async function loadBoards(
   eventIds: string[],
   selfEmpireId: string,
-  own: Map<string, OwnEntry>
+  own: Map<string, OwnEntry>,
+  t: T
 ): Promise<Map<string, Board>> {
   if (eventIds.length === 0) return new Map();
 
@@ -170,7 +173,7 @@ async function loadBoards(
         players: players.get(eventIds[i]) ?? rows.length,
         rows: rows.map((e) => ({
           empireId: e.empireId,
-          name: names.get(e.empireId) ?? "אימפריה אלמונית",
+          name: names.get(e.empireId) ?? t("אימפריה אלמונית"),
           attempts: e.attempts,
           solved: e.solved,
           won: e.won,
@@ -185,12 +188,14 @@ async function loadBoards(
 async function loadBoard(
   eventId: string,
   selfEmpireId: string,
-  own: OwnEntry | null
+  own: OwnEntry | null,
+  t: T
 ): Promise<Board> {
   const boards = await loadBoards(
     [eventId],
     selfEmpireId,
-    own ? new Map([[eventId, own]]) : new Map()
+    own ? new Map([[eventId, own]]) : new Map(),
+    t
   );
   return boards.get(eventId) ?? EMPTY_BOARD;
 }
@@ -202,6 +207,7 @@ async function loadBoard(
  */
 export async function getMiniGameStates(): Promise<MiniGameState[]> {
   try {
+    const t = await getT();
     const empireId = await ownEmpireId();
     if (!empireId) return [];
     const events = await loadLiveEvents();
@@ -217,10 +223,13 @@ export async function getMiniGameStates(): Promise<MiniGameState[]> {
     const boards = await loadBoards(
       events.map((e) => e.id),
       empireId,
-      mine
+      mine,
+      t
     );
 
-    return events.map((e) => toState(e, mine.get(e.id) ?? null, boards.get(e.id) ?? EMPTY_BOARD));
+    return events.map((e) =>
+      toState(e, mine.get(e.id) ?? null, t, boards.get(e.id) ?? EMPTY_BOARD)
+    );
   } catch {
     return [];
   }
@@ -281,7 +290,7 @@ function prizeIncrements(event: MiniGameEvent): Prisma.EmpireUpdateInput {
   return inc;
 }
 
-/** Hebrew names of the three code marks, for the one-line result summary. */
+/** The three code marks, for the one-line result summary. */
 const MARK_WORD = { hit: "במקום", near: "בקוד", miss: "בחוץ" } as const;
 
 /**
@@ -298,13 +307,14 @@ export async function submitMiniGameGuess(
   _prev: MiniGameGuessResult,
   formData: FormData
 ): Promise<MiniGameGuessResult> {
+  const t = await getT();
   try {
     const empireId = await ownEmpireId();
-    if (!empireId) return { state: null, feedback: "לא מחובר", tone: "error" };
+    if (!empireId) return { state: null, feedback: t("לא מחובר"), tone: "error" };
 
     const raw = formData.get("guess");
     if (typeof raw !== "string") {
-      return { state: null, feedback: "בחר ניחוש תקין", tone: "error" };
+      return { state: null, feedback: t("בחר ניחוש תקין"), tone: "error" };
     }
     const guess = raw.trim();
     const rawEvent = formData.get("eventId");
@@ -323,7 +333,7 @@ export async function submitMiniGameGuess(
       // A timed release stops accepting guesses the moment its deadline passes,
       // even if no read has flipped `isActive` yet (see loadLiveEvent).
       if (!event || isExpired(event)) {
-        return { state: null, feedback: "המשחק הסתיים", tone: "info" as const };
+        return { state: null, feedback: t("המשחק הסתיים"), tone: "info" as const };
       }
       const cfg = (event.config ?? {}) as Record<string, unknown>;
       const pub = publicConfig(event);
@@ -341,7 +351,7 @@ export async function submitMiniGameGuess(
             /^[0-9]+$/.test(guess)
           : /^[0-9]{1,2}$/.test(guess) && Number(guess) < cups;
       if (!valid) {
-        return { state: null, feedback: "בחר ניחוש תקין", tone: "error" as const };
+        return { state: null, feedback: t("בחר ניחוש תקין"), tone: "error" as const };
       }
 
       // Staff may watch a release but never enter it: the board is a race for a
@@ -356,7 +366,7 @@ export async function submitMiniGameGuess(
       if (!player || player.isStaff) {
         return {
           state: null,
-          feedback: "חשבון הנהלה אינו משתתף במשחקי הצד",
+          feedback: t("חשבון הנהלה אינו משתתף במשחקי הצד"),
           tone: "info" as const,
         };
       }
@@ -369,8 +379,8 @@ export async function submitMiniGameGuess(
 
       if (entry.solved) {
         return {
-          state: toState(event, entry),
-          feedback: "כבר פתרת את המשחק 🎉",
+          state: toState(event, entry, t),
+          feedback: t("כבר פתרת את המשחק 🎉"),
           tone: "info" as const,
         };
       }
@@ -391,8 +401,10 @@ export async function submitMiniGameGuess(
           where: { id: entry.id },
         });
         return {
-          state: toState(event, current),
-          feedback: current.solved ? "כבר פתרת את המשחק 🎉" : "נגמרו הניסיונות",
+          state: toState(event, current, t),
+          feedback: current.solved
+            ? t("כבר פתרת את המשחק 🎉")
+            : t("נגמרו הניסיונות"),
           tone: current.solved ? ("info" as const) : ("lose" as const),
         };
       }
@@ -419,14 +431,18 @@ export async function submitMiniGameGuess(
         for (const m of marks) tally[m]++;
         feedback = correct
           ? ""
-          : `🔐 ${(["hit", "near", "miss"] as const)
-              .filter((m) => tally[m] > 0)
-              .map((m) => `${tally[m]} ${MARK_WORD[m]}`)
-              .join(" · ")}`;
+          : t("🔐 {marks}", {
+              marks: (["hit", "near", "miss"] as const)
+                .filter((m) => tally[m] > 0)
+                .map((m) =>
+                  t("{count} {mark}", { count: tally[m], mark: t(MARK_WORD[m]) })
+                )
+                .join(" · "),
+            });
       } else {
         correct = Number(guess) === Number(cfg.answer);
         row = { kind: "cup", pick: Number(guess), hit: correct };
-        feedback = "🫙 הכוס ריקה…";
+        feedback = t("🫙 הכוס ריקה…");
       }
       const history = [...parseHistory(locked.guesses), row].slice(-HISTORY_LIMIT);
 
@@ -437,8 +453,8 @@ export async function submitMiniGameGuess(
           data: { guesses: history },
         });
         return {
-          state: toState(event, updated),
-          feedback: finished ? "😔 נגמרו הניסיונות — נסה בפעם הבאה" : feedback,
+          state: toState(event, updated, t),
+          feedback: finished ? t("😔 נגמרו הניסיונות — נסה בפעם הבאה") : feedback,
           tone: finished ? ("lose" as const) : ("hint" as const),
         };
       }
@@ -458,8 +474,8 @@ export async function submitMiniGameGuess(
           where: { id: entry.id },
         });
         return {
-          state: toState(event, current),
-          feedback: "כבר פתרת את המשחק 🎉",
+          state: toState(event, current, t),
+          feedback: t("כבר פתרת את המשחק 🎉"),
           tone: "info" as const,
         };
       }
@@ -504,8 +520,11 @@ export async function submitMiniGameGuess(
           data: {
             empireId,
             kind: "SYSTEM",
-            title: `🎉 ניצחת ב"${event.title}"!`,
-            body: `כל הכבוד! זכית בפרס: ${prizeText(event)}`,
+            // The winner is the player who just guessed, so `t` here is
+            // already their language — unlike the mail an *action* sends to
+            // somebody else (see the note in `attackEmpire`).
+            title: t('🎉 ניצחת ב"{game}"!', { game: event.title }),
+            body: t("כל הכבוד! זכית בפרס: {prize}", { prize: prizeText(t, event) }),
           },
         });
       }
@@ -517,10 +536,10 @@ export async function submitMiniGameGuess(
       // Re-read the event so winnersCount/prizesLeft are fresh in the response.
       const freshEvent = (await tx.miniGameEvent.findUnique({ where: { id: event.id } }))!;
       return {
-        state: toState(freshEvent, updatedEntry),
+        state: toState(freshEvent, updatedEntry, t),
         feedback: won
-          ? `🎉 ניצחת! הפרס בדרך: ${prizeText(event)}`
-          : "✅ ניחשת נכון! אך כל הפרסים כבר חולקו",
+          ? t("🎉 ניצחת! הפרס בדרך: {prize}", { prize: prizeText(t, event) })
+          : t("✅ ניחשת נכון! אך כל הפרסים כבר חולקו"),
         tone: won ? ("win" as const) : ("info" as const),
       };
     });
@@ -529,11 +548,11 @@ export async function submitMiniGameGuess(
     // Refresh the rival board on the way out so a player who just spent their
     // last attempt lands straight on the live standings instead of a stale copy.
     if (result.state) {
-      const board = await loadBoard(result.state.id, empireId, result.state);
+      const board = await loadBoard(result.state.id, empireId, result.state, t);
       return { ...result, state: { ...result.state, board: board.rows, players: board.players } };
     }
     return result;
   } catch {
-    return { state: null, feedback: "אירעה שגיאה, נסה שוב", tone: "error" };
+    return { state: null, feedback: t("אירעה שגיאה, נסה שוב"), tone: "error" };
   }
 }

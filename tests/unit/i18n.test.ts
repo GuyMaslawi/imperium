@@ -60,8 +60,15 @@ describe("the English dictionary", () => {
   it("has no entry that translates to itself", () => {
     // A key whose value is the same Hebrew is a line that looks translated in
     // the coverage report and is not.
+    //
+    // A key made of nothing but placeholders and punctuation is the one honest
+    // exception: "{amount} {resource}" exists to state a *word order*, and both
+    // languages happen to put the number first. Dropping the entry would leave
+    // the report calling it untranslated forever; keeping it is the claim that
+    // somebody looked and the order is right.
+    const hasHebrew = (s: string) => /[\u0590-\u05FF]/.test(s);
     const untranslated = Object.entries(EN)
-      .filter(([key, value]) => key === value)
+      .filter(([key, value]) => key === value && hasHebrew(key))
       .map(([key]) => key);
     expect(untranslated).toEqual([]);
   });

@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/ui/Icon";
+import type { T } from "@/i18n/translate";
 import { lastWallTime, nextWallTime, type WallTime } from "./time";
 
 /**
@@ -272,13 +273,20 @@ export function prizeForRank(rank: number, guildCount: number): GuildWarPrize | 
   return prize;
 }
 
-/** One-line prize summary, snapshotted onto the entry at settlement. */
-export function prizeSummary(prize: GuildWarPrize): string {
+/**
+ * One-line prize summary, snapshotted onto the entry at settlement.
+ *
+ * Takes the translator because the snapshot is written in the *reader's*
+ * language at the moment it settles, and because Hebrew counts one spin
+ * differently — "1 סיבובי גלגל" reads as a bug.
+ */
+export function prizeSummary(t: T, prize: GuildWarPrize): string {
   return [
-    `${prize.citizens.toLocaleString("he-IL")} אזרחים`,
-    `${prize.turns.toLocaleString("he-IL")} תורות`,
-    // Hebrew counts one differently — "1 סיבובי גלגל" reads as a bug.
-    `${prize.wheelSpins} ${prize.wheelSpins === 1 ? "סיבוב גלגל" : "סיבובי גלגל"}`,
+    t("{count} אזרחים", { count: prize.citizens.toLocaleString("en-US") }),
+    t("{count} תורות", { count: prize.turns.toLocaleString("en-US") }),
+    prize.wheelSpins === 1
+      ? t("סיבוב גלגל אחד")
+      : t("{count} סיבובי גלגל", { count: prize.wheelSpins }),
   ].join(" · ");
 }
 

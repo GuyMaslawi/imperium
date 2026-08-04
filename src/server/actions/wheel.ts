@@ -17,6 +17,7 @@ import {
 import { HERO_BAG_CAPACITY, itemDisplayName, rollGuaranteedItem } from "@/lib/game/hero";
 import { awardSeasonPassXp } from "../seasonPassXp";
 import type { FullEmpire } from "@/lib/game/updates";
+import { getT, type T } from "@/i18n/server";
 
 /** What a spin returns to the client so it can animate to the right wedge. */
 export type SpinResult =
@@ -33,11 +34,13 @@ export type SpinResult =
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban on every action (not just page loads); see getActiveEmpireId.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — spinWheel catches it and returns the
+  // translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
 
-const heNum = (n: number) => Math.round(n).toLocaleString("he-IL");
+const num = (n: number) => Math.round(n).toLocaleString("en-US");
 
 /**
  * Grant a won prize to the empire and return the reveal message. Every branch
@@ -48,7 +51,8 @@ async function grantPrize(
   tx: Prisma.TransactionClient,
   empire: FullEmpire,
   prize: WheelPrizeDef,
-  cycle: number
+  cycle: number,
+  t: T
 ): Promise<{ message: string; grants: WheelGrant[] }> {
   const empireId = empire.id;
   const amount = wheelPrizeAmount(prize, cycle);
@@ -56,23 +60,41 @@ async function grantPrize(
   switch (prize.key) {
     case "diamonds":
       await tx.empire.update({ where: { id: empireId }, data: { diamonds: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} יהלומים!`, grants: [{ key: "diamonds", amount }] };
+      return {
+        message: t("זכית ב־{amount} יהלומים!", { amount: num(amount) }),
+        grants: [{ key: "diamonds", amount }],
+      };
     case "gold":
       await tx.empire.update({ where: { id: empireId }, data: { gold: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} זהב!`, grants: [{ key: "gold", amount }] };
+      return {
+        message: t("זכית ב־{amount} זהב!", { amount: num(amount) }),
+        grants: [{ key: "gold", amount }],
+      };
     case "iron":
       await tx.empire.update({ where: { id: empireId }, data: { iron: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} ברזל!`, grants: [{ key: "iron", amount }] };
+      return {
+        message: t("זכית ב־{amount} ברזל!", { amount: num(amount) }),
+        grants: [{ key: "iron", amount }],
+      };
     case "stone":
       await tx.empire.update({ where: { id: empireId }, data: { stone: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} אבן!`, grants: [{ key: "stone", amount }] };
+      return {
+        message: t("זכית ב־{amount} אבן!", { amount: num(amount) }),
+        grants: [{ key: "stone", amount }],
+      };
     case "wood":
       await tx.empire.update({ where: { id: empireId }, data: { wood: { increment: amount } } });
-      return { message: `זכית ב־${heNum(amount)} עץ!`, grants: [{ key: "wood", amount }] };
+      return {
+        message: t("זכית ב־{amount} עץ!", { amount: num(amount) }),
+        grants: [{ key: "wood", amount }],
+      };
     case "citizens":
       // Capped by city count — see grantCitizens.
       await grantCitizens(tx, empireId, amount);
-      return { message: `זכית ב־${heNum(amount)} אזרחים!`, grants: [{ key: "citizens", amount }] };
+      return {
+        message: t("זכית ב־{amount} אזרחים!", { amount: num(amount) }),
+        grants: [{ key: "citizens", amount }],
+      };
     case "item": {
       const hero = empire.hero;
       // Take the hero row lock and re-count the bag *under* it. `empire.hero.items`
@@ -95,7 +117,9 @@ async function grantPrize(
         const drop = rollGuaranteedItem(hero.level);
         await tx.heroItem.create({ data: { heroId: hero.id, ...drop } });
         return {
-          message: `זכית ב־${itemDisplayName(drop.slot, drop.level)} לתיק הגיבור!`,
+          message: t("זכית ב־{item} לתיק הגיבור!", {
+            item: itemDisplayName(t, drop.slot, drop.level),
+          }),
           grants: [{ key: "item", amount: 1 }],
         };
       }
@@ -110,17 +134,20 @@ async function grantPrize(
       });
       // Grant reflects what actually landed (gold), not the item wedge.
       return {
-        message: `התיק מלא — קיבלת ${heNum(consolation)} זהב במקום החפץ.`,
+        message: t("התיק מלא — קיבלת {amount} זהב במקום החפץ.", {
+          amount: num(consolation),
+        }),
         grants: [{ key: "gold", amount: consolation }],
       };
     }
     default:
-      return { message: "זכית בפרס!", grants: [] };
+      return { message: t("זכית בפרס!"), grants: [] };
   }
 }
 
 /** Spin the wheel: consume one spin, roll a prize server-side, and pay it out. */
 export async function spinWheel(): Promise<SpinResult> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await prisma.$transaction(async (tx): Promise<SpinResult> => {
@@ -132,7 +159,7 @@ export async function spinWheel(): Promise<SpinResult> {
         data: { wheelSpins: { decrement: 1 } },
       });
       if (consumed.count === 0) {
-        return { ok: false, error: "אין סיבובים זמינים" };
+        return { ok: false, error: t("אין סיבובים זמינים") };
       }
 
       const season = empire.seasonId
@@ -141,7 +168,13 @@ export async function spinWheel(): Promise<SpinResult> {
       const cycle = seasonCycle(season, Date.now());
 
       const prizeIndex = pickWheelPrizeIndex();
-      const { message, grants } = await grantPrize(tx, empire, WHEEL_PRIZES[prizeIndex], cycle);
+      const { message, grants } = await grantPrize(
+        tx,
+        empire,
+        WHEEL_PRIZES[prizeIndex],
+        cycle,
+        t
+      );
       await awardSeasonPassXp(tx, empireId, "wheelSpin");
 
       return { ok: true, prizeIndex, message, grants, spinsLeft: empire.wheelSpins - 1 };
@@ -150,6 +183,6 @@ export async function spinWheel(): Promise<SpinResult> {
     revalidatePath("/game", "layout");
     return result;
   } catch {
-    return { ok: false, error: "אירעה שגיאה, נסה שוב" };
+    return { ok: false, error: t("אירעה שגיאה, נסה שוב") };
   }
 }

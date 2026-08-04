@@ -16,11 +16,16 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Card, CardTitle } from "@/components/ui/Card";
 import { Icon } from "@/components/ui/Icon";
 import { formatNumber } from "@/lib/game/format";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "שדרוגים | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("שדרוגים | קראלדור") };
+}
 
 export default async function UpgradesPage() {
   const empire = await requireEmpire();
+  const t = await getT();
   // The citizen-intake effect is admin-tunable, so the card must print the live
   // rate rather than the shipped default.
   const tunables = await getTunables();
@@ -38,19 +43,20 @@ export default async function UpgradesPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="שדרוגים"
+        title={t("שדרוגים")}
         ornament={<Icon name="upgrades" size={22} className="text-crimson" />}
       />
 
       {/* -------- cities (עליית עיר) -------- */}
       <section className="space-y-4">
         <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
-          כל עלייה בעיר מכפילה את תפוקת המכרות (×מספר העיר) ופותחת עוד רמות
-          לשדרוג קבלת האזרחים — עד{" "}
+          {t("כל עלייה בעיר מכפילה את תפוקת המכרות (×מספר העיר) ופותחת עוד רמות לשדרוג קבלת האזרחים — עד")}{" "}
           <span className="font-bold text-gold-bright nums" dir="ltr">
             ×{MAX_CITIES}
           </span>{" "}
-          תפוקה ברמת עיר {MAX_CITIES}. אין תקרה לכמות האזרחים שאפשר לצבור.
+          {t("תפוקה ברמת עיר {max}. אין תקרה לכמות האזרחים שאפשר לצבור.", {
+            max: MAX_CITIES,
+          })}
         </p>
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -58,7 +64,7 @@ export default async function UpgradesPage() {
           <Card variant="gold">
             <CardTitle>
               <Icon name="base" size={20} className="text-crimson-bright" />
-              הממלכה שלך
+              {t("הממלכה שלך")}
             </CardTitle>
 
             <div className="mb-4">
@@ -67,14 +73,14 @@ export default async function UpgradesPage() {
 
             <dl className="space-y-3 text-sm">
               <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-                <dt className="text-zinc-400">ערים</dt>
+                <dt className="text-zinc-400">{t("ערים")}</dt>
                 <dd className="text-lg font-black text-gold nums" dir="ltr">
                   {cities} / {MAX_CITIES}
                 </dd>
               </div>
               <div className="flex items-center justify-between">
                 <dt className="text-zinc-400">
-                  <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> אזרחים
+                  <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> {t("אזרחים")}
                 </dt>
                 <dd className="font-bold text-zinc-100 nums" dir="ltr">
                   {formatNumber(citizens)}
@@ -98,7 +104,7 @@ export default async function UpgradesPage() {
 
       {/* -------- empire upgrades -------- */}
       <p className="panel-inset rounded-xl p-4 text-center text-sm text-zinc-400">
-        שדרוגי אימפריה קבועים שמשפרים אזרחים, מודיעין, בנקאות וקבלת תורות.
+        {t("שדרוגי אימפריה קבועים שמשפרים אזרחים, מודיעין, בנקאות וקבלת תורות.")}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -112,12 +118,12 @@ export default async function UpgradesPage() {
             <UpgradeCard
               key={type}
               upgradeType={type}
-              label={meta.label}
+              label={t(meta.label)}
               icon={meta.icon}
-              description={meta.description}
+              description={t(meta.description, meta.descriptionParams)}
               level={level}
-              currentEffect={meta.effectLabel(level, tunables.daily)}
-              nextEffect={meta.effectLabel(level + 1, tunables.daily)}
+              currentEffect={meta.effectLabel(t, level, tunables.daily)}
+              nextEffect={meta.effectLabel(t, level + 1, tunables.daily)}
               upgradeCost={empireUpgradeCostFor(type, level)}
               available={available}
               isMaxLevel={isMaxLevel}

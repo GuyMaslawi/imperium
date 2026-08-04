@@ -4,25 +4,30 @@ import { formatNumber } from "@/lib/game/format";
 import { TrainCard } from "@/components/game/TrainCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "צבא | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("צבא | קראלדור") };
+}
 
 export default async function ArmyPage() {
   const empire = await requireEmpire();
+  const t = await getT();
   const army = empire.army;
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="ניהול" ornament="🛠️" />
+      <SectionHeading title={t("ניהול")} ornament="🛠️" />
 
       <div className="panel-gold rounded-xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <span aria-hidden>🔥</span>
-            אימון מגויסים
+            {t("אימון מגויסים")}
           </h2>
           <span className="rounded-lg border border-gold/40 bg-panel-inset px-3 py-1 text-sm">
-            <span className="text-gold-dim">אזרחים פנויים </span>
+            <span className="text-gold-dim">{t("אזרחים פנויים")} </span>
             <span className="nums font-black text-gold-bright" dir="ltr">
               <Icon name="citizens" size={14} className="inline align-[-2px] text-bone" /> {formatNumber(empire.citizens)}
             </span>

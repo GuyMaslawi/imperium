@@ -25,11 +25,16 @@ import { getGloryChampions, stampGloryAwards } from "@/server/gloryBoard";
 import { selectGlory } from "@/lib/game/achievements";
 import { seasonCycle } from "@/lib/game/wheel";
 import { formatNumber, formatCompact, formatDate } from "@/lib/game/format";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "בסיס | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("בסיס | KRALDOR") };
+}
 
 export default async function BasePage() {
   const empire = await requireEmpire();
+  const { t, locale } = await getI18n();
 
   const [
     recentBattles,
@@ -135,18 +140,18 @@ export default async function BasePage() {
   if (achievements) await stampGloryAwards(empire.id, achievements);
   const gloryRecords = await getGloryChampions();
   const glory = achievements
-    ? selectGlory(achievements, gloryRecords, empire.id)
+    ? selectGlory(achievements, gloryRecords, empire.id, locale)
     : [];
 
   const resourceTiles = [
-    { icon: <Icon name="turns" size={14} className="text-emerald-400" />, label: "תורות", value: empire.turns, tone: "text-emerald-400" },
-    { icon: <Icon name="iron" size={14} className="text-slate-300" />, label: "ברזל", value: empire.iron, tone: "text-zinc-200" },
-    { icon: <Icon name="wood" size={14} className="text-amber-600" />, label: "עץ", value: empire.wood, tone: "text-amber-200/90" },
-    { icon: <Icon name="gold" size={14} className="text-gold-bright" />, label: "זהב", value: empire.gold, tone: "text-gold-bright" },
-    { icon: <Icon name="bank" size={14} className="text-gold" />, label: "בבנק", value: bankGold, tone: "text-gold" },
-    { icon: <Icon name="diamond" size={14} className="text-cyan-300" />, label: "יהלומים", value: empire.diamonds, tone: "text-sky-300" },
-    { icon: <Icon name="stone" size={14} className="text-stone-400" />, label: "אבן", value: empire.stone, tone: "text-zinc-200" },
-    { icon: <Icon name="citizens" size={14} className="text-bone" />, label: "אזרחים", value: empire.citizens, tone: "text-zinc-200" },
+    { icon: <Icon name="turns" size={14} className="text-emerald-400" />, label: t("תורות"), value: empire.turns, tone: "text-emerald-400" },
+    { icon: <Icon name="iron" size={14} className="text-slate-300" />, label: t("ברזל"), value: empire.iron, tone: "text-zinc-200" },
+    { icon: <Icon name="wood" size={14} className="text-amber-600" />, label: t("עץ"), value: empire.wood, tone: "text-amber-200/90" },
+    { icon: <Icon name="gold" size={14} className="text-gold-bright" />, label: t("זהב"), value: empire.gold, tone: "text-gold-bright" },
+    { icon: <Icon name="bank" size={14} className="text-gold" />, label: t("בבנק"), value: bankGold, tone: "text-gold" },
+    { icon: <Icon name="diamond" size={14} className="text-cyan-300" />, label: t("יהלומים"), value: empire.diamonds, tone: "text-sky-300" },
+    { icon: <Icon name="stone" size={14} className="text-stone-400" />, label: t("אבן"), value: empire.stone, tone: "text-zinc-200" },
+    { icon: <Icon name="citizens" size={14} className="text-bone" />, label: t("אזרחים"), value: empire.citizens, tone: "text-zinc-200" },
   ];
 
   // Server component renders once per request, so reading the clock here is safe.
@@ -161,7 +166,7 @@ export default async function BasePage() {
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="מרכז הפיקוד" ornament={<Icon name="base" size={22} className="text-crimson" />} />
+      <SectionHeading title={t("מרכז הפיקוד")} ornament={<Icon name="base" size={22} className="text-crimson" />} />
 
       {/* World records lead the screen: they are the one thing here about the
           whole game rather than about this one empire. */}
@@ -179,16 +184,16 @@ export default async function BasePage() {
             <p className="flex items-center gap-2 text-sm">
               <span aria-hidden>📣</span>
               <span className="font-bold text-gold-bright">
-                {season ? `${season.name} התחילה!` : "העונה פעילה"}
+                {season ? t("{season} התחילה!", { season: season.name }) : t("העונה פעילה")}
               </span>
-              <span className="text-zinc-400">— בהצלחה לכולם בעונה החדשה! <Icon name="attack" size={14} className="inline-block align-middle" /></span>
+              <span className="text-zinc-400">{t("— בהצלחה לכולם בעונה החדשה!")} <Icon name="attack" size={14} className="inline-block align-middle" /></span>
             </p>
             {season && (
               <p className="flex items-center gap-1.5 text-xs text-zinc-400">
                 <Icon name="turns" size={14} className="text-emerald-400" />
-                סיום עונה:
+                {t("סיום עונה:")}
                 <span className="font-bold text-gold nums" dir="ltr">
-                  {formatDate(season.endsAt)}
+                  {formatDate(season.endsAt, locale)}
                 </span>
               </p>
             )}
@@ -208,55 +213,55 @@ export default async function BasePage() {
       {/* base details + resources */}
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardTitle><Icon name="base" size={20} className="text-crimson-bright" />פרטי בסיס</CardTitle>
+          <CardTitle><Icon name="base" size={20} className="text-crimson-bright" />{t("פרטי בסיס")}</CardTitle>
           <dl className="space-y-3 text-sm">
             {/* "דירוג עולמי" used to sit here reading `empire.level` — a column
                 gameplay never writes, so it printed 1 on every account. The real
                 standing lives on /game/rankings; a fake one is worse than none. */}
             <div className="flex items-center justify-between border-b border-border-subtle pb-2">
-              <dt className="text-zinc-400">עונה</dt>
+              <dt className="text-zinc-400">{t("עונה")}</dt>
               <dd className="font-bold text-gold">{season?.name ?? "—"}</dd>
             </div>
             <div className="flex items-center justify-between">
-              <dt className="text-zinc-400">ברית</dt>
+              <dt className="text-zinc-400">{t("ברית")}</dt>
               {guildMembership ? (
                 <dd className="flex items-center gap-1.5 font-bold text-gold">
                   <span>{guildMembership.guild.name}</span>
                   <span className="text-xs font-normal text-zinc-400">
                     {GUILD_ROLE_META[guildMembership.role].icon}{" "}
-                    {GUILD_ROLE_META[guildMembership.role].label}
+                    {t(GUILD_ROLE_META[guildMembership.role].label)}
                   </span>
                 </dd>
               ) : (
-                <dd className="font-bold text-red-400">ללא</dd>
+                <dd className="font-bold text-red-400">{t("ללא")}</dd>
               )}
             </div>
           </dl>
           <Link href="/game/guild" className="btn btn-ghost mt-4 w-full py-2 text-sm">
             <Icon name="guild" size={16} className="inline-block align-middle" />{" "}
-            {guildMembership ? "לעמוד הברית" : "הצטרף לברית"}
+            {guildMembership ? t("לעמוד הברית") : t("הצטרף לברית")}
           </Link>
         </Card>
 
         <Card variant="gold">
           <div className="mb-4 flex items-center justify-between">
-            <CardTitle className="mb-0"><Icon name="gold" size={20} className="text-crimson-bright" />משאבים</CardTitle>
+            <CardTitle className="mb-0"><Icon name="gold" size={20} className="text-crimson-bright" />{t("משאבים")}</CardTitle>
             <span className="text-xs text-zinc-400">
-              מאוחסן:{" "}
+              {t("מאוחסן:")}{" "}
               <span className="font-bold text-zinc-200 nums" dir="ltr">
                 {formatCompact(totalStored)}/{formatCompact(totalCapacity)}
               </span>
             </span>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {resourceTiles.map((t) => (
-              <div key={t.label} className="panel-inset rounded-lg px-3 py-2.5 text-center">
+            {resourceTiles.map((tile) => (
+              <div key={tile.label} className="panel-inset rounded-lg px-3 py-2.5 text-center">
                 <p className="flex items-center justify-center gap-1 text-[11px] text-zinc-400">
-                  <span aria-hidden>{t.icon}</span>
-                  {t.label}
+                  <span aria-hidden>{tile.icon}</span>
+                  {tile.label}
                 </p>
-                <p className={`mt-0.5 text-sm font-black nums ${t.tone}`} dir="ltr">
-                  {formatCompact(t.value)}
+                <p className={`mt-0.5 text-sm font-black nums ${tile.tone}`} dir="ltr">
+                  {formatCompact(tile.value)}
                 </p>
               </div>
             ))}
@@ -266,10 +271,10 @@ export default async function BasePage() {
 
       {/* recent activity */}
       <Card>
-        <CardTitle><Icon name="reports" size={20} className="text-crimson-bright" />פעילות אחרונה</CardTitle>
+        <CardTitle><Icon name="reports" size={20} className="text-crimson-bright" />{t("פעילות אחרונה")}</CardTitle>
         {!hasActivity ? (
           <p className="text-sm text-zinc-400">
-            אין דיווחים עדיין. היכנס לפרופיל אימפריה מעמוד הדירוג כדי לרגל או לתקוף.
+            {t("אין דיווחים עדיין. היכנס לפרופיל אימפריה מעמוד הדירוג כדי לרגל או לתקוף.")}
           </p>
         ) : (
           <ul className="space-y-2.5 text-sm">
@@ -282,23 +287,23 @@ export default async function BasePage() {
                 <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                   <span className="text-zinc-300">
                     {isAttacker ? (
-                      <><Icon name="attack" size={16} className="inline-block align-middle" /> תקפת את</>
+                      <><Icon name="attack" size={16} className="inline-block align-middle" /> {t("תקפת את")}</>
                     ) : (
-                      <><Icon name="shield" size={16} className="inline-block align-middle" /> הותקפת על ידי</>
+                      <><Icon name="shield" size={16} className="inline-block align-middle" /> {t("הותקפת על ידי")}</>
                     )}{" "}
                     <PlayerLink empireId={rivalId} name={rival} className="font-semibold" /> —{" "}
                     <span className={won ? "text-emerald-400" : "text-red-400"}>
-                      {won ? "ניצחון" : "הפסד"}
+                      {won ? t("ניצחון") : t("הפסד")}
                     </span>
                   </span>
-                  <span className="text-xs text-zinc-500">{formatDate(r.createdAt)}</span>
+                  <span className="text-xs text-zinc-500">{formatDate(r.createdAt, locale)}</span>
                 </li>
               );
             })}
             {recentSpies.map((r) => (
               <li key={r.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                 <span className="text-zinc-300">
-                  <Icon name="spy" size={16} className="inline-block align-middle" /> ריגלת אחרי{" "}
+                  <Icon name="spy" size={16} className="inline-block align-middle" /> {t("ריגלת אחרי")}{" "}
                   <PlayerLink
                     empireId={r.defenderEmpireId}
                     name={r.defenderEmpire.name}
@@ -306,30 +311,34 @@ export default async function BasePage() {
                   />{" "}
                   —{" "}
                   <span className={r.success ? "text-emerald-400" : "text-red-400"}>
-                    {r.success ? "הצלחה" : "כישלון"}
+                    {r.success ? t("הצלחה") : t("כישלון")}
                   </span>
                 </span>
-                <span className="text-xs text-zinc-500">{formatDate(r.createdAt)}</span>
+                <span className="text-xs text-zinc-500">{formatDate(r.createdAt, locale)}</span>
               </li>
             ))}
-            {recentBankTransactions.map((t) => (
-              <li key={t.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
+            {recentBankTransactions.map((tx) => (
+              <li key={tx.id} className="flex items-center justify-between gap-2 border-b border-border-subtle pb-2 last:border-0">
                 <span className="text-zinc-300">
                   <Icon name="bank" size={16} className="inline-block align-middle" />{" "}
-                  {t.type === "DEPOSIT" ? "הפקדה לבנק" : t.type === "WITHDRAW" ? "משיכה מהבנק" : "ריבית מהבנק"}{" "}
+                  {tx.type === "DEPOSIT"
+                    ? t("הפקדה לבנק")
+                    : tx.type === "WITHDRAW"
+                      ? t("משיכה מהבנק")
+                      : t("ריבית מהבנק")}{" "}
                   —{" "}
                   <span className="font-semibold nums" dir="ltr">
-                    {t.type === "WITHDRAW" ? "-" : "+"}
-                    {formatNumber(t.amount)}
+                    {tx.type === "WITHDRAW" ? "-" : "+"}
+                    {formatNumber(tx.amount)}
                   </span>
                 </span>
-                <span className="text-xs text-zinc-500">{formatDate(t.createdAt)}</span>
+                <span className="text-xs text-zinc-500">{formatDate(tx.createdAt, locale)}</span>
               </li>
             ))}
           </ul>
         )}
         <Link href="/game/reports" className="btn btn-ghost mt-4 w-full py-2 text-sm">
-          לכל הדוחות ←
+          {t("לכל הדוחות ←")}
         </Link>
       </Card>
     </div>

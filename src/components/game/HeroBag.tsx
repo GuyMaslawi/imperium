@@ -21,6 +21,7 @@ import {
 } from "@/lib/game/hero";
 import { FORGE_DISCOUNT_PCT, forgeDiscountedCost } from "@/lib/game/potions";
 import { itemDetails, uiRarity, type HeroItemView } from "@/components/game/heroItemView";
+import { useT } from "@/i18n/client";
 
 /**
  * The hero's bag: unequipped items in a 5×3 grid of slots with rarity filters.
@@ -49,6 +50,7 @@ export function HeroBag({
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmUpgrade, setConfirmUpgrade] = useState(false);
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<ActionState>({});
 
@@ -237,7 +239,7 @@ export function HeroBag({
                     details={
                       selecting
                         ? undefined
-                        : itemDetails(item, heroLevel, { hint: "לחץ לפרטים" })
+                        : itemDetails(t, item, heroLevel, { hint: "לחץ לפרטים" })
                     }
                   />
                   {selecting && (

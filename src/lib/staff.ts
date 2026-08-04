@@ -1,3 +1,4 @@
+import type { T } from "@/i18n/translate";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 /**
@@ -43,8 +44,9 @@ export const notStaffEmpire = { empire: notStaff } as const;
  * "הנהלה" rather than naming a shield: this is not a timer that will run out,
  * and a player who keeps checking back is a player wasting turns.
  */
-export const STAFF_TARGET_REFUSAL =
-  "האימפריה הזו שייכת להנהלת המשחק — לא ניתן לתקוף או לרגל אותה.";
+export function staffTargetRefusal(t: T): string {
+  return t("האימפריה הזו שייכת להנהלת המשחק — לא ניתן לתקוף או לרגל אותה.");
+}
 
 /** Is this empire out of the game? Accepts anything carrying the flag. */
 export function isStaffEmpire(empire: { isStaff: boolean }): boolean {

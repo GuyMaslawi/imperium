@@ -96,9 +96,11 @@ import {
 } from "@/lib/game/config";
 import {
   breakToHours,
-  formatBreakHours as formatBreak,
   isBreakUnit,
 } from "@/lib/game/seasonCycle";
+import { formatBreakHours as formatBreak } from "@/components/admin/seasonBreak";
+import { makeT } from "@/i18n/translate";
+import { DEFAULT_LOCALE } from "@/i18n/locale";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
@@ -1999,7 +2001,10 @@ export async function castDiamondSpell(
       await lockEmpire(tx, empireId);
       const empire = await applyPendingUpdates(empireId, tx);
       return castByKind(
-        { tx, empireId, now: new Date(), ignoreCooldown: true },
+        // The control centre stays Hebrew on purpose, so an admin casting on a
+        // player's behalf reads the result in the source language rather than
+        // whatever the *game* is set to for this admin's own account.
+        { tx, empireId, now: new Date(), ignoreCooldown: true, t: makeT(DEFAULT_LOCALE) },
         empire,
         kind,
         hours
@@ -3572,6 +3577,8 @@ async function activateEvent(
   },
   durationMinutes: number
 ): Promise<void> {
+  // Admin chrome / broadcast copy stays in the source language.
+  const t = makeT(DEFAULT_LOCALE);
   // Re-activating reuses the event's own shape (cup count / code length) and
   // only rolls a new secret behind it. Both the shape and the attempt budget go
   // back through the clamps on the way out: a row saved before the bounds
@@ -3641,7 +3648,7 @@ async function activateEvent(
     channel: "events",
     title: `${meta.icon} ${released.title} — באוויר`,
     body:
-      `🎁 בפרס: ${prizeText(released)}\n` +
+      `🎁 בפרס: ${prizeText(t, released)}\n` +
       `${limits}\n` +
       (minutes > 0
         ? `נסגר בעוד ${minutes} דק׳ — מי שראשון, לוקח.`

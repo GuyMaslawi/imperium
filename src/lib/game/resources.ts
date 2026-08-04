@@ -1,4 +1,5 @@
 import type { Building } from "@prisma/client";
+import type { TranslateParams } from "@/i18n/translate";
 import { BUILDING_META, mineProductionPerTick } from "./constants";
 import { bonusMultiplier } from "./hero";
 
@@ -12,7 +13,10 @@ export function productionPerTick(building: Building): number {
 /** One active bonus contributing to a mine's real production. */
 export interface ProductionBonusLine {
   key: "cities" | "hero" | "guild-spell" | "diamond-boost";
+  /** Translation source — render as `t(label, labelParams)`. */
   label: string;
+  /** Fills the `{placeholders}` in `label`. */
+  labelParams?: TranslateParams;
   /** Percent, for the multiplicative bonuses (absent for flat item bonuses). */
   pct?: number;
   /** Extra resources this bonus adds per regular update (incremental). */
@@ -58,7 +62,8 @@ export function mineProductionBreakdown(params: {
   if (params.cities > 1 && afterCities - base > 0) {
     lines.push({
       key: "cities",
-      label: `ערים — ×${params.cities}`,
+      label: "ערים — ×{cities}",
+      labelParams: { cities: params.cities },
       amount: afterCities - base,
     });
   }

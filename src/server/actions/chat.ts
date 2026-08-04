@@ -13,6 +13,7 @@ import {
 } from "@/lib/rateLimit";
 import { formatGameTime } from "@/lib/game/time";
 import { logError } from "@/server/errorLog";
+import { getT } from "@/i18n/server";
 import {
   CHAT_BODY_MAX,
   CHAT_BURST_LIMIT,
@@ -106,6 +107,8 @@ export type ChatPulse = {
 async function requireOwnEmpireId(): Promise<string> {
   // Enforces the ban and the email gate on every call, not just on page load.
   const empireId = await getActiveEmpireId();
+  // i18n-exempt: thrown, never rendered — the callers catch it and return the
+  // translated "something went wrong" instead.
   if (empireId === null) throw new Error("לא מחובר");
   return empireId;
 }
@@ -589,11 +592,12 @@ export async function sendChat(input: {
   body: string;
   toEmpireId?: string | null;
 }): Promise<ChatSendResult> {
+  const t = await getT();
   let empireId: string;
   try {
     empireId = await requireOwnEmpireId();
   } catch {
-    return { error: "לא מחובר" };
+    return { error: t("לא מחובר") };
   }
 
   const parsed = sendSchema.safeParse({
@@ -601,7 +605,7 @@ export async function sendChat(input: {
     toEmpireId: input.toEmpireId ?? null,
   });
   if (!parsed.success) {
-    return { error: `כתוב הודעה (עד ${CHAT_BODY_MAX} תווים)` };
+    return { error: t("כתוב הודעה (עד {max} תווים)", { max: CHAT_BODY_MAX }) };
   }
   const { body, toEmpireId } = parsed.data;
 
@@ -613,7 +617,7 @@ export async function sendChat(input: {
       CHAT_BURST_WINDOW_MS
     ))
   ) {
-    return { error: "לאט יותר — המתן רגע לפני ההודעה הבאה" };
+    return { error: t("לאט יותר — המתן רגע לפני ההודעה הבאה") };
   }
 
   try {
@@ -621,18 +625,18 @@ export async function sendChat(input: {
       where: { id: empireId },
       select: { name: true },
     });
-    if (!me) return { error: "לא מחובר" };
+    if (!me) return { error: t("לא מחובר") };
 
     let recipient: { id: string; name: string } | null = null;
     if (toEmpireId !== null) {
       if (toEmpireId === empireId) {
-        return { error: "אי אפשר לשלוח הודעה לעצמך" };
+        return { error: t("אי אפשר לשלוח הודעה לעצמך") };
       }
       recipient = await prisma.empire.findFirst({
         where: { id: toEmpireId, user: notBannedWhere() },
         select: { id: true, name: true },
       });
-      if (!recipient) return { error: "השחקן לא נמצא" };
+      if (!recipient) return { error: t("השחקן לא נמצא") };
     }
 
     // Volume budget. The room and private conversations get separate ones: a
@@ -650,7 +654,7 @@ export async function sendChat(input: {
           CHAT_GLOBAL_WINDOW_MS
         );
     if (!allowed) {
-      return { error: "שלחת יותר מדי הודעות — המתן דקה" };
+      return { error: t("שלחת יותר מדי הודעות — המתן דקה") };
     }
 
     // Per-conversation budget: the volume cap above still allows a whole minute
@@ -664,7 +668,7 @@ export async function sendChat(input: {
         CHAT_PAIR_WINDOW_MS
       ))
     ) {
-      return { error: "יותר מדי הודעות בשיחה הזו — המתן דקה" };
+      return { error: t("יותר מדי הודעות בשיחה הזו — המתן דקה") };
     }
 
     // "Did I just say this?" — the one spam shape a per-minute budget cannot
@@ -681,7 +685,7 @@ export async function sendChat(input: {
     });
     const now = new Date();
     if (isRepeat(body, previous, now)) {
-      return { error: "כבר כתבת את זה" };
+      return { error: t("כבר כתבת את זה") };
     }
 
     const row = await prisma.chatMessage.create({
@@ -703,7 +707,7 @@ export async function sendChat(input: {
     return { line: toLine(row, empireId) };
   } catch (err) {
     await logError("chat.sendChat", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -808,27 +812,29 @@ export async function searchChatPlayers(query: string): Promise<ChatPlayer[]> {
 export async function hideChatMessage(
   messageId: string
 ): Promise<{ ok: true } | { error: string }> {
+  const t = await getT();
   try {
     const admin = await getSessionUser();
     // getSessionUser, not requireAdmin: this is an action, not a route, so a
     // non-admin caller gets a refusal rather than a redirect.
-    if (!admin || admin.role !== "ADMIN") return { error: "אין הרשאה" };
+    if (!admin || admin.role !== "ADMIN") return { error: t("אין הרשאה") };
 
     const hidden = await prisma.chatMessage.updateMany({
       where: { id: String(messageId), hiddenAt: null },
       data: { hiddenAt: new Date(), hiddenById: admin.id },
     });
-    if (hidden.count === 0) return { error: "ההודעה כבר הוסרה" };
+    if (hidden.count === 0) return { error: t("ההודעה כבר הוסרה") };
 
     await logAdmin(admin, {
       action: "chat.hide",
       targetType: "ChatMessage",
       targetId: String(messageId),
+      // i18n-exempt: an admin audit-log line, read only in the control centre.
       summary: "הסתיר הודעת צ׳אט",
     });
     return { ok: true };
   } catch (err) {
     await logError("chat.hideChatMessage", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }

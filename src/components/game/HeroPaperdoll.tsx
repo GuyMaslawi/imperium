@@ -11,6 +11,7 @@ import { Tip, useTip } from "@/components/ui/Tip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { equipHeroItem } from "@/server/actions/hero";
 import type { ActionState } from "@/server/actions/game";
+import { useT } from "@/i18n/client";
 import {
   HERO_STAT_META,
   SLOT_META,
@@ -110,6 +111,7 @@ export function HeroPaperdoll({
   /** Show-only: no equipping, no dialogs — just the dressed figure. */
   readOnly?: boolean;
 }) {
+  const t = useT();
   const [openItem, setOpenItem] = useState<HeroItemView | null>(null);
   const [pickSlot, setPickSlot] = useState<HeroItemSlot | null>(null);
 
@@ -158,7 +160,7 @@ export function HeroPaperdoll({
                   icon={meta.icon}
                   level={item.level}
                   rarity={uiRarity(item.rarity)}
-                  details={itemDetails(item, heroLevel, { worn: true })}
+                  details={itemDetails(t, item, heroLevel, { worn: true })}
                 />
               ) : (
                 <EmptySocket
@@ -184,7 +186,7 @@ export function HeroPaperdoll({
                   icon={meta.icon}
                   level={item.level}
                   rarity={uiRarity(item.rarity)}
-                  details={itemDetails(item, heroLevel, {
+                  details={itemDetails(t, item, heroLevel, {
                     worn: true,
                     hint: "לחץ לפרטים",
                   })}
@@ -350,6 +352,7 @@ function SlotPicker({
   heroLevel: number;
   onClose: () => void;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<ActionState>({});
   const meta = SLOT_META[slot];
@@ -428,8 +431,8 @@ function SlotPicker({
                 disabled={pending || !allowed}
                 title={
                   allowed
-                    ? `לבש ${itemDisplayName(slot, stack.level)}`
-                    : `דרוש גיבור רמה ${stack.level}`
+                    ? t("לבש {item}", { item: itemDisplayName(t, slot, stack.level) })
+                    : t("דרוש גיבור רמה {level}", { level: stack.level })
                 }
                 className="relative block w-full rounded-xl text-center transition hover:brightness-110 disabled:cursor-not-allowed"
               >

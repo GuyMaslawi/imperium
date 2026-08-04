@@ -20,6 +20,7 @@ import { BossAttackButton } from "@/components/game/BossAttackButton";
 import { BossCountdown } from "@/components/game/BossCountdown";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import type { CityBossState } from "@/server/bossState";
+import { useT } from "@/i18n/client";
 
 /**
  * The city boss, as a compact slab above the rankings ladder.
@@ -36,6 +37,7 @@ import type { CityBossState } from "@/server/bossState";
  * where reference material belongs when it is read once and never again.
  */
 export function CityBossBanner({ state, cities }: { state: CityBossState; cities: number }) {
+  const t = useT();
   const {
     boss,
     power,
@@ -171,9 +173,9 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 {boss.title}
               </span>
             </p>
-            <Tip tip={`${boss.name} שולט ב${cityFullName(cities)}.`}>
+            <Tip tip={`${boss.name} שולט ב${cityFullName(t, cities)}.`}>
               <span className="cursor-help shrink-0 rounded border border-[rgb(var(--boss-accent))]/60 bg-black/60 px-1.5 py-0.5 text-[10px] font-black text-[rgb(var(--boss-accent))]">
-                עיר {cityName(cities)}
+                עיר {cityName(t, cities)}
               </span>
             </Tip>
           </div>

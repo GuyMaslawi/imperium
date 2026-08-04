@@ -8,6 +8,7 @@ import { Tip } from "@/components/ui/Tip";
 import { PotionBottle } from "@/components/game/PotionBottle";
 import { drinkPotion } from "@/server/actions/potions";
 import type { ActionState } from "@/server/actions/game";
+import { useT } from "@/i18n/client";
 import {
   POTION_KINDS,
   POTION_META,
@@ -146,13 +147,14 @@ function PotionCube({
   now: number;
   onOpen: () => void;
 }) {
+  const t = useT();
   const meta = POTION_META[kind];
   const active = activeUntil !== null && activeUntil > now;
   const owned = count > 0;
 
   return (
     <Tip
-      tip={`${meta.label} — ${meta.tagline} (${potionDurationLabel(kind)})${
+      tip={`${meta.label} — ${meta.tagline} (${potionDurationLabel(t, kind)})${
         owned ? "" : " · אין לך אחד כזה"
       }`}
     >
@@ -215,6 +217,7 @@ function PotionDialog({
   now: number;
   onClose: () => void;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [msg, setMsg] = useState<ActionState>({});
   const meta = POTION_META[kind];
@@ -241,7 +244,7 @@ function PotionDialog({
           </h2>
           <p className="mt-1 text-xs text-zinc-400">{meta.tagline}</p>
           <p className="mt-1 text-xs text-zinc-500">
-            משך: <span className="text-zinc-300">{potionDurationLabel(kind)}</span>
+            משך: <span className="text-zinc-300">{potionDurationLabel(t, kind)}</span>
             {" · "}בתרמיל:{" "}
             <span className="nums text-zinc-200" dir="ltr">
               {count}

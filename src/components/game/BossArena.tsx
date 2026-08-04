@@ -18,6 +18,7 @@ import {
 } from "@/lib/game/bossBattle";
 import { pollBossArena } from "@/server/actions/boss";
 import type { BossArenaState } from "@/server/bossBattleState";
+import { useT } from "@/i18n/client";
 
 /** How often to ask the server what has happened. */
 const POLL_MS = 3_000;
@@ -68,6 +69,7 @@ const RING_C = 2 * Math.PI * RING_R;
  * script — is what keeps that true.
  */
 export function BossArena({ initial }: { initial: BossArenaState }) {
+  const t = useT();
   const router = useRouter();
   const [state, setState] = useState<BossArenaState>(initial);
   const [now, setNow] = useState(initial.serverNow);
@@ -234,7 +236,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                 {state.boss.name}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
-                {state.boss.title} · עיר {cityName(state.cityTier)}
+                {state.boss.title} · עיר {cityName(t, state.cityTier)}
               </p>
             </div>
 

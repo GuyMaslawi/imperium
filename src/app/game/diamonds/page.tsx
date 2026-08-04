@@ -6,6 +6,7 @@ import { bankInterestRate } from "@/lib/game/constants";
 import { DiamondShop } from "@/components/game/DiamondShop";
 import { DiamondsHeader } from "@/components/game/DiamondsHeader";
 import { VipCard } from "@/components/game/VipCard";
+import { getT } from "@/i18n/server";
 import {
   BOOSTABLE_RESOURCES,
   RESOURCE_BOOST_KIND,
@@ -14,9 +15,13 @@ import {
   type ShieldKey,
 } from "@/lib/game/diamondShop";
 
-export const metadata = { title: "יהלומים | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("יהלומים | KRALDOR") };
+}
 
 export default async function DiamondsPage() {
+  const t = await getT();
   const empire = await requireEmpire();
   const now = new Date();
   const diamonds = Math.floor(empire.diamonds);
@@ -94,14 +99,14 @@ export default async function DiamondsPage() {
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="יהלומים"
+        title={t("יהלומים")}
         ornament={<Icon name="diamond" size={22} className="text-cyan-300" />}
       />
 
       <DiamondsHeader
         diamonds={diamonds}
         active="spend"
-        note="הוצא יהלומים על האצות ייצור, מגני תקיפה, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה."
+        note={t("הוצא יהלומים על האצות ייצור, מגני תקיפה, חבילות תורות וקסמים — כל רכישה משפיעה מיידית על האימפריה.")}
       />
 
       {/* Above the shop grid on purpose: it is the one permanent purchase on

@@ -189,6 +189,7 @@ import { VIP_COST, VIP_LABEL } from "@/lib/game/vip";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, resourceIcon, type IconName } from "@/components/ui/Icon";
 import { BackToTop, GuideToc, type TocEntry } from "@/components/game/guide/GuideToc";
+import { getT } from "@/i18n/server";
 import {
   BankCalc,
   BattleCalc,
@@ -309,6 +310,7 @@ function upgradeLadderTotal(
 }
 
 export default async function GuidePage() {
+  const t = await getT();
   // The guide quotes live balance, not the historical defaults: an admin who
   // softens the boss or doubles mine output changes this page with it.
   await requireEmpire();
@@ -1845,7 +1847,7 @@ export default async function GuidePage() {
                         {meta.description}
                       </p>
                       <p className="mt-2 text-center text-[11px] font-bold text-gold-bright">
-                        משך: {potionDurationLabel(kind)}
+                        משך: {potionDurationLabel(t, kind)}
                       </p>
                     </article>
                   );
@@ -1944,7 +1946,7 @@ export default async function GuidePage() {
                 ]}
                 example={
                   <>
-                    מסע של <b>{heroQuestDurationLabel(3)}</b> מביא בממוצע פי שלושה ממסע
+                    מסע של <b>{heroQuestDurationLabel(t, 3)}</b> מביא בממוצע פי שלושה ממסע
                     של שעה באותן ערים — אבל שעה עם <b>מזל אגדי</b> תכה בקלות שלוש שעות
                     של דרך קשה.
                   </>
@@ -2007,7 +2009,7 @@ export default async function GuidePage() {
                           {quest.name}
                         </td>
                         <td className="nums" dir="ltr">
-                          {heroQuestDurationLabel(quest.tier)}
+                          {heroQuestDurationLabel(t, quest.tier)}
                         </td>
                         <td className="nums" dir="ltr">
                           {nf(heroQuestTurnCost(quest.tier))}
@@ -2218,7 +2220,7 @@ export default async function GuidePage() {
                         {meta.description}
                       </p>
                       <p className="mt-2 text-[11px] text-emerald-300">
-                        {meta.effectLabel(meta.maxLevel)} (בשיא)
+                        {meta.effectLabel(t, meta.maxLevel)} (בשיא)
                       </p>
                     </div>
                   );
