@@ -124,9 +124,9 @@ export function HeroBag({
        so the page owns its frame. */
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Tip tip="חפצים שנלכדו בקרבות וממתינים בתיק. לחיצה על חפץ פותחת את פרטיו — שם אפשר ללבוש, לשדרג או לזרוק.">
+        <Tip tip={t("חפצים שנלכדו בקרבות וממתינים בתיק. לחיצה על חפץ פותחת את פרטיו — שם אפשר ללבוש, לשדרג או לזרוק.")}>
           <h2 className="cursor-help text-base font-bold tracking-wide text-gold-bright">
-            התיק
+            {t("התיק")}
           </h2>
         </Tip>
         <div className="flex items-center gap-2">
@@ -136,19 +136,22 @@ export function HeroBag({
                 onClick={exitSelect}
                 className="btn btn-ghost px-2.5 py-1 text-xs"
               >
-                בטל
+                {t("בטל")}
               </button>
             ) : (
               <button
                 onClick={() => setSelecting(true)}
                 className="btn btn-ghost px-2.5 py-1 text-xs"
               >
-                בחירה
+                {t("בחירה")}
               </button>
             ))}
-          <Tip tip="הקטלוג המלא: כל החפצים הקיימים במשחק, מרמה 1 עד 100 בכל הדרגות" side="bottom">
+          <Tip
+            tip={t("הקטלוג המלא: כל החפצים הקיימים במשחק, מרמה 1 עד 100 בכל הדרגות")}
+            side="bottom"
+          >
             <Link href="/game/hero/items" className="btn btn-ghost px-2.5 py-1 text-xs">
-              לכל הפריטים
+              {t("לכל הפריטים")}
             </Link>
           </Tip>
         </div>
@@ -162,7 +165,7 @@ export function HeroBag({
             filter === null ? "btn-gold" : "btn-ghost text-zinc-300"
           }`}
         >
-          הכל ({items.length})
+          {t("הכל")} ({items.length})
         </button>
         {RARITY_ORDER.map((r) => {
           const count = items.filter((i) => i.rarity === r).length;
@@ -174,7 +177,7 @@ export function HeroBag({
                 filter === r ? "btn-gold" : `btn-ghost ${RARITY_META[r].tone}`
               }`}
             >
-              {RARITY_META[r].label} ({count})
+              {t(RARITY_META[r].label)} ({count})
             </button>
           );
         })}
@@ -191,25 +194,29 @@ export function HeroBag({
                 disabled={visible.length === 0}
                 className="btn btn-ghost px-3 py-1 text-xs"
               >
-                {allVisibleSelected ? "נקה בחירה" : "סמן הכל"}
+                {allVisibleSelected ? t("נקה בחירה") : t("סמן הכל")}
               </button>
             ) : (
-              <Tip tip={`מקום בתיק: ${HERO_BAG_CAPACITY} סלוטים (5 על 3). כשהתיק מלא — לא נלכדים חפצים חדשים בקרב ואי אפשר להסיר ציוד מהגיבור!`}>
-                <span className="cursor-help">סלוטים</span>
+              <Tip
+                tip={t("מקום בתיק: {slots} סלוטים (5 על 3). כשהתיק מלא — לא נלכדים חפצים חדשים בקרב ואי אפשר להסיר ציוד מהגיבור!", {
+                  slots: HERO_BAG_CAPACITY,
+                })}
+              >
+                <span className="cursor-help">{t("סלוטים")}</span>
               </Tip>
             )}
             <span
               className={`nums ${bagFull ? "font-black text-red-400" : ""}`}
             >
               {selecting
-                ? `${selectedCount} נבחרו`
+                ? t("{count} נבחרו", { count: selectedCount })
                 : `${items.length}/${HERO_BAG_CAPACITY}`}
             </span>
           </div>
 
           {bagFull && !selecting && (
             <p className="mt-2 text-[11px] font-semibold text-amber-300">
-              התיק מלא — חפצים חדשים לא ייכנסו. זרוק או שדרג כדי לפנות מקום.
+              {t("התיק מלא — חפצים חדשים לא ייכנסו. זרוק או שדרג כדי לפנות מקום.")}
             </p>
           )}
 
@@ -228,7 +235,10 @@ export function HeroBag({
                       ? "ring-2 ring-gold ring-offset-2 ring-offset-black"
                       : ""
                   }`}
-                  aria-label={`${SLOT_META[item.slot].label} רמה ${item.level}`}
+                  aria-label={t("{slot} רמה {level}", {
+                    slot: t(SLOT_META[item.slot].label),
+                    level: item.level,
+                  })}
                 >
                   <ItemTile
                     slug={SLOT_META[item.slot].slug}
@@ -239,7 +249,7 @@ export function HeroBag({
                     details={
                       selecting
                         ? undefined
-                        : itemDetails(t, item, heroLevel, { hint: "לחץ לפרטים" })
+                        : itemDetails(t, item, heroLevel, { hint: t("לחץ לפרטים") })
                     }
                   />
                   {selecting && (
@@ -288,27 +298,26 @@ export function HeroBag({
                 className="btn py-2 text-sm font-black text-white disabled:opacity-45"
                 style={{ background: "linear-gradient(180deg,#b91c1c,#7f1d1d)" }}
               >
-                זרוק הכל ({selectedCount})
+                {t("זרוק הכל")} ({selectedCount})
               </button>
               <button
                 onClick={() => setConfirmUpgrade(true)}
                 disabled={pending || selectedUpgradeable === 0}
                 title={
                   selectedUpgradeable === 0
-                    ? "אין פריטים לשדרוג מבין הנבחרים"
+                    ? t("אין פריטים לשדרוג מבין הנבחרים")
                     : undefined
                 }
                 className="btn btn-dark py-2 text-sm"
               >
-                שדרג הכל ({selectedUpgradeable})
+                {t("שדרג הכל")} ({selectedUpgradeable})
               </button>
             </div>
           )}
         </div>
 
         <p className="mx-auto mt-4 max-w-md text-center text-[11px] leading-relaxed text-zinc-500">
-          חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים — ככל שהחפץ נדיר יותר, כך
-          קשה יותר ללכוד אותו.
+          {t("חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים — ככל שהחפץ נדיר יותר, כך קשה יותר ללכוד אותו.")}
         </p>
       </div>
 
@@ -334,19 +343,17 @@ export function HeroBag({
             id="confirm-upgrade-title"
             className="text-lg font-black text-gold-bright"
           >
-            שדרוג חפצים
+            {t("שדרוג חפצים")}
           </h2>
-          <p className="mt-2 text-sm text-zinc-300">
-            עומדים לשדרג{" "}
-            <span className="nums font-bold text-zinc-100">
-              {selectedUpgradeable}
-            </span>{" "}
-            חפצים לדרגה הבאה.
+          <p className="nums mt-2 text-sm text-zinc-300">
+            {t("עומדים לשדרג {count} חפצים לדרגה הבאה.", {
+              count: selectedUpgradeable,
+            })}
           </p>
 
           <div className="panel-inset mt-4 rounded-lg p-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-zinc-400">עלות כוללת</span>
+              <span className="text-zinc-400">{t("עלות כוללת")}</span>
               <span
                 className={`nums font-black ${
                   canAffordAll ? "text-gold-bright" : "text-red-400"
@@ -357,7 +364,7 @@ export function HeroBag({
               </span>
             </div>
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-zinc-500">הזהב שלך</span>
+              <span className="text-zinc-500">{t("הזהב שלך")}</span>
               <span className="nums text-xs font-bold text-zinc-300" dir="ltr">
                 <Icon name="gold" size={14} className="inline align-[-2px] text-gold-bright" /> {formatNumber(gold)}
               </span>
@@ -366,13 +373,15 @@ export function HeroBag({
 
           {forgeDiscount && (
             <p className="mt-3 text-xs font-semibold text-violet-300">
-              🧪 שיקוי הנפח פעיל — המחירים כאן כבר כוללים {FORGE_DISCOUNT_PCT}% הנחה.
+              {t("🧪 שיקוי הנפח פעיל — המחירים כאן כבר כוללים {pct}% הנחה.", {
+                pct: FORGE_DISCOUNT_PCT,
+              })}
             </p>
           )}
 
           {!canAffordAll && (
             <p className="mt-3 text-xs font-semibold text-amber-300">
-              אין מספיק זהב לשדרוג הכל — ישודרגו הזולים ביותר עד שייגמר הזהב.
+              {t("אין מספיק זהב לשדרוג הכל — ישודרגו הזולים ביותר עד שייגמר הזהב.")}
             </p>
           )}
 
@@ -382,14 +391,14 @@ export function HeroBag({
               disabled={pending}
               className="btn btn-ghost py-2 text-sm"
             >
-              ביטול
+              {t("ביטול")}
             </button>
             <button
               onClick={confirmUpgradeAll}
               disabled={pending}
               className="btn btn-gold py-2 text-sm"
             >
-              {pending ? "משדרג…" : "אישור שדרוג"}
+              {pending ? t("משדרג…") : t("אישור שדרוג")}
             </button>
           </div>
         </Dialog>

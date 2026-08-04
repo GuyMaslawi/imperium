@@ -4,6 +4,7 @@ import { RESOURCE_META, type StorableResource } from "@/lib/game/constants";
 import { formatBonus, formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
+import { getT, type T } from "@/i18n/server";
 
 /**
  * "סך הכל מהגיבור" — the combined yield the player actually gets from the hero,
@@ -16,6 +17,7 @@ import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 
 /** One detailed stat line: icon + label + breakdown note on the right, value on the left. */
 function StatRow({
+  t,
   stat,
   value,
   suffix,
@@ -24,6 +26,7 @@ function StatRow({
   // formatBonus rather than being interpolated raw.
   format = (v) => `+${formatBonus(v)}`,
 }: {
+  t: T;
   stat: HeroStat;
   value: number;
   /** "%" for percentage stats, unit word for flat stats. */
@@ -34,7 +37,7 @@ function StatRow({
   const meta = HERO_STAT_META[stat];
   const active = value > 0;
   return (
-    <Tip className="w-full" tip={<>{meta.description}<br />{note}</>}>
+    <Tip className="w-full" tip={<>{t(meta.description)}<br />{note}</>}>
       <div
         className={`flex w-full cursor-help items-center justify-between gap-3 rounded-lg p-2.5 ${
           active ? "panel" : "panel-inset opacity-60"
@@ -42,7 +45,7 @@ function StatRow({
       >
         <div className="min-w-0 text-right">
           <p className="text-sm font-bold text-zinc-200">
-            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {meta.label}
+            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {t(meta.label)}
           </p>
           <p className="text-[11px] leading-tight text-zinc-500">{note}</p>
         </div>
@@ -69,12 +72,14 @@ function StatRow({
  * (matching the per-resource breakdown on the mines page).
  */
 function ResourcesRow({
+  t,
   pointsPct,
   classPct = 0,
   itemPct = 0,
   itemFlat,
   itemNote,
 }: {
+  t: T;
   /** % from allocated resource points — multiplies mine production. */
   pointsPct: number;
   /** % from the chosen hero class (הסוחר) — multiplies mine production too. */
@@ -94,9 +99,9 @@ function ResourcesRow({
       className="w-full"
       tip={
         <>
-          {meta.description}
+          {t(meta.description)}
           <br />
-          האחוזים מכפילים את תפוקת המכרות; הכמות הקבועה נוספת מעליה בכל עדכון רגיל.
+          {t("האחוזים מכפילים את תפוקת המכרות; הכמות הקבועה נוספת מעליה בכל עדכון רגיל.")}
         </>
       }
     >
@@ -107,18 +112,20 @@ function ResourcesRow({
       >
         <div className="min-w-0 text-right">
           <p className="text-sm font-bold text-zinc-200">
-            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {meta.label}
+            <Icon name={meta.icon} size={14} className="inline align-[-2px]" /> {t(meta.label)}
           </p>
-          <div className="mt-0.5 space-y-0.5 text-[11px] leading-tight text-zinc-500">
+          <div className="nums mt-0.5 space-y-0.5 text-[11px] leading-tight text-zinc-500">
             {pointsPct > 0 && (
-              <p>
-                נקודות +{pointsPct}% — מכפיל תפוקת מכרות
-              </p>
+              <p>{t("נקודות +{pct}% — מכפיל תפוקת מכרות", { pct: pointsPct })}</p>
             )}
-            {classPct > 0 && <p>דמות +{classPct}% — יתרון הסוחר</p>}
-            {itemPct > 0 && <p>חרב ומגן +{itemPct}% — מכפיל תפוקת מכרות</p>}
+            {classPct > 0 && <p>{t("דמות +{pct}% — יתרון הסוחר", { pct: classPct })}</p>}
+            {itemPct > 0 && (
+              <p>{t("חרב ומגן +{pct}% — מכפיל תפוקת מכרות", { pct: itemPct })}</p>
+            )}
             {itemFlat > 0 ? (
-              <p>כמות קבועה +{formatNumber(itemFlat)} — {itemNote}</p>
+              <p>
+                {t("כמות קבועה +{flat} —", { flat: formatNumber(itemFlat) })} {itemNote}
+              </p>
             ) : (
               totalPctValue === 0 && <p>{itemNote}</p>
             )}
@@ -155,7 +162,8 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
+export async function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
+  const t = await getT();
   const { points, itemsPct, itemsResourcePct, itemsFlat, itemsFlatByResource, classPct, totalPct } =
     bonuses;
 
@@ -191,13 +199,13 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
               size={11}
               className={RESOURCE_ICON_COLOR[r]}
             />
-            {RESOURCE_META[r].label}
+            {t(RESOURCE_META[r].label)}
           </span>
         ))}{" "}
-        — בכל עדכון רגיל
+        {t("— בכל עדכון רגיל")}
       </>
     ) : (
-      "מפרי שטן, מכנסיים או נעליים — המשאבים לפי דרגת החפץ"
+      t("מפרי שטן, מכנסיים או נעליים — המשאבים לפי דרגת החפץ")
     );
 
   // התקפה/הגנה = נקודות + חפצים; ריגול מגיע מחפצים בלבד.
@@ -207,11 +215,11 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
       value: totalPct.attack,
       note: bonusNote(
         [
-          ["נקודות", points.attack],
-          ["חפצים", itemsPct.attack],
-          ["דמות", classPct.attack],
+          [t("נקודות"), points.attack],
+          [t("חפצים"), itemsPct.attack],
+          [t("דמות"), classPct.attack],
         ],
-        "מנקודות התקפה ומחפצים לבושים"
+        t("מנקודות התקפה ומחפצים לבושים")
       ),
     },
     {
@@ -219,11 +227,11 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
       value: totalPct.defense,
       note: bonusNote(
         [
-          ["נקודות", points.defense],
-          ["חפצים", itemsPct.defense],
-          ["דמות", classPct.defense],
+          [t("נקודות"), points.defense],
+          [t("חפצים"), itemsPct.defense],
+          [t("דמות"), classPct.defense],
         ],
-        "מנקודות הגנה ומחפצים לבושים"
+        t("מנקודות הגנה ומחפצים לבושים")
       ),
     },
     {
@@ -231,10 +239,10 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
       value: totalPct.spy,
       note: bonusNote(
         [
-          ["חפצים", itemsPct.spy],
-          ["דמות", classPct.spy],
+          [t("חפצים"), itemsPct.spy],
+          [t("דמות"), classPct.spy],
         ],
-        "מחפצי ריגול לבושים בלבד"
+        t("מחפצי ריגול לבושים בלבד")
       ),
     },
   ];
@@ -243,21 +251,20 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
   // ניזונים משני מקורות שונים: אחוז מהנקודות (מכפיל מכרות) + כמות מהחפץ.
   // יהלומים אינם ברשימה: חפצים אינם מייצרים יהלומים כלל (ראו HeroFlatStat).
   const flatRows: { stat: HeroStat; value: number; note: string }[] = [
-    { stat: "turns", value: itemsFlat.turns, note: "נוסף בכל עדכון יומי" },
-    { stat: "citizens", value: itemsFlat.citizens, note: "נוסף בכל עדכון יומי" },
+    { stat: "turns", value: itemsFlat.turns, note: t("נוסף בכל עדכון יומי") },
+    { stat: "citizens", value: itemsFlat.citizens, note: t("נוסף בכל עדכון יומי") },
   ];
 
   return (
     <div className="panel-gold rounded-2xl p-4 md:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <h3 className="text-base font-bold tracking-wide text-gold-bright">
-          סך הכל מהגיבור
+          {t("סך הכל מהגיבור")}
         </h3>
       </div>
       <div className="rule-gold my-3" />
       <p className="mb-4 text-[11px] leading-relaxed text-zinc-500">
-        מה שאתה מקבל בפועל מהנקודות והחפצים יחד. שורות מודגשות פעילות; שורות
-        עמומות ממתינות לחפץ מתאים.
+        {t("מה שאתה מקבל בפועל מהנקודות והחפצים יחד. שורות מודגשות פעילות; שורות עמומות ממתינות לחפץ מתאים.")}
       </p>
 
       {/* Three labelled groups. The panel only owns half the row from xl up
@@ -267,10 +274,10 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
       <div className="grid gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-1">
         {/* battle percentages: attack / defense / spy */}
         <section>
-          <SectionLabel>בונוסי קרב · באחוזים</SectionLabel>
+          <SectionLabel>{t("בונוסי קרב · באחוזים")}</SectionLabel>
           <div className="flex flex-col gap-1.5">
             {percentRows.map(({ stat, value, note }) => (
-              <StatRow key={stat} stat={stat} value={value} suffix="%" note={note} />
+              <StatRow key={stat} t={t} stat={stat} value={value} suffix="%" note={note} />
             ))}
           </div>
         </section>
@@ -280,11 +287,12 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
             two-then-one columns the section labels already separate the groups,
             and a rule down a two-column split reads as a page seam. */}
         <section>
-          <SectionLabel>תשואה קבועה מחפצים · בכמויות</SectionLabel>
+          <SectionLabel>{t("תשואה קבועה מחפצים · בכמויות")}</SectionLabel>
           <div className="flex flex-col gap-1.5">
             {flatRows.map(({ stat, value, note }) => (
               <StatRow
                 key={stat}
+                t={t}
                 stat={stat}
                 value={value}
                 note={note}
@@ -296,8 +304,9 @@ export function HeroPowerSummary({ bonuses }: { bonuses: HeroBonuses }) {
 
         {/* resources: hybrid — % from points (mines) + flat from the relic */}
         <section>
-          <SectionLabel>תפוקת משאבים · אחוזים + כמות</SectionLabel>
+          <SectionLabel>{t("תפוקת משאבים · אחוזים + כמות")}</SectionLabel>
           <ResourcesRow
+            t={t}
             pointsPct={points.resources}
             classPct={classPct.resources}
             itemPct={itemsResourcePct}

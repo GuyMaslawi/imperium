@@ -16,6 +16,7 @@ import { Dialog } from "@/components/ui/Dialog";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Icon } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 export type PlayerOption = { id: string; name: string };
 
@@ -58,6 +59,7 @@ export function MessageCompose({
   const [found, setFound] = useState<{ q: string; rows: PlayerOption[] } | null>(
     null
   );
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     sendPlayerMessage,
     {}
@@ -137,7 +139,7 @@ export function MessageCompose({
         onClick={() => setOpen(true)}
         className={triggerClassName}
       >
-        <Icon name="messages" size={16} /> {triggerLabel}
+        <Icon name="messages" size={16} /> {t(triggerLabel)}
       </button>
 
       <Dialog
@@ -148,12 +150,12 @@ export function MessageCompose({
       >
         <div className="flex items-start justify-between gap-3">
           <h2 id="compose-title" className="text-lg font-black text-gold-bright">
-            הודעה חדשה
+            {t("הודעה חדשה")}
           </h2>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            aria-label="סגירה"
+            aria-label={t("סגירה")}
             className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-crimson/50 hover:text-crimson-bright"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -167,7 +169,7 @@ export function MessageCompose({
               otherwise the closed list of the game's players */}
           {lockedRecipient ? (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-gold">נמען</p>
+              <p className="mb-1.5 text-xs font-semibold text-gold">{t("נמען")}</p>
               <p className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm font-bold text-gold-bright">
                 {lockedRecipient.name}
               </p>
@@ -179,7 +181,7 @@ export function MessageCompose({
               htmlFor="msg-search"
               className="mb-1.5 block text-xs font-semibold text-gold"
             >
-              נמענים ({selected.length}/{MESSAGE_MAX_RECIPIENTS})
+              {t("נמענים")} ({selected.length}/{MESSAGE_MAX_RECIPIENTS})
             </label>
 
             {selected.length > 0 && (
@@ -193,7 +195,7 @@ export function MessageCompose({
                     <button
                       type="button"
                       onClick={() => toggle(p)}
-                      aria-label={`הסרת ${p.name}`}
+                      aria-label={t("הסרת {name}", { name: p.name })}
                       className="text-gold-dim hover:text-white"
                     >
                       ×
@@ -213,18 +215,18 @@ export function MessageCompose({
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="חיפוש שחקן לפי שם אימפריה"
+              placeholder={t("חיפוש שחקן לפי שם אימפריה")}
               className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none"
             />
 
             <ul className="mt-2 max-h-44 space-y-0.5 overflow-y-auto rounded-lg border border-border-subtle bg-panel-inset p-1">
               {searching ? (
                 <li className="px-2 py-3 text-center text-xs text-zinc-500">
-                  מחפש…
+                  {t("מחפש…")}
                 </li>
               ) : matches.length === 0 ? (
                 <li className="px-2 py-3 text-center text-xs text-zinc-500">
-                  לא נמצא שחקן בשם הזה.
+                  {t("לא נמצא שחקן בשם הזה.")}
                 </li>
               ) : (
                 matches.map((p) => {
@@ -254,13 +256,16 @@ export function MessageCompose({
             </ul>
             {!searchable && players.length > 0 && (
               <p className="mt-1 text-[11px] text-zinc-500">
-                מוצגים {players.length} השחקנים הראשונים — הקלד שם כדי לחפש בכל
-                המשחק.
+                {t("מוצגים {count} השחקנים הראשונים — הקלד שם כדי לחפש בכל המשחק.", {
+                  count: players.length,
+                })}
               </p>
             )}
             {atCap && (
               <p className="mt-1 text-[11px] text-zinc-500">
-                הגעת למקסימום {MESSAGE_MAX_RECIPIENTS} נמענים בהודעה אחת.
+                {t("הגעת למקסימום {max} נמענים בהודעה אחת.", {
+                  max: MESSAGE_MAX_RECIPIENTS,
+                })}
               </p>
             )}
           </div>
@@ -272,7 +277,7 @@ export function MessageCompose({
               htmlFor="msg-title"
               className="mb-1.5 block text-xs font-semibold text-gold"
             >
-              נושא
+              {t("נושא")}
             </label>
             <input
               id="msg-title"
@@ -280,7 +285,7 @@ export function MessageCompose({
               type="text"
               required
               maxLength={MESSAGE_TITLE_MAX}
-              placeholder="על מה ההודעה?"
+              placeholder={t("על מה ההודעה?")}
               className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none"
             />
           </div>
@@ -291,7 +296,7 @@ export function MessageCompose({
               htmlFor="msg-body"
               className="mb-1.5 block text-xs font-semibold text-gold"
             >
-              תוכן ההודעה
+              {t("תוכן ההודעה")}
             </label>
             <textarea
               id="msg-body"
@@ -299,7 +304,7 @@ export function MessageCompose({
               required
               rows={5}
               maxLength={MESSAGE_BODY_MAX}
-              placeholder={`עד ${MESSAGE_BODY_MAX} תווים`}
+              placeholder={t("עד {max} תווים", { max: MESSAGE_BODY_MAX })}
               className="w-full resize-y rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-gold/50 focus:outline-none"
             />
           </div>
@@ -308,14 +313,14 @@ export function MessageCompose({
 
           <div className="flex items-center justify-between gap-2">
             <p className="text-[11px] text-zinc-500">
-              ההודעה תגיע לתיבת הדואר של הנמענים.
+              {t("ההודעה תגיע לתיבת הדואר של הנמענים.")}
             </p>
             <SubmitButton
               className="btn btn-gold"
               disabled={selected.length === 0}
-              pendingText="שולח..."
+              pendingText={t("שולח...")}
             >
-              שליחה
+              {t("שליחה")}
             </SubmitButton>
           </div>
         </form>

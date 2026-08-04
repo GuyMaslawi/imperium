@@ -26,6 +26,7 @@ import {
 import { Icon } from "@/components/ui/Icon";
 import { PlayerLink } from "@/components/ui/PlayerLink";
 import { MiniGameTakeover } from "@/components/game/MiniGameTakeover";
+import { useDir, useT } from "@/i18n/client";
 
 /**
  * Two rates, because this panel lives in the game's layout — it is mounted on
@@ -102,6 +103,7 @@ function Countdown({
 
 /** One rival's row on the live standings. */
 function BoardRow({ row, maxAttempts }: { row: MiniGameBoardRow; maxAttempts: number }) {
+  const t = useT();
   const out = !row.solved && row.attempts >= maxAttempts;
   return (
     <li
@@ -115,20 +117,22 @@ function BoardRow({ row, maxAttempts }: { row: MiniGameBoardRow; maxAttempts: nu
         }`}
       >
         <PlayerLink empireId={row.empireId} name={row.name} />
-        {row.isSelf && <span className="mr-1 text-[10px] font-normal text-gold-dim">(אתה)</span>}
+        {row.isSelf && (
+          <span className="ms-1 text-[10px] font-normal text-gold-dim">{t("(אתה)")}</span>
+        )}
       </span>
       <span className="nums shrink-0 text-[11px] text-zinc-500" dir="ltr">
         {row.attempts}/{maxAttempts}
       </span>
       <span className="shrink-0 text-[10px] font-bold">
         {row.won ? (
-          <span className="text-emerald-300">🏆 זכה</span>
+          <span className="text-emerald-300">{t("🏆 זכה")}</span>
         ) : row.solved ? (
-          <span className="text-sky-300">✅ פתר</span>
+          <span className="text-sky-300">{t("✅ פתר")}</span>
         ) : out ? (
-          <span className="text-red-300">💀 נגמרו</span>
+          <span className="text-red-300">{t("💀 נגמרו")}</span>
         ) : (
-          <span className="text-amber-300">⏳ משחק</span>
+          <span className="text-amber-300">{t("⏳ משחק")}</span>
         )}
       </span>
     </li>
@@ -163,6 +167,7 @@ function CupsGame({
   pending: boolean;
   onPick: (index: number) => void;
 }) {
+  const t = useT();
   const picks = useMemo(() => {
     const map = new Map<number, boolean>();
     for (const row of history) if (row.kind === "cup") map.set(row.pick, row.hit);
@@ -176,7 +181,7 @@ function CupsGame({
   const shuffling = picks.size === 0;
 
   return (
-    <div className="cups-stage" role="group" aria-label="כוסות">
+    <div className="cups-stage" role="group" aria-label={t("כוסות")}>
       <div className={`cups-row ${shuffling ? "is-shuffling" : ""}`}>
         {Array.from({ length: count }).map((_, i) => {
           const tried = picks.has(i);
@@ -191,7 +196,11 @@ function CupsGame({
               data-state={hit ? "hit" : tried ? "tried" : "idle"}
               style={{ "--i": i, "--dir": i % 2 === 0 ? 1 : -1 } as CSSProperties}
               aria-label={
-                hit ? `כוס ${i + 1} — הכדור כאן!` : tried ? `כוס ${i + 1} — ריקה` : `כוס ${i + 1}`
+                hit
+                  ? t("כוס {n} — הכדור כאן!", { n: i + 1 })
+                  : tried
+                    ? t("כוס {n} — ריקה", { n: i + 1 })
+                    : t("כוס {n}", { n: i + 1 })
               }
             >
               {hit && <span className="cup-ball" aria-hidden />}
@@ -230,19 +239,20 @@ const MARK_CLASS: Record<SafeMark, string> = {
 
 /** The three marks, spelled out once above the log so the game is learnable. */
 function SafeLegend() {
+  const t = useT();
   return (
     <ul className="safe-legend">
       <li>
         <span className="safe-pip mark-hit" aria-hidden />
-        ספרה נכונה במקום הנכון
+        {t("ספרה נכונה במקום הנכון")}
       </li>
       <li>
         <span className="safe-pip mark-near" aria-hidden />
-        ספרה נכונה במקום אחר
+        {t("ספרה נכונה במקום אחר")}
       </li>
       <li>
         <span className="safe-pip mark-miss" aria-hidden />
-        לא בקוד
+        {t("לא בקוד")}
       </li>
     </ul>
   );
@@ -272,6 +282,7 @@ function SafeGame({
   attempts: number;
   onSubmit: (code: string) => void;
 }) {
+  const t = useT();
   const [code, setCode] = useState<string[]>(() => Array(digits).fill(""));
   const slots = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -360,15 +371,9 @@ function SafeGame({
         <form onSubmit={submit} className="space-y-2.5">
           <p className="text-center text-sm text-zinc-300">
             {solved ? (
-              <span className="font-bold text-emerald-300">הכספת פתוחה 🎉</span>
+              <span className="font-bold text-emerald-300">{t("הכספת פתוחה 🎉")}</span>
             ) : (
-              <>
-                הזן קוד בן{" "}
-                <span className="nums font-bold text-gold-bright" dir="ltr">
-                  {digits}
-                </span>{" "}
-                ספרות
-              </>
+              <span className="nums">{t("הזן קוד בן {digits} ספרות", { digits })}</span>
             )}
           </p>
           <div className="safe-slots" dir="ltr">
@@ -388,14 +393,14 @@ function SafeGame({
                 autoComplete="off"
                 maxLength={1}
                 className={`safe-slot nums ${solved ? "is-cracked" : ""}`}
-                aria-label={`ספרה ${i + 1}`}
+                aria-label={t("ספרה {n}", { n: i + 1 })}
               />
             ))}
           </div>
           {interactive && (
             <div className="flex justify-center">
               <button type="submit" disabled={!ready || pending} className="btn btn-gold px-6">
-                🔓 נסה לפרוץ
+                {t("🔓 נסה לפרוץ")}
               </button>
             </div>
           )}
@@ -437,11 +442,13 @@ function SafeGame({
  * first medal is the player who cracked it first.
  */
 function WinnersRail({ board }: { board: MiniGameBoardRow[] }) {
+  const t = useT();
+  const dir = useDir();
   const winners = board.filter((r) => r.won);
   if (winners.length === 0) return null;
   return (
-    <div className="mg-winners" dir="rtl">
-      <span className="mg-winners-title">🏆 כבר זכו</span>
+    <div className="mg-winners" dir={dir}>
+      <span className="mg-winners-title">{t("🏆 כבר זכו")}</span>
       <ul className="mg-winners-list">
         {winners.slice(0, 8).map((row, i) => (
           <li key={row.empireId} className="mg-winner" style={{ "--i": i } as CSSProperties}>
@@ -493,6 +500,8 @@ function MiniGameStage({
   onClose: () => void;
   onExpire: () => void;
 }) {
+  const t = useT();
+  const dir = useDir();
   const meta = MINIGAME_TYPE_META[state.type];
   const attemptsLeft = Math.max(0, state.maxAttempts - state.attempts);
   const outOfAttempts = !state.solved && attemptsLeft === 0;
@@ -513,8 +522,8 @@ function MiniGameStage({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`${meta.label} — ${state.title}`}
-      dir="rtl"
+      aria-label={`${t(meta.label)} — ${state.title}`}
+      dir={dir}
       onClick={(e) => e.stopPropagation()}
       // `max-h-full` against a dvh-sized overlay, not `max-h-[90vh]` — see the
       // note in ui/Dialog: on a phone `vh` is the toolbar-collapsed height, so
@@ -542,7 +551,7 @@ function MiniGameStage({
               <span className="truncate">{state.title}</span>
             </p>
             <p className="text-xs text-gold-dim">
-              {meta.label} · פרס:{" "}
+              {t(meta.label)} · {t("פרס:")}{" "}
               <span className="font-bold text-amber-200" dir="ltr">
                 {state.prizeText}
               </span>
@@ -553,14 +562,14 @@ function MiniGameStage({
         <div className="flex items-center gap-2 text-[11px]">
           {state.maxWinners > 0 && (
             <span className="rounded-md border border-border-subtle px-2 py-1 text-zinc-400">
-              זוכים{" "}
+              {t("זוכים")}{" "}
               <span className="nums font-bold text-zinc-200" dir="ltr">
                 {state.winnersCount}/{state.maxWinners}
               </span>
             </span>
           )}
           <span className="rounded-md border border-border-subtle px-2 py-1 text-zinc-400">
-            משתתפים{" "}
+            {t("משתתפים")}{" "}
             <span className="nums font-bold text-zinc-200" dir="ltr">
               {state.players}
             </span>
@@ -573,7 +582,7 @@ function MiniGameStage({
               <span aria-hidden className="text-base leading-none">
                 ⏳
               </span>
-              נותר{" "}
+              {t("נותר")}{" "}
               <Countdown
                 key={state.endsAt}
                 endsAt={state.endsAt}
@@ -585,7 +594,7 @@ function MiniGameStage({
           <button
             type="button"
             onClick={onClose}
-            aria-label="סגירה"
+            aria-label={t("סגירה")}
             className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-500 transition-colors hover:bg-white/10 hover:text-zinc-200"
           >
             ✕
@@ -599,21 +608,20 @@ function MiniGameStage({
           {state.solved && (
             <div className="panel-inset space-y-1 rounded-lg p-3 text-center">
               <p className="text-xl font-black text-emerald-300">
-                {state.won ? "🎉 ניצחת!" : "✅ פתרת נכון"}
+                {state.won ? t("🎉 ניצחת!") : t("✅ פתרת נכון")}
               </p>
               <p className="text-sm text-zinc-300">
                 {state.won
-                  ? `הפרס נוסף לאימפריה שלך: ${state.prizeText}`
-                  : "כל הפרסים כבר חולקו — אבל כל הכבוד!"}
+                  ? t("הפרס נוסף לאימפריה שלך: {prize}", { prize: state.prizeText })
+                  : t("כל הפרסים כבר חולקו — אבל כל הכבוד!")}
               </p>
             </div>
           )}
           {outOfAttempts && (
             <div className="panel-inset space-y-1 rounded-lg p-3 text-center">
-              <p className="text-xl font-black text-red-300">😔 נגמרו הניסיונות</p>
+              <p className="text-xl font-black text-red-300">{t("😔 נגמרו הניסיונות")}</p>
               <p className="text-sm text-zinc-400">
-                יצאת מהמשחק, אבל הוא עדיין רץ — סגור את החלון והמשך לשחק; הכפתור
-                למעלה יעדכן אותך מי זכה.
+                {t("יצאת מהמשחק, אבל הוא עדיין רץ — סגור את החלון והמשך לשחק; הכפתור למעלה יעדכן אותך מי זכה.")}
               </p>
             </div>
           )}
@@ -638,18 +646,10 @@ function MiniGameStage({
             />
           )}
 
-          <p className="text-center text-xs text-zinc-500">
-            {interactive ? (
-              <>
-                נותרו{" "}
-                <span className="nums font-bold text-zinc-300" dir="ltr">
-                  {attemptsLeft}
-                </span>{" "}
-                ניסיונות
-              </>
-            ) : (
-              "המשחק ממשיך בלעדיך — עקוב אחרי המתחרים"
-            )}
+          <p className="nums text-center text-xs text-zinc-500">
+            {interactive
+              ? t("נותרו {count} ניסיונות", { count: attemptsLeft })
+              : t("המשחק ממשיך בלעדיך — עקוב אחרי המתחרים")}
           </p>
 
           {fb && <p className={`text-center text-sm font-bold ${toneClass}`}>{fb.text}</p>}
@@ -660,10 +660,12 @@ function MiniGameStage({
           <WinnersRail board={state.board} />
 
           <div className="panel-inset rounded-lg p-2">
-            <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">🏁 מי משחק עכשיו</p>
+            <p className="px-1 pb-1.5 text-[11px] font-bold text-gold-dim">
+              {t("🏁 מי משחק עכשיו")}
+            </p>
             {state.board.length === 0 ? (
               <p className="px-1 py-3 text-center text-[11px] text-zinc-500">
-                עדיין אף אחד לא ניסה — היה הראשון!
+                {t("עדיין אף אחד לא ניסה — היה הראשון!")}
               </p>
             ) : (
               <ul className="max-h-56 space-y-0.5 overflow-y-auto">
@@ -673,12 +675,10 @@ function MiniGameStage({
               </ul>
             )}
             {state.players > state.board.length && (
-              <p className="px-1 pt-1.5 text-center text-[10px] text-zinc-600">
-                ועוד{" "}
-                <span className="nums" dir="ltr">
-                  {state.players - state.board.length}
-                </span>{" "}
-                משתתפים
+              <p className="nums px-1 pt-1.5 text-center text-[10px] text-zinc-600">
+                {t("ועוד {count} משתתפים", {
+                  count: state.players - state.board.length,
+                })}
               </p>
             )}
           </div>
@@ -773,11 +773,13 @@ function CornerNotes({
   notes: CornerNote[];
   onDismiss: (id: string) => void;
 }) {
+  const t = useT();
+  const dir = useDir();
   if (typeof document === "undefined" || notes.length === 0) return null;
 
   return createPortal(
     <div
-      dir="rtl"
+      dir={dir}
       aria-live="polite"
       // Lifted clear of the chat dock on a phone: at 390px a note this wide
       // reaches the dock's corner, and being the higher layer it covered it.
@@ -792,17 +794,18 @@ function CornerNotes({
             <span className="font-black text-emerald-300">
               <PlayerLink empireId={note.empireId} name={note.name} />
             </span>{" "}
-            לקח את הפרס
+            {t("לקח את הפרס")}
             {note.game && (
               <>
-                {" ב"}
+                {" "}
+                {t("ב־")}
                 <span className="font-bold text-gold-bright">״{note.game}״</span>
               </>
             )}
           </span>
           <button
             type="button"
-            aria-label="סגירה"
+            aria-label={t("סגירה")}
             onClick={() => onDismiss(note.id)}
             className="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded text-zinc-600 transition-colors hover:bg-white/10 hover:text-zinc-300"
           >
@@ -850,6 +853,7 @@ function MiniGamePill({
   onOpen: () => void;
   onExpire: () => void;
 }) {
+  const t = useT();
   const meta = MINIGAME_TYPE_META[state.type];
   const attemptsLeft = Math.max(0, state.maxAttempts - state.attempts);
   const interactive = !state.finished;
@@ -860,14 +864,14 @@ function MiniGamePill({
       type="button"
       onClick={onOpen}
       aria-haspopup="dialog"
-      aria-label={`${state.title} — ${meta.label}`}
+      aria-label={`${state.title} — ${t(meta.label)}`}
       // The narrow-screen squeeze is `.mg-pill--crowded` in globals.css rather
       // than utilities here: `.mg-pill-badge` and `.btn` are unlayered rules, so
       // they beat any Tailwind `hidden`/`gap-*`/`text-*` this could ask for.
       className={`mg-pill btn gap-2 px-3 py-1.5 text-sm ${crowded ? "mg-pill--crowded" : ""} ${
         interactive ? "btn-gold mg-pill--live" : "btn-dark"
       }`}
-      title={`${state.title} · ${meta.label} · פרס: ${state.prizeText}`}
+      title={`${state.title} · ${t(meta.label)} · ${t("פרס:")} ${state.prizeText}`}
     >
       <span aria-hidden className="text-base leading-none">
         {meta.icon}
@@ -900,11 +904,9 @@ function MiniGamePill({
       {interactive ? (
         <span className="mg-pill-badge mg-pill-badge--go">
           {attemptsLeft === 1 ? (
-            "ניסיון אחרון"
+            t("ניסיון אחרון")
           ) : (
-            <>
-              נותרו <span className="nums">{attemptsLeft}</span>
-            </>
+            <span className="nums">{t("נותרו {count}", { count: attemptsLeft })}</span>
           )}
         </span>
       ) : (
@@ -914,7 +916,7 @@ function MiniGamePill({
               🏆 <span className="nums">{winners.length}</span>
             </>
           ) : (
-            "אין עדיין זוכה"
+            t("אין עדיין זוכה")
           )}
         </span>
       )}

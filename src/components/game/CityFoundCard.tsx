@@ -71,11 +71,7 @@ export function CityFoundCard({
               </>
             )}{" "}
             <span className="font-normal text-gold-dim">
-              {t("(מתוך")}{" "}
-              <span className="nums" dir="ltr">
-                {maxCities}
-              </span>{" "}
-              {t("ערים)")}
+              {t("(מתוך {max} ערים)", { max: maxCities })}
             </span>
           </p>
         </div>
@@ -83,7 +79,7 @@ export function CityFoundCard({
 
       {isMax ? (
         <p className="text-sm text-zinc-400">
-          {t("הגעת ל")}
+          {t("הגעת ל־")}
           <span className="font-bold text-bone">{cityName(t, cities)}</span>{" "}
           {t("— העיר האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.")}
         </p>
@@ -94,11 +90,9 @@ export function CityFoundCard({
             <span className="font-bold text-emerald-400 nums" dir="ltr">
               ×{cities + 1}
             </span>{" "}
-            {t("ופותחת עוד")}{" "}
-            <span className="font-bold text-emerald-400 nums" dir="ltr">
-              {CITIZEN_GROWTH_LEVELS_PER_CITY}
-            </span>{" "}
-            {t("רמות לשדרוג קבלת האזרחים.")}
+            {t("ופותחת עוד {levels} רמות לשדרוג קבלת האזרחים.", {
+              levels: CITIZEN_GROWTH_LEVELS_PER_CITY,
+            })}
           </p>
 
           {/* Requirements — these are gates the empire must meet; none are spent. */}
@@ -106,22 +100,17 @@ export function CityFoundCard({
             <p className="font-semibold text-gold-dim">{t("דרישות (אינן נצרכות):")}</p>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className={meetsHero ? "text-emerald-400" : "text-red-400"}>
-                <Icon name="hero" size={14} className="inline align-[-2px]" /> {t("גיבור רמה")}{" "}
-                <span className="nums" dir="ltr">
-                  {heroRequired}
-                </span>{" "}
-                {t("(כעת")}{" "}
-                <span className="nums" dir="ltr">
-                  {heroLevel}
-                </span>
-                {t(")")} {meetsHero ? "✓" : "✗"}
+                <Icon name="hero" size={14} className="inline align-[-2px]" />{" "}
+                {t("גיבור רמה {required} (כעת {level})", {
+                  required: heroRequired,
+                  level: heroLevel,
+                })}{" "}
+                {meetsHero ? "✓" : "✗"}
               </span>
               <span className={enoughSoldiers ? "text-emerald-400" : "text-red-400"}>
                 <Icon name="army" size={14} className="inline align-[-2px]" />{" "}
-                <span className="nums" dir="ltr">
-                  {formatNumber(cost.soldiers)}
-                </span>{" "}
-                {t("חיילים בצבא")} {enoughSoldiers ? "✓" : "✗"}
+                {t("{count} חיילים בצבא", { count: formatNumber(cost.soldiers) })}{" "}
+                {enoughSoldiers ? "✓" : "✗"}
               </span>
             </div>
           </div>

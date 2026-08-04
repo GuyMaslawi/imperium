@@ -11,6 +11,7 @@ import { spinWheel } from "@/server/actions/wheel";
 import { formatCompact, formatNumber } from "@/lib/game/format";
 import { Icon, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { useScrollLock } from "@/components/ui/scrollLock";
+import { useDir, useT } from "@/i18n/client";
 
 /**
  * One line in a batch reveal: a prize totalled across the whole batch.
@@ -94,6 +95,8 @@ export function WheelOfFortune({
   seasonCycle: number;
   onClose: () => void;
 }) {
+  const t = useT();
+  const dir = useDir();
   // The wheel is the only overlay in the game that never locked the page behind
   // it, so on a phone a spin gesture that missed the wheel scrolled the base
   // screen underneath instead.
@@ -396,7 +399,7 @@ export function WheelOfFortune({
       setResult({
         prize: WHEEL_PRIZES[lastIdx],
         index: lastIdx,
-        message: `הושלמו ${spun} סיבובים — הנה מה שזכית בו:`,
+        message: t("הושלמו {count} סיבובים — הנה מה שזכית בו:", { count: spun }),
         haul,
       })
     );
@@ -423,23 +426,23 @@ export function WheelOfFortune({
         // an overlay sweep queries for. It had neither.
         role="dialog"
         aria-modal="true"
-        aria-label="גלגל המזל"
-        dir="rtl"
+        aria-label={t("גלגל המזל")}
+        dir={dir}
         onClick={(e) => e.stopPropagation()}
         className="ornate-shell relative my-6 w-full max-w-lg rounded-xl p-4 text-center sm:p-6"
       >
         <div className="absolute left-4 top-4 flex items-center gap-2">
           <button
             onClick={onClose}
-            aria-label="סגור"
+            aria-label={t("סגור")}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-zinc-400 transition-colors hover:border-gold/50 hover:text-white"
           >
             ✕
           </button>
           <button
             onClick={toggleSound}
-            aria-label={sound ? "כבה צלילים" : "הפעל צלילים"}
-            title={sound ? "כבה צלילים" : "הפעל צלילים"}
+            aria-label={sound ? t("כבה צלילים") : t("הפעל צלילים")}
+            title={sound ? t("כבה צלילים") : t("הפעל צלילים")}
             className="flex h-9 w-9 items-center justify-center rounded-full border border-border-subtle text-zinc-400 transition-colors hover:border-gold/50 hover:text-white"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -456,19 +459,21 @@ export function WheelOfFortune({
           </button>
         </div>
 
-        <h2 className="text-3xl font-black text-gold-bright">גלגל המזל</h2>
+        <h2 className="text-3xl font-black text-gold-bright">{t("גלגל המזל")}</h2>
         <div className="rule-gold mx-auto mt-2 w-40" />
 
         <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-gold/40 bg-panel-inset px-4 py-1 text-sm shadow-[inset_0_1px_0_rgba(228,195,90,0.12)]">
           <Icon name="wheel" size={14} className="text-gold" />
-          <span className="text-zinc-400">סיבובים זמינים</span>
+          <span className="text-zinc-400">{t("סיבובים זמינים")}</span>
           <span className="nums font-black text-gold-bright" dir="ltr">{spinsLeft}</span>
         </div>
-        <p className="mt-3 text-xs font-semibold text-gold">
-          מחזור <span className="nums" dir="ltr">{seasonCycle}</span> לעונה — הפרסים גדלים בכל עדכון יומי!
+        <p className="nums mt-3 text-xs font-semibold text-gold">
+          {t("מחזור {cycle} לעונה — הפרסים גדלים בכל עדכון יומי!", {
+            cycle: seasonCycle,
+          })}
         </p>
         <p className="mt-1 text-xs font-semibold text-zinc-400">
-          פרס &quot;חפץ&quot; דורש לפחות מקום פנוי אחד בתיק הגיבור.
+          {t("פרס ״חפץ״ דורש לפחות מקום פנוי אחד בתיק הגיבור.")}
         </p>
 
         {/* wheel — fixed 340px geometry, scaled down to fit narrow phones */}
@@ -721,20 +726,21 @@ export function WheelOfFortune({
             onClick={spinBatch}
             disabled={spinning || spinsLeft < 2}
             className="btn btn-ghost px-5 py-3 text-sm font-black"
-            title="סובב את כל הסיבובים הזמינים בבת אחת (עד 10)"
+            title={t("סובב את כל הסיבובים הזמינים בבת אחת (עד 10)")}
           >
-            <span className="nums" dir="ltr">×{Math.min(spinsLeft, 10)}</span> סיבובים
+            <span className="nums" dir="ltr">×{Math.min(spinsLeft, 10)}</span>{" "}
+            {t("סיבובים")}
           </button>
           <button
             onClick={spin}
             disabled={spinning || spinsLeft <= 0}
             className="btn btn-gold px-5 py-3 text-base"
           >
-            <Icon name="wheel" size={18} /> {spinning ? "מסתובב…" : "סובב"}
+            <Icon name="wheel" size={18} /> {spinning ? t("מסתובב…") : t("סובב")}
           </button>
         </div>
         <p className="mt-2 text-[11px] text-bone-dim">
-          כפתור הבאטץ&apos; מסובב את כל הסיבובים הזמינים בבת אחת (עד 10).
+          {t("כפתור הבאטץ׳ מסובב את כל הסיבובים הזמינים בבת אחת (עד 10).")}
         </p>
       </div>
     </div>

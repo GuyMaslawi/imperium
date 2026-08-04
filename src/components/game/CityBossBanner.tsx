@@ -20,7 +20,7 @@ import { BossAttackButton } from "@/components/game/BossAttackButton";
 import { BossCountdown } from "@/components/game/BossCountdown";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 import type { CityBossState } from "@/server/bossState";
-import { useT } from "@/i18n/client";
+import { useDir, useT } from "@/i18n/client";
 
 /**
  * The city boss, as a compact slab above the rankings ladder.
@@ -38,6 +38,7 @@ import { useT } from "@/i18n/client";
  */
 export function CityBossBanner({ state, cities }: { state: CityBossState; cities: number }) {
   const t = useT();
+  const dir = useDir();
   const {
     boss,
     power,
@@ -88,17 +89,18 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
   // own city: past that the honest advice is to grow first, and say why.
   const outmatched = soldiers > 0 && sortiesToKill > 3;
 
+  const bossName = t(boss.name);
   const disabledReason = dead
-    ? `${boss.name} מת — הוא קם לתחייה בעוד רגע`
+    ? t("{boss} מת — הוא קם לתחייה בעוד רגע", { boss: bossName })
     : activeBattleId
-      ? "הקרב הנוכחי עוד רץ"
+      ? t("הקרב הנוכחי עוד רץ")
       : outOfTurns
-        ? `חסרות לך ${formatNumber(turnCost - myTurns)} תורות`
-        : "אין לך צבא — אמן חיילים קודם";
+        ? t("חסרות לך {turns} תורות", { turns: formatNumber(turnCost - myTurns) })
+        : t("אין לך צבא — אמן חיילים קודם");
 
   return (
     <section
-      dir="rtl"
+      dir={dir}
       style={{ ["--boss-accent" as string]: boss.accent }}
       className="relative overflow-hidden rounded-2xl border border-[rgb(var(--boss-accent))]/45 bg-[#0a0709] shadow-[0_0_0_1px_rgba(0,0,0,0.8),0_20px_60px_-30px_rgb(var(--boss-accent)/0.55)]"
     >
@@ -133,7 +135,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           </div>
           <LivingPortrait
             src={bossImage(boss.key)}
-            alt={`${boss.name} — ${boss.title}`}
+            alt={`${bossName} — ${t(boss.title)}`}
             className={`absolute inset-0 ${dead ? "grayscale" : ""}`}
             accent={boss.accent}
             embers={dead ? 0 : 8}
@@ -154,7 +156,12 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           </LivingPortrait>
           {myKills > 0 && (
             <div className="absolute inset-x-0 bottom-1.5 flex justify-center">
-              <Tip tip={`הפלת את ${boss.name} ${myKills} פעמים בעיר הזו.`}>
+              <Tip
+                tip={t("הפלת את {boss} {count} פעמים בעיר הזו.", {
+                  boss: bossName,
+                  count: myKills,
+                })}
+              >
                 <span className="nums rounded border border-gold/60 bg-black/85 px-1.5 text-[10px] font-black text-gold-bright">
                   ☠ ×{myKills}
                 </span>
@@ -168,14 +175,19 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           {/* identity — one line */}
           <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
             <p className="min-w-0 truncate text-lg font-black leading-tight text-[rgb(var(--boss-accent))]">
-              {boss.name}
+              {bossName}
               <span className="mr-2 text-[10px] font-bold uppercase tracking-[0.2em] text-bone-dim">
-                {boss.title}
+                {t(boss.title)}
               </span>
             </p>
-            <Tip tip={`${boss.name} שולט ב${cityFullName(t, cities)}.`}>
+            <Tip
+              tip={t("{boss} שולט ב{city}.", {
+                boss: bossName,
+                city: cityFullName(t, cities),
+              })}
+            >
               <span className="cursor-help shrink-0 rounded border border-[rgb(var(--boss-accent))]/60 bg-black/60 px-1.5 py-0.5 text-[10px] font-black text-[rgb(var(--boss-accent))]">
-                עיר {cityName(t, cities)}
+                {t("עיר {city}", { city: cityName(t, cities) })}
               </span>
             </Tip>
           </div>
@@ -184,10 +196,10 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           {dead ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-gold/30 bg-black/40 px-2.5 py-2">
               <span className="text-xs font-bold text-gold-bright">
-                <Icon name="crown" size={13} className="inline-block align-middle" /> {boss.name}{" "}
-                הופל
+                <Icon name="crown" size={13} className="inline-block align-middle" />{" "}
+                {t("{boss} הופל", { boss: bossName })}
               </span>
-              <span className="text-xs text-zinc-400">— קם לתחייה בעוד</span>
+              <span className="text-xs text-zinc-400">{t("— קם לתחייה בעוד")}</span>
               <BossCountdown
                 endsAt={revivesAt.getTime()}
                 serverNow={serverNow}
@@ -198,7 +210,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             <div>
               <div className="mb-1 flex items-baseline justify-between gap-2">
                 <span className="text-[11px] font-bold text-[rgb(var(--boss-accent))]">
-                  חיי הבוס
+                  {t("חיי הבוס")}
                 </span>
                 <span className="nums text-xs font-black text-zinc-100" dir="ltr">
                   {formatNumber(Math.round(hp))} / {formatNumber(maxHp)}
@@ -211,16 +223,15 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 />
               </div>
               {woundedPct >= 1 && (
-                <p className="mt-1 text-[11px] text-zinc-500">
-                  פצוע ב־
-                  <span className="nums text-zinc-300" dir="ltr">
-                    {Math.round(woundedPct)}%
-                  </span>{" "}
-                  מ־
-                  <span className="nums" dir="ltr">
-                    {sorties}
-                  </span>{" "}
-                  {sorties === 1 ? "תקיפה" : "תקיפות"} — הפצעים נשארים עד שהוא נופל
+                <p className="nums mt-1 text-[11px] text-zinc-500">
+                  {sorties === 1
+                    ? t("פצוע ב־{pct}% מתקיפה אחת — הפצעים נשארים עד שהוא נופל", {
+                        pct: Math.round(woundedPct),
+                      })
+                    : t("פצוע ב־{pct}% מ־{sorties} תקיפות — הפצעים נשארים עד שהוא נופל", {
+                        pct: Math.round(woundedPct),
+                        sorties,
+                      })}
                 </p>
               )}
             </div>
@@ -243,14 +254,14 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               }`}
             >
               <div>
-                <p className="font-bold text-gold-dim">תקיפה אחת תוריד לו</p>
+                <p className="font-bold text-gold-dim">{t("תקיפה אחת תוריד לו")}</p>
                 <p className="nums mt-0.5 text-right font-black text-gold-bright" dir="ltr">
                   ~{formatNumber(Math.round(expectedSortieDamage))}
                   <span className="font-normal text-zinc-500"> ({Math.round(bitePct)}%)</span>
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gold-dim">ותשלם לך בערך</p>
+                <p className="font-bold text-gold-dim">{t("ותשלם לך בערך")}</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   {BOSS_REWARD_RESOURCES.map((res) => (
                     <span
@@ -275,7 +286,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               </div>
               {BOSS_CASUALTIES && (
                 <div>
-                  <p className="font-bold text-gold-dim">ותעלה לך</p>
+                  <p className="font-bold text-gold-dim">{t("ותעלה לך")}</p>
                   <p className="nums mt-0.5 text-right font-black text-red-300" dir="ltr">
                     ~{formatNumber(Math.round(expectedSortieLosses))} ⚔
                     <span className="font-normal text-zinc-500"> ({Math.round(lossPct)}%)</span>
@@ -288,31 +299,20 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
           {/* The one sentence a player under the wall was never told: this is a
               bad trade *right now*, and here is the lever that changes it. */}
           {!dead && !activeBattleId && outmatched && (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-200/90">
-              <b>{boss.name} עדיין חזק ממך.</b> בקצב הזה צריך כ־
-              <span className="nums" dir="ltr">
-                {Number.isFinite(sortiesToKill) ? sortiesToKill : "∞"}
-              </span>{" "}
-              תקיפות כדי להפיל אותו, וכל אחת עולה{" "}
-              <span className="nums" dir="ltr">
-                {formatNumber(turnCost)}
-              </span>{" "}
-              תורות
-              {BOSS_CASUALTIES && (
-                <>
-                  {" "}
-                  ובערך{" "}
-                  <span className="nums" dir="ltr">
-                    {formatNumber(Math.round(expectedSortieLosses))}
-                  </span>{" "}
-                  חיילים
-                </>
+            <p className="nums rounded-lg border border-amber-500/30 bg-amber-950/20 px-2.5 py-1.5 text-[11px] leading-relaxed text-amber-200/90">
+              <b>{t("{boss} עדיין חזק ממך.", { boss: bossName })}</b>{" "}
+              {t("בקצב הזה צריך כ־{sorties} תקיפות כדי להפיל אותו, וכל אחת עולה {turns} תורות", {
+                sorties: Number.isFinite(sortiesToKill) ? sortiesToKill : "∞",
+                turns: formatNumber(turnCost),
+              })}
+              {BOSS_CASUALTIES &&
+                t(" ובערך {soldiers} חיילים", {
+                  soldiers: formatNumber(Math.round(expectedSortieLosses)),
+                })}
+              {t(
+                ". השלל הגדול ({share}% ממנו + הציוד) משולם רק בהפלה — עדיף לגדל צבא ולהעלות את הגיבור, ואז לתקוף.",
+                { share: Math.round(BOSS_KILL_SHARE * 100) }
               )}
-              . השלל הגדול (
-              <span className="nums" dir="ltr">
-                {Math.round(BOSS_KILL_SHARE * 100)}%
-              </span>{" "}
-              ממנו + הציוד) משולם רק בהפלה — עדיף לגדל צבא ולהעלות את הגיבור, ואז לתקוף.
             </p>
           )}
 
@@ -323,13 +323,13 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 href="/game/boss/battle"
                 className="btn btn-gold inline-flex items-center gap-2 px-4 py-2 text-sm font-black"
               >
-                <Icon name="attack" size={16} className="inline-block align-middle" /> הקרב רץ —
-                צפה בו
+                <Icon name="attack" size={16} className="inline-block align-middle" />{" "}
+                {t("הקרב רץ — צפה בו")}
                 <BossCountdown endsAt={activeEndsAt.getTime()} serverNow={serverNow} compact />
               </Link>
             ) : (
               <BossAttackButton
-                bossName={boss.name}
+                bossName={bossName}
                 disabled={!canAttack}
                 disabledReason={disabledReason}
                 turnCost={turnCost}
@@ -338,14 +338,17 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             )}
 
             <Tip
-              tip={`תקיפה עולה ${turnCost.toLocaleString("he-IL")} תורות ורצה כדקה. הצבא נלחם לבד ${roundsPerSortie} סבבים — תקבל הודעה עם השלל כשהקרב נגמר, גם אם עברת לדף אחר.`}
+              tip={t(
+                "תקיפה עולה {cost} תורות ורצה כדקה. הצבא נלחם לבד {rounds} סבבים — תקבל הודעה עם השלל כשהקרב נגמר, גם אם עברת לדף אחר.",
+                { cost: formatNumber(turnCost), rounds: roundsPerSortie }
+              )}
             >
               <span className="nums inline-flex cursor-help items-center gap-1.5 rounded-full border border-border-subtle bg-panel-inset px-2.5 py-1 text-xs text-zinc-300">
                 <Icon name="turns" size={13} className="text-emerald-400" />
                 <b className={outOfTurns ? "text-red-400" : "text-gold-bright"} dir="ltr">
                   {formatNumber(turnCost)}
                 </b>{" "}
-                תורות
+                {t("תורות")}
               </span>
             </Tip>
             {!canAttack && !dead && !activeBattleId && (
@@ -362,37 +365,36 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               >
                 ▸
               </span>
-              שלל, איך הקרב עובד, וסיפור הרקע
-              {conquerors.length > 0 && <> · מפילי {boss.name}</>}
+              {t("שלל, איך הקרב עובד, וסיפור הרקע")}
+              {conquerors.length > 0 && <> · {t("מפילי {boss}", { boss: bossName })}</>}
             </summary>
 
             <div className="mt-3 space-y-3.5">
               {/* -------- how the fight goes, now that it fights itself -------- */}
               <div>
                 <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-                  <Icon name="attack" size={13} /> איך הקרב עובד
+                  <Icon name="attack" size={13} /> {t("איך הקרב עובד")}
                 </p>
-                <p className="text-xs leading-relaxed text-zinc-400">
-                  לוחצים תקיפה פעם אחת. הצבא יוצא ל־
-                  <b className="nums">{roundsPerSortie}</b> סבבים לאורך כדקה, ובכל סבב הקצינים
-                  מנסים לקרוא את המהלך של {boss.name} ולענות עליו. קריאה נכונה מכפילה את הנזק
-                  {BOSS_CASUALTIES && " ומבטלת כמעט את האבדות"}; קריאה שגויה עושה את ההפוך.
-                  הסיכוי לקרוא נכון תלוי <b>ברמת הגיבור שלך</b> — כרגע{" "}
+                <p className="nums text-xs leading-relaxed text-zinc-400">
+                  {t(
+                    "לוחצים תקיפה פעם אחת. הצבא יוצא ל־{rounds} סבבים לאורך כדקה, ובכל סבב הקצינים מנסים לקרוא את המהלך של {boss} ולענות עליו. קריאה נכונה מכפילה את הנזק",
+                    { rounds: roundsPerSortie, boss: bossName }
+                  )}
+                  {BOSS_CASUALTIES && t(" ומבטלת כמעט את האבדות")}
+                  {t("; קריאה שגויה עושה את ההפוך. הסיכוי לקרוא נכון תלוי")}{" "}
+                  <b>{t("ברמת הגיבור שלך")}</b> —{" "}
+                  {t("כרגע")}{" "}
                   <b className="nums text-gold-bright" dir="ltr">
                     {Math.round(readChance * 100)}%
                   </b>
                   .{" "}
                   {BOSS_CASUALTIES ? (
-                    <>
-                      אבדות של{" "}
-                      <span className="nums" dir="ltr">
-                        {Math.round(BOSS_ROUT_LOSS_FRACTION * 100)}%
-                      </span>{" "}
-                      מבריחות את הצבא באמצע הקרב.
-                    </>
+                    t("אבדות של {pct}% מבריחות את הצבא באמצע הקרב.", {
+                      pct: Math.round(BOSS_ROUT_LOSS_FRACTION * 100),
+                    })
                   ) : (
                     <b className="text-emerald-300">
-                      הקרב לא עולה לך אף חייל — הצבא חוזר שלם תמיד, והמחיר היחיד הוא התורות.
+                      {t("הקרב לא עולה לך אף חייל — הצבא חוזר שלם תמיד, והמחיר היחיד הוא התורות.")}
                     </b>
                   )}
                 </p>
@@ -406,42 +408,29 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                         className="flex flex-wrap items-center gap-x-2 rounded border border-border-subtle bg-panel-inset px-2 py-1 text-[11px]"
                       >
                         <span aria-hidden>{meta.icon}</span>
-                        <b className={meta.tone}>{meta.label}</b>
+                        <b className={meta.tone}>{t(meta.label)}</b>
                         <span aria-hidden className="text-zinc-600">
                           ←
                         </span>
                         <span aria-hidden>{counter.icon}</span>
-                        <b className="text-zinc-200">{counter.label}</b>
+                        <b className="text-zinc-200">{t(counter.label)}</b>
                       </li>
                     );
                   })}
                 </ul>
-                <p className="mt-1.5 text-[11px] text-zinc-500">
-                  תקיפה אחת שלך מורידה בממוצע{" "}
-                  <span className="nums text-gold-dim" dir="ltr">
-                    {formatNumber(Math.round(expectedSortieDamage))}
-                  </span>{" "}
-                  חיים —{" "}
-                  {Number.isFinite(sortiesToKill) ? (
-                    <>
-                      כ־
-                      <span className="nums text-gold-dim" dir="ltr">
-                        {sortiesToKill}
-                      </span>{" "}
-                      {sortiesToKill === 1 ? "תקיפה" : "תקיפות"} להפלה
-                    </>
-                  ) : (
-                    <>אמן צבא כדי להתחיל</>
-                  )}
-                  . כוח הבוס{" "}
-                  <span className="nums" dir="ltr">
-                    {formatNumber(power)}
-                  </span>{" "}
-                  מול כוח התקיפה שלך{" "}
-                  <span className="nums" dir="ltr">
-                    {formatNumber(Math.round(myPower))}
-                  </span>
-                  .
+                <p className="nums mt-1.5 text-[11px] text-zinc-500">
+                  {t("תקיפה אחת שלך מורידה בממוצע {damage} חיים —", {
+                    damage: formatNumber(Math.round(expectedSortieDamage)),
+                  })}{" "}
+                  {!Number.isFinite(sortiesToKill)
+                    ? t("אמן צבא כדי להתחיל")
+                    : sortiesToKill === 1
+                      ? t("תקיפה אחת להפלה")
+                      : t("כ־{sorties} תקיפות להפלה", { sorties: sortiesToKill })}
+                  {t(". כוח הבוס {bossPower} מול כוח התקיפה שלך {myPower}.", {
+                    bossPower: formatNumber(power),
+                    myPower: formatNumber(Math.round(myPower)),
+                  })}
                 </p>
               </div>
 
@@ -454,37 +443,37 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                   with it bloodless, both levers now point at damage.) */}
               <div className="border-t border-border-subtle pt-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-                  <Icon name="spark" size={13} /> איך מגדילים את הסיכויים
+                  <Icon name="spark" size={13} /> {t("איך מגדילים את הסיכויים")}
                 </p>
 
                 <div className="grid gap-2 sm:grid-cols-2">
                   {/* damage side */}
                   <div className="rounded-lg border border-border-subtle bg-panel-inset p-2.5">
                     <p className="text-[11px] font-bold text-emerald-300">
-                      <Icon name="attack" size={12} className="inline-block align-middle" /> כדי
-                      לפגוע בו יותר — כוח תקיפה
+                      <Icon name="attack" size={12} className="inline-block align-middle" />{" "}
+                      {t("כדי לפגוע בו יותר — כוח תקיפה")}
                     </p>
-                    <p className="nums mt-1 text-[11px] leading-relaxed text-zinc-400" dir="rtl">
-                      (חיילים{" "}
+                    <p className="nums mt-1 text-[11px] leading-relaxed text-zinc-400">
+                      {t("(חיילים")}{" "}
                       <b className="text-zinc-200" dir="ltr">
                         {formatNumber(armyPower)}
                       </b>{" "}
-                      + נשקי תקיפה{" "}
+                      {t("+ נשקי תקיפה")}{" "}
                       <b className="text-zinc-200" dir="ltr">
                         {formatNumber(weaponPower)}
                       </b>
-                      ) × גיבור{" "}
+                      {t(") × גיבור")}{" "}
                       <b className="text-zinc-200" dir="ltr">
                         +{Math.round(heroBonusPct)}%
                       </b>{" "}
-                      × גילדה{" "}
+                      {t("× גילדה")}{" "}
                       <b className="text-zinc-200" dir="ltr">
                         +{Math.round(guildBonusPct)}%
                       </b>
                       {guildAidPower > 0 && (
                         <>
                           {" "}
-                          + סיוע{" "}
+                          {t("+ סיוע")}{" "}
                           <b className="text-zinc-200" dir="ltr">
                             {formatNumber(Math.round(guildAidPower))}
                           </b>
@@ -495,17 +484,14 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                         {formatNumber(Math.round(myPower))}
                       </b>
                     </p>
-                    <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                      הנזק בכל סבב הוא אחוז מהכוח הזה — כל{" "}
-                      <span className="nums" dir="ltr">
-                        100
-                      </span>{" "}
-                      חיילים מוסיפים{" "}
-                      <span className="nums" dir="ltr">
-                        1,000
-                      </span>{" "}
-                      כוח, ונשקי תקיפה מוסיפים כוח{BOSS_CASUALTIES ? " בלי לעלות בדם" : " בלי לאמן אף חייל"}.
-                      שיקוי כוח, באפ גילדה וציוד גיבור נספרים גם הם.
+                    <p className="nums mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                      {t(
+                        "הנזק בכל סבב הוא אחוז מהכוח הזה — כל 100 חיילים מוסיפים 1,000 כוח, ונשקי תקיפה מוסיפים כוח"
+                      )}
+                      {BOSS_CASUALTIES
+                        ? t(" בלי לעלות בדם")
+                        : t(" בלי לאמן אף חייל")}
+                      {t(". שיקוי כוח, באפ גילדה וציוד גיבור נספרים גם הם.")}
                     </p>
                   </div>
 
@@ -513,36 +499,38 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                   <div className="rounded-lg border border-border-subtle bg-panel-inset p-2.5">
                     <p className="text-[11px] font-bold text-sky-300">
                       <Icon name="hero" size={12} className="inline-block align-middle" />{" "}
-                      {BOSS_CASUALTIES ? "כדי לספוג פחות — הגיבור" : "כדי לפגוע בכל סבב — הגיבור"}
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">
                       {BOSS_CASUALTIES
-                        ? "אבדות נקבעות רק לפי אם הקצינים קראו את המהלך נכון. גיבור רמה "
-                        : "כמה נזק ייצא מהסבב נקבע לפי אם הקצינים קראו את המהלך נכון. גיבור רמה "}
+                        ? t("כדי לספוג פחות — הגיבור")
+                        : t("כדי לפגוע בכל סבב — הגיבור")}
+                    </p>
+                    <p className="nums mt-1 text-[11px] leading-relaxed text-zinc-400">
+                      {BOSS_CASUALTIES
+                        ? t("אבדות נקבעות רק לפי אם הקצינים קראו את המהלך נכון. גיבור רמה")
+                        : t("כמה נזק ייצא מהסבב נקבע לפי אם הקצינים קראו את המהלך נכון. גיבור רמה")}{" "}
                       <b className="nums text-zinc-200" dir="ltr">
                         {heroLevel}
                       </b>{" "}
-                      קורא נכון{" "}
+                      {t("קורא נכון")}{" "}
                       <b className="nums text-gold-bright" dir="ltr">
                         {Math.round(readChance * 100)}%
                       </b>{" "}
-                      מהמהלכים
+                      {t("מהמהלכים")}
                       {BOSS_CASUALTIES
-                        ? ", וסבב שנקרא נכון עולה כשליש מהדם של סבב שגוי — ומכפיל את הנזק."
-                        : ", וסבב שנקרא נכון מכפיל את הנזק מול סבב שנקרא לא נכון."}
+                        ? t(", וסבב שנקרא נכון עולה כשליש מהדם של סבב שגוי — ומכפיל את הנזק.")
+                        : t(", וסבב שנקרא נכון מכפיל את הנזק מול סבב שנקרא לא נכון.")}
                     </p>
                     {!heroAlive ? (
                       <p className="mt-1.5 rounded border border-red-500/40 bg-red-950/30 px-2 py-1 text-[11px] font-bold text-red-300">
-                        הגיבור שלך מת — הקצינים מנחשים ואין זעם
-                        {BOSS_CASUALTIES && ", והאבדות כמעט מוכפלות"}. החייה אותו לפני שתתקוף.
+                        {t("הגיבור שלך מת — הקצינים מנחשים ואין זעם")}
+                        {BOSS_CASUALTIES && t(", והאבדות כמעט מוכפלות")}
+                        {t(". החייה אותו לפני שתתקוף.")}
                       </p>
                     ) : (
-                      <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-                        כל רמה מוסיפה לסיכוי הקריאה (עד{" "}
-                        <span className="nums" dir="ltr">
-                          {Math.round(BOSS_READ_CHANCE_MAX * 100)}%
-                        </span>
-                        ) ומחזקת את מכת הזעם. גיבור מת מאבד את שניהם.
+                      <p className="nums mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+                        {t(
+                          "כל רמה מוסיפה לסיכוי הקריאה (עד {max}%) ומחזקת את מכת הזעם. גיבור מת מאבד את שניהם.",
+                          { max: Math.round(BOSS_READ_CHANCE_MAX * 100) }
+                        )}
                       </p>
                     )}
                   </div>
@@ -552,7 +540,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               {/* -------- spoils -------- */}
               <div className="border-t border-border-subtle pt-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-                  <Icon name="gift" size={13} /> שלל מלא על הבוס הזה
+                  <Icon name="gift" size={13} /> {t("שלל מלא על הבוס הזה")}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {BOSS_REWARD_RESOURCES.map((res) => (
@@ -567,53 +555,52 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                       />
                       <span dir="ltr">{formatNumber(lifeHaul[res])}</span>
                       <span className="text-[10px] font-normal text-zinc-500">
-                        {RESOURCE_META[res].label}
+                        {t(RESOURCE_META[res].label)}
                       </span>
                     </span>
                   ))}
-                  <Tip tip="שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.">
+                  <Tip tip={t("שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.")}>
                     <span className="nums inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-2 py-1 text-xs font-bold text-emerald-300">
                       <Icon name="mine" size={13} />
                       <span dir="ltr">{formatNumber(lifeHaul.slaves)}</span>
-                      <span className="text-[10px] font-normal text-emerald-500/80">עבדים</span>
+                      <span className="text-[10px] font-normal text-emerald-500/80">
+                        {t("עבדים")}
+                      </span>
                     </span>
                   </Tip>
-                  <Tip tip="הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה.">
+                  <Tip tip={t("הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה.")}>
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-950/40 px-2 py-1 text-xs font-bold text-purple-300">
-                      <Icon name="spark" size={13} /> ציוד מובטח בהפלה
+                      <Icon name="spark" size={13} /> {t("ציוד מובטח בהפלה")}
                     </span>
                   </Tip>
                   <span className="nums inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-panel-inset px-2 py-1 text-xs font-bold text-zinc-200">
                     <Icon name="hero" size={13} className="text-gold" />
                     <span dir="ltr">+{formatNumber(heroXp)}</span>
-                    <span className="text-[10px] font-normal text-zinc-500">ניסיון</span>
+                    <span className="text-[10px] font-normal text-zinc-500">{t("ניסיון")}</span>
                   </span>
                 </div>
-                <p className="mt-1.5 text-[11px] text-zinc-500">
-                  <span className="nums" dir="ltr">
-                    {Math.round(BOSS_CHIP_SHARE * 100)}%
-                  </span>{" "}
-                  מהשלל משולם לפי הנזק שאתה מספיק לגרום — גם בתקיפה שלא הפילה אותו. השאר (
-                  <span className="nums" dir="ltr">
-                    {Math.round(BOSS_KILL_SHARE * 100)}%
-                  </span>
-                  ) הוא אוצר ההפלה, שגדל עד{" "}
-                  <span className="nums" dir="ltr">
-                    ×{BOSS_GRADE_BONUS.S}
-                  </span>{" "}
-                  בקרב מושלם. השלל גדל עם התקדמות העונה ועם מספר הערים שלך.
+                <p className="nums mt-1.5 text-[11px] text-zinc-500">
+                  {t(
+                    "{chip}% מהשלל משולם לפי הנזק שאתה מספיק לגרום — גם בתקיפה שלא הפילה אותו. השאר ({kill}%) הוא אוצר ההפלה, שגדל עד ×{grade} בקרב מושלם. השלל גדל עם התקדמות העונה ועם מספר הערים שלך.",
+                    {
+                      chip: Math.round(BOSS_CHIP_SHARE * 100),
+                      kill: Math.round(BOSS_KILL_SHARE * 100),
+                      grade: BOSS_GRADE_BONUS.S,
+                    }
+                  )}
                 </p>
               </div>
 
               <p className="border-t border-border-subtle pt-3 text-xs leading-relaxed text-zinc-400">
-                {boss.lore}
+                {t(boss.lore)}
               </p>
 
               {/* -------- honour roll -------- */}
               {conquerors.length > 0 && (
                 <div className="border-t border-border-subtle pt-3">
                   <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-                    <Icon name="rankings" size={13} /> מפילי {boss.name}
+                    <Icon name="rankings" size={13} />{" "}
+                    {t("מפילי {boss}", { boss: bossName })}
                   </p>
                   <ul className="flex flex-wrap gap-2">
                     {conquerors.map((c) => (

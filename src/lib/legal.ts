@@ -12,10 +12,18 @@ import { DEFAULT_LOCALE, LOCALE_TAG, type Locale } from "@/i18n/locale";
  * until it is set.
  *
  * Set on Vercel (and in `.env` for local work):
- *   LEGAL_OPERATOR_NAME   "ישראל ישראלי"        — the name on the dealer certificate
- *   LEGAL_OPERATOR_TAX_ID "123456789"           — מספר עוסק (for an עוסק פטור: your ת.ז.)
- *   LEGAL_CONTACT_EMAIL   "kraldorsupport@gmail.com" — where cancellation requests land
- *   LEGAL_OPERATOR_CITY   "תל אביב"             — city is enough; a street address is not required
+ *   LEGAL_OPERATOR_NAME    "ישראל ישראלי"             — the name on the dealer certificate
+ *   LEGAL_OPERATOR_TAX_ID  "123456789"                — מספר עוסק (for an עוסק פטור: your ת.ז.)
+ *   LEGAL_CONTACT_EMAIL    "kraldorsupport@gmail.com" — where cancellation requests land
+ *   LEGAL_CONTACT_PHONE    "050-1234567"              — a number a customer can actually call
+ *   LEGAL_OPERATOR_ADDRESS "הרצל 1, תל אביב 6100000"  — full postal address for written notice
+ *
+ * The last two were added on 2026-08-04 because the acquirer's underwriting asks
+ * for them by name: a postal address for written notice and a contact telephone
+ * number. That supersedes the earlier `LEGAL_OPERATOR_CITY`, which published a
+ * city only — enough for the consumer-protection rule, not enough for the
+ * gateway. Both are therefore *required*, not decorative: see
+ * {@link REQUIRED_LEGAL_ENV}.
  */
 
 export interface LegalOperator {
@@ -25,8 +33,18 @@ export interface LegalOperator {
   taxId: string | null;
   /** Contact address for support, cancellations and privacy requests. */
   email: string;
-  /** City of the business, or null while unset. */
-  city: string | null;
+  /** Telephone number a customer can reach, or null while unset. */
+  phone: string | null;
+  /**
+   * Full postal address for written notice (street, number, city, postcode),
+   * or null while unset.
+   *
+   * Worth saying out loud: for a home-run עוסק פטור this is a home address, and
+   * publishing it is the point — the acquirer and the consumer-protection rules
+   * both want a place a letter can be sent. A תא דואר satisfies both if the home
+   * address should not be public.
+   */
+  address: string | null;
   /**
    * True once the operator is fully identified.
    *
@@ -62,15 +80,22 @@ const FALLBACK_EMAIL = "kraldorsupport@gmail.com";
  * The env vars that must be set before the game may take money, and which of
  * them are still missing.
  *
- * The city is not here: Israeli distance-selling rules want a place of business,
- * and a city is enough to satisfy the page, but a policy that named no city has
- * never been the thing that voids a sale. Name, dealer number and a contact
- * address are the three that identify who the buyer is contracting with.
+ * All five are here because all five are checked by someone. Name, dealer number
+ * and a contact address identify who the buyer is contracting with under Israeli
+ * distance-selling rules; the acquirer's underwriting adds a postal address and
+ * a telephone number to that list by name. A deploy missing any of them is a
+ * deploy that would fail review, so the store refuses to open rather than
+ * discovering it after the first chargeback.
+ *
+ * `LEGAL_OPERATOR_CITY` is deliberately *not* here — it is superseded by
+ * `LEGAL_OPERATOR_ADDRESS`, which contains the city.
  */
 export const REQUIRED_LEGAL_ENV = [
   "LEGAL_OPERATOR_NAME",
   "LEGAL_OPERATOR_TAX_ID",
   "LEGAL_CONTACT_EMAIL",
+  "LEGAL_CONTACT_PHONE",
+  "LEGAL_OPERATOR_ADDRESS",
 ] as const;
 
 /** Which of REQUIRED_LEGAL_ENV are unset — empty once the operator is published. */
@@ -82,13 +107,21 @@ export function getLegalOperator(): LegalOperator {
   const name = process.env.LEGAL_OPERATOR_NAME?.trim() || "";
   const taxId = process.env.LEGAL_OPERATOR_TAX_ID?.trim() || "";
   const email = process.env.LEGAL_CONTACT_EMAIL?.trim() || "";
-  const city = process.env.LEGAL_OPERATOR_CITY?.trim() || "";
+  const phone = process.env.LEGAL_CONTACT_PHONE?.trim() || "";
+  // The retired `LEGAL_OPERATOR_CITY` still answers when no full address is
+  // configured, so a deploy mid-migration prints the city it always printed
+  // instead of dropping the place of business off the page entirely.
+  const address =
+    process.env.LEGAL_OPERATOR_ADDRESS?.trim() ||
+    process.env.LEGAL_OPERATOR_CITY?.trim() ||
+    "";
 
   return {
     name: name || FALLBACK_NAME,
     taxId: taxId || null,
     email: email || FALLBACK_EMAIL,
-    city: city || null,
+    phone: phone || null,
+    address: address || null,
     complete: missingLegalFields().length === 0,
   };
 }

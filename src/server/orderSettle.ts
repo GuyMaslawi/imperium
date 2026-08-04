@@ -2,32 +2,37 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { logError } from "@/server/errorLog";
-import { asGrowProvider, growProvider } from "@/server/grow";
+import { getPaymentProvider } from "@/server/payments";
 import { settleDiamondPurchase, type SettleOutcome } from "@/server/purchases";
 
 /**
- * Settling a Grow order — the single code path both settlement triggers run
- * through.
+ * Settling a hosted-checkout order — the single code path every settlement
+ * trigger runs through, for whichever gateway is wired.
  *
  * A hosted-checkout payment is announced twice, in a racing, unordered way:
  *
  * - the **buyer's browser** comes back to `/game/diamonds/buy/success`, and
- * - **Grow's server** POSTs `/api/pay/grow/[secret]`, possibly first, possibly
- *   twice, possibly an hour later after retries.
+ * - the **gateway's server** calls `/api/pay/<gateway>`, possibly first,
+ *   possibly twice, possibly an hour later after retries.
  *
- * Both call {@link settleGrowOrder}. Neither is trusted for anything but the
+ * Both call {@link settleOrder}. Neither is trusted for anything but the
  * *identity* of the order: the amount and the paid/unpaid state come from asking
- * Grow directly (`captureOrder`), and the crediting itself goes through
+ * the gateway directly (`captureOrder`), and the crediting itself goes through
  * `settleDiamondPurchase`, whose guarded PENDING→PAID flip means the loser of
  * the race credits nothing.
  *
+ * This file is deliberately gateway-agnostic. It was written for Grow, and the
+ * move to PayPlus changed nothing in it — which is the point of the
+ * `OrderPaymentProvider` seam and the reason the next gateway will not touch it
+ * either. Everything provider-shaped lives behind `getPaymentProvider()`.
+ *
  * Nothing here fails a purchase that merely isn't paid *yet*. A row stays
- * PENDING until Grow says the money moved, because the buyer may still be on the
- * payment page — marking it FAILED on the first look would make the real
+ * PENDING until the gateway says the money moved, because the buyer may still be
+ * on the payment page — marking it FAILED on the first look would make the real
  * callback, arriving seconds later, land on a row that can no longer be settled.
  */
 
-export interface GrowSettleResult {
+export interface OrderSettleResult {
   outcome: SettleOutcome | "unconfigured" | "unverified" | "not-found";
   diamonds: number;
   purchaseId: string | null;
@@ -35,22 +40,23 @@ export interface GrowSettleResult {
   reason?: string;
 }
 
-const NOTHING: GrowSettleResult = { outcome: "not-found", diamonds: 0, purchaseId: null };
+const NOTHING: OrderSettleResult = { outcome: "not-found", diamonds: 0, purchaseId: null };
 
 /**
- * Verify one order against Grow and credit it if it is paid.
+ * Verify one order against the gateway and credit it if it is paid.
  *
- * @param ref.purchaseId our row id, as echoed back in `cField1`
- * @param ref.orderId    Grow's `processId`, stored as `providerRef`
+ * @param ref.purchaseId our row id, as echoed to the gateway at order time
+ *                       (Grow's `cField1`, PayPlus's `more_info`)
+ * @param ref.orderId    the gateway's own order id, stored as `providerRef`
  * @param ref.userId     set **only** on the browser-return path, where the row
- *                       must belong to the session that is asking. The callback
+ *                       must belong to the session that is asking. A callback
  *                       has no session and omits it.
  */
-export async function settleGrowOrder(ref: {
+export async function settleOrder(ref: {
   purchaseId?: string | null;
   orderId?: string | null;
   userId?: string | null;
-}): Promise<GrowSettleResult> {
+}): Promise<OrderSettleResult> {
   const where = ref.purchaseId
     ? { id: ref.purchaseId }
     : ref.orderId
@@ -73,8 +79,8 @@ export async function settleGrowOrder(ref: {
 
   // Ownership is checked *before* the gateway is asked anything, not just at
   // crediting time: `settleDiamondPurchase` would also refuse, but by then a
-  // stranger's order id would already have been probed against Grow, turning
-  // this into an oracle for whether someone else's payment went through.
+  // stranger's order id would already have been probed against the gateway,
+  // turning this into an oracle for whether someone else's payment went through.
   if (ref.userId && purchase.userId !== ref.userId) return NOTHING;
 
   if (purchase.status !== "PENDING") {
@@ -84,27 +90,31 @@ export async function settleGrowOrder(ref: {
     return { outcome: "not-found", diamonds: 0, purchaseId: purchase.id };
   }
 
-  const provider = asGrowProvider(growProvider());
-  if (!provider) {
-    // Credentials were pulled between opening the order and settling it. The
-    // money may well have moved, so this is loud rather than silent — the row
-    // stays PENDING and visible in /admin/purchases.
+  const provider = getPaymentProvider();
+  if (provider.kind !== "order") {
+    // Credentials were pulled between opening the order and settling it, so the
+    // seam has fallen back to the mock. The money may well have moved, so this
+    // is loud rather than silent — the row stays PENDING and visible in
+    // /admin/purchases.
     // i18n-exempt: an error-log line for the operator, never rendered.
-    await logError("grow.settle", new Error("Grow אינו מוגדר בזמן סגירת עסקה"), {
-      path: "/api/pay/grow",
+    await logError("order.settle", new Error("ספק הסליקה אינו מוגדר בזמן סגירת עסקה"), {
+      path: "/api/pay",
       userId: purchase.userId,
     });
     return { outcome: "unconfigured", diamonds: 0, purchaseId: purchase.id };
   }
 
-  const capture = await provider.captureOrder({
+  const orderRef = {
     orderId: purchase.providerRef,
     token: purchase.providerToken,
-  });
+    purchaseId: purchase.id,
+  };
+
+  const capture = await provider.captureOrder(orderRef);
   if (!capture.ok) {
     // Expected on the browser path — the buyer can land on the success URL a
-    // beat before Grow has finished booking the transaction. Left PENDING for
-    // the callback (and its retries) to finish.
+    // beat before the gateway has finished booking the transaction. Left PENDING
+    // for the callback (and its retries) to finish.
     return {
       outcome: "unverified",
       diamonds: 0,
@@ -122,23 +132,22 @@ export async function settleGrowOrder(ref: {
     userId: ref.userId ?? null,
   });
 
-  // Tell Grow we took delivery, so it stops retrying the callback. Deliberately
-  // after crediting and deliberately unawaited-for-correctness: the transaction
-  // is already booked on their side either way.
-  void provider
-    .approveTransaction(purchase.providerRef, capture.captureId)
-    .catch(() => undefined);
+  // Tell the gateway we took delivery, so it stops retrying. Deliberately after
+  // crediting and deliberately not awaited: the transaction is already booked on
+  // their side either way, and a gateway that does not need this (PayPlus) does
+  // not implement it at all.
+  void provider.acknowledge?.(orderRef, capture.captureId).catch(() => undefined);
 
   return { outcome: settled.outcome, diamonds: settled.diamonds, purchaseId: settled.purchaseId };
 }
 
 /** What the buyer is told when they land back on our success page. */
-export type GrowReturnStatus =
+export type OrderReturnStatus =
   /** Settled by this request — the diamonds are in the balance now. */
   | "credited"
   /** The callback got there first. Same happy ending, already booked. */
   | "already"
-  /** Paid-but-unconfirmed: Grow has not (yet) said the money moved. */
+  /** Paid-but-unconfirmed: the gateway has not (yet) said the money moved. */
   | "pending"
   /** No recent order at all — a stale bookmark or a direct visit. */
   | "none";
@@ -152,21 +161,25 @@ export type GrowReturnStatus =
 const RETURN_WINDOW_MS = 2 * 60 * 60 * 1000;
 
 /**
- * Settle whatever this buyer just paid for, on their return from Grow's page.
+ * Settle whatever this buyer just paid for, on their return from the hosted page.
  *
- * The order is found by session rather than by anything in the URL: Grow's
- * `successUrl` carries no field we would be willing to trust anyway, and looking
- * up "this user's newest open order" is both simpler and unforgeable. The real
- * settlement guarantee is still the callback — this path only exists so the
- * diamonds are visible by the time the page paints, instead of a beat later.
+ * The order is found by session rather than by anything in the URL: the return
+ * carries no field we would be willing to trust anyway, and looking up "this
+ * user's newest open order" is both simpler and unforgeable. The real settlement
+ * guarantee is still the callback — this path only exists so the diamonds are
+ * visible by the time the page paints, instead of a beat later.
  */
-export async function settleGrowReturn(
+export async function settleOrderReturn(
   userId: string
-): Promise<{ status: GrowReturnStatus; diamonds: number }> {
+): Promise<{ status: OrderReturnStatus; diamonds: number }> {
   const recent = await prisma.diamondPurchase.findFirst({
     where: {
       userId,
-      provider: "grow",
+      // Scoped to the *active* gateway: a row opened against a provider we have
+      // since swapped away from cannot be verified any more, and reporting on it
+      // would tell the buyer their brand-new purchase is "pending" when what is
+      // actually pending is last month's abandoned one.
+      provider: getPaymentProvider().name,
       providerRef: { not: null },
       status: { in: ["PENDING", "PAID"] },
       createdAt: { gt: new Date(Date.now() - RETURN_WINDOW_MS) },
@@ -177,7 +190,7 @@ export async function settleGrowReturn(
   if (!recent) return { status: "none", diamonds: 0 };
   if (recent.status === "PAID") return { status: "already", diamonds: recent.diamonds };
 
-  const settled = await settleGrowOrder({ purchaseId: recent.id, userId });
+  const settled = await settleOrder({ purchaseId: recent.id, userId });
   if (settled.outcome === "credited") return { status: "credited", diamonds: settled.diamonds };
   if (settled.outcome === "already-settled") {
     return { status: "already", diamonds: recent.diamonds };

@@ -17,6 +17,8 @@ import {
   type GuildWarPhase,
 } from "@/lib/game/guildWar";
 import { getGuildWarLive } from "@/server/actions/guildWar";
+import { useT } from "@/i18n/client";
+import type { T } from "@/i18n/translate";
 
 export interface GuildWarBoardProps {
   /** Server-rendered snapshot; the poll takes over from here. */
@@ -45,13 +47,13 @@ function clock(ms: number): string {
  * server-rendered before it is hydrated, and a formatted local time would
  * differ between the server's timezone and the reader's.
  */
-function since(at: number, now: number): string {
+function since(t: T, at: number, now: number): string {
   const seconds = Math.max(0, Math.round((now - at) / 1000));
-  if (seconds < 5) return "עכשיו";
-  if (seconds < 60) return `לפני ${seconds} שנ׳`;
+  if (seconds < 5) return t("עכשיו");
+  if (seconds < 60) return t("לפני {seconds} שנ׳", { seconds });
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `לפני ${minutes} דק׳`;
-  return `לפני ${Math.round(minutes / 60)} שע׳`;
+  if (minutes < 60) return t("לפני {minutes} דק׳", { minutes });
+  return t("לפני {hours} שע׳", { hours: Math.round(minutes / 60) });
 }
 
 const RANK_MEDAL = ["🥇", "🥈", "🥉"];
@@ -80,6 +82,7 @@ function Embers() {
 /* ------------------------------ the board ------------------------------ */
 
 export function GuildWarBoard({ initial }: GuildWarBoardProps) {
+  const t = useT();
   const router = useRouter();
   const [state, setState] = useState<GuildWarLiveState>(initial);
 
@@ -146,12 +149,12 @@ export function GuildWarBoard({ initial }: GuildWarBoardProps) {
 
   const countdownLabel =
     phase === "REGISTRATION"
-      ? "הקרב נפתח בעוד"
+      ? t("הקרב נפתח בעוד")
       : live
-        ? "נותר לקרב"
+        ? t("נותר לקרב")
         : phase === "SETTLING"
-          ? "סופרים את הנקודות"
-          : "המלחמה הבאה בעוד";
+          ? t("סופרים את הנקודות")
+          : t("המלחמה הבאה בעוד");
 
   const leaderScore = Math.max(1, ...state.scoreboard.map((row) => row.score));
   const newestId = state.feed[0]?.id;
@@ -168,9 +171,11 @@ export function GuildWarBoard({ initial }: GuildWarBoardProps) {
       />
 
       {!state.valid && !decided && (
-        <p className="panel-inset rounded-lg px-3 py-2 text-center text-xs text-amber-300/90">
-          נרשמו {state.guildCount} בריתות. צריך לפחות {GUILD_WAR_MIN_GUILDS} כדי
-          שהמלחמה תתקיים — אחרת הערב מתבטל ואף אחד לא מקבל פרס.
+        <p className="nums panel-inset rounded-lg px-3 py-2 text-center text-xs text-amber-300/90">
+          {t("נרשמו {count} בריתות. צריך לפחות {min} כדי שהמלחמה תתקיים — אחרת הערב מתבטל ואף אחד לא מקבל פרס.", {
+            count: state.guildCount,
+            min: GUILD_WAR_MIN_GUILDS,
+          })}
         </p>
       )}
 
@@ -203,6 +208,7 @@ function Arena({
   remaining: number;
   urgent: boolean;
 }) {
+  const t = useT();
   const champion = state.scoreboard.find((row) => row.rank === 1);
   return (
     <div className={`gw-arena rounded-xl p-5 sm:p-7 ${live ? "is-live" : ""}`}>
@@ -216,7 +222,7 @@ function Arena({
             name="attack"
             size={44}
             className="gw-clash text-gold-bright"
-            title="מלחמת בריתות"
+            title={t("מלחמת בריתות")}
           />
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-dim">
@@ -240,40 +246,42 @@ function Arena({
         </div>
 
         {state.phase === "CANCELLED" ? (
-          <p className="max-w-md text-sm text-zinc-400">
-            פחות מ־{GUILD_WAR_MIN_GUILDS} בריתות נרשמו, ולכן המלחמה לא התקיימה.
-            אין מנצחת ואין פרסים.
+          <p className="nums max-w-md text-sm text-zinc-400">
+            {t("פחות מ־{min} בריתות נרשמו, ולכן המלחמה לא התקיימה. אין מנצחת ואין פרסים.", {
+              min: GUILD_WAR_MIN_GUILDS,
+            })}
           </p>
         ) : decided && champion ? (
           <p className="text-sm text-zinc-300">
             👑 <span className="font-black text-gold-bright">{champion.guildName}</span>{" "}
-            כבשה את הזירה עם{" "}
+            {t("כבשה את הזירה עם")}{" "}
             <span className="nums font-bold text-gold-bright" dir="ltr">
               {formatNumber(champion.score)}
             </span>{" "}
-            נקודות — הפרס מחולק שווה בשווה לכל חברי הברית
+            {t("נקודות — הפרס מחולק שווה בשווה לכל חברי הברית")}
           </p>
         ) : (
           <p className="max-w-lg text-sm leading-relaxed text-zinc-400">
-            הקרב מתנהל <span className="font-bold text-zinc-200">אוטומטית</span> בין{" "}
+            {t("הקרב מתנהל")}{" "}
+            <span className="font-bold text-zinc-200">{t("אוטומטית")}</span> {t("בין")}{" "}
             <span className="nums font-bold text-gold-bright" dir="ltr">
               {GUILD_WAR_START_LABEL}
             </span>{" "}
-            ל־
+            {t("ל־")}
             <span className="nums font-bold text-gold-bright" dir="ltr">
               {GUILD_WAR_END_LABEL}
             </span>{" "}
-            (שעון ישראל) — אין מה ללחוץ, המערכת מנהלת את כל ההתנגשויות לבד.
+            {t("(שעון ישראל) — אין מה ללחוץ, המערכת מנהלת את כל ההתנגשויות לבד.")}
           </p>
         )}
 
         <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
-          <Stat label="בריתות בזירה" value={state.guildCount} />
+          <Stat label={t("בריתות בזירה")} value={state.guildCount} />
           {state.myGuildName && (
-            <Stat label="הברית שלך" value={state.myGuildName} tone="gold" />
+            <Stat label={t("הברית שלך")} value={state.myGuildName} tone="gold" />
           )}
           {(live || state.phase === "SETTLING") && (
-            <Stat label="סבב" value={`${state.round}/${GUILD_WAR_ROUNDS}`} tone="gold" />
+            <Stat label={t("סבב")} value={`${state.round}/${GUILD_WAR_ROUNDS}`} tone="gold" />
           )}
         </div>
 
@@ -290,6 +298,7 @@ function Arena({
 }
 
 function PhaseBadge({ phase }: { phase: GuildWarPhase }) {
+  const t = useT();
   const live = phase === "LIVE";
   return (
     <span
@@ -302,7 +311,7 @@ function PhaseBadge({ phase }: { phase: GuildWarPhase }) {
       }`}
     >
       {live && <span className="gw-live-dot" />}
-      {GUILD_WAR_PHASE_LABEL[phase]}
+      {t(GUILD_WAR_PHASE_LABEL[phase])}
     </span>
   );
 }
@@ -340,24 +349,24 @@ function Scoreboard({
   leaderScore: number;
   decided: boolean;
 }) {
+  const t = useT();
   return (
     <div className="panel rounded-xl p-4">
       <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
         <Icon name="rankings" size={18} className="text-crimson" />
-        טבלת הזירה
+        {t("טבלת הזירה")}
       </h2>
       {/* Said out loud because the two numbers on each row pull in opposite
           directions: the power is the roster's combined strength, but the arena
           rotates one member in per round, so it scores by the average. A guild
           with double the total and half the average is the underdog here. */}
       <p className="mb-3 text-[11px] text-zinc-500">
-        כוח הברית הוא הכוח הצבאי המשולב של כל החברים. הזירה עצמה נמדדת לפי החבר
-        הממוצע — רוסטר גדול מעלה את הסכום, לא בהכרח את הסיכוי.
+        {t("כוח הברית הוא הכוח הצבאי המשולב של כל החברים. הזירה עצמה נמדדת לפי החבר הממוצע — רוסטר גדול מעלה את הסכום, לא בהכרח את הסיכוי.")}
       </p>
 
       {state.scoreboard.length === 0 ? (
         <p className="py-6 text-center text-sm text-zinc-500">
-          אף ברית לא נרשמה עדיין למלחמה הקרובה — היו הראשונים.
+          {t("אף ברית לא נרשמה עדיין למלחמה הקרובה — היו הראשונים.")}
         </p>
       ) : (
         <ul className="space-y-2">
@@ -379,8 +388,8 @@ function Scoreboard({
                   <span className="min-w-0 flex-1 truncate font-bold text-zinc-100">
                     {row.guildName}
                     {row.mine && (
-                      <span className="mr-2 rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
-                        הברית שלך
+                      <span className="ms-2 rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
+                        {t("הברית שלך")}
                       </span>
                     )}
                   </span>
@@ -395,26 +404,26 @@ function Scoreboard({
 
                 <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
                   <span>
-                    כוח הברית{" "}
+                    {t("כוח הברית")}{" "}
                     <span className="nums text-zinc-300" dir="ltr">
                       {formatCompact(row.power)}
                     </span>
                   </span>
                   <span>
-                    ניצחונות{" "}
+                    {t("ניצחונות")}{" "}
                     <span className="nums text-emerald-300" dir="ltr">
                       {row.wins}
                     </span>
                   </span>
                   <span>
-                    הפסדים{" "}
+                    {t("הפסדים")}{" "}
                     <span className="nums text-zinc-400" dir="ltr">
                       {row.losses}
                     </span>
                   </span>
                   {row.rewardLabel && (
-                    <span className="mr-auto font-bold text-gold-bright">
-                      🎁 {row.rewardLabel}
+                    <span className="ms-auto font-bold text-gold-bright">
+                      🎁 {t(row.rewardLabel)}
                     </span>
                   )}
                 </div>
@@ -430,27 +439,27 @@ function Scoreboard({
 /* ------------------------------ fighters ------------------------------ */
 
 function Fighters({ state }: { state: GuildWarLiveState }) {
+  const t = useT();
   if (state.fighters.length === 0) return null;
   return (
     <div className="panel rounded-xl p-4">
       <h2 className="mb-1 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
         <Icon name="hero" size={18} className="text-crimson" />
-        לוחמי המלחמה
+        {t("לוחמי המלחמה")}
       </h2>
       <p className="mb-3 text-[11px] text-zinc-500">
-        המערכת מסובבת חבר אחר של כל ברית לכל סבב — הטבלה מראה מי הביא הכי הרבה
-        נקודות. אין כאן פרס אישי.
+        {t("המערכת מסובבת חבר אחר של כל ברית לכל סבב — הטבלה מראה מי הביא הכי הרבה נקודות. אין כאן פרס אישי.")}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border-subtle text-right text-xs text-gold-dim">
-              <th className="pb-2 pr-2 font-semibold">#</th>
-              <th className="pb-2 font-semibold">לוחם</th>
-              <th className="pb-2 font-semibold">ברית</th>
-              <th className="pb-2 font-semibold">פריצות</th>
-              <th className="pb-2 font-semibold">הדיפות</th>
-              <th className="pb-2 pl-2 font-semibold">נקודות</th>
+            <tr className="border-b border-border-subtle text-start text-xs text-gold-dim">
+              <th className="pb-2 pe-2 font-semibold">#</th>
+              <th className="pb-2 font-semibold">{t("לוחם")}</th>
+              <th className="pb-2 font-semibold">{t("ברית")}</th>
+              <th className="pb-2 font-semibold">{t("פריצות")}</th>
+              <th className="pb-2 font-semibold">{t("הדיפות")}</th>
+              <th className="pb-2 ps-2 font-semibold">{t("נקודות")}</th>
             </tr>
           </thead>
           <tbody>
@@ -461,7 +470,7 @@ function Fighters({ state }: { state: GuildWarLiveState }) {
                   fighter.me ? "bg-gold/8" : ""
                 }`}
               >
-                <td className="py-2 pr-2 text-zinc-500">
+                <td className="py-2 pe-2 text-zinc-500">
                   <span className="nums" dir="ltr">
                     {index + 1}
                   </span>
@@ -469,8 +478,8 @@ function Fighters({ state }: { state: GuildWarLiveState }) {
                 <td className="py-2 font-semibold text-zinc-100">
                   <PlayerLink empireId={fighter.empireId} name={fighter.name} />
                   {fighter.me && (
-                    <span className="mr-2 text-[10px] font-black text-gold-bright">
-                      (אתה)
+                    <span className="ms-2 text-[10px] font-black text-gold-bright">
+                      {t("(אתה)")}
                     </span>
                   )}
                 </td>
@@ -485,7 +494,7 @@ function Fighters({ state }: { state: GuildWarLiveState }) {
                     {fighter.holds}
                   </span>
                 </td>
-                <td className="py-2 pl-2">
+                <td className="py-2 ps-2">
                   <span className="nums font-black text-gold-bright" dir="ltr">
                     {formatNumber(fighter.points)}
                   </span>
@@ -510,22 +519,23 @@ function Feed({
   now: number;
   newestId: string | undefined;
 }) {
+  const t = useT();
   return (
     <div className="panel rounded-xl p-4">
       <h2 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
         <Icon name="reports" size={18} className="text-crimson" />
-        שידור חי מהזירה
+        {t("שידור חי מהזירה")}
         {state.phase === "LIVE" && <span className="gw-live-dot" />}
       </h2>
 
       {state.feed.length === 0 ? (
         <p className="py-8 text-center text-sm text-zinc-500">
           {state.phase === "LIVE"
-            ? "הזירה נפתחת — הסבב הראשון עוד רגע."
-            : "עוד לא היו קרבות במלחמה הזו."}
+            ? t("הזירה נפתחת — הסבב הראשון עוד רגע.")
+            : t("עוד לא היו קרבות במלחמה הזו.")}
         </p>
       ) : (
-        <ul className="max-h-[34rem] space-y-2 overflow-y-auto pl-1">
+        <ul className="max-h-[34rem] space-y-2 overflow-y-auto pe-1">
           {state.feed.map((item) => (
             <li
               key={item.id}
@@ -536,9 +546,9 @@ function Feed({
               <div className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 font-black tracking-wide">
                   {item.won ? (
-                    <span className="text-orange-300">💥 פריצה</span>
+                    <span className="text-orange-300">{t("💥 פריצה")}</span>
                   ) : (
-                    <span className="text-emerald-300">🛡️ הדיפה</span>
+                    <span className="text-emerald-300">{t("🛡️ הדיפה")}</span>
                   )}
                   <span className="nums rounded bg-black/40 px-1.5 text-[10px] text-zinc-500" dir="ltr">
                     #{item.round + 1}
@@ -549,7 +559,7 @@ function Feed({
                     +{item.points}
                   </span>
                   <span className="text-[10px] text-zinc-600">
-                    {since(item.at, now)}
+                    {since(t, item.at, now)}
                   </span>
                 </span>
               </div>
@@ -573,7 +583,9 @@ function Feed({
               </p>
 
               <p className="mt-0.5 text-[10px] text-zinc-600">
-                הנקודות ל{item.won ? item.attackerGuildName : item.defenderGuildName}
+                {t("הנקודות ל{guild}", {
+                  guild: item.won ? item.attackerGuildName : item.defenderGuildName,
+                })}
               </p>
             </li>
           ))}

@@ -15,12 +15,13 @@ import {
   type CombatPowerBreakdown,
 } from "@/lib/game/power";
 import { formatNumber } from "@/lib/game/format";
+import { getT, type T } from "@/i18n/server";
 
 /** Turn a base decomposition plus a bonus breakdown into PowerCard rows. */
-function bonusRows(breakdown: CombatPowerBreakdown | undefined) {
+function bonusRows(t: T, breakdown: CombatPowerBreakdown | undefined) {
   if (!breakdown) return [];
   return breakdown.lines.map((line) => ({
-    label: `${line.label} (+${line.pct}%)`,
+    label: t("{label} (+{pct}%)", { label: t(line.label), pct: line.pct }),
     value: Math.round(line.amount),
   }));
 }
@@ -31,6 +32,7 @@ interface PowerLink {
 }
 
 function PowerCard({
+  t,
   icon,
   title,
   value,
@@ -39,6 +41,7 @@ function PowerCard({
   links,
   highlight = false,
 }: {
+  t: T;
   icon: ReactNode;
   title: string;
   value: number;
@@ -82,7 +85,7 @@ function PowerCard({
             </dl>
           }
         >
-          מהרכב הכוח
+          {t("מהרכב הכוח")}
           <span aria-hidden className="text-[9px] leading-none">▾</span>
         </Tip>
       )}
@@ -104,7 +107,7 @@ function PowerCard({
   );
 }
 
-export function PowerSummary({
+export async function PowerSummary({
   army,
   weapons,
   attackBreakdown,
@@ -117,6 +120,7 @@ export function PowerSummary({
   /** When given, the defense card shows real battle power (incl. +20%). */
   defenseBreakdown?: CombatPowerBreakdown;
 }) {
+  const t = await getT();
   const soldiersPower = armyPower(army);
   const spyUnitsPower = spiesPower(army);
   const attackWeaponsPower = weaponsPower(weapons, "ATTACK");
@@ -130,66 +134,70 @@ export function PowerSummary({
     <section>
       <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-gold">
         <Icon name="spark" size={20} className="text-crimson-bright" />
-        כוח האימפריה
+        {t("כוח האימפריה")}
       </h2>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <PowerCard
+          t={t}
           icon={<Icon name="attack" size={28} className="text-red-400" />}
-          title="כוח התקפה"
+          title={t("כוח התקפה")}
           value={attackValue}
           breakdown={[
-            { label: "חיילים", value: soldiersPower },
-            { label: "נשקי התקפה", value: attackWeaponsPower },
-            ...bonusRows(attackBreakdown),
+            { label: t("חיילים"), value: soldiersPower },
+            { label: t("נשקי התקפה"), value: attackWeaponsPower },
+            ...bonusRows(t, attackBreakdown),
           ]}
           helper={
             attackBreakdown && attackBreakdown.lines.length > 0
-              ? "כולל בונוסים פעילים (גיבור / קסם / עזרת ברית)."
+              ? t("כולל בונוסים פעילים (גיבור / קסם / עזרת ברית).")
               : undefined
           }
           links={[
-            { href: "/game/weapons", label: "ניהול נשקים" },
-            { href: "/game/army", label: "אימון צבא" },
+            { href: "/game/weapons", label: t("ניהול נשקים") },
+            { href: "/game/army", label: t("אימון צבא") },
           ]}
         />
         <PowerCard
+          t={t}
           icon={<Icon name="shield" size={28} className="text-sky-300" />}
-          title="כוח הגנה"
+          title={t("כוח הגנה")}
           value={defenseValue}
           breakdown={[
-            { label: "חיילים", value: soldiersPower },
-            { label: "נשקי הגנה", value: defenseWeaponsPower },
-            ...bonusRows(defenseBreakdown),
+            { label: t("חיילים"), value: soldiersPower },
+            { label: t("נשקי הגנה"), value: defenseWeaponsPower },
+            ...bonusRows(t, defenseBreakdown),
           ]}
           helper={
             defenseBreakdown
-              ? "כוח ההגנה בפועל בקרב, כולל בונוס מגן ובונוסים פעילים."
-              : "בקרב הגנה מתקבל בונוס הגנה של 20%."
+              ? t("כוח ההגנה בפועל בקרב, כולל בונוס מגן ובונוסים פעילים.")
+              : t("בקרב הגנה מתקבל בונוס הגנה של 20%.")
           }
           links={[
-            { href: "/game/weapons", label: "ניהול נשקים" },
-            { href: "/game/army", label: "אימון צבא" },
+            { href: "/game/weapons", label: t("ניהול נשקים") },
+            { href: "/game/army", label: t("אימון צבא") },
           ]}
         />
         <PowerCard
+          t={t}
           icon={<Icon name="spy" size={28} className="text-gold" />}
-          title="כוח מודיעין"
+          title={t("כוח מודיעין")}
           value={getEmpireSpyPower(army, weapons)}
           breakdown={[
-            { label: "מרגלים", value: spyUnitsPower },
-            { label: "נשקי ריגול", value: spyWeaponsPower },
+            { label: t("מרגלים"), value: spyUnitsPower },
+            { label: t("נשקי ריגול"), value: spyWeaponsPower },
           ]}
-          helper="שדרוג מודיעין מכפיל אותו — ריגול מצליח כשהוא גדול מזה של היעד."
+          helper={t("שדרוג מודיעין מכפיל אותו — ריגול מצליח כשהוא גדול מזה של היעד.")}
           links={[
-            { href: "/game/weapons?tab=spy", label: "ניהול נשקי ריגול" },
-            { href: "/game/army", label: "אימון מרגלים" },
+            { href: "/game/weapons?tab=spy", label: t("ניהול נשקי ריגול") },
+            { href: "/game/army", label: t("אימון מרגלים") },
           ]}
         />
         <PowerCard
+          t={t}
           icon={<Icon name="crown" size={28} className="text-gold-bright" />}
-          title="כוח כללי"
+          title={t("כוח כללי")}
           value={getEmpireGeneralPower(army, weapons)}
-          breakdown="התקפה + הגנה + מודיעין"
+          breakdown={t("התקפה + הגנה + מודיעין")}
           highlight
         />
       </div>

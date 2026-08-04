@@ -5,6 +5,7 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatBonus } from "@/lib/game/format";
 import { heroItemArtPath, itemSetForLevel } from "@/lib/game/heroSets";
 import { useTip } from "@/components/ui/Tip";
+import { useT } from "@/i18n/client";
 
 export type Rarity = "legendary" | "epic" | "rare" | "common";
 
@@ -141,6 +142,7 @@ export function ItemTile({
   size?: "sm" | "md" | "lg";
   details?: ItemTileDetails;
 }) {
+  const t = useT();
   const [imgOk, setImgOk] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const art = slug ? heroItemArtPath(slug, level) : undefined;
@@ -174,16 +176,18 @@ export function ItemTile({
     <>
       <p className={`text-sm font-black ${r.text}`}>{details.name}</p>
       <p className="mt-0.5 text-[10px] text-zinc-500">
-        דרגה: <span className={r.text}>{details.rarityLabel}</span>
+        {t("דרגה:")} <span className={r.text}>{details.rarityLabel}</span>
         {level != null && (
           <>
-            {" · "}רמת פריט: <span className="nums text-zinc-300">{level}</span>
+            {" · "}
+            {t("רמת פריט:")} <span className="nums text-zinc-300">{level}</span>
           </>
         )}
       </p>
       {level != null && (
         <p className="text-[10px] text-zinc-500">
-          סט: <span className="text-zinc-300">{itemSetForLevel(level).label}</span>
+          {t("סט:")}{" "}
+          <span className="text-zinc-300">{t(itemSetForLevel(level).label)}</span>
         </p>
       )}
 
@@ -225,23 +229,23 @@ export function ItemTile({
           details.meetsRequirement === false ? "text-red-400" : "text-emerald-400"
         }`}
       >
-        {details.meetsRequirement === false ? "✗" : "✓"} דרישה: גיבור רמה{" "}
+        {details.meetsRequirement === false ? "✗" : "✓"} {t("דרישה: גיבור רמה")}{" "}
         <span className="nums">{details.requiredLevel}</span>
       </p>
 
       {/* grandfathered: worn from before a reset, below its own requirement */}
       {worn && details.meetsRequirement === false && (
         <p className="mt-1 text-[11px] text-amber-300">
-          ממשיך לפעול — אך הסרתו תנעל אותו עד רמה{" "}
+          {t("ממשיך לפעול — אך הסרתו תנעל אותו עד רמה")}{" "}
           <span className="nums">{details.requiredLevel}</span>
         </p>
       )}
 
       {details.equipped && (
-        <p className="mt-1 text-[11px] font-bold text-emerald-300">✔ לבוש כעת</p>
+        <p className="mt-1 text-[11px] font-bold text-emerald-300">{t("✔ לבוש כעת")}</p>
       )}
       {details.owned && !details.equipped && (
-        <p className="mt-1 text-[11px] text-zinc-400">נמצא ברשותך</p>
+        <p className="mt-1 text-[11px] text-zinc-400">{t("נמצא ברשותך")}</p>
       )}
       {details.hint && (
         <p className="mt-2 border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
@@ -317,14 +321,14 @@ export function ItemTile({
                 : `bg-black/75 ${r.badge}`
             }`}
             dir="ltr"
-            title={`רמה ${level}`}
+            title={t("רמה {level}", { level })}
           >
             {level}
           </span>
         )}
         {locked && (
           <span
-            aria-label="נעול — הגיבור ברמה נמוכה מדי"
+            aria-label={t("נעול — הגיבור ברמה נמוכה מדי")}
             className="absolute bottom-1 left-1 rounded bg-black/80 px-1 text-[11px]"
           >
             🔒
@@ -332,7 +336,7 @@ export function ItemTile({
         )}
         {details?.equipped && (
           <span className="absolute bottom-1 right-1 rounded bg-emerald-600/90 px-1 text-[9px] font-black text-white">
-            לבוש
+            {t("לבוש")}
           </span>
         )}
         {details?.owned && !details.equipped && (

@@ -24,15 +24,29 @@ Neon console → reset the role password → update `PRISMA_DATABASE_URL` and
 `PRISMA_DIRECT_URL` (and the Vercel↔Neon integration's own `DATABASE_URL`) on
 Vercel → redeploy. Nothing in the repo needs to change.
 
-### 1.2 Publish the operator identity · **contained in code 08-01, still needs your details**
+### 1.2 Publish the operator identity · **PayPlus asked for two more fields on 08-04**
 
-`LEGAL_OPERATOR_NAME` = `GM-business` (the עוסק פטור) and `LEGAL_CONTACT_EMAIL` =
-`kraldorsupport@gmail.com` are set in `.env` **and** on Vercel production.
-`LEGAL_OPERATOR_TAX_ID` is set locally but **not** on Vercel, and
-`LEGAL_OPERATOR_CITY` is still commented out — so in production the operator is
-one value short of published and the store stays shut. Adding the dealer number
-to Vercel is the last step, and it is a deliberate one: for an עוסק פטור that
-number is your ת.ז., and the policy pages print it publicly.
+Five values are now required before the store may open, because PayPlus's
+underwriting asks for them by name:
+
+| Variable | Status |
+| --- | --- |
+| `LEGAL_OPERATOR_NAME` | set locally + on Vercel (`GM-business`) |
+| `LEGAL_CONTACT_EMAIL` | set locally + on Vercel |
+| `LEGAL_OPERATOR_TAX_ID` | set locally, **not on Vercel** |
+| `LEGAL_CONTACT_PHONE` | **empty — new** |
+| `LEGAL_OPERATOR_ADDRESS` | **empty — new**, full postal address |
+
+`LEGAL_OPERATOR_CITY` is retired: it published a city only, which satisfied the
+consumer-protection rule but not the gateway. It still answers as a fallback so a
+mid-migration deploy does not drop the place of business off the page, but it no
+longer counts toward `complete`.
+
+All five print publicly on `/terms`, `/refund` and `/privacy`, and for a
+home-run עוסק פטור the address is a home address and the tax id is a ת.ז. If
+that is not acceptable, a **תא דואר** satisfies the address requirement and a
+second number (Google Voice, a cheap SIM) satisfies the phone — both are normal
+and neither weakens the disclosure.
 
 **The exposure itself is now closed by construction** — selling without naming
 the merchant is what the law and the gateways care about, so that state can no
@@ -62,49 +76,59 @@ Verify once against a known address in production (log it, or read it back from
 a `RateLimitBucket` key) and set the env var if the default is wrong. Cheap to
 check, expensive to be wrong about.
 
-### 1.4 Finish the Grow connection · **code complete 08-03, waiting on credentials**
+### 1.4 Finish the PayPlus connection · **code complete 08-04, one value missing**
 
-The whole Grow integration is written and tested; what is missing is input only
-Grow can give you. The store stays on the mock provider until all three of these
-are set, so nothing about the current deploy changes when you merge it.
+The gateway is **PayPlus**, not Grow. Grow wanted **₪500/month** for API access;
+PayPlus charges **₪29.9**. Everything is written and tested — `src/server/payplus.ts`,
+the signed callback at `/api/pay/payplus`, and the shared settlement path in
+`src/server/orderSettle.ts` that both gateways run through.
+
+`src/server/grow.ts` stays in the tree. It works, it is tested, and keeping it is
+cheaper than rewriting it if the pricing ever changes. `getPaymentProvider()`
+prefers PayPlus; a deploy with both configured charges through PayPlus.
 
 Set on Vercel (and in `.env` for local work):
 
 | Variable | Where it comes from |
 | --- | --- |
-| `GROW_USER_ID` | Grow panel — the business identifier |
-| `GROW_PAGE_CODE` | Grow panel — the payment-page identifier |
-| `GROW_CALLBACK_SECRET` | **you generate it**: `openssl rand -hex 24`. Letters and digits only, ≥24 chars |
-| `GROW_ENV` | `sandbox` (default) → `production` when you go live |
-| `GROW_PAYMENT_METHODS` | optional. Default `1,6,13,14` = card, Bit, Apple Pay, Google Pay |
+| `PAYPLUS_API_KEY` | PayPlus panel — **already in `.env`** |
+| `PAYPLUS_SECRET_KEY` | PayPlus panel — **already in `.env`**; also the HMAC key for callbacks |
+| `PAYPLUS_PAGE_UID` | **← THE MISSING ONE.** Panel → **דפי תשלום** → the page's UID |
+| `PAYPLUS_ENV` | `staging` (default) → `production` when you go live |
 
-Then, in the Grow panel, set the server callback (`notifyUrl`) to:
+Then, in the PayPlus panel, set the callback (`refURL_callback`) to:
 
 ```
-https://<your-domain>/api/pay/grow/<GROW_CALLBACK_SECRET>
+https://<your-domain>/api/pay/payplus
 ```
 
-The secret is in the *path*, not a query string, because Grow rejects special
-characters in `notifyUrl`. It is the endpoint's only credential — Grow does not
-sign its callbacks — so treat it like a password: never commit it, and rotate it
-in both places at once if it leaks. Rotating is safe at any moment except while
-a payment is mid-flight.
+There is no callback secret to invent, unlike Grow: **PayPlus signs the body**
+(HMAC-SHA256 under `PAYPLUS_SECRET_KEY`, base64, in the `hash` header, with a
+`PayPlus` User-Agent), and that signature is the endpoint's authentication. The
+amount is still re-read from `Transactions/View` before anything is credited —
+a signature proves the message is theirs, not that it is fresh or unique.
 
-Two things to confirm in the panel **before the first real charge**, both marked
-`VERIFY:` in `src/server/grow.ts`:
+Two things to confirm in the panel before the first real charge:
 
-1. the parameter names for the order lookup (`getPaymentProcessInfo`), and
-2. the status-code table — the code trusts `statusCode === "2"` to mean paid.
+1. the payment page's **charge method** — the API call deliberately omits
+   `charge_method` so the page's own setting applies, because the documented enum
+   is ambiguous and guessing wrong yields an authorisation that never captures;
+2. the success **status code** — the code trusts `"000"`, marked `VERIFY:`.
 
 Both fail **closed**: anything unrecognised leaves the purchase PENDING and
-visible in `/admin/purchases` rather than crediting diamonds. So the failure mode
-of getting these wrong is a payment you have to settle by hand, not a leak.
+visible in `/admin/purchases` rather than crediting diamonds.
 
-Order of operations for go-live: sandbox credentials → one end-to-end test
-purchase → check the row in `/admin/purchases` and that a receipt was issued →
-`GROW_ENV=production` → one real ₪ purchase, confirm the money lands in the bank
-→ `DIAMOND_PURCHASES_LIVE=true`. The interlocks in `arePurchasesLive()` enforce
-that ordering; they do not enforce that you actually looked at your bank account.
+Order of operations for go-live: page UID → staging test purchase (PayPlus
+publishes sandbox card numbers) → check the row in `/admin/purchases` and that a
+receipt was issued → `PAYPLUS_ENV=production` → one real ₪ purchase, confirm the
+money lands in the bank → `DIAMOND_PURCHASES_LIVE=true`. The interlocks in
+`arePurchasesLive()` enforce that ordering; they do not enforce that you actually
+looked at your bank account.
+
+Still outstanding on the commercial side: the acquirer contract (1.2% domestic),
+whether there is a **minimum monthly commission**, whether a **rolling reserve**
+applies to virtual-currency merchants, and Bit (+₪16.9/mo + 1.4%, ~15 business
+days). None of them block the code.
 
 ### 1.5 Edge rules for unauthenticated floods
 

@@ -236,7 +236,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                 {state.boss.name}
               </p>
               <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-bone-dim">
-                {state.boss.title} · עיר {cityName(t, state.cityTier)}
+                {t(state.boss.title)} · {t("עיר {city}", { city: cityName(t, state.cityTier) })}
               </p>
             </div>
 
@@ -292,7 +292,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
 
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-gold-dim">
-                  {over ? "הקרב הוכרע" : "הקרב נגמר בעוד"}
+                  {over ? t("הקרב הוכרע") : t("הקרב נגמר בעוד")}
                 </p>
                 <p className="mt-0.5 truncate text-sm font-bold text-zinc-100">
                   {over ? (
@@ -300,29 +300,21 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                       <span aria-hidden className="ba-spin inline-block">
                         ⏳
                       </span>
-                      מסכמים את השלל…
+                      {t("מסכמים את השלל…")}
                     </span>
                   ) : (
-                    <>
-                      סבב{" "}
-                      <span className="nums" dir="ltr">
-                        {Math.min(state.revealed.length + 1, state.totalRounds)}
-                      </span>{" "}
-                      מתוך{" "}
-                      <span className="nums" dir="ltr">
-                        {state.totalRounds}
-                      </span>
+                    <span className="nums">
+                      {t("סבב {round} מתוך {total}", {
+                        round: Math.min(state.revealed.length + 1, state.totalRounds),
+                        total: state.totalRounds,
+                      })}
                       {nextRoundIn != null && (
                         <span className="font-normal text-zinc-400">
                           {" "}
-                          · המכה הבאה בעוד{" "}
-                          <span className="nums" dir="ltr">
-                            {nextRoundIn}
-                          </span>{" "}
-                          שנ׳
+                          {t("· המכה הבאה בעוד {seconds} שנ׳", { seconds: nextRoundIn })}
                         </span>
                       )}
-                    </>
+                    </span>
                   )}
                 </p>
 
@@ -351,8 +343,8 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                 </div>
                 <p className="mt-1.5 text-[11px] text-zinc-500">
                   {over
-                    ? "אל תסגור — דוח הקרב המלא נפתח בעוד רגע."
-                    : "הצבא נלחם לבד. אין מה ללחוץ — אפשר גם לצאת ולחזור."}
+                    ? t("אל תסגור — דוח הקרב המלא נפתח בעוד רגע.")
+                    : t("הצבא נלחם לבד. אין מה ללחוץ — אפשר גם לצאת ולחזור.")}
                 </p>
               </div>
             </div>
@@ -360,7 +352,9 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             {/* the tyrant's health, with this assault's damage marked behind it */}
             <div>
               <div className="mb-1 flex items-baseline justify-between gap-2 text-xs">
-                <span className="font-bold text-[rgb(var(--boss-accent))]">חיי הבוס</span>
+                <span className="font-bold text-[rgb(var(--boss-accent))]">
+                  {t("חיי הבוס")}
+                </span>
                 <span className="nums font-black text-zinc-100" dir="ltr">
                   {formatNumber(Math.round(state.bossHp))} / {formatNumber(state.bossMaxHp)}
                 </span>
@@ -380,7 +374,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                 />
               </div>
               <p className="mt-1 text-[11px] text-zinc-500">
-                הפסים המוזהבים הם הנזק של התקיפה הזו. הפצעים נשארים עליו גם אחרי שהקרב נגמר.
+                {t("הפסים המוזהבים הם הנזק של התקיפה הזו. הפצעים נשארים עליו גם אחרי שהקרב נגמר.")}
               </p>
             </div>
           </div>
@@ -404,85 +398,76 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
         aria-live="polite"
       >
         {stranded ? (
-          <>הקרב הזה כבר הסתיים. הדוח נשלח אליך להודעות.</>
+          t("הקרב הזה כבר הסתיים. הדוח נשלח אליך להודעות.")
         ) : !last ? (
-          <>הכוחות מסתערים על השער… המכה הראשונה נופלת עוד רגע.</>
+          t("הכוחות מסתערים על השער… המכה הראשונה נופלת עוד רגע.")
         ) : last.furyUsed ? (
-          <>
-            <b>הגיבור השתחרר.</b> {BOSS_MOVE_META[last.move]?.label} של {state.boss.name} לא הספיק —
-            מכת זעם אחת הורידה לו{" "}
-            <span className="nums" dir="ltr">
-              {formatNumber(last.damage)}
-            </span>{" "}
-            חיים.
-          </>
+          <span className="nums">
+            <b>{t("הגיבור השתחרר.")}</b>{" "}
+            {t("{move} של {boss} לא הספיק — מכת זעם אחת הורידה לו {damage} חיים.", {
+              move: t(BOSS_MOVE_META[last.move]?.label ?? last.move),
+              boss: t(state.boss.name),
+              damage: formatNumber(last.damage),
+            })}
+          </span>
         ) : (
-          <>
+          <span className="nums">
             <b>
-              {state.boss.name} {BOSS_MOVE_META[last.move]?.telegraph}
+              {t(state.boss.name)} {t(BOSS_MOVE_META[last.move]?.telegraph ?? "")}
             </b>{" "}
-            — הקצינים ענו ב{BOSS_TACTIC_META[last.tactic]?.label}
+            {t("— הקצינים ענו ב{tactic}", {
+              tactic: t(BOSS_TACTIC_META[last.tactic]?.label ?? last.tactic),
+            })}
             {last.correct ? (
               <>
-                , וזו התשובה הנכונה: נזק כפול{BOSS_CASUALTIES && " ובקושי אבדות"} (
-                <span className="nums" dir="ltr">
-                  −{formatNumber(last.damage)}
-                </span>{" "}
-                חיים
-                {BOSS_CASUALTIES && (
-                  <>
-                    ,{" "}
-                    <span className="nums" dir="ltr">
-                      −{formatNumber(last.soldiersLost)}
-                    </span>{" "}
-                    חיילים
-                  </>
-                )}
-                ).
+                {t(", וזו התשובה הנכונה: נזק כפול")}
+                {BOSS_CASUALTIES && t(" ובקושי אבדות")}{" "}
+                {BOSS_CASUALTIES
+                  ? t("(−{damage} חיים, −{soldiers} חיילים).", {
+                      damage: formatNumber(last.damage),
+                      soldiers: formatNumber(last.soldiersLost),
+                    })
+                  : t("(−{damage} חיים).", { damage: formatNumber(last.damage) })}
               </>
             ) : (
               <>
-                , וזו התשובה הלא נכונה — היה צריך{" "}
-                {BOSS_TACTIC_META[BOSS_MOVE_COUNTER[last.move]]?.label}. הנזק נחלש (
-                <span className="nums" dir="ltr">
-                  −{formatNumber(last.damage)}
-                </span>{" "}
-                חיים
-                {BOSS_CASUALTIES && (
-                  <>
-                    , והמכה נכנסה:{" "}
-                    <span className="nums" dir="ltr">
-                      −{formatNumber(last.soldiersLost)}
-                    </span>{" "}
-                    חיילים
-                  </>
-                )}
-                ).
+                {t(", וזו התשובה הלא נכונה — היה צריך {tactic}. הנזק נחלש", {
+                  tactic: t(
+                    BOSS_TACTIC_META[BOSS_MOVE_COUNTER[last.move]]?.label ?? ""
+                  ),
+                })}{" "}
+                {BOSS_CASUALTIES
+                  ? t("(−{damage} חיים, והמכה נכנסה: −{soldiers} חיילים).", {
+                      damage: formatNumber(last.damage),
+                      soldiers: formatNumber(last.soldiersLost),
+                    })
+                  : t("(−{damage} חיים).", { damage: formatNumber(last.damage) })}
               </>
             )}
-          </>
+          </span>
         )}
       </section>
 
       {/* ---------------- you can go ---------------- */}
       <section className="panel-inset flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3">
         <p className="text-xs text-zinc-400">
-          <span aria-hidden className="mr-1">
+          <span aria-hidden className="me-1">
             📨
           </span>
           {stranded
-            ? "אפשר לחזור לבוס העיר או לקרוא את הדוח בהודעות."
-            : "אפשר לצאת ולעשות דברים אחרים — כשהקרב ייגמר תקבל הודעה עם כל השלל."}
+            ? t("אפשר לחזור לבוס העיר או לקרוא את הדוח בהודעות.")
+            : t("אפשר לצאת ולעשות דברים אחרים — כשהקרב ייגמר תקבל הודעה עם כל השלל.")}
         </p>
         <div className="flex gap-2">
           <Link href="/game/base" className="btn btn-ghost px-4 py-1.5 text-xs">
-            <Icon name="base" size={14} className="inline-block align-middle" /> לבסיס
+            <Icon name="base" size={14} className="inline-block align-middle" /> {t("לבסיס")}
           </Link>
           <Link
             href="/game/rankings"
             className={`btn px-4 py-1.5 text-xs ${stranded ? "btn-gold" : "btn-ghost"}`}
           >
-            <Icon name="rankings" size={14} className="inline-block align-middle" /> לבוס העיר
+            <Icon name="rankings" size={14} className="inline-block align-middle" />{" "}
+            {t("לבוס העיר")}
           </Link>
         </div>
       </section>
@@ -492,7 +477,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
         <div className="panel-inset rounded-xl p-4">
           <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-300">
-              <Icon name="army" size={14} /> הצבא שלך
+              <Icon name="army" size={14} /> {t("הצבא שלך")}
             </span>
             <span className="nums text-sm font-black text-zinc-100" dir="ltr">
               {formatNumber(state.soldiersAtStart - state.soldiersLostSoFar)}
@@ -517,26 +502,25 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                   }}
                 />
               </div>
-              <p className="mt-1.5 text-[11px] text-zinc-500">
-                אבדות עד כה:{" "}
+              <p className="nums mt-1.5 text-[11px] text-zinc-500">
+                {t("אבדות עד כה:")}{" "}
                 <span className="nums text-red-300" dir="ltr">
                   {formatNumber(state.soldiersLostSoFar)}
                 </span>{" "}
-                ({Math.round(lossPct)}%). הצבא נסוג אם יאבד{" "}
-                <span className="nums" dir="ltr">
-                  {Math.round(state.routLine * 100)}%
-                </span>
-                .
+                {t("({lossPct}%). הצבא נסוג אם יאבד {routPct}%.", {
+                  lossPct: Math.round(lossPct),
+                  routPct: Math.round(state.routLine * 100),
+                })}
               </p>
             </>
           ) : (
             <p className="text-[11px] text-emerald-300/80">
-              כל החיילים חוזרים הביתה — קרב מול הבוס לא עולה באף חייל.
+              {t("כל החיילים חוזרים הביתה — קרב מול הבוס לא עולה באף חייל.")}
             </p>
           )}
           <div className="mt-2">
             <div className="mb-1 flex items-baseline justify-between gap-2 text-[11px]">
-              <span className="font-bold text-gold-dim">זעם הגיבור</span>
+              <span className="font-bold text-gold-dim">{t("זעם הגיבור")}</span>
               <span className="nums text-zinc-500" dir="ltr">
                 {Math.round(furyPct)}%
               </span>
@@ -550,7 +534,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
               />
             </div>
             <p className="mt-1 text-[11px] text-zinc-500">
-              מתמלא בכל סבב. כשהוא מתמלא הגיבור משתחרר במכה אחת גדולה.
+              {t("מתמלא בכל סבב. כשהוא מתמלא הגיבור משתחרר במכה אחת גדולה.")}
             </p>
           </div>
         </div>
@@ -558,7 +542,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
         {/* the running loot */}
         <div className="panel-gold rounded-xl p-4">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-gold-bright">
-            <Icon name="gift" size={14} /> שלל שנצבר עד כה
+            <Icon name="gift" size={14} /> {t("שלל שנצבר עד כה")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {BOSS_REWARD_RESOURCES.map((res) => (
@@ -578,7 +562,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
             )}
           </div>
           <p className="mt-2 text-[11px] text-zinc-500">
-            נצבר לפי הנזק שנגרם עד כה. הפלת הבוס משלמת את האוצר כולו מעל זה, והכול משולם בסוף הקרב.
+            {t("נצבר לפי הנזק שנגרם עד כה. הפלת הבוס משלמת את האוצר כולו מעל זה, והכול משולם בסוף הקרב.")}
           </p>
         </div>
       </section>
@@ -586,23 +570,25 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
       {/* ---------------- what has happened ---------------- */}
       <section className="panel rounded-xl p-3">
         <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-          יומן הקרב
+          {t("יומן הקרב")}
         </p>
         {state.revealed.length === 0 ? (
-          <p className="px-2 py-4 text-center text-xs text-zinc-500">הכוחות מתקרבים לשער…</p>
+          <p className="px-2 py-4 text-center text-xs text-zinc-500">
+            {t("הכוחות מתקרבים לשער…")}
+          </p>
         ) : (
           <>
             {/* A header row, because the log is five unlabelled columns otherwise
                 and every one of them needed guessing. */}
             <div className="flex flex-wrap items-center gap-x-2 px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-600">
-              <span className="w-8 shrink-0">סבב</span>
-              <span className="shrink-0">המהלך שלו</span>
+              <span className="w-8 shrink-0">{t("סבב")}</span>
+              <span className="shrink-0">{t("המהלך שלו")}</span>
               <span aria-hidden className="opacity-0">
                 ←
               </span>
-              <span className="shrink-0">התשובה שלנו</span>
-              <span className="mr-auto shrink-0">נזק</span>
-              {BOSS_CASUALTIES && <span className="shrink-0">אבדות</span>}
+              <span className="shrink-0">{t("התשובה שלנו")}</span>
+              <span className="ms-auto shrink-0">{t("נזק")}</span>
+              {BOSS_CASUALTIES && <span className="shrink-0">{t("אבדות")}</span>}
             </div>
             <ul className="space-y-1">
               {[...state.revealed].reverse().map((entry) => (
@@ -617,7 +603,7 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                   </span>
                   <span className="shrink-0 text-zinc-400">
                     {BOSS_MOVE_META[entry.move]?.icon}{" "}
-                    {BOSS_MOVE_META[entry.move]?.label ?? entry.move}
+                    {t(BOSS_MOVE_META[entry.move]?.label ?? entry.move)}
                   </span>
                   <span aria-hidden className="text-zinc-600">
                     ←
@@ -627,16 +613,20 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                       entry.furyUsed ? "text-gold-bright" : "text-zinc-200"
                     }`}
                   >
-                    {BOSS_TACTIC_META[entry.tactic]?.label ?? entry.tactic}
+                    {t(BOSS_TACTIC_META[entry.tactic]?.label ?? entry.tactic)}
                   </span>
                   <span
                     className={`shrink-0 font-bold ${
                       entry.correct ? "text-emerald-400" : "text-red-400"
                     }`}
                   >
-                    {entry.furyUsed ? "🔥" : entry.correct ? "✔ קריאה נכונה" : "✘ קריאה שגויה"}
+                    {entry.furyUsed
+                      ? "🔥"
+                      : entry.correct
+                        ? t("✔ קריאה נכונה")
+                        : t("✘ קריאה שגויה")}
                   </span>
-                  <span className="nums mr-auto shrink-0 font-bold text-gold-bright" dir="ltr">
+                  <span className="nums ms-auto shrink-0 font-bold text-gold-bright" dir="ltr">
                     −{formatNumber(entry.damage)}
                   </span>
                   {BOSS_CASUALTIES && (
@@ -647,16 +637,14 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-2 px-2 text-[11px] text-zinc-500">
-              קריאות נכונות עד כה:{" "}
+            <p className="nums mt-2 px-2 text-[11px] text-zinc-500">
+              {t("קריאות נכונות עד כה:")}{" "}
               <span className="nums text-emerald-300" dir="ltr">
                 {state.correctSoFar}
               </span>{" "}
-              מתוך{" "}
-              <span className="nums" dir="ltr">
-                {state.revealed.length}
-              </span>{" "}
-              — הן קובעות גם את דירוג הקרב וגם את גודל אוצר ההפלה.
+              {t("מתוך {total} — הן קובעות גם את דירוג הקרב וגם את גודל אוצר ההפלה.", {
+                total: state.revealed.length,
+              })}
             </p>
           </>
         )}
@@ -671,33 +659,35 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
           >
             ▸
           </span>
-          מה בעצם קורה כאן, ואיך משפרים את התוצאה
+          {t("מה בעצם קורה כאן, ואיך משפרים את התוצאה")}
         </summary>
 
         <div className="mt-3 space-y-3 px-1">
           <ol className="space-y-1.5 text-xs leading-relaxed text-zinc-400">
             <li>
-              <b className="text-zinc-200">1.</b> שילמת תורות ושלחת את הצבא. מרגע הלחיצה הכול כבר
-              מוכרע — הדקה הזו היא הצפייה, לא ההחלטה.
+              <b className="text-zinc-200">1.</b>{" "}
+              {t("שילמת תורות ושלחת את הצבא. מרגע הלחיצה הכול כבר מוכרע — הדקה הזו היא הצפייה, לא ההחלטה.")}
             </li>
             <li>
-              <b className="text-zinc-200">2.</b> בכל סבב {state.boss.name} מבצע מהלך, והקצינים שלך
-              מנסים לקרוא אותו ולענות בתשובה הנכונה. סיכוי הקריאה שלך כרגע:{" "}
+              <b className="text-zinc-200">2.</b>{" "}
+              {t("בכל סבב {boss} מבצע מהלך, והקצינים שלך מנסים לקרוא אותו ולענות בתשובה הנכונה. סיכוי הקריאה שלך כרגע:", {
+                boss: t(state.boss.name),
+              })}{" "}
               <b className="nums text-gold-bright" dir="ltr">
                 {Math.round(state.readChance * 100)}%
               </b>{" "}
-              — הוא נקבע ברמת הגיבור.
+              {t("— הוא נקבע ברמת הגיבור.")}
             </li>
             <li>
-              <b className="text-zinc-200">3.</b> כשהמונה נגמר משולם השלל
-              {BOSS_CASUALTIES && ", נכנסות האבדות"}, ונשלחת אליך הודעה עם הסיכום — גם אם עברת
-              בינתיים למסך אחר.
+              <b className="text-zinc-200">3.</b> {t("כשהמונה נגמר משולם השלל")}
+              {BOSS_CASUALTIES && t(", נכנסות האבדות")}
+              {t(", ונשלחת אליך הודעה עם הסיכום — גם אם עברת בינתיים למסך אחר.")}
             </li>
           </ol>
 
           <div>
             <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-              שלוש התשובות
+              {t("שלוש התשובות")}
             </p>
             <ul className="space-y-1">
               {(["SMASH", "SWEEP", "EXPOSED"] as const).map((move) => {
@@ -709,13 +699,13 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
                     className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded border border-border-subtle bg-panel-inset px-2 py-1 text-[11px]"
                   >
                     <span aria-hidden>{meta.icon}</span>
-                    <b className={meta.tone}>{meta.label}</b>
+                    <b className={meta.tone}>{t(meta.label)}</b>
                     <span aria-hidden className="text-zinc-600">
                       ←
                     </span>
                     <span aria-hidden>{counter.icon}</span>
-                    <b className="text-zinc-200">{counter.label}</b>
-                    <span className="text-zinc-500">{meta.effect}</span>
+                    <b className="text-zinc-200">{t(counter.label)}</b>
+                    <span className="text-zinc-500">{t(meta.effect)}</span>
                   </li>
                 );
               })}
@@ -724,37 +714,30 @@ export function BossArena({ initial }: { initial: BossArenaState }) {
 
           <div className="grid gap-2 sm:grid-cols-2">
             <p className="rounded-lg border border-border-subtle bg-panel-inset p-2.5 text-[11px] leading-relaxed text-zinc-400">
-              <b className="text-emerald-300">כדי לפגוע בו יותר:</b> כוח התקיפה. עוד חיילים, נשקי
-              תקיפה, ציוד ונקודות תקיפה לגיבור, באפ גילדה ושיקוי כוח — הנזק בכל סבב הוא אחוז מהכוח
-              הזה.
+              <b className="text-emerald-300">{t("כדי לפגוע בו יותר:")}</b>{" "}
+              {t("כוח התקיפה. עוד חיילים, נשקי תקיפה, ציוד ונקודות תקיפה לגיבור, באפ גילדה ושיקוי כוח — הנזק בכל סבב הוא אחוז מהכוח הזה.")}
             </p>
             <p className="rounded-lg border border-border-subtle bg-panel-inset p-2.5 text-[11px] leading-relaxed text-zinc-400">
               {BOSS_CASUALTIES ? (
                 <>
-                  <b className="text-sky-300">כדי לאבד פחות חיילים:</b> הגיבור. רמה גבוהה יותר =
-                  קריאות נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם.
+                  <b className="text-sky-300">{t("כדי לאבד פחות חיילים:")}</b>{" "}
+                  {t("הגיבור. רמה גבוהה יותר = קריאות נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם.")}
                 </>
               ) : (
                 <>
-                  <b className="text-sky-300">כדי לקרוא אותו נכון יותר:</b> הגיבור. רמה גבוהה יותר =
-                  יותר סבבים שנקראים נכון, וכל אחד מהם מכפיל את הנזק.
+                  <b className="text-sky-300">{t("כדי לקרוא אותו נכון יותר:")}</b>{" "}
+                  {t("הגיבור. רמה גבוהה יותר = יותר סבבים שנקראים נכון, וכל אחד מהם מכפיל את הנזק.")}
                 </>
               )}{" "}
-              גיבור מת מוריד את הקריאה לניחוש ומבטל את הזעם.
+              {t("גיבור מת מוריד את הקריאה לניחוש ומבטל את הזעם.")}
             </p>
           </div>
 
-          <p className="text-[11px] leading-relaxed text-zinc-500">
-            השלל:{" "}
-            <span className="nums" dir="ltr">
-              {Math.round(BOSS_CHIP_SHARE * 100)}%
-            </span>{" "}
-            מהאוצר משולם לפי הנזק שגרמת — גם בקרב שלא הפיל אותו — והשאר (
-            <span className="nums" dir="ltr">
-              {Math.round(BOSS_KILL_SHARE * 100)}%
-            </span>{" "}
-            + ציוד גיבור מובטח) משולם רק למי שמנחית את המכה האחרונה. הפצעים נשארים על הבוס בין
-            תקיפות, אז כל תקיפה מקרבת את ההפלה.
+          <p className="nums text-[11px] leading-relaxed text-zinc-500">
+            {t("השלל: {chip}% מהאוצר משולם לפי הנזק שגרמת — גם בקרב שלא הפיל אותו — והשאר ({kill}% + ציוד גיבור מובטח) משולם רק למי שמנחית את המכה האחרונה. הפצעים נשארים על הבוס בין תקיפות, אז כל תקיפה מקרבת את ההפלה.", {
+              chip: Math.round(BOSS_CHIP_SHARE * 100),
+              kill: Math.round(BOSS_KILL_SHARE * 100),
+            })}
           </p>
         </div>
       </details>

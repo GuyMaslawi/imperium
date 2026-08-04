@@ -164,10 +164,10 @@ export function HeroPaperdoll({
                 />
               ) : (
                 <EmptySocket
-                  label={meta.label}
+                  label={t(meta.label)}
                   icon={meta.icon}
                   statIcon={statMeta.icon}
-                  statLabel={statMeta.label}
+                  statLabel={t(statMeta.label)}
                   waiting={0}
                   readOnly
                 />
@@ -177,7 +177,10 @@ export function HeroPaperdoll({
                 type="button"
                 onClick={() => setOpenItem(item)}
                 className="relative block w-full"
-                aria-label={`${meta.label} רמה ${item.level} — פרטים`}
+                aria-label={t("{slot} רמה {level} — פרטים", {
+                  slot: t(meta.label),
+                  level: item.level,
+                })}
               >
                 {/* no "לבוש" flag — an item sitting in a body socket is
                     self-evidently worn */}
@@ -188,7 +191,7 @@ export function HeroPaperdoll({
                   rarity={uiRarity(item.rarity)}
                   details={itemDetails(t, item, heroLevel, {
                     worn: true,
-                    hint: "לחץ לפרטים",
+                    hint: t("לחץ לפרטים"),
                   })}
                 />
                 {/* a stronger piece of the same kind is sitting in the bag */}
@@ -199,7 +202,7 @@ export function HeroPaperdoll({
                     canEquipItem(heroLevel, b.level),
                 ) && (
                   <span
-                    aria-label="יש חפץ חזק יותר בתיק"
+                    aria-label={t("יש חפץ חזק יותר בתיק")}
                     className="absolute -left-1 -top-1 z-10 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[11px] font-black text-black shadow-[0_0_10px_rgba(52,211,153,0.8)]"
                   >
                     ↑
@@ -208,10 +211,10 @@ export function HeroPaperdoll({
               </button>
             ) : (
               <EmptySocket
-                label={meta.label}
+                label={t(meta.label)}
                 icon={meta.icon}
                 statIcon={statMeta.icon}
-                statLabel={statMeta.label}
+                statLabel={t(statMeta.label)}
                 waiting={waiting}
                 onPick={() => setPickSlot(slot)}
               />
@@ -225,12 +228,12 @@ export function HeroPaperdoll({
         <Tip
           tip={
             readOnly
-              ? "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. ריחוף מעל חפץ מציג את דרגתו והבונוסים שהוא מעניק. הלבשה והשדרוג נעשים בעמוד הגיבור."
-              : "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. לחיצה על סלוט ריק בוחרת חפץ מהתיק; לחיצה על חפץ לבוש פותחת את פרטיו. הבונוסים שלהם מרוכזים ב'סך הכל מהגיבור' שלמטה."
+              ? t("תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. ריחוף מעל חפץ מציג את דרגתו והבונוסים שהוא מעניק. הלבשה והשדרוג נעשים בעמוד הגיבור.")
+              : t("תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. לחיצה על סלוט ריק בוחרת חפץ מהתיק; לחיצה על חפץ לבוש פותחת את פרטיו. הבונוסים שלהם מרוכזים ב'סך הכל מהגיבור' שלמטה.")
           }
         >
           <span className="cursor-help rounded-full border border-gold/40 bg-black/75 px-3 py-1 text-[11px] font-bold text-gold-dim">
-            ציוד לבוש{" "}
+            {t("ציוד לבוש")}{" "}
             <span className="nums text-gold-bright" dir="ltr">
               {equipped.length}/9
             </span>
@@ -285,18 +288,19 @@ function EmptySocket({
   /** Draw the socket without offering to fill it (dossier view). */
   readOnly?: boolean;
 }) {
+  const t = useT();
   const { triggerProps, node } = useTip(
     <>
       <span className="block text-sm font-black text-zinc-300">{label}</span>
-      <span className="mt-0.5 block text-[10px] text-zinc-500">סלוט ריק</span>
+      <span className="mt-0.5 block text-[10px] text-zinc-500">{t("סלוט ריק")}</span>
       <span className="mt-2 block text-xs text-zinc-300">
         <Icon name={statIcon} size={12} className="inline align-[-2px]" /> {statLabel}
       </span>
       {!readOnly && (
         <span className="mt-2 block border-t border-white/10 pt-1.5 text-[10px] text-gold-dim">
           {waiting > 0
-            ? `${waiting} בתיק — לחץ לבחירה`
-            : "אין חפץ כזה בתיק — לכוד אחד בתקיפה"}
+            ? t("{count} בתיק — לחץ לבחירה", { count: waiting })
+            : t("אין חפץ כזה בתיק — לכוד אחד בתקיפה")}
         </span>
       )}
     </>,
@@ -309,8 +313,12 @@ function EmptySocket({
   return (
     <Frame
       {...(readOnly
-        ? { "aria-label": `סלוט ${label} ריק` }
-        : { type: "button" as const, onClick: onPick, "aria-label": `סלוט ${label} ריק — בחר חפץ` })}
+        ? { "aria-label": t("סלוט {slot} ריק", { slot: label }) }
+        : {
+            type: "button" as const,
+            onClick: onPick,
+            "aria-label": t("סלוט {slot} ריק — בחר חפץ", { slot: label }),
+          })}
       className="group relative block w-full"
       {...triggerProps}
     >
@@ -391,15 +399,16 @@ function SlotPicker({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 id={titleId} className="text-lg font-black text-gold-bright">
-            <span aria-hidden>{meta.icon}</span> {meta.label}
+            <span aria-hidden>{meta.icon}</span> {t(meta.label)}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" /> {statMeta.label} — בחר חפץ מהתיק כדי ללבוש אותו
+            <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" />{" "}
+            {t("{stat} — בחר חפץ מהתיק כדי ללבוש אותו", { stat: t(statMeta.label) })}
           </p>
         </div>
         <button
           onClick={onClose}
-          aria-label="סגור"
+          aria-label={t("סגור")}
           className="btn btn-ghost -mt-1 h-8 w-8 !p-0 text-base"
         >
           ✕
@@ -410,10 +419,10 @@ function SlotPicker({
 
       {stacks.length === 0 ? (
         <p className="py-4 text-center text-sm text-zinc-400">
-          אין חפצי {meta.label} בתיק.
+          {t("אין חפצי {slot} בתיק.", { slot: t(meta.label) })}
           <br />
           <span className="text-xs text-zinc-500">
-            חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים.
+            {t("חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים.")}
           </span>
         </p>
       ) : (

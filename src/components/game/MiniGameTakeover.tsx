@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useScrollLock } from "@/components/ui/scrollLock";
 import { MINIGAME_TYPE_META, type MiniGameState } from "@/lib/game/minigame";
+import { useT } from "@/i18n/client";
 
 /**
  * The release announcement for a mini-game — the four seconds where the screen
@@ -47,6 +48,7 @@ type Flavour = {
   cta: string;
 };
 
+/** Hebrew source text, translated where the takeover is drawn. */
 const FLAVOUR: Record<MiniGameState["type"], Flavour> = {
   FIND_BALL: {
     game: "cups",
@@ -137,6 +139,7 @@ export function MiniGameTakeover({
   onDone: () => void;
 }) {
   const meta = MINIGAME_TYPE_META[state.type];
+  const t = useT();
   const flavour = FLAVOUR[state.type];
   const [leaving, setLeaving] = useState(false);
   const closed = useRef(false);
@@ -208,7 +211,7 @@ export function MiniGameTakeover({
           className="mgt-rise text-sm font-bold text-white/70"
           style={{ ["--mgt-delay" as string]: "0.55s" }}
         >
-          <span aria-hidden>{meta.icon}</span> {meta.label} · {flavour.tagline}
+          <span aria-hidden>{meta.icon}</span> {t(meta.label)} · {t(flavour.tagline)}
         </p>
 
         <div
@@ -216,7 +219,7 @@ export function MiniGameTakeover({
           style={{ ["--mgt-delay" as string]: "0.7s" }}
         >
           <span className="mgt-chip mgt-chip--prize">
-            <span aria-hidden>🎁</span> פרס:{" "}
+            <span aria-hidden>🎁</span> {t("פרס:")}{" "}
             <span className="nums font-black" dir="ltr">
               {state.prizeText}
             </span>
@@ -226,7 +229,7 @@ export function MiniGameTakeover({
             <span className="nums font-black" dir="ltr">
               {state.maxAttempts}
             </span>{" "}
-            ניסיונות
+            {t("ניסיונות")}
           </span>
           {state.maxWinners > 0 && (
             <span className="mgt-chip">
@@ -234,7 +237,7 @@ export function MiniGameTakeover({
               <span className="nums font-black" dir="ltr">
                 {state.maxWinners}
               </span>{" "}
-              {state.maxWinners === 1 ? "זוכה בלבד" : "זוכים"}
+              {state.maxWinners === 1 ? t("זוכה בלבד") : t("זוכים")}
             </span>
           )}
         </div>
@@ -248,7 +251,7 @@ export function MiniGameTakeover({
           className="mgt-rise btn btn-gold mt-1 px-8 py-3 text-base"
           style={{ ["--mgt-delay" as string]: "0.85s" }}
         >
-          {flavour.cta}
+          {t(flavour.cta)}
         </button>
 
         <button
@@ -257,7 +260,7 @@ export function MiniGameTakeover({
           className="mgt-rise text-xs font-bold text-white/45 underline-offset-4 transition-colors hover:text-white/80 hover:underline"
           style={{ ["--mgt-delay" as string]: "0.95s" }}
         >
-          אחר כך — הכפתור למעלה שומר לי אותו
+          {t("אחר כך — הכפתור למעלה שומר לי אותו")}
         </button>
       </div>
     </div>,

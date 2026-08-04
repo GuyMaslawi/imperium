@@ -15,6 +15,7 @@ import { MineRig, type MineRigPulseKind } from "./MineRig";
 import { VipLockedAction } from "./VipLockedAction";
 import { formatNumber } from "@/lib/game/format";
 import type { MineProductionBreakdown } from "@/lib/game/resources";
+import { useT } from "@/i18n/client";
 
 const nis = (n: number) => formatNumber(n);
 
@@ -50,6 +51,7 @@ export function MineCard({
   upgradeCost,
   isVip,
 }: MineCardProps) {
+  const t = useT();
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeMine,
     {}
@@ -89,9 +91,9 @@ export function MineCard({
             className={RESOURCE_ICON_COLOR[resource]}
           />
           <div>
-            <h3 className="font-bold text-gold-bright">{label}</h3>
+            <h3 className="font-bold text-gold-bright">{t(label)}</h3>
             <p className="text-xs font-semibold text-gold-dim">
-              רמה{" "}
+              {t("רמה")}{" "}
               <span className="nums" dir="ltr">
                 {level} / {maxLevel}
               </span>
@@ -105,8 +107,8 @@ export function MineCard({
               : "border border-border-subtle bg-panel-inset text-gold-dim"
           }`}
         >
-          {isMaxLevel ? "שיא " : ""}
-          רמה{" "}
+          {isMaxLevel ? `${t("שיא")} ` : ""}
+          {t("רמה")}{" "}
           <span className="nums" dir="ltr">
             {maxLevel}
           </span>
@@ -117,8 +119,8 @@ export function MineCard({
           and the plate on its frame carries the real per-update output. */}
       <MineRig
         resource={resource}
-        label={label}
-        resourceLabel={resourceLabel}
+        label={t(label)}
+        resourceLabel={t(resourceLabel)}
         slaves={assignedSlaves}
         level={level}
         output={breakdown.total}
@@ -126,26 +128,26 @@ export function MineCard({
       />
 
       <p className="text-center text-xs text-gold-dim">
-        תפוקה לעדכון רגיל
-        {breakdown.lines.length > 0 ? " (כולל בונוסים)" : ""}
+        {t("תפוקה לעדכון רגיל")}
+        {breakdown.lines.length > 0 ? t(" (כולל בונוסים)") : ""}
       </p>
 
       {/* min-height keeps the stat boxes and forms aligned across the four
           cards even when descriptions wrap to a different number of lines */}
-      <p className="min-h-[3.75rem] text-sm text-zinc-400">{description}</p>
+      <p className="min-h-[3.75rem] text-sm text-zinc-400">{t(description)}</p>
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 panel-inset rounded-lg p-3 text-xs">
-        <dt className="text-zinc-400">עבדי מכרות מוצבים</dt>
+        <dt className="text-zinc-400">{t("עבדי מכרות מוצבים")}</dt>
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
           {nis(assignedSlaves)}
         </dd>
-        <dt className="text-zinc-400">תפוקה לעבד מכרות</dt>
+        <dt className="text-zinc-400">{t("תפוקה לעבד מכרות")}</dt>
         <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
-          {nis(productionPerSlave)} {resourceLabel}
+          {nis(productionPerSlave)} {t(resourceLabel)}
         </dd>
-        <dt className="text-zinc-400">תפוקת בסיס לעדכון</dt>
-        <dd className="nums text-left font-bold text-zinc-100" dir="ltr">
-          +{nis(breakdown.base)} {resourceLabel}
+        <dt className="text-zinc-400">{t("תפוקת בסיס לעדכון")}</dt>
+        <dd className="nums text-end font-bold text-zinc-100" dir="ltr">
+          +{nis(breakdown.base)} {t(resourceLabel)}
         </dd>
       </dl>
 
@@ -153,12 +155,12 @@ export function MineCard({
         <div className="panel-inset rounded-lg p-3 text-xs space-y-1.5">
           <p className="flex items-center gap-1.5 font-semibold text-gold-dim">
             <Icon name="spark" size={14} className="text-crimson-bright" />
-            בונוסים פעילים
+            {t("בונוסים פעילים")}
           </p>
           {breakdown.lines.map((line) => (
             <div key={line.key} className="flex items-center justify-between gap-2">
               <span className="text-zinc-400">
-                {line.label}
+                {t(line.label, line.labelParams)}
                 {line.pct !== undefined ? (
                   <span className="nums" dir="ltr">
                     {" "}
@@ -172,9 +174,9 @@ export function MineCard({
             </div>
           ))}
           <div className="flex items-center justify-between gap-2 border-t border-border-subtle pt-1.5">
-            <span className="font-semibold text-gold-dim">סה״כ בפועל</span>
+            <span className="font-semibold text-gold-dim">{t("סה״כ בפועל")}</span>
             <span className="nums font-black text-emerald-400" dir="ltr">
-              +{nis(breakdown.total)} {resourceLabel}
+              +{nis(breakdown.total)} {t(resourceLabel)}
             </span>
           </div>
         </div>
@@ -184,7 +186,7 @@ export function MineCard({
         <input type="hidden" name="resource" value={resource} />
         <label className="flex-1 space-y-1">
           <span className="text-xs text-gold-dim">
-            ניהול עובדים (פנויים:{" "}
+            {t("ניהול עובדים (פנויים:")}{" "}
             <span className="nums" dir="ltr">
               {nis(freeSlaves)}
             </span>
@@ -199,8 +201,12 @@ export function MineCard({
             className="nums w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
           />
         </label>
-        <SubmitButton variant="secondary" className="btn btn-ghost" pendingText="מעדכן...">
-          עדכן חלוקה
+        <SubmitButton
+          variant="secondary"
+          className="btn btn-ghost"
+          pendingText={t("מעדכן...")}
+        >
+          {t("עדכן חלוקה")}
         </SubmitButton>
       </form>
 
@@ -209,37 +215,37 @@ export function MineCard({
       {isMaxLevel ? (
         <div className="mt-auto flex items-center justify-center gap-2 rounded-lg border border-gold/40 bg-gold/10 p-3 text-sm font-bold text-gold-bright">
           <Icon name="spark" size={16} className="text-gold-bright" />
-          המכונה משודרגת למקסימום
+          {t("המכונה משודרגת למקסימום")}
         </div>
       ) : (
         <form action={upgradeAction} className="mt-auto space-y-2">
           <input type="hidden" name="resource" value={resource} />
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-            <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
+            <span className="font-semibold text-gold-dim">{t("עלות שדרוג:")}</span>
             <span className="nums" dir="ltr">
               <Icon
                 name={RESOURCE_ICON[resource]}
                 size={14}
                 className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[resource]}`}
               />{" "}
-              {nis(upgradeCost[resource])} {resourceLabel}
+              {nis(upgradeCost[resource])} {t(resourceLabel)}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">
-              שדרג רמה
+            <SubmitButton className="btn btn-dark w-full" pendingText={t("משדרג...")}>
+              {t("שדרג רמה")}
             </SubmitButton>
             {isVip ? (
               <SubmitButton
                 formAction={maxAction}
                 variant="secondary"
                 className="btn btn-ghost w-full"
-                pendingText="משדרג..."
+                pendingText={t("משדרג...")}
               >
-                שדרג למקסימום
+                {t("שדרג למקסימום")}
               </SubmitButton>
             ) : (
-              <VipLockedAction label="שדרג למקסימום" className="w-full" />
+              <VipLockedAction label={t("שדרג למקסימום")} className="w-full" />
             )}
           </div>
         </form>

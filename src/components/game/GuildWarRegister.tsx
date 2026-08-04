@@ -14,6 +14,7 @@ import {
   withdrawGuildFromWar,
 } from "@/server/actions/guildWar";
 import type { ActionState } from "@/server/actions/game";
+import { useT } from "@/i18n/client";
 
 export interface GuildWarRegisterProps {
   guildName: string;
@@ -52,6 +53,7 @@ export function GuildWarRegister({
     {}
   );
 
+  const t = useT();
   const short = enrolled < GUILD_WAR_MIN_GUILDS;
 
   return (
@@ -60,25 +62,23 @@ export function GuildWarRegister({
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
             <Icon name="guild" size={18} className="text-crimson" />
-            הרשמה למלחמה הבאה
+            {t("הרשמה למלחמה הבאה")}
           </h2>
           <p className="mt-1 text-xs leading-relaxed text-zinc-400">
-            {nextBellLabel} · הזירה נפתחת ב־
+            {t(nextBellLabel)} · {t("הזירה נפתחת ב־")}
             <span className="nums font-bold text-gold-bright" dir="ltr">
               {GUILD_WAR_START_LABEL}
             </span>{" "}
-            ונסגרת ב־
+            {t("ונסגרת ב־")}
             <span className="nums font-bold text-gold-bright" dir="ltr">
               {GUILD_WAR_END_LABEL}
             </span>
           </p>
           <p className="mt-1 text-[11px] text-zinc-500">
-            ההרשמה פתוחה תמיד — כל לחיצה רושמת אתכם לקרב הקרוב שטרם התחיל. אחרי
-            זה אין מה לעשות: הקרב מתנהל אוטומטית והמערכת מנהלת אותו לבד.
+            {t("ההרשמה פתוחה תמיד — כל לחיצה רושמת אתכם לקרב הקרוב שטרם התחיל. אחרי זה אין מה לעשות: הקרב מתנהל אוטומטית והמערכת מנהלת אותו לבד.")}
           </p>
           <p className="mt-1 text-[11px] text-zinc-500">
-            הפרס מחולק לרוסטר שהיה בברית כשהפעמון צלצל. מי שמצטרף באמצע הקרב
-            נלחם ומוסיף נקודות — אבל מקבל פרס רק מהמלחמה הבאה.
+            {t("הפרס מחולק לרוסטר שהיה בברית כשהפעמון צלצל. מי שמצטרף באמצע הקרב נלחם ומוסיף נקודות — אבל מקבל פרס רק מהמלחמה הבאה.")}
           </p>
         </div>
 
@@ -89,13 +89,13 @@ export function GuildWarRegister({
               : "border-zinc-700 bg-black/40 text-zinc-400"
           }`}
         >
-          {registered ? `${guildName} רשומה ✓` : "לא רשומים"}
+          {registered ? t("{guild} רשומה ✓", { guild: guildName }) : t("לא רשומים")}
         </span>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <span className="panel-inset rounded-full px-3 py-1 text-xs text-zinc-400">
-          בריתות רשומות:{" "}
+          {t("בריתות רשומות:")}{" "}
           <span
             className={`nums font-bold ${short ? "text-amber-300" : "text-gold-bright"}`}
             dir="ltr"
@@ -105,8 +105,9 @@ export function GuildWarRegister({
         </span>
         {short && (
           <span className="text-xs text-amber-300/90">
-            צריך לפחות {GUILD_WAR_MIN_GUILDS} בריתות — אחרת הקרב מתבטל ואף אחד לא
-            זוכה בכלום.
+            {t("צריך לפחות {min} בריתות — אחרת הקרב מתבטל ואף אחד לא זוכה בכלום.", {
+              min: GUILD_WAR_MIN_GUILDS,
+            })}
           </span>
         )}
       </div>
@@ -118,24 +119,24 @@ export function GuildWarRegister({
               formAction={leaveAction}
               variant="secondary"
               className="btn btn-dark"
-              pendingText="מבטל..."
+              pendingText={t("מבטל...")}
             >
-              ביטול ההרשמה
+              {t("ביטול ההרשמה")}
             </SubmitButton>
           ) : (
             <SubmitButton
               formAction={joinAction}
               className="btn btn-gold"
-              pendingText="נרשמים..."
+              pendingText={t("נרשמים...")}
             >
-              <Icon name="attack" size={16} /> רשום את {guildName} למלחמה
+              <Icon name="attack" size={16} />{" "}
+              {t("רשום את {guild} למלחמה", { guild: guildName })}
             </SubmitButton>
           )}
         </form>
       ) : (
         <p className="mt-4 rounded-lg border border-border-subtle bg-black/30 px-3 py-2 text-xs text-zinc-400">
-          רק מנהיג או סגן יכולים לרשום את הברית — ההרשמה מכניסה את כל הרוסטר
-          לזירה למשך חצי שעה, וזו לא החלטה של חבר בודד.
+          {t("רק מנהיג או סגן יכולים לרשום את הברית — ההרשמה מכניסה את כל הרוסטר לזירה למשך חצי שעה, וזו לא החלטה של חבר בודד.")}
         </p>
       )}
 

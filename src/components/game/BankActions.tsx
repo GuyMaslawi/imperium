@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/Input";
 import { Card } from "@/components/ui/Card";
 import { VipLockedAction } from "./VipLockedAction";
 import { formatNumber } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 
 export interface BankActionsProps {
   /** Whole gold available outside the warehouse. */
@@ -42,6 +43,7 @@ export function BankActions({
   remainingDeposits,
   isVip,
 }: BankActionsProps) {
+  const t = useT();
   const [depositState, depositAction] = useActionState<ActionState, FormData>(
     depositGoldToBank,
     {}
@@ -83,18 +85,18 @@ export function BankActions({
   const depositsExhausted = remainingDeposits < 1;
 
   const validateAmount = (kind: "deposit" | "withdraw"): string | undefined => {
-    if (amount.trim() === "") return "יש להזין כמות";
+    if (amount.trim() === "") return t("יש להזין כמות");
     const value = Number(amount);
     if (!Number.isInteger(value) || value <= 0) {
-      return "יש להזין מספר שלם גדול מ־0";
+      return t("יש להזין מספר שלם גדול מ־0");
     }
     if (kind === "deposit" && value > availableGold) {
       return storedGold > 0
-        ? "יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק."
-        : "אין מספיק זהב זמין להפקדה.";
+        ? t("יש למשוך זהב מהמחסן לפני שניתן להפקיד אותו בבנק.")
+        : t("אין מספיק זהב זמין להפקדה.");
     }
     if (kind === "withdraw" && value > bankGold) {
-      return "אין מספיק זהב בבנק למשיכה.";
+      return t("אין מספיק זהב בבנק למשיכה.");
     }
     return undefined;
   };
@@ -124,13 +126,13 @@ export function BankActions({
     <Card className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-zinc-400">
         <span>
-          זהב זמין:{" "}
+          {t("זהב זמין:")}{" "}
           <span className="nums font-bold text-gold-bright" dir="ltr">
             {formatAmount(availableGold)}
           </span>
         </span>
         <span>
-          זהב בבנק:{" "}
+          {t("זהב בבנק:")}{" "}
           <span className="nums font-bold text-gold-bright" dir="ltr">
             {formatAmount(bankGold)}
           </span>
@@ -141,11 +143,11 @@ export function BankActions({
         <Input
           type="number"
           name="amount"
-          label="סכום"
+          label={t("סכום")}
           min={1}
           step={1}
           inputMode="numeric"
-          placeholder="כמות זהב"
+          placeholder={t("כמות זהב")}
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
           aria-invalid={clientError ? true : undefined}
@@ -155,7 +157,7 @@ export function BankActions({
           <div className="panel-inset flex flex-col gap-2 rounded-lg p-3">
             <p className="flex items-center gap-1.5 text-sm font-bold text-emerald-400">
               <span aria-hidden>⬇️</span>
-              הפקדה
+              {t("הפקדה")}
             </p>
             {isVip ? (
               <SubmitButton
@@ -164,21 +166,21 @@ export function BankActions({
                 formAction={depositAllAction}
                 onClick={handleQuickAction("depositAll")}
                 disabled={depositsExhausted}
-                pendingText="מפקיד..."
+                pendingText={t("מפקיד...")}
               >
-                הפקד הכל
+                {t("הפקד הכל")}
               </SubmitButton>
             ) : (
-              <VipLockedAction label="הפקד הכל" className="w-full" />
+              <VipLockedAction label={t("הפקד הכל")} className="w-full" />
             )}
             <SubmitButton
               className="btn btn-dark w-full"
               formAction={depositAction}
               onClick={handleTransfer("deposit")}
               disabled={depositsExhausted}
-              pendingText="מפקיד..."
+              pendingText={t("מפקיד...")}
             >
-              הפקד לחיסכון
+              {t("הפקד לחיסכון")}
             </SubmitButton>
           </div>
 
@@ -186,7 +188,7 @@ export function BankActions({
           <div className="panel-inset flex flex-col gap-2 rounded-lg p-3">
             <p className="flex items-center gap-1.5 text-sm font-bold text-red-400">
               <span aria-hidden>⬆️</span>
-              משיכה
+              {t("משיכה")}
             </p>
             {isVip ? (
               <SubmitButton
@@ -194,20 +196,20 @@ export function BankActions({
                 className="btn btn-ghost w-full"
                 formAction={withdrawAllAction}
                 onClick={handleQuickAction("withdrawAll")}
-                pendingText="מושך..."
+                pendingText={t("מושך...")}
               >
-                משוך הכל
+                {t("משוך הכל")}
               </SubmitButton>
             ) : (
-              <VipLockedAction label="משוך הכל" className="w-full" />
+              <VipLockedAction label={t("משוך הכל")} className="w-full" />
             )}
             <SubmitButton
               className="btn btn-dark w-full"
               formAction={withdrawAction}
               onClick={handleTransfer("withdraw")}
-              pendingText="מושך..."
+              pendingText={t("מושך...")}
             >
-              משוך כספים
+              {t("משוך כספים")}
             </SubmitButton>
           </div>
         </div>
@@ -215,7 +217,7 @@ export function BankActions({
 
       {depositsExhausted && (
         <p className="rounded-lg border border-amber-900 bg-amber-950/60 px-3 py-2 text-sm text-amber-300">
-          ניצלת את כל ההפקדות עד העדכון היומי הבא.
+          {t("ניצלת את כל ההפקדות עד העדכון היומי הבא.")}
         </p>
       )}
 
@@ -225,10 +227,10 @@ export function BankActions({
       />
 
       <ul className="space-y-1 text-xs text-gold-dim">
-        <li>הפקדות מוגבלות לפי שדרוג כמות הפקדות בבנק.</li>
-        <li>משיכות אינן מוגבלות.</li>
-        <li>הריבית מחושבת על הזהב שנמצא בבנק בלבד.</li>
-        <li>הריבית נכנסת בכל עדכון יומי.</li>
+        <li>{t("הפקדות מוגבלות לפי שדרוג כמות הפקדות בבנק.")}</li>
+        <li>{t("משיכות אינן מוגבלות.")}</li>
+        <li>{t("הריבית מחושבת על הזהב שנמצא בבנק בלבד.")}</li>
+        <li>{t("הריבית נכנסת בכל עדכון יומי.")}</li>
       </ul>
     </Card>
   );

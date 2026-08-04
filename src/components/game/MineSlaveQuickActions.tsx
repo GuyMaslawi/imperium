@@ -12,6 +12,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { VipLockedAction } from "./VipLockedAction";
 import { VIP_LABEL } from "@/lib/game/vip";
+import { useT } from "@/i18n/client";
 
 const ALL_TO_RESOURCE: Array<{
   resource: "gold" | "wood" | "iron" | "stone";
@@ -33,6 +34,7 @@ const ALL_TO_RESOURCE: Array<{
  * layout these buttons produce.
  */
 export function MineSlaveQuickActions({ isVip }: { isVip: boolean }) {
+  const t = useT();
   const [allState, allAction] = useActionState<ActionState, FormData>(
     assignAllMineSlavesToResource,
     {}
@@ -50,10 +52,10 @@ export function MineSlaveQuickActions({ isVip }: { isVip: boolean }) {
     <div className="panel rounded-xl p-4 space-y-3">
       <h2 className="flex flex-wrap items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
         <Icon name="spark" size={16} className="text-crimson-bright" />
-        פעולות מהירות
+        {t("פעולות מהירות")}
         {!isVip && (
           <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
-            {VIP_LABEL}
+            {t(VIP_LABEL)}
           </span>
         )}
       </h2>
@@ -62,26 +64,38 @@ export function MineSlaveQuickActions({ isVip }: { isVip: boolean }) {
           isVip ? (
             <form key={resource} action={allAction}>
               <input type="hidden" name="resource" value={resource} />
-              <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מציב...">
-                {label}
+              <SubmitButton
+                variant="secondary"
+                className="btn btn-ghost px-4 py-2 text-sm"
+                pendingText={t("מציב...")}
+              >
+                {t(label)}
               </SubmitButton>
             </form>
           ) : (
-            <VipLockedAction key={resource} label={label} />
+            <VipLockedAction key={resource} label={t(label)} />
           )
         )}
         {isVip ? (
           <form action={splitAction}>
-            <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מחלק...">
-              חלק שווה בין המשאבים
+            <SubmitButton
+              variant="secondary"
+              className="btn btn-ghost px-4 py-2 text-sm"
+              pendingText={t("מחלק...")}
+            >
+              {t("חלק שווה בין המשאבים")}
             </SubmitButton>
           </form>
         ) : (
-          <VipLockedAction label="חלק שווה בין המשאבים" />
+          <VipLockedAction label={t("חלק שווה בין המשאבים")} />
         )}
         <form action={clearAction}>
-          <SubmitButton variant="secondary" className="btn btn-ghost px-4 py-2 text-sm" pendingText="מנקה...">
-            נקה חלוקה
+          <SubmitButton
+            variant="secondary"
+            className="btn btn-ghost px-4 py-2 text-sm"
+            pendingText={t("מנקה...")}
+          >
+            {t("נקה חלוקה")}
           </SubmitButton>
         </form>
       </div>

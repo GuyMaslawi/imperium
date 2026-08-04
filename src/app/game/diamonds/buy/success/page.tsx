@@ -4,20 +4,20 @@ import { getSessionUserId, requireEmpire } from "@/lib/auth";
 import { Icon } from "@/components/ui/Icon";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { formatNumber } from "@/lib/game/format";
-import { settleGrowReturn, type GrowReturnStatus } from "@/server/growSettle";
+import { settleOrderReturn, type OrderReturnStatus } from "@/server/orderSettle";
 
 /**
- * Where Grow returns the buyer after a successful payment.
+ * Where the gateway returns the buyer after a successful payment.
  *
- * The page settles as a *convenience*, not as the mechanism: it asks Grow what
- * the buyer's newest open order is worth and credits it, so the diamonds are
- * already in the balance by the time this paints. If anything about that is
+ * The page settles as a *convenience*, not as the mechanism: it asks the gateway
+ * what the buyer's newest open order is worth and credits it, so the diamonds
+ * are already in the balance by the time this paints. If anything about that is
  * slow, down, or merely out of order, the gateway's callback settles the same
  * purchase moments later through the same guard — which is why nothing here
  * treats "not confirmed yet" as a failure.
  *
- * Nothing in the URL is read. Grow's return carries no field worth trusting, so
- * the order is found by session instead. See `@/server/growSettle`.
+ * Nothing in the URL is read. The return carries no field worth trusting, so the
+ * order is found by session instead. See `@/server/orderSettle`.
  */
 
 export const metadata = {
@@ -31,7 +31,7 @@ export const metadata = {
 export const dynamic = "force-dynamic";
 
 const VIEWS: Record<
-  GrowReturnStatus,
+  OrderReturnStatus,
   { emoji: string; title: string; tone: string; body: string }
 > = {
   credited: {
@@ -64,7 +64,7 @@ export default async function PurchaseSuccessPage() {
   const empire = await requireEmpire();
   const userId = await getSessionUserId();
   const result = userId
-    ? await settleGrowReturn(userId)
+    ? await settleOrderReturn(userId)
     : ({ status: "none", diamonds: 0 } as const);
 
   const view = VIEWS[result.status];

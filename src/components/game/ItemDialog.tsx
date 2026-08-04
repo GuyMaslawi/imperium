@@ -153,17 +153,18 @@ export function ItemDialog({
             {itemDisplayName(t, item.slot, level)}
           </h2>
           <p className="mt-1 text-xs text-zinc-400">
-            דרגה: <span className={rarityMeta.tone}>{rarityMeta.label}</span>
-            {" · "}רמת פריט:{" "}
-            <span className="nums text-zinc-200">{level}</span>
+            {t("דרגה:")} <span className={rarityMeta.tone}>{t(rarityMeta.label)}</span>
+            {" · "}
+            {t("רמת פריט:")} <span className="nums text-zinc-200">{level}</span>
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
-            סט: <span className="text-zinc-300">{itemSetForLevel(level).label}</span>
+            {t("סט:")}{" "}
+            <span className="text-zinc-300">{t(itemSetForLevel(level).label)}</span>
           </p>
         </div>
         <button
           onClick={onClose}
-          aria-label="סגור"
+          aria-label={t("סגור")}
           className="btn btn-ghost -mt-1 h-8 w-8 !p-0 text-base"
         >
           ✕
@@ -196,7 +197,7 @@ export function ItemDialog({
                   size={line.primary ? 14 : 13}
                   className={line.resource ? RESOURCE_ICON_COLOR[line.resource] : ""}
                 />
-                {line.label}
+                {t(line.label, line.labelParams)}
               </span>
               <span
                 className={`nums font-black ${
@@ -211,16 +212,16 @@ export function ItemDialog({
           ))}
         </div>
         <p className="text-[11px] leading-relaxed text-zinc-500">
-          {statMeta.description}
+          {t(statMeta.description)}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-zinc-400">דרישת רמה</span>
+          <span className="text-zinc-400">{t("דרישת רמה")}</span>
           <span
             className={`nums text-xs font-bold ${
               meetsLevel ? "text-emerald-400" : "text-red-400"
             }`}
           >
-            {meetsLevel ? "✓" : "✗"} גיבור רמה {level}
+            {meetsLevel ? "✓" : "✗"} {t("גיבור רמה {level}", { level })}
           </span>
         </div>
       </div>
@@ -229,28 +230,29 @@ export function ItemDialog({
       {upgradeToLevel != null && nextTier != null && (
         <div className="panel-inset mt-4 rounded-lg p-3 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400">שדרוג לרמה</span>
+            <span className="text-zinc-400">{t("שדרוג לרמה")}</span>
             <span className={`font-black ${RARITY_META[nextTier].tone}`}>
-              <span className="nums" dir="ltr">{upgradeToLevel}</span> · {RARITY_META[nextTier].label}
+              <span className="nums" dir="ltr">{upgradeToLevel}</span> ·{" "}
+              {t(RARITY_META[nextTier].label)}
             </span>
           </div>
           {/* the one upgrade in each decade that also changes how the piece looks */}
           {itemSetForLevel(upgradeToLevel).index !== itemSetForLevel(level).index && (
             <div className="mt-1 flex items-center justify-between">
-              <span className="text-zinc-500">סט חדש</span>
+              <span className="text-zinc-500">{t("סט חדש")}</span>
               <span className="font-black text-gold-bright">
-                {itemSetForLevel(upgradeToLevel).label} ✦
+                {t(itemSetForLevel(upgradeToLevel).label)} ✦
               </span>
             </div>
           )}
           <div className="mt-1 flex items-center justify-between">
-            <span className="text-zinc-500">בונוס לאחר שדרוג</span>
+            <span className="text-zinc-500">{t("בונוס לאחר שדרוג")}</span>
             <span className="nums font-bold text-emerald-300" dir="ltr">
               +{formatBonus(bonus.value)}{unit} → +{formatBonus(nextBonus ?? 0)}{unit}
             </span>
           </div>
           <div className="mt-1 flex items-center justify-between">
-            <span className="text-zinc-500">עלות</span>
+            <span className="text-zinc-500">{t("עלות")}</span>
             <span
               className={`nums font-bold ${canAfford ? "text-gold-bright" : "text-red-400"}`}
               dir="ltr"
@@ -264,13 +266,18 @@ export function ItemDialog({
             </span>
           </div>
           {forgeDiscount && (
-            <p className="mt-1.5 text-[11px] font-semibold text-violet-300">
-              🧪 שיקוי הנפח פעיל — {FORGE_DISCOUNT_PCT}% הנחה על השדרוג
+            <p className="nums mt-1.5 text-[11px] font-semibold text-violet-300">
+              {t("🧪 שיקוי הנפח פעיל — {pct}% הנחה על השדרוג", {
+                pct: FORGE_DISCOUNT_PCT,
+              })}
             </p>
           )}
           {!meetsUpgradeLevel && (
-            <p className="mt-2 text-[11px] font-semibold text-red-400">
-              דרוש גיבור רמה {upgradeToLevel} כדי לשדרג (אתה ברמה {heroLevel})
+            <p className="nums mt-2 text-[11px] font-semibold text-red-400">
+              {t("דרוש גיבור רמה {required} כדי לשדרג (אתה ברמה {level})", {
+                required: upgradeToLevel,
+                level: heroLevel,
+              })}
             </p>
           )}
         </div>
@@ -280,24 +287,24 @@ export function ItemDialog({
       {upgradeToLevel == null && (
         <div className="panel-inset mt-4 rounded-lg p-3 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-400">שדרוג</span>
+            <span className="text-zinc-400">{t("שדרוג")}</span>
             <span className="font-black text-gold-bright">
-              {setCapped ? "שיא הסט ✦" : "רמה מקסימלית ✦"}
+              {setCapped ? t("שיא הסט ✦") : t("רמה מקסימלית ✦")}
             </span>
           </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
             {setCapped ? (
               <>
-                אגדי הוא הרמה הגבוהה בסט{" "}
-                <b className="text-zinc-300">{itemSetForLevel(level).label}</b> — אין
-                לאן לשדרג אותו יותר. הסט הבא (
-                <b className="text-zinc-300">{itemSetForLevel(level + 1).label}</b>)
-                מגיע רק כשלל מתקיפה מנצחת.
+                {t("אגדי הוא הרמה הגבוהה בסט")}{" "}
+                <b className="text-zinc-300">{t(itemSetForLevel(level).label)}</b>{" "}
+                {t("— אין לאן לשדרג אותו יותר. הסט הבא (")}
+                <b className="text-zinc-300">{t(itemSetForLevel(level + 1).label)}</b>
+                {t(") מגיע רק כשלל מתקיפה מנצחת.")}
               </>
             ) : (
               <>
-                רמה <b className="nums text-zinc-300">{level}</b> — אין ציוד גבוה
-                מזה במשחק.
+                {t("רמה")} <b className="nums text-zinc-300">{level}</b>{" "}
+                {t("— אין ציוד גבוה מזה במשחק.")}
               </>
             )}
           </p>
@@ -319,9 +326,8 @@ export function ItemDialog({
           the hero climbs back. Say so, and make the player confirm. */}
       {grandfathered && (
         <p className="mt-4 rounded-lg border border-amber-500/50 bg-amber-500/10 p-2.5 text-xs leading-relaxed text-amber-200">
-          <Icon name="spark" size={13} className="inline align-[-2px]" /> החפץ
-          נשמר עליך מהאיפוס וממשיך להעניק את הבונוס המלא. אם תסיר אותו — לא תוכל
-          ללבוש אותו שוב עד שהגיבור יחזור לרמה{" "}
+          <Icon name="spark" size={13} className="inline align-[-2px] " />{" "}
+          {t("החפץ נשמר עליך מהאיפוס וממשיך להעניק את הבונוס המלא. אם תסיר אותו — לא תוכל ללבוש אותו שוב עד שהגיבור יחזור לרמה")}{" "}
           <b className="nums">{level}</b>.
         </p>
       )}
@@ -340,16 +346,18 @@ export function ItemDialog({
               confirmUnequip ? "btn btn-gold" : "btn btn-ghost"
             }`}
           >
-            {confirmUnequip ? `אישור — הסר ונעל עד רמה ${level}` : "הסר לתיק"}
+            {confirmUnequip
+              ? t("אישור — הסר ונעל עד רמה {level}", { level })
+              : t("הסר לתיק")}
           </button>
         ) : (
           <button
             onClick={() => run(equipHeroItem)}
             disabled={pending || !meetsLevel}
-            title={meetsLevel ? undefined : `עלה לרמה ${level} כדי ללבוש`}
+            title={meetsLevel ? undefined : t("עלה לרמה {level} כדי ללבוש", { level })}
             className="btn btn-gold col-span-2 py-2 text-sm"
           >
-            {meetsLevel ? "לבש" : `דרוש רמה ${level}`}
+            {meetsLevel ? t("לבש") : t("דרוש רמה {level}", { level })}
           </button>
         )}
 
@@ -359,23 +367,25 @@ export function ItemDialog({
           title={
             upgradeToLevel == null
               ? setCapped
-                ? `אגדי הוא שיא הסט ${itemSetForLevel(level).label} — הסט הבא מגיע כשלל`
-                : "הפריט כבר ברמה הגבוהה ביותר"
+                ? t("אגדי הוא שיא הסט {set} — הסט הבא מגיע כשלל", {
+                    set: t(itemSetForLevel(level).label),
+                  })
+                : t("הפריט כבר ברמה הגבוהה ביותר")
               : !meetsUpgradeLevel
-                ? `דרוש גיבור רמה ${upgradeToLevel} כדי לשדרג`
+                ? t("דרוש גיבור רמה {level} כדי לשדרג", { level: upgradeToLevel })
                 : !canAfford
-                  ? "אין מספיק זהב"
+                  ? t("אין מספיק זהב")
                   : undefined
           }
           className="btn btn-dark py-2 text-sm"
         >
           {upgradeToLevel == null
             ? setCapped
-              ? "שיא הסט"
-              : "רמה מקסימלית"
+              ? t("שיא הסט")
+              : t("רמה מקסימלית")
             : !meetsUpgradeLevel
-              ? `דרוש רמה ${upgradeToLevel}`
-              : "שדרג"}
+              ? t("דרוש רמה {level}", { level: upgradeToLevel })
+              : t("שדרג")}
         </button>
 
         {confirmDiscard ? (
@@ -385,7 +395,7 @@ export function ItemDialog({
             className="btn py-2 text-sm font-black text-white"
             style={{ background: "linear-gradient(180deg,#b91c1c,#7f1d1d)" }}
           >
-            אישור זריקה
+            {t("אישור זריקה")}
           </button>
         ) : (
           <button
@@ -393,15 +403,16 @@ export function ItemDialog({
             disabled={pending}
             className="btn btn-ghost py-2 text-sm text-red-300"
           >
-            זרוק
+            {t("זרוק")}
           </button>
         )}
       </div>
 
       {confirmDiscard && (
-        <p className="mt-2 text-center text-xs text-amber-300/80">
-          🎡 סיכוי {Math.round((discardWheelSpinChance(level) + wheelSpinBonus) * 100)}% לזכות
-          בסיבוב גלגל מזל מהזריקה
+        <p className="nums mt-2 text-center text-xs text-amber-300/80">
+          {t("🎡 סיכוי {pct}% לזכות בסיבוב גלגל מזל מהזריקה", {
+            pct: Math.round((discardWheelSpinChance(level) + wheelSpinBonus) * 100),
+          })}
         </p>
       )}
     </Dialog>

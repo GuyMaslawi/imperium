@@ -411,19 +411,20 @@ export class GrowProvider implements OrderPaymentProvider {
   }
 
   /**
-   * Grow's "yes, I got it" call. Fire-and-forget by design: the money has
-   * already moved and the diamonds are already credited by the time this runs,
-   * so a failure here costs at most a duplicate notification — which the
-   * settlement guard swallows. Skipping it, on the other hand, makes Grow retry
-   * the callback six times over an hour.
+   * Grow's "yes, I got it" call (`approveTransaction`), as the seam's optional
+   * {@link OrderPaymentProvider.acknowledge}.
+   *
+   * Fire-and-forget by design: the money has already moved and the diamonds are
+   * already credited by the time this runs, so a failure here costs at most a
+   * duplicate notification — which the settlement guard swallows. Skipping it,
+   * on the other hand, makes Grow retry the callback six times over an hour.
    */
-  async approveTransaction(processId: string, transactionId: string): Promise<boolean> {
-    const call = await growPost(this.config.env, "approveTransaction", {
+  async acknowledge(ref: OrderRef, captureId: string): Promise<void> {
+    await growPost(this.config.env, "approveTransaction", {
       pageCode: this.config.pageCode,
-      processId,
-      transactionId,
+      processId: ref.orderId,
+      transactionId: captureId,
     });
-    return call.ok;
   }
 }
 
@@ -450,9 +451,4 @@ function readCustomField(data: Record<string, unknown>, key: string): string {
 export function growProvider(): OrderPaymentProvider | null {
   const config = growConfig();
   return config ? new GrowProvider(config) : null;
-}
-
-/** Narrow the active provider to Grow, for the Grow-specific callback route. */
-export function asGrowProvider(provider: unknown): GrowProvider | null {
-  return provider instanceof GrowProvider ? provider : null;
 }

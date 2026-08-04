@@ -10,6 +10,7 @@ import { HERO_REVIVE_HOURS } from "@/lib/game/hero";
 import { Icon } from "@/components/ui/Icon";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
+import { useT } from "@/i18n/client";
 
 /** "12:34" — minutes:seconds, the only shape an under-an-hour wait needs. */
 function formatCountdown(ms: number): string {
@@ -78,6 +79,7 @@ export function HeroRevive({
 
   const short = diamonds < HERO_REVIVE_COST;
 
+  const t = useT();
   return (
     <div className="hero-revive overflow-hidden rounded-2xl border-2 border-red-500/70">
       <div className="grid gap-4 p-4 md:grid-cols-[1fr_auto] md:items-center md:gap-6 md:p-5">
@@ -88,25 +90,29 @@ export function HeroRevive({
               💀
             </span>
             <h2 className="text-lg font-black tracking-wide text-red-300 sm:text-xl">
-              הגיבור שלך נפל בקרב
+              {t("הגיבור שלך נפל בקרב")}
             </h2>
             <span className="rounded-full border border-red-500/50 bg-red-950/70 px-2.5 py-0.5 text-[11px] font-black text-red-200">
-              כל הבונוסים שלו מושבתים
+              {t("כל הבונוסים שלו מושבתים")}
             </span>
           </div>
           <p className="mt-2.5 max-w-2xl text-xs leading-relaxed text-zinc-300 sm:text-[13px]">
-            כל עוד הוא מת, <b className="text-red-300">אף אחד מהבונוסים שלו אינו פועל</b> —
-            הנקודות שהקצית, החפצים שהוא לובש ובונוס המחלקה מושבתים לחלוטין: הצבא שלך
-            נלחם בלעדיו, והמכרות מייצרים בלעדיו. הוא יקום מעצמו כעבור{" "}
-            {HERO_REVIVE_HOURS === 1 ? "שעה" : `${HERO_REVIVE_HOURS} שעות`} — או מיד,
-            תמורת יהלומים.
+            {t("כל עוד הוא מת,")}{" "}
+            <b className="text-red-300">{t("אף אחד מהבונוסים שלו אינו פועל")}</b>{" "}
+            {t("— הנקודות שהקצית, החפצים שהוא לובש ובונוס המחלקה מושבתים לחלוטין: הצבא שלך נלחם בלעדיו, והמכרות מייצרים בלעדיו. הוא יקום מעצמו כעבור")}{" "}
+            {HERO_REVIVE_HOURS === 1
+              ? t("שעה")
+              : t("{hours} שעות", { hours: HERO_REVIVE_HOURS })}{" "}
+            {t("— או מיד, תמורת יהלומים.")}
           </p>
         </div>
 
         {/* the two ways out, side by side: wait, or pay */}
         <div className="flex shrink-0 flex-col gap-3 md:w-72">
           <div className="rounded-xl border border-red-500/40 bg-black/50 px-3 py-2 text-center">
-            <p className="text-[11px] font-bold text-red-200/80">קם לתחייה מעצמו בעוד</p>
+            <p className="text-[11px] font-bold text-red-200/80">
+              {t("קם לתחייה מעצמו בעוד")}
+            </p>
             <p
               className="nums text-3xl font-black leading-tight text-red-100"
               dir="ltr"
@@ -120,11 +126,11 @@ export function HeroRevive({
               className="btn btn-gold w-full px-4 py-3 text-sm"
               formAction={formAction}
               disabled={short}
-              pendingText="מחייה..."
+              pendingText={t("מחייה...")}
             >
               <span className="inline-flex items-center gap-1.5">
                 <Icon name="heart" size={16} />
-                החייאה מיידית ל-100% חיים ·
+                {t("החייאה מיידית ל-100% חיים ·")}
                 <span className="nums inline-flex items-center gap-1" dir="ltr">
                   {HERO_REVIVE_COST}
                   <Icon name="diamond" size={14} className="text-cyan-300" />
@@ -135,13 +141,14 @@ export function HeroRevive({
 
           {short && (
             <p className="text-center text-[11px] text-zinc-400">
-              יש לך <span className="nums">{diamonds}</span> יהלומים — חסרים{" "}
+              {t("יש לך")} <span className="nums">{diamonds}</span>{" "}
+              {t("יהלומים — חסרים")}{" "}
               <span className="nums">{HERO_REVIVE_COST - diamonds}</span>.{" "}
               <Link
                 href="/game/diamonds/buy"
                 className="font-bold text-cyan-300 underline decoration-dotted underline-offset-2"
               >
-                לרכישת יהלומים
+                {t("לרכישת יהלומים")}
               </Link>
             </p>
           )}

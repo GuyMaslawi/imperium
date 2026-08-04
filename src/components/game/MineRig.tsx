@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { formatNumber } from "@/lib/game/format";
 import { oreVars, type OreKind } from "./oreTint";
 import { useCountUp, type Pulse } from "@/components/ui/motion";
+import { useT } from "@/i18n/client";
 
 /**
  * The working mine drawn on every production card: a pit-head whose hoist wheel
@@ -82,6 +83,7 @@ export function MineRig({
   output,
   pulse,
 }: MineRigProps) {
+  const t = useT();
   // A mine with no crew — or one that was never built — produces nothing, and
   // the drawing says so: the machine stops rather than miming work.
   const idle = slaves <= 0 || level <= 0;
@@ -102,8 +104,13 @@ export function MineRig({
       role="img"
       aria-label={
         idle
-          ? `${label} — מושבת, אין עובדים`
-          : `${label} — ${formatNumber(slaves)} עובדים, ${formatNumber(output)} ${resourceLabel} לעדכון`
+          ? t("{mine} — מושבת, אין עובדים", { mine: label })
+          : t("{mine} — {slaves} עובדים, {output} {resource} לעדכון", {
+              mine: label,
+              slaves: formatNumber(slaves),
+              output: formatNumber(output),
+              resource: resourceLabel,
+            })
       }
     >
       <span className="rig-haze" aria-hidden />
@@ -161,9 +168,9 @@ export function MineRig({
       <div className="rig-plate">
         {idle ? (
           <>
-            <span className="rig-plate-halt">מושבת</span>
+            <span className="rig-plate-halt">{t("מושבת")}</span>
             <span className="rig-plate-label">
-              {level <= 0 ? "המכרה טרם נבנה" : "אין עובדים במכרה"}
+              {level <= 0 ? t("המכרה טרם נבנה") : t("אין עובדים במכרה")}
             </span>
           </>
         ) : (
@@ -172,7 +179,7 @@ export function MineRig({
               +{formatNumber(shownOutput)}
             </span>
             <span className="rig-plate-label">
-              {resourceLabel} לעדכון · צוות{" "}
+              {resourceLabel} {t("לעדכון · צוות")}{" "}
               <span className="nums" dir="ltr">
                 {formatNumber(slaves)}
               </span>

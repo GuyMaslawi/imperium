@@ -53,16 +53,15 @@ export function ItemCatalog({
       {/* how the tier series works */}
       <div className="panel-inset rounded-lg p-3 text-xs leading-relaxed text-zinc-400">
         <p>
-          🎯 חפצים נלכדים בניצחון בתקיפה (סיכוי{" "}
+          {t("🎯 חפצים נלכדים בניצחון בתקיפה (סיכוי")}{" "}
           <span className="nums text-gold" dir="ltr">
             {Math.round(ITEM_DROP_CHANCE * 100)}%
           </span>{" "}
-          ללכידה). ככל שהדרגה נדירה יותר, כך היא נופלת לעיתים רחוקות יותר —
-          הסיכוי בכל תקיפה מנצחת:{" "}
+          {t("ללכידה). ככל שהדרגה נדירה יותר, כך היא נופלת לעיתים רחוקות יותר — הסיכוי בכל תקיפה מנצחת:")}{" "}
           {RARITY_ORDER.map((r, i) => (
             <span key={r}>
               {i > 0 && " · "}
-              <span className={RARITY_META[r].tone}>{RARITY_META[r].label}</span>{" "}
+              <span className={RARITY_META[r].tone}>{t(RARITY_META[r].label)}</span>{" "}
               <span className="nums text-zinc-300" dir="ltr">
                 {formatDropChance(ITEM_DROP_CHANCE_BY_RARITY[r])}
               </span>
@@ -70,23 +69,20 @@ export function ItemCatalog({
           ))}
         </p>
         <p className="mt-1">
-          ⬆ שדרוג מעלה את רמת החפץ לדרגה הבאה בתוך הסט (וגם את הסטטים), ונעצר
-          באגדי — הסט הבא מגיע רק כשלל · 🔒 = הגיבור שלך
-          (רמה{" "}
+          {t("⬆ שדרוג מעלה את רמת החפץ לדרגה הבאה בתוך הסט (וגם את הסטטים), ונעצר באגדי — הסט הבא מגיע רק כשלל · 🔒 = הגיבור שלך (רמה")}{" "}
           <span className="nums text-gold-bright" dir="ltr">
             {heroLevel}
           </span>
-          ) עדיין לא יכול ללבוש · ✓ = נמצא ברשותך
+          {t(") עדיין לא יכול ללבוש · ✓ = נמצא ברשותך")}
         </p>
         {/* the sets — the visible half of the ladder */}
         <p className="mt-1">
-          ✦ כל עשר רמות מתחלף הסט וכל תשעת החפצים מקבלים מראה חדש, יקר וחזק
-          יותר:{" "}
+          {t("✦ כל עשר רמות מתחלף הסט וכל תשעת החפצים מקבלים מראה חדש, יקר וחזק יותר:")}{" "}
           {HERO_ITEM_SETS.map((s, i) => (
             <span key={s.dir}>
               {i > 0 && " · "}
               <span className={i === HERO_ITEM_SETS.length - 1 ? "text-gold-bright" : "text-zinc-300"}>
-                {s.label}
+                {t(s.label)}
               </span>{" "}
               <span className="nums" dir="ltr">
                 {s.from}–{s.to}
@@ -115,24 +111,24 @@ export function ItemCatalog({
           <section key={slot} className="panel rounded-xl p-4">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-bold text-gold-bright">
-                {slotMeta.icon} {slotMeta.label}
+                {slotMeta.icon} {t(slotMeta.label)}
               </h2>
               <span className="text-[11px] text-zinc-500">
                 <Icon name={statMeta.icon} size={12} className="inline align-[-2px]" />{" "}
-                {statMeta.label} — עד{" "}
+                {t(statMeta.label)} {t("— עד")}{" "}
                 <span className="nums text-emerald-400" dir="ltr">
                   +{formatBonus(maxBonus.value)}
                   {maxBonus.flat ? "" : "%"}
                 </span>{" "}
-                ברמה 100
+                {t("ברמה 100")}
                 {/* the extras this slot carries alongside its headline stat */}
                 {extras.length > 0 && (
                   <span className="text-zinc-600">
-                    {" · ועוד "}
+                    {t(" · ועוד ")}
                     {extras
                       .map(
                         (e) =>
-                          `${HERO_STAT_META[e.stat].label} +${formatBonus(e.value)}${e.flat ? "" : "%"}`
+                          `${t(HERO_STAT_META[e.stat].label)} +${formatBonus(e.value)}${e.flat ? "" : "%"}`
                       )
                       .join(" · ")}
                   </span>
@@ -156,7 +152,7 @@ export function ItemCatalog({
                         equipped: isEquipped,
                         hint: isOwned
                           ? undefined
-                          : "נלכד בניצחון בתקיפה על שחקן אחר",
+                          : t("נלכד בניצחון בתקיפה על שחקן אחר"),
                       })}
                     />
                   </div>

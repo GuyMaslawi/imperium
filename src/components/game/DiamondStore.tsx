@@ -23,6 +23,7 @@ import {
   purchaseDiamondPackage,
   startDiamondCheckout,
 } from "@/server/actions/diamondStore";
+import { useT } from "@/i18n/client";
 
 /**
  * How the active gateway takes money.
@@ -72,6 +73,7 @@ export function DiamondStore({
   /** Shape of the active gateway — decides what the checkout modal asks for. */
   checkoutKind?: CheckoutKind;
 }) {
+  const t = useT();
   const hasDiscount = discountPct > 0;
   const [pending, setPending] = useState<DiamondPackage | null>(null);
 
@@ -94,15 +96,19 @@ export function DiamondStore({
               🔥
             </span>
             <div className="min-w-0">
-              <p className="text-lg font-black text-amber-200">מבצע לזמן מוגבל!</p>
-              <p className="text-sm text-amber-100/80">
-                כל חבילות היהלומים ב־
-                <span className="nums font-black" dir="ltr">
-                  {discountPct}%
-                </span>{" "}
-                {/* "נצל את זה עכשיו" in front of a chained store is a promise
-                    the page cannot keep. */}
-                {locked ? "הנחה — מחכה לך ברגע שהחנות תיפתח." : "הנחה. הזמן מוגבל — נצל את זה עכשיו."}
+              <p className="text-lg font-black text-amber-200">
+                {t("מבצע לזמן מוגבל!")}
+              </p>
+              {/* "נצל את זה עכשיו" in front of a chained store is a promise
+                  the page cannot keep. */}
+              <p className="nums text-sm text-amber-100/80">
+                {locked
+                  ? t("כל חבילות היהלומים ב־{pct}% הנחה — מחכה לך ברגע שהחנות תיפתח.", {
+                      pct: discountPct,
+                    })
+                  : t("כל חבילות היהלומים ב־{pct}% הנחה. הזמן מוגבל — נצל את זה עכשיו.", {
+                      pct: discountPct,
+                    })}
               </p>
             </div>
             <span
@@ -140,15 +146,15 @@ export function DiamondStore({
           </div>
         </div>
 
-        {locked && <StoreSeal note={SEAL_NOTE} />}
+        {locked && <StoreSeal note={t(SEAL_NOTE)} />}
       </div>
 
       <p className="text-center text-xs text-zinc-500">
         {locked
-          ? "החנות תיפתח ברגע שמערכת התשלומים תסיים את ההרצה. עד אז אפשר להרוויח יהלומים במשחק עצמו."
+          ? t("החנות תיפתח ברגע שמערכת התשלומים תסיים את ההרצה. עד אז אפשר להרוויח יהלומים במשחק עצמו.")
           : purchasesLive
-            ? "התשלומים מעובדים בצורה מאובטחת. היהלומים נזקפים לחשבונך מיד לאחר הרכישה."
-            : "מערכת התשלומים בהרצה אחרונה. היהלומים נזקפים אוטומטית לחשבונך מיד עם סיום הרכישה."}
+            ? t("התשלומים מעובדים בצורה מאובטחת. היהלומים נזקפים לחשבונך מיד לאחר הרכישה.")
+            : t("מערכת התשלומים בהרצה אחרונה. היהלומים נזקפים אוטומטית לחשבונך מיד עם סיום הרכישה.")}
       </p>
 
       {pending && (
@@ -168,12 +174,13 @@ export function DiamondStore({
 
 /** "+123% ערך" — how much more each shekel buys vs the entry package. */
 function ValueBadge({ pct, className = "" }: { pct: number; className?: string }) {
+  const t = useT();
   if (pct <= 0) return null;
   return (
     <span
       className={`nums rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-300 ${className}`}
     >
-      <span dir="ltr">+{pct}%</span> ערך
+      <span dir="ltr">+{pct}%</span> {t("ערך")}
     </span>
   );
 }
@@ -221,6 +228,7 @@ function FeaturedPackage({
   locked: boolean;
   onBuy: () => void;
 }) {
+  const t = useT();
   const total = packageTotal(pkg);
   const tag = pkg.tag ? TAG_META[pkg.tag] : null;
 
@@ -242,23 +250,23 @@ function FeaturedPackage({
               <span
                 className={`rounded-full border px-2.5 py-0.5 text-[11px] font-black ${tag.className}`}
               >
-                {tag.label}
+                {t(tag.label)}
               </span>
             )}
             <ValueBadge pct={packageValuePct(pkg)} />
           </div>
-          <p className="mt-1.5 text-base font-black text-amber-100">{pkg.name}</p>
+          <p className="mt-1.5 text-base font-black text-amber-100">{t(pkg.name)}</p>
           <div className="mt-1 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:justify-start">
             <Icon name="diamond" size={24} className="text-cyan-300" />
             <span className="nums text-3xl font-black text-sky-200" dir="ltr">
               {formatNumber(total)}
             </span>
-            <span className="text-xs font-semibold text-zinc-400">יהלומים</span>
+            <span className="text-xs font-semibold text-zinc-400">{t("יהלומים")}</span>
             {pkg.bonus > 0 && (
               <span
                 className="nums rounded-full border border-emerald-400/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-black text-emerald-300"
               >
-                <span dir="ltr">+{formatNumber(pkg.bonus)}</span> בונוס
+                <span dir="ltr">+{formatNumber(pkg.bonus)}</span> {t("בונוס")}
               </span>
             )}
           </div>
@@ -273,7 +281,7 @@ function FeaturedPackage({
             tabIndex={locked ? -1 : undefined}
             className="btn btn-gold w-full px-6 py-2.5 text-sm sm:w-auto"
           >
-            {locked ? "בקרוב" : "רכישה מיידית"}
+            {locked ? t("בקרוב") : t("רכישה מיידית")}
           </button>
         </div>
       </div>
@@ -293,6 +301,7 @@ function PackageCard({
   locked: boolean;
   onBuy: () => void;
 }) {
+  const t = useT();
   const total = packageTotal(pkg);
   const tag = pkg.tag ? TAG_META[pkg.tag] : null;
   const valuePct = packageValuePct(pkg);
@@ -318,14 +327,14 @@ function PackageCard({
           <span
             className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${tag.className}`}
           >
-            {tag.label}
+            {t(tag.label)}
           </span>
         ) : (
           <ValueBadge pct={valuePct} />
         )}
       </div>
 
-      <p className="relative mt-1.5 text-xs font-bold text-zinc-300">{pkg.name}</p>
+      <p className="relative mt-1.5 text-xs font-bold text-zinc-300">{t(pkg.name)}</p>
       <span aria-hidden className="relative mt-1 text-3xl drop-shadow-lg">
         {pkg.emoji}
       </span>
@@ -339,7 +348,7 @@ function PackageCard({
       <span className="relative mt-0.5 block h-4 text-[11px] font-black text-emerald-300">
         {pkg.bonus > 0 && (
           <span className="nums">
-            <span dir="ltr">+{formatNumber(pkg.bonus)}</span> בונוס
+            <span dir="ltr">+{formatNumber(pkg.bonus)}</span> {t("בונוס")}
           </span>
         )}
       </span>
@@ -353,7 +362,7 @@ function PackageCard({
           tabIndex={locked ? -1 : undefined}
           className="btn btn-ghost w-full px-3 py-2 text-sm"
         >
-          {locked ? "בקרוב" : "רכישה"}
+          {locked ? t("בקרוב") : t("רכישה")}
         </button>
       </div>
     </div>
@@ -375,6 +384,7 @@ function CheckoutModal({
   checkoutKind: CheckoutKind;
   onClose: () => void;
 }) {
+  const t = useT();
   const hosted = checkoutKind === "order";
   const [state, action] = useActionState<StoreActionState, FormData>(
     hosted ? startDiamondCheckout : purchaseDiamondPackage,
@@ -417,7 +427,7 @@ function CheckoutModal({
         // announced to a screen reader as an anonymous div.
         role="dialog"
         aria-modal="true"
-        aria-label="אישור רכישה"
+        aria-label={t("אישור רכישה")}
         className="relative max-h-full w-full max-w-sm overflow-y-auto overscroll-contain rounded-2xl border border-sky-400/30 bg-panel p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -431,9 +441,11 @@ function CheckoutModal({
             <span aria-hidden className="block animate-pulse text-5xl">
               🔐
             </span>
-            <h3 className="text-lg font-black text-sky-200">מעביר לתשלום מאובטח…</h3>
+            <h3 className="text-lg font-black text-sky-200">
+              {t("מעביר לתשלום מאובטח…")}
+            </h3>
             <p className="text-sm text-zinc-400">
-              עוד רגע תועבר לעמוד הסליקה. אל תסגור את החלון.
+              {t("עוד רגע תועבר לעמוד הסליקה. אל תסגור את החלון.")}
             </p>
           </div>
         ) : credited !== null ? (
@@ -441,16 +453,14 @@ function CheckoutModal({
             <span aria-hidden className="block text-5xl">
               ✅
             </span>
-            <h3 className="text-lg font-black text-emerald-300">התשלום בוצע!</h3>
-            <p className="text-sm text-zinc-300">
-              נזקפו{" "}
-              <span className="nums font-black text-sky-300" dir="ltr">
-                {formatNumber(credited || total)}
-              </span>{" "}
-              יהלומים לחשבונך.
+            <h3 className="text-lg font-black text-emerald-300">{t("התשלום בוצע!")}</h3>
+            <p className="nums text-sm text-zinc-300">
+              {t("נזקפו {count} יהלומים לחשבונך.", {
+                count: formatNumber(credited || total),
+              })}
             </p>
             <button type="button" onClick={onClose} className="btn btn-gold w-full">
-              מעולה!
+              {t("מעולה!")}
             </button>
           </div>
         ) : state.status === "unavailable" ? (
@@ -458,13 +468,13 @@ function CheckoutModal({
             <span aria-hidden className="block text-5xl">
               🚧
             </span>
-            <h3 className="text-lg font-black text-sky-200">התשלום בקרוב!</h3>
+            <h3 className="text-lg font-black text-sky-200">{t("התשלום בקרוב!")}</h3>
             <p className="text-sm text-zinc-400">
               {state.message ??
-                "רכישות יהלומים ייפתחו ברגע שנחבר את מערכת התשלומים. תודה על הסבלנות!"}
+                t("רכישות יהלומים ייפתחו ברגע שנחבר את מערכת התשלומים. תודה על הסבלנות!")}
             </p>
             <button type="button" onClick={onClose} className="btn btn-gold w-full">
-              הבנתי
+              {t("הבנתי")}
             </button>
           </div>
         ) : (
@@ -473,13 +483,13 @@ function CheckoutModal({
               <span aria-hidden className="text-5xl drop-shadow-lg">
                 {pkg.emoji}
               </span>
-              <h3 className="text-lg font-black text-sky-100">אישור רכישה</h3>
-              <p className="text-xs font-bold text-zinc-400">{pkg.name}</p>
+              <h3 className="text-lg font-black text-sky-100">{t("אישור רכישה")}</h3>
+              <p className="text-xs font-bold text-zinc-400">{t(pkg.name)}</p>
             </div>
 
             <div className="space-y-2 rounded-xl border border-border-subtle bg-panel-inset p-4 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-zinc-400">יהלומים</span>
+                <span className="text-zinc-400">{t("יהלומים")}</span>
                 <span className="nums inline-flex items-center gap-1 font-black text-sky-200" dir="ltr">
                   <Icon name="diamond" size={16} className="text-cyan-300" />
                   {formatNumber(total)}
@@ -487,14 +497,14 @@ function CheckoutModal({
               </div>
               {pkg.bonus > 0 && (
                 <div className="flex items-center justify-between text-emerald-300">
-                  <span>כולל בונוס</span>
+                  <span>{t("כולל בונוס")}</span>
                   <span className="nums font-bold" dir="ltr">
                     +{formatNumber(pkg.bonus)}
                   </span>
                 </div>
               )}
               <div className="flex items-center justify-between border-t border-border-subtle pt-2">
-                <span className="text-zinc-400">לתשלום</span>
+                <span className="text-zinc-400">{t("לתשלום")}</span>
                 <span className="flex items-baseline gap-2">
                   {hasDiscount && (
                     <span className="nums text-xs text-zinc-500 line-through" dir="ltr">
@@ -528,18 +538,18 @@ function CheckoutModal({
                       an עוסק פטור issues per sale — not by us. Said out loud so
                       it does not read as arbitrary data collection. */}
                   <p className="text-[11px] text-zinc-500">
-                    פרטים אלה נדרשים על ידי חברת הסליקה ולהפקת הקבלה.
+                    {t("פרטים אלה נדרשים על ידי חברת הסליקה ולהפקת הקבלה.")}
                   </p>
                   <Input
-                    label="שם מלא"
+                    label={t("שם מלא")}
                     name="buyerName"
                     value={buyerName}
                     onChange={(e) => setBuyerName(e.target.value)}
                     autoComplete="name"
-                    placeholder="ישראל ישראלי"
+                    placeholder={t("ישראל ישראלי")}
                   />
                   <Input
-                    label="טלפון נייד"
+                    label={t("טלפון נייד")}
                     name="buyerPhone"
                     value={buyerPhone}
                     onChange={(e) => setBuyerPhone(e.target.value)}
@@ -556,34 +566,36 @@ function CheckoutModal({
                 className="btn btn-gold w-full"
                 formAction={action}
                 disabled={!detailsReady}
-                pendingText={hosted ? "פותח עמוד תשלום..." : "מעבד תשלום..."}
+                pendingText={hosted ? t("פותח עמוד תשלום...") : t("מעבד תשלום...")}
               >
-                {hosted ? `המשך לתשלום ${formatIls(net)}` : `שלם ${formatIls(net)}`}
+                {hosted
+                  ? t("המשך לתשלום {price}", { price: formatIls(net) })
+                  : t("שלם {price}", { price: formatIls(net) })}
               </SubmitButton>
               <button
                 type="button"
                 onClick={onClose}
                 className="btn btn-ghost w-full text-sm"
               >
-                ביטול
+                {t("ביטול")}
               </button>
             </form>
 
             <p className="text-center text-[11px] leading-relaxed text-zinc-500">
-              בהשלמת הרכישה אתה מאשר את{" "}
+              {t("בהשלמת הרכישה אתה מאשר את")}{" "}
               <Link href="/terms" target="_blank" className="text-gold underline">
-                תנאי השימוש
+                {t("תנאי השימוש")}
               </Link>{" "}
-              ואת{" "}
+              {t("ואת")}{" "}
               <Link href="/refund" target="_blank" className="text-gold underline">
-                מדיניות הביטולים
+                {t("מדיניות הביטולים")}
               </Link>
               .
             </p>
 
             {testMode && (
               <p className="text-center text-[11px] text-zinc-500">
-                מצב הדגמה — לא מתבצע חיוב אמיתי עד לחיבור ספק התשלומים.
+                {t("מצב הדגמה — לא מתבצע חיוב אמיתי עד לחיבור ספק התשלומים.")}
               </p>
             )}
           </div>

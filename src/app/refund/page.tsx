@@ -83,8 +83,14 @@ export default function RefundPage() {
             "סיבת הבקשה במשפט אחד",
           ]}
         />
+        {/* חוק הגנת הצרכן lets a consumer cancel through any of several
+            channels, not only the one the merchant prefers — so all three are
+            named here rather than steering everyone to email. The details
+            themselves come from the operator block below, so this text never
+            goes stale when a number or an address changes. */}
         <P>
-          כתובת הדוא״ל מופיעה בתחתית הדף. אפשר לפנות גם בכתב בדואר לכתובת המפעיל.
+          פרטי ההתקשרות — דוא״ל, טלפון וכתובת למשלוח דואר — מופיעים במלואם בתחתית הדף.
+          אפשר לפנות בכל אחד מהם: בדוא״ל, בטלפון, או בכתב בדואר.
         </P>
       </Clause>
 

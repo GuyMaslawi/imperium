@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { useScrollLock } from "@/components/ui/scrollLock";
+import { useDir, useT } from "@/i18n/client";
 import {
   SEASON_PASS_HAUL_ORDER,
   SEASON_PASS_PREMIUM_MULTIPLIER,
@@ -102,13 +103,14 @@ function RewardChips({
   entries: SeasonPassHaulEntry[];
   className?: string;
 }) {
+  const t = useT();
   if (!entries.length) return null;
   return (
     <div className={`flex flex-wrap items-center justify-center gap-1.5 ${className}`}>
       {entries.map((e) => (
         <span
           key={e.kind}
-          title={`${heNum(e.amount)} ${SEASON_PASS_REWARD_LABEL[e.kind]}`}
+          title={`${heNum(e.amount)} ${t(SEASON_PASS_REWARD_LABEL[e.kind])}`}
           className="inline-flex items-center gap-1 rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5"
         >
           <Icon
@@ -119,7 +121,7 @@ function RewardChips({
           <span className="text-[11px] font-black text-bone-bright nums">
             +{heNum(e.amount)}
           </span>
-          <span className="sr-only">{SEASON_PASS_REWARD_LABEL[e.kind]}</span>
+          <span className="sr-only">{t(SEASON_PASS_REWARD_LABEL[e.kind])}</span>
         </span>
       ))}
     </div>
@@ -142,21 +144,22 @@ function HaulPanel({
   tiers: number;
   onDismiss: () => void;
 }) {
+  const t = useT();
   return (
     <div className="haul-panel mt-3 overflow-hidden rounded-xl border border-emerald-500/50 bg-gradient-to-b from-emerald-950/70 via-black/60 to-black/70 p-3 shadow-[0_0_28px_-10px_rgba(16,185,129,0.8)]">
       <div className="flex items-center justify-between gap-2">
         <button
           onClick={onDismiss}
-          aria-label="סגור את סיכום השלל"
+          aria-label={t("סגור את סיכום השלל")}
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 text-[11px] text-emerald-300/70 transition hover:bg-emerald-500/10 hover:text-emerald-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
         >
           ✕
         </button>
         <p className="flex items-center gap-1.5 text-sm font-black text-emerald-300">
           <Icon name="gift" size={15} />
-          השלל נאסף
+          {t("השלל נאסף")}
           <span className="rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black text-emerald-200 nums">
-            {tiers} דרגות
+            {t("{count} דרגות", { count: tiers })}
           </span>
         </p>
       </div>
@@ -177,7 +180,7 @@ function HaulPanel({
               +{heNum(entry.amount)}
             </span>
             <span className="text-[10px] font-bold leading-none text-zinc-400">
-              {SEASON_PASS_REWARD_LABEL[entry.kind]}
+              {t(SEASON_PASS_REWARD_LABEL[entry.kind])}
             </span>
           </div>
         ))}
@@ -188,6 +191,7 @@ function HaulPanel({
 
 /** Countdown to the daily update that refills the ladder with bigger rewards. */
 function CycleCountdown({ endsAt }: { endsAt: number }) {
+  const t = useT();
   // Seeded from a lazy initializer and re-seeded by the `key` at the call site,
   // so a new cycle boundary remounts this with a fresh reading. The old code
   // re-synced with a `setLeft` at the top of the effect, which fired on every
@@ -199,7 +203,7 @@ function CycleCountdown({ endsAt }: { endsAt: number }) {
     return () => clearInterval(id);
   }, [endsAt]);
 
-  if (left <= 0) return <span className="nums">מתחדש עכשיו…</span>;
+  if (left <= 0) return <span className="nums">{t("מתחדש עכשיו…")}</span>;
   const total = Math.floor(left / 1000);
   const h = String(Math.floor(total / 3600)).padStart(2, "0");
   const m = String(Math.floor((total % 3600) / 60)).padStart(2, "0");
@@ -230,6 +234,7 @@ function tileState(
   return reached ? "ready" : "future";
 }
 
+/** Kept in Hebrew and translated at the call site, like every data label. */
 const TILE_STATE_WORD: Record<TileState, string> = {
   done: "נאסף",
   ready: "מוכן לאיסוף",
@@ -264,8 +269,9 @@ function TierTile({
   unlocking?: boolean;
   delay?: number;
 }) {
+  const t = useT();
   const premium = track === "premium";
-  const trackWord = premium ? "מסלול פרימיום" : "מסלול חינמי";
+  const trackWord = premium ? t("מסלול פרימיום") : t("מסלול חינמי");
   // A locked gold reward the player has already climbed past is the whole sales
   // pitch, so it stays lit; only the rungs still ahead of them recede.
   const ahead = state === "paywalled" && !reached;
@@ -302,7 +308,12 @@ function TierTile({
       {/* One accessible sentence per tile, so a screen reader never has to
           assemble meaning out of an icon, a number and a colour. */}
       <span className="sr-only">
-        {`דרגה ${tier}, ${trackWord}: ${reward.label} — ${TILE_STATE_WORD[state]}`}
+        {t("דרגה {tier}, {track}: {reward} — {status}", {
+          tier,
+          track: trackWord,
+          reward: t(reward.label),
+          status: t(TILE_STATE_WORD[state]),
+        })}
       </span>
 
       {/* Corner status marker, in the inline-start (right, in RTL) corner on
@@ -312,7 +323,7 @@ function TierTile({
           <Icon name="check" size={11} className="text-emerald-400" />
         ) : state === "ready" ? (
           <span className="rounded bg-emerald-500 px-1 text-[8px] font-black text-black">
-            מוכן
+            {t("מוכן")}
           </span>
         ) : (
           <Icon
@@ -340,7 +351,7 @@ function TierTile({
           state === "future" ? "text-zinc-600" : "text-zinc-400"
         }`}
       >
-        {SEASON_PASS_REWARD_LABEL[reward.kind]}
+        {t(SEASON_PASS_REWARD_LABEL[reward.kind])}
       </span>
 
       {/* The scrim exists only for the split second its lock is breaking away
@@ -377,6 +388,7 @@ function ChapterHead({
   total: number;
   active: boolean;
 }) {
+  const t = useT();
   const complete = total > 0 && claimed === total;
   return (
     <div
@@ -392,7 +404,7 @@ function ChapterHead({
         }`}
       >
         {complete && <Icon aria-hidden name="check" size={10} />}
-        {claimed}/{total} נאספו
+        {t("{claimed}/{total} נאספו", { claimed, total })}
       </span>
       <h3 className="flex items-center gap-1.5 text-[11px] font-black text-bone">
         <Icon
@@ -401,11 +413,11 @@ function ChapterHead({
           size={13}
           className={active ? "text-emerald-400" : "text-gold-dim"}
         />
-        דרגות{" "}
+        {t("דרגות")}{" "}
         <span className="nums">
           {from}–{to}
         </span>
-        {active && <span className="text-emerald-400">· אתה כאן</span>}
+        {active && <span className="text-emerald-400">· {t("אתה כאן")}</span>}
       </h3>
     </div>
   );
@@ -429,6 +441,7 @@ function ProgressConsole({
   state: SeasonPassState;
   tierCount: number;
 }) {
+  const t = useT();
   const atMax = state.level >= tierCount;
   const intoRung = Math.max(0, state.xp - state.level * SEASON_PASS_XP_PER_TIER);
   const rungPct = atMax
@@ -447,9 +460,9 @@ function ProgressConsole({
           {state.level}
         </span>
         <span className="mt-0.5 text-[8px] font-bold leading-none text-gold-dim nums">
-          מתוך {tierCount}
+          {t("מתוך {total}", { total: tierCount })}
         </span>
-        <span className="sr-only">דרגה נוכחית</span>
+        <span className="sr-only">{t("דרגה נוכחית")}</span>
       </div>
 
       <div className="min-w-0 flex-1">
@@ -459,17 +472,19 @@ function ProgressConsole({
               the overflow it is. The surplus buys nothing, so it is not
               information worth confusing anyone over. */}
           <span className="text-[11px] font-bold text-zinc-500 nums">
-            {Math.min(state.xp, state.xpMax)}/{state.xpMax} ניסיון · {cyclePct}% מהסולם
+            {t("{xp}/{max} ניסיון · {pct}% מהסולם", {
+              xp: Math.min(state.xp, state.xpMax),
+              max: state.xpMax,
+              pct: cyclePct,
+            })}
           </span>
-          <span className="text-[11px] font-black text-emerald-300">
-            {atMax ? (
-              "כל הדרגות נפתחו"
-            ) : (
-              <>
-                עוד <span className="nums">{toNext}</span> ניסיון לדרגה{" "}
-                <span className="nums">{state.level + 1}</span>
-              </>
-            )}
+          <span className="text-[11px] font-black text-emerald-300 nums">
+            {atMax
+              ? t("כל הדרגות נפתחו")
+              : t("עוד {xp} ניסיון לדרגה {tier}", {
+                  xp: toNext,
+                  tier: state.level + 1,
+                })}
           </span>
         </p>
 
@@ -480,7 +495,9 @@ function ProgressConsole({
           aria-valuemax={SEASON_PASS_XP_PER_TIER}
           aria-valuenow={atMax ? SEASON_PASS_XP_PER_TIER : intoRung}
           aria-valuetext={
-            atMax ? "כל הדרגות נפתחו" : `עוד ${toNext} ניסיון לדרגה ${state.level + 1}`
+            atMax
+              ? t("כל הדרגות נפתחו")
+              : t("עוד {xp} ניסיון לדרגה {tier}", { xp: toNext, tier: state.level + 1 })
           }
           className="relative mt-1.5 h-2 overflow-hidden rounded-full bg-white/10"
         >
@@ -499,7 +516,11 @@ function ProgressConsole({
           aria-valuemin={0}
           aria-valuemax={state.xpMax}
           aria-valuenow={state.xp}
-          aria-valuetext={`דרגה ${state.level} מתוך ${tierCount} — ${cyclePct}% מהסולם`}
+          aria-valuetext={t("דרגה {level} מתוך {total} — {pct}% מהסולם", {
+            level: state.level,
+            total: tierCount,
+            pct: cyclePct,
+          })}
           className="relative mt-2 h-3.5 overflow-hidden rounded-full border border-gold/40 bg-black/60"
         >
           <span
@@ -568,10 +589,12 @@ function CycleClearedOverlay({
   lockedValue: SeasonPassHaulEntry[];
   onClose: () => void;
 }) {
+  const t = useT();
+  const dir = useDir();
   const dialogRef = useModalChrome(onClose);
   return (
     <div
-      dir="rtl"
+      dir={dir}
       onClick={onClose}
       className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-center justify-center overflow-hidden bg-black/85 p-4 backdrop-blur-sm"
     >
@@ -605,15 +628,19 @@ function CycleClearedOverlay({
             🏆
           </p>
           <h2 id="sp-cleared-title" className="mt-3 text-2xl font-black text-gold-bright">
-            וואו! ניקית הכול 🔥
+            {t("וואו! ניקית הכול 🔥")}
           </h2>
-          <p className="mt-1.5 text-sm font-bold text-zinc-300">
-            סיימת את כל <span className="nums text-gold-bright">{tierCount}</span> הדרגות של
-            דרך התהילה — ביום <span className="nums">{day}</span> של העונה. משוגע.
+          <p className="nums mt-1.5 text-sm font-bold text-zinc-300">
+            {t("סיימת את כל {total} הדרגות של דרך התהילה — ביום {day} של העונה. משוגע.", {
+              total: tierCount,
+              day,
+            })}
           </p>
 
           <div className="mt-4 rounded-xl border border-emerald-500/40 bg-emerald-950/30 p-3">
-            <p className="text-xs font-black text-emerald-300">כל השלל של הסבב הזה</p>
+            <p className="text-xs font-black text-emerald-300">
+              {t("כל השלל של הסבב הזה")}
+            </p>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {haul.map((entry, i) => (
                 <div
@@ -630,7 +657,7 @@ function CycleClearedOverlay({
                     +{heNum(entry.amount)}
                   </span>
                   <span className="text-[10px] font-bold leading-none text-zinc-400">
-                    {SEASON_PASS_REWARD_LABEL[entry.kind]}
+                    {t(SEASON_PASS_REWARD_LABEL[entry.kind])}
                   </span>
                 </div>
               ))}
@@ -639,7 +666,7 @@ function CycleClearedOverlay({
 
           <div className="mt-3 rounded-xl border border-gold/40 bg-amber-950/30 p-3">
             <p className="text-xs font-bold text-amber-100/90">
-              סבב חדש נפתח בעדכון היומי הבא, בעוד{" "}
+              {t("סבב חדש נפתח בעדכון היומי הבא, בעוד")}{" "}
               <b className="text-gold-bright">
                 <CycleCountdown key={cycleEndsAt} endsAt={cycleEndsAt} />
               </b>
@@ -648,7 +675,7 @@ function CycleClearedOverlay({
                 refills twice a day but both refills are worth the same. Saying
                 "next cycle pays more" would be a promise the math doesn't keep. */}
             <p className="mt-1 text-[11px] text-zinc-400">
-              הסולם יתמלא מחדש — וכל יום שעובר בעונה מגדיל את התגמולים בכל דרגה
+              {t("הסולם יתמלא מחדש — וכל יום שעובר בעונה מגדיל את התגמולים בכל דרגה")}
             </p>
           </div>
 
@@ -656,14 +683,14 @@ function CycleClearedOverlay({
             <div className="mt-3 rounded-xl border border-gold/40 bg-black/50 p-3">
               <p className="flex items-center justify-center gap-1.5 text-[11px] font-black text-gold-bright">
                 <Icon aria-hidden name="lock" size={12} />
-                זה מה שהצד הזהוב היה מוסיף על השלל הזה
+                {t("זה מה שהצד הזהוב היה מוסיף על השלל הזה")}
               </p>
               <RewardChips entries={lockedValue} className="mt-2" />
             </div>
           )}
 
           <button onClick={onClose} className="btn btn-gold mt-4 w-full py-2.5 font-black">
-            יאללה, בחזרה לקרב
+            {t("יאללה, בחזרה לקרב")}
           </button>
         </div>
       </div>
@@ -739,6 +766,7 @@ function useModalChrome(onClose: () => void) {
 /* ------------------------------ the pass ------------------------------ */
 
 export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [state, setState] = useState(initial);
   const [unlocking, setUnlocking] = useState(false);
@@ -890,7 +918,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
     startTransition(async () => {
       const res = await buySeasonPassPremium();
       if (!res.ok || !res.state) {
-        reject(res.error ?? "הרכישה נכשלה");
+        reject(res.error ?? t("הרכישה נכשלה"));
         return;
       }
       setState(res.state);
@@ -928,7 +956,7 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         }
       } else {
         setHaul(null);
-        setNotice(res.error ?? "האיסוף נכשל");
+        setNotice(res.error ?? t("האיסוף נכשל"));
       }
     });
   }
@@ -940,20 +968,20 @@ export function SeasonPassButton({ initial }: { initial: SeasonPassState }) {
         aria-haspopup="dialog"
         className={`btn gap-2 px-4 py-1.5 text-sm ${owned ? "btn-gold" : "btn-dark"}`}
       >
-        דרך התהילה
+        {t("דרך התהילה")}
         {collectable > 0 && (
           <span className="rounded-full bg-emerald-500 px-1.5 text-[9px] font-black text-white nums">
             {collectable}
-            <span className="sr-only"> דרגות מוכנות לאיסוף</span>
+            <span className="sr-only"> {t("דרגות מוכנות לאיסוף")}</span>
           </span>
         )}
         {owned ? (
           <span className="rounded bg-emerald-500 px-1 text-[9px] font-black text-white">
-            פרימיום
+            {t("פרימיום")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-0.5 animate-pulse rounded bg-red-500 px-1 text-[9px] font-black text-white">
-            שדרג <Icon aria-hidden name="spark" size={11} />
+            {t("שדרג")} <Icon aria-hidden name="spark" size={11} />
           </span>
         )}
       </button>
@@ -1076,6 +1104,8 @@ function PassDialog({
   onUpgrade: () => void;
   onDismissHaul: () => void;
 }) {
+  const t = useT();
+  const dir = useDir();
   const dialogRef = useModalChrome(onClose);
   const { premium: owned, tiers, collectable } = state;
 
@@ -1086,7 +1116,7 @@ function PassDialog({
       aria-modal="true"
       aria-labelledby="sp-title"
       tabIndex={-1}
-      dir="rtl"
+      dir={dir}
       onClick={(e) => e.stopPropagation()}
       className="ornate-shell flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-xl"
     >
@@ -1113,7 +1143,7 @@ function PassDialog({
         <div className="flex items-center justify-between gap-2">
           <button
             onClick={onClose}
-            aria-label="סגור את דרך התהילה"
+            aria-label={t("סגור את דרך התהילה")}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border-subtle text-zinc-400 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"
           >
             ✕
@@ -1123,16 +1153,16 @@ function PassDialog({
             className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-xl font-black text-zinc-100 sm:text-2xl"
           >
             <Icon aria-hidden name="crown" size={20} className="text-gold" />
-            דרך התהילה
+            {t("דרך התהילה")}
             <span className="rounded bg-red-500 px-1.5 text-[10px] font-black text-white nums">
-              יום {state.day}
+              {t("יום {day}", { day: state.day })}
             </span>
             {/* Ownership as a chip rather than the old full-width green banner:
                 it is a permanent fact about the account, not news, and the box
                 it used to live in cost a fifth of the modal's height forever. */}
             {owned && (
               <span className="inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
-                <Icon aria-hidden name="unlocked" size={11} /> פרימיום פעיל
+                <Icon aria-hidden name="unlocked" size={11} /> {t("פרימיום פעיל")}
               </span>
             )}
           </h2>
@@ -1142,9 +1172,9 @@ function PassDialog({
         <ProgressConsole state={state} tierCount={tiers.length} />
 
         <p className="mt-1.5 text-center text-[10px] text-zinc-500">
-          מתאפס בעדכון היומי הבא בעוד{" "}
-          <CycleCountdown key={state.cycleEndsAt} endsAt={state.cycleEndsAt} /> — וכל יום
-          שעובר בעונה מגדיל את התגמולים
+          {t("מתאפס בעדכון היומי הבא בעוד")}{" "}
+          <CycleCountdown key={state.cycleEndsAt} endsAt={state.cycleEndsAt} />{" "}
+          {t("— וכל יום שעובר בעונה מגדיל את התגמולים")}
         </p>
 
         {/* Claim console — the modal's primary action, and the one place that
@@ -1154,11 +1184,11 @@ function PassDialog({
             <div className="mt-3 rounded-xl border border-emerald-500/45 bg-gradient-to-b from-emerald-950/55 to-black/40 p-3">
               <div className="flex items-center justify-between gap-2">
                 <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-black text-emerald-200 nums">
-                  {collectable} דרגות
+                  {t("{count} דרגות", { count: collectable })}
                 </span>
                 <p className="flex items-center gap-1.5 text-xs font-black text-emerald-300">
                   <Icon aria-hidden name="gift" size={14} />
-                  מחכה לך לאיסוף
+                  {t("מחכה לך לאיסוף")}
                 </p>
               </div>
               <RewardChips entries={pendingHaul} className="mt-2" />
@@ -1167,7 +1197,11 @@ function PassDialog({
                 disabled={pending}
                 className="btn btn-gold mt-2.5 w-full py-2 text-sm font-black disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {pending ? "אוסף..." : owned ? "אסוף את השלל" : "אסוף את השלל החינמי"}
+                {pending
+                  ? t("אוסף...")
+                  : owned
+                    ? t("אסוף את השלל")
+                    : t("אסוף את השלל החינמי")}
               </button>
             </div>
           ) : (
@@ -1188,7 +1222,7 @@ function PassDialog({
                     size={13}
                     className="ms-1 inline-block align-text-bottom text-gold"
                   />
-                  כל פעולה במשחק מזכה בניסיון — תקוף או בנה כדי לפתוח את הדרגה הראשונה
+                  {t("כל פעולה במשחק מזכה בניסיון — תקוף או בנה כדי לפתוח את הדרגה הראשונה")}
                 </>
               ) : (
                 <>
@@ -1198,7 +1232,7 @@ function PassDialog({
                     size={13}
                     className="ms-1 inline-block align-text-bottom text-emerald-500"
                   />
-                  אספת כל מה שנפתח — עלה דרגה כדי לפתוח עוד
+                  {t("אספת כל מה שנפתח — עלה דרגה כדי לפתוח עוד")}
                 </>
               )}
             </p>
@@ -1234,15 +1268,17 @@ function PassDialog({
             }`}
           >
             <p className="flex items-center justify-center gap-1.5 text-base font-black text-gold-bright">
-              <Icon aria-hidden name="crown" size={18} /> פתח את הצד הזהוב
+              <Icon aria-hidden name="crown" size={18} /> {t("פתח את הצד הזהוב")}
             </p>
-            <p className="mt-0.5 text-[11px] text-amber-100/80">
-              פי {SEASON_PASS_PREMIUM_MULTIPLIER} שלל בכל אחת מ־{tiers.length} הדרגות ·
-              תשלום אחד לכל העונה
+            <p className="nums mt-0.5 text-[11px] text-amber-100/80">
+              {t("פי {multiplier} שלל בכל אחת מ־{tiers} הדרגות · תשלום אחד לכל העונה", {
+                multiplier: SEASON_PASS_PREMIUM_MULTIPLIER,
+                tiers: tiers.length,
+              })}
             </p>
             <RewardChips entries={premiumTrackTotal} className="mt-2" />
             <p className="mt-1 text-[10px] text-amber-200/50">
-              זה מה שהמסלול הזהוב מוסיף בסבב אחד — ויש שני סבבים ביום
+              {t("זה מה שהמסלול הזהוב מוסיף בסבב אחד — ויש שני סבבים ביום")}
             </p>
             <button
               onClick={onUpgrade}
@@ -1252,10 +1288,11 @@ function PassDialog({
               }`}
             >
               {unlocking || pending ? (
-                "פותח..."
+                t("פותח...")
               ) : (
                 <span className="inline-flex items-center gap-1">
-                  <Icon aria-hidden name="unlocked" size={15} /> שדרג עכשיו · {state.price}{" "}
+                  <Icon aria-hidden name="unlocked" size={15} /> {t("שדרג עכשיו")} ·{" "}
+                  {state.price}{" "}
                   <Icon aria-hidden name="diamond" size={14} className="text-cyan-300" />
                 </span>
               )}
@@ -1266,14 +1303,17 @@ function PassDialog({
               }`}
             >
               {canAfford ? (
-                <span className="inline-flex items-center gap-1">
-                  יש לך {state.diamonds}{" "}
-                  <Icon aria-hidden name="diamond" size={12} className="text-cyan-300" /> ·
-                  נשאר פתוח עד סוף העונה
+                <span className="nums inline-flex items-center gap-1">
+                  {t("יש לך {count}", { count: state.diamonds })}{" "}
+                  <Icon aria-hidden name="diamond" size={12} className="text-cyan-300" />{" "}
+                  {t("· נשאר פתוח עד סוף העונה")}
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1">
-                  אין מספיק יהלומים ({state.diamonds}/{state.price}{" "}
+                <span className="nums inline-flex items-center gap-1">
+                  {t("אין מספיק יהלומים ({have}/{price}", {
+                    have: state.diamonds,
+                    price: state.price,
+                  })}{" "}
                   <Icon aria-hidden name="diamond" size={12} className="text-cyan-300" />)
                 </span>
               )}
@@ -1293,12 +1333,12 @@ function PassDialog({
                 : "border-gold/40 bg-amber-950/50 text-gold-dim"
             }`}
           >
-            <Icon aria-hidden name="crown" size={13} /> פרימיום
+            <Icon aria-hidden name="crown" size={13} /> {t("פרימיום")}
             {!owned && <Icon aria-hidden name="lock" size={11} />}
           </div>
           <div />
           <div className="rounded-lg border border-sky-500/40 bg-sky-950/40 py-1.5 text-center text-xs font-black text-sky-200">
-            חינמי
+            {t("חינמי")}
           </div>
         </div>
       </div>
@@ -1395,12 +1435,13 @@ function PassDialog({
             where finishing actually lands you. */}
         <div className="mt-2 rounded-xl border border-gold/30 bg-black/45 p-3 text-center">
           <p className="flex items-center justify-center gap-1.5 text-xs font-black text-gold-bright">
-            <Icon aria-hidden name="rankings" size={14} /> סבב מלא — כל {tiers.length} הדרגות
+            <Icon aria-hidden name="rankings" size={14} />{" "}
+            {t("סבב מלא — כל {tiers} הדרגות", { tiers: tiers.length })}
           </p>
-          <p className="mt-1.5 text-[10px] font-bold text-sky-300">מסלול חינמי</p>
+          <p className="mt-1.5 text-[10px] font-bold text-sky-300">{t("מסלול חינמי")}</p>
           <RewardChips entries={freeTrackTotal} className="mt-1" />
           <p className="mt-2 text-[10px] font-bold text-gold-dim">
-            {owned ? "מסלול פרימיום (בנוסף)" : "מסלול פרימיום — נעול"}
+            {owned ? t("מסלול פרימיום (בנוסף)") : t("מסלול פרימיום — נעול")}
           </p>
           <RewardChips entries={premiumTrackTotal} className="mt-1" />
         </div>
@@ -1414,7 +1455,7 @@ function PassDialog({
               onClick={() => scrollToCurrent(true)}
               className="pointer-events-auto rounded-full border border-emerald-400/60 bg-black/90 px-3 py-1 text-[11px] font-black text-emerald-300 shadow-lg backdrop-blur focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
             >
-              חזרה לדרגה שלך ({currentTier})
+              {t("חזרה לדרגה שלך ({tier})", { tier: currentTier })}
             </button>
           </div>
         )}

@@ -134,7 +134,7 @@ export const EN: Record<string, string> = {
   "עוצמה ליחידה:": "Power per unit:",
   "קנה": "Buy",
   "קונה...": "Buying…",
-  "הכל": "Max",
+  "הכל": "All",
   "כמות לא תקינה": "That quantity is not valid",
   "נשק לא מוכר": "Unknown weapon",
   "אין מספיק משאבים זמינים לקנייה.": "You do not have enough available resources.",
@@ -1737,8 +1737,8 @@ export const EN: Record<string, string> = {
   /* ------------------------------------------------------------------ */
   "אימות אימייל | קראלדור": "Verify your email | Kraldor",
   "אימות כתובת האימייל שלך בקראלדור": "Verify your email address for Kraldor",
-  "שלום {name},\\n\\nכדי להפעיל את החשבון שלך בקראלדור, פתח את הקישור:\\n{link}\\n\\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.":
-    "Hello {name},\\n\\nTo activate your Kraldor account, open this link:\\n{link}\\n\\nThe link is good for 24 hours. If you did not sign up, you can ignore this message.",
+  "שלום {name},\n\nכדי להפעיל את החשבון שלך בקראלדור, פתח את הקישור:\n{link}\n\nהקישור תקף ל-24 שעות. אם לא נרשמת, אפשר להתעלם מההודעה.":
+    "Hello {name},\n\nTo activate your Kraldor account, open this link:\n{link}\n\nThe link is good for 24 hours. If you did not sign up, you can ignore this message.",
   "ברוך הבא לקראלדור, {name}": "Welcome to Kraldor, {name}",
   "כדי להפעיל את החשבון ולהתחיל לשחק, אשר את כתובת האימייל שלך:":
     "To activate your account and start playing, confirm your email address:",
@@ -1809,4 +1809,866 @@ export const EN: Record<string, string> = {
   "חזרה לדירוג": "Back to the rankings",
   "סגור": "Close",
   "סגירה": "Close",
+
+  /* ------------------------------------------------------------------ */
+  /* the expedition board — מסעות הגיבור                                 */
+  /* ------------------------------------------------------------------ */
+  "הגיבור יוצא למסע אחד בכל פעם. כל עיר שאתה מקים פותחת מסע ארוך יותר — והשלל של כל המסעות גדל עם מספר הערים שלך ועם התקדמות העונה.":
+    "Your hero walks one road at a time. Every city you found opens a longer one — and the haul of every expedition grows with the number of cities you hold and with the season's progress.",
+  "נפתחו {open} מתוך {total}": "{open} of {total} unlocked",
+  "אף אחד לא יודע מה יחזור מהדרך.": "Nobody knows what comes back down the road.",
+  "כל מסע מגלגל את מזלו שלו — לפעמים הגיבור חוזר חבול ועם מעט, ולפעמים נגררת אחריו עגלה שלמה. מה שכן בטוח: השלל גדל עם מספר הערים שלך ועם התקדמות העונה, וכל מסע משלם אותו ממוצע":
+    "Every run rolls its own fortune — sometimes the hero limps home with scraps, sometimes a whole wagon follows him in. What is certain: the haul grows with the number of cities you hold and with the season's progress, and every expedition pays the same average",
+  "לכל שעה": "per hour",
+  ". המסעות הארוכים קונים מחיר תורות נמוך יותר לשעה וסיכויי שלל גבוהים בהרבה; הקצרים קונים חפצים לשעה ואת החופש להגיב. הגיבור ממשיך להעניק את כל הבונוסים שלו גם בזמן שהוא בדרכים.":
+    ". The long roads buy a lower turn price per hour and far better loot odds; the short ones buy items per hour and the freedom to react. The hero keeps granting every one of his bonuses while he is away.",
+  "חזר!": "Home!",
+  "לחץ כדי לראות מה הוא הביא — השלל, המזל שליווה אותו, וכל מה שנפל בדרך.":
+    "Tap to see what he brought — the haul, the fortune that rode with him, and everything picked up along the way.",
+  "השלל נקבע ברגע שהוא יצא לדרך, אבל אף אחד בעיר עוד לא יודע מה יש בשק. הוא ייספר כשיחזור.":
+    "The haul was settled the moment he left, but nobody in the city knows yet what is in the sack. It gets counted when he walks back in.",
+  "אוסף…": "Collecting…",
+  "קבל את פני הגיבור ואסוף את השלל": "Welcome the hero home and take the haul",
+  "הגיבור בדרכים…": "The hero is on the road…",
+  "הגיבור חזר מ”{quest}”": "The hero is back from “{quest}”",
+  "סגור את סיכום המסע": "Dismiss the expedition summary",
+  "הגיבור עלה {count} דרגות!": "The hero gained {count} levels!",
+  "הגיבור עלה דרגה!": "The hero gained a level!",
+  "נמצא בדרך:": "Found on the road:",
+  "מחכה בתרמיל": "waiting in the pack",
+  "נפתח עם העיר ה-{tier}": "Unlocks with city {tier}",
+  "הגיבור כבר במסע": "The hero is already away",
+  "חסרות {turns} תורות": "{turns} turns short",
+  "{quest} — מסע נעול": "{quest} — expedition locked",
+  "השלל של המסע הזה לא ידוע מראש: כל יציאה מגלגלת את מזלה שלה — לפעמים מעט, לפעמים עגלה שלמה. הגודל הממוצע נגזר ממספר הערים שלך ומיום העונה, ואותו לכל שעת מסע בכל הדרגות.":
+    "This expedition's haul is not known in advance: every departure rolls its own fortune — sometimes scraps, sometimes a full wagon. The average size follows the number of cities you hold and the day of the season, and it is the same per hour on the road at every rung.",
+  "סיכוי לחפץ גיבור בסיום המסע: {item}% · סיכוי לשיקוי: {potion}% — שתי הגרלות נפרדות, ומסע יכול להחזיר את שניהם.":
+    "Chance of a hero item at the end of the road: {item}% · chance of a potion: {potion}% — two separate draws, and one expedition can bring back both.",
+  "עלות שליחה: {cost} תורות — {perHour} לכל שעת מסע.":
+    "Cost to send: {cost} turns — {perHour} per hour on the road.",
+  "שלח למסע": "Send out",
+  "מחכה בשער": "waiting at the gate",
+  "שלל לא ידוע": "haul unknown",
+  "ניסיון לגיבור — הדבר היחיד במסע שידוע מראש: הוא נקבע לפי דרגת המסע בלבד ולא מושפע ממזל.":
+    "Hero experience — the one thing about an expedition that is known in advance: it follows the rung alone and no roll of fortune touches it.",
+  "מסעות הגיבור": "The Hero's Expeditions",
+  "הגיבור מת": "Your hero is dead",
+
+  /* ------------------------------------------------------------------ */
+  /* founding the next city                                             */
+  /* ------------------------------------------------------------------ */
+  "עליית עיר": "Rise a City",
+  "(מתוך {max} ערים)": "(of {max} cities)",
+  "הגעת ל־": "You have reached ",
+  "— העיר האחרונה. תפוקת המכרות ורמות קבלת האזרחים שלך במקסימום.":
+    "— the last city. Your mine output and your citizen-intake levels are both maxed out.",
+  "עליית עיר מכפילה את תפוקת המכרות ל־": "Rising a city multiplies mine output to ",
+  "ופותחת עוד {levels} רמות לשדרוג קבלת האזרחים.":
+    "and opens {levels} more levels of the citizen-intake upgrade.",
+  "דרישות (אינן נצרכות):": "Requirements (nothing is spent):",
+  "גיבור רמה {required} (כעת {level})": "Level {required} hero (yours is {level})",
+  "{count} חיילים בצבא": "{count} soldiers in the army",
+  "עלות עלייה (נצרכת):": "Cost to rise (spent):",
+  "אין מספיק מהמשאב הזה": "Not enough of this resource",
+  "מעלה עיר...": "Rising…",
+  "עלה עיר": "Rise a city",
+  "ערים · תפוקת מכרות": "cities · mine output",
+  "הממלכה שלך — {cities} ערים מתוך {max}, ומושבך ב{city}":
+    "Your realm — {cities} of {max} cities, seated in {city}",
+  "{city} — ריגול ותקיפה אפשריים רק בתוך העיר שלך.":
+    "{city} — you can only spy on and attack empires inside your own city.",
+
+  /* ------------------------------------------------------------------ */
+  /* the city boss, as it sits above the ladder                          */
+  /* ------------------------------------------------------------------ */
+  "{boss} מת — הוא קם לתחייה בעוד רגע": "{boss} is dead — he rises again shortly",
+  "הקרב הנוכחי עוד רץ": "The current battle is still running",
+  "חסרות לך {turns} תורות": "You are {turns} turns short",
+  "אין לך צבא — אמן חיילים קודם": "You have no army — train soldiers first",
+  "הפלת את {boss} {count} פעמים בעיר הזו.":
+    "You have brought {boss} down {count} times in this city.",
+  "{boss} שולט ב{city}.": "{boss} rules {city}.",
+  "עיר {city}": "{city}",
+  "{boss} הופל": "{boss} has fallen",
+  "— קם לתחייה בעוד": "— rises again in",
+  "חיי הבוס": "Boss health",
+  "פצוע ב־{pct}% מתקיפה אחת — הפצעים נשארים עד שהוא נופל":
+    "Wounded {pct}% by one assault — the wounds stay until he falls",
+  "פצוע ב־{pct}% מ־{sorties} תקיפות — הפצעים נשארים עד שהוא נופל":
+    "Wounded {pct}% across {sorties} assaults — the wounds stay until he falls",
+  "תקיפה אחת תוריד לו": "One assault takes off",
+  "ותשלם לך בערך": "and pays you roughly",
+  "ותעלה לך": "and costs you",
+  "{boss} עדיין חזק ממך.": "{boss} is still stronger than you.",
+  "בקצב הזה צריך כ־{sorties} תקיפות כדי להפיל אותו, וכל אחת עולה {turns} תורות":
+    "At this rate it takes about {sorties} assaults to bring him down, and each one costs {turns} turns",
+  " ובערך {soldiers} חיילים": " and roughly {soldiers} soldiers",
+  ". השלל הגדול ({share}% ממנו + הציוד) משולם רק בהפלה — עדיף לגדל צבא ולהעלות את הגיבור, ואז לתקוף.":
+    ". The big haul ({share}% of it, plus the gear) is only paid on the kill — grow the army and level the hero first, then march.",
+  "הקרב רץ — צפה בו": "The battle is running — watch it",
+  "תקיפה עולה {cost} תורות ורצה כדקה. הצבא נלחם לבד {rounds} סבבים — תקבל הודעה עם השלל כשהקרב נגמר, גם אם עברת לדף אחר.":
+    "An assault costs {cost} turns and runs about a minute. The army fights {rounds} rounds on its own — you get a message with the haul when it ends, even if you have moved on to another page.",
+  "שלל, איך הקרב עובד, וסיפור הרקע": "Spoils, how the fight works, and the lore",
+  "מפילי {boss}": "Those who felled {boss}",
+  "איך הקרב עובד": "How the fight works",
+  "לוחצים תקיפה פעם אחת. הצבא יוצא ל־{rounds} סבבים לאורך כדקה, ובכל סבב הקצינים מנסים לקרוא את המהלך של {boss} ולענות עליו. קריאה נכונה מכפילה את הנזק":
+    "You press attack once. The army marches out for {rounds} rounds over about a minute, and in each one the officers try to read {boss}'s move and answer it. A correct read doubles the damage",
+  " ומבטלת כמעט את האבדות": " and all but cancels the losses",
+  "; קריאה שגויה עושה את ההפוך. הסיכוי לקרוא נכון תלוי":
+    "; a wrong read does the opposite. The odds of reading right depend on",
+  "ברמת הגיבור שלך": "your hero's level",
+  "כרגע": "right now",
+  "אבדות של {pct}% מבריחות את הצבא באמצע הקרב.":
+    "Losses of {pct}% rout the army mid-battle.",
+  "הקרב לא עולה לך אף חייל — הצבא חוזר שלם תמיד, והמחיר היחיד הוא התורות.":
+    "The fight costs you no soldiers at all — the army always comes home whole, and the only price is the turns.",
+  "תקיפה אחת שלך מורידה בממוצע {damage} חיים —":
+    "One of your assaults takes an average of {damage} health off him —",
+  "אמן צבא כדי להתחיל": "train an army to get started",
+  "תקיפה אחת להפלה": "one assault to bring him down",
+  "כ־{sorties} תקיפות להפלה": "about {sorties} assaults to bring him down",
+  ". כוח הבוס {bossPower} מול כוח התקיפה שלך {myPower}.":
+    ". His power is {bossPower} against your attack power of {myPower}.",
+  "איך מגדילים את הסיכויים": "How to improve your odds",
+  "כדי לפגוע בו יותר — כוח תקיפה": "To hit him harder — attack power",
+  "(חיילים": "(soldiers",
+  "+ נשקי תקיפה": "+ attack weapons",
+  ") × גיבור": ") × hero",
+  "× גילדה": "× guild",
+  "+ סיוע": "+ aid",
+  "הנזק בכל סבב הוא אחוז מהכוח הזה — כל 100 חיילים מוסיפים 1,000 כוח, ונשקי תקיפה מוסיפים כוח":
+    "Each round's damage is a percentage of that power — every 100 soldiers add 1,000 power, and attack weapons add power",
+  " בלי לעלות בדם": " without costing blood",
+  " בלי לאמן אף חייל": " without training a single soldier",
+  ". שיקוי כוח, באפ גילדה וציוד גיבור נספרים גם הם.":
+    ". A power potion, the guild buff and hero gear all count too.",
+  "כדי לספוג פחות — הגיבור": "To take less — the hero",
+  "כדי לפגוע בכל סבב — הגיבור": "To land every round — the hero",
+  "אבדות נקבעות רק לפי אם הקצינים קראו את המהלך נכון. גיבור רמה":
+    "Losses come down to one thing: whether the officers read the move right. A level",
+  "כמה נזק ייצא מהסבב נקבע לפי אם הקצינים קראו את המהלך נכון. גיבור רמה":
+    "How much damage a round lands comes down to whether the officers read the move right. A level",
+  "קורא נכון": "hero reads",
+  "מהמהלכים": "of the moves correctly",
+  ", וסבב שנקרא נכון עולה כשליש מהדם של סבב שגוי — ומכפיל את הנזק.":
+    ", and a round read right costs about a third of the blood of one read wrong — and doubles the damage.",
+  ", וסבב שנקרא נכון מכפיל את הנזק מול סבב שנקרא לא נכון.":
+    ", and a round read right does double the damage of one read wrong.",
+  "הגיבור שלך מת — הקצינים מנחשים ואין זעם":
+    "Your hero is dead — the officers are guessing and there is no fury",
+  ", והאבדות כמעט מוכפלות": ", and the losses nearly double",
+  ". החייה אותו לפני שתתקוף.": ". Raise him before you march.",
+  "כל רמה מוסיפה לסיכוי הקריאה (עד {max}%) ומחזקת את מכת הזעם. גיבור מת מאבד את שניהם.":
+    "Every level adds to the read chance (up to {max}%) and sharpens the fury blow. A dead hero loses both.",
+  "שלל מלא על הבוס הזה": "The full haul on this boss",
+  "שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.":
+    "Captives freed from the boss's pens — they join your pool of free mine slaves.",
+  "עבדים": "slaves",
+  "הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה.":
+    "The boss always drops hero gear — and never common gear. A perfect battle grade (S) raises the floor by one rarity.",
+  "ציוד מובטח בהפלה": "Gear guaranteed on the kill",
+  "{chip}% מהשלל משולם לפי הנזק שאתה מספיק לגרום — גם בתקיפה שלא הפילה אותו. השאר ({kill}%) הוא אוצר ההפלה, שגדל עד ×{grade} בקרב מושלם. השלל גדל עם התקדמות העונה ועם מספר הערים שלך.":
+    "{chip}% of the haul is paid out for the damage you manage to land — even on an assault that did not finish him. The rest ({kill}%) is the kill treasure, which grows up to ×{grade} in a perfect battle. The haul grows with the season's progress and with the number of cities you hold.",
+
+  /* ------------------------------------------------------------------ */
+  /* the diamond shop                                                    */
+  /* ------------------------------------------------------------------ */
+  "בונוס תפוקת משאבים": "Resource output boost",
+  "עד +{max}% לכל משאב · 24ש׳": "up to +{max}% per resource · 24h",
+  "תוספת {resource}": "{resource} boost",
+  "כל רכישה +{step}% לתפוקה · עד +{max}% · 24ש׳":
+    "each purchase is +{step}% output · up to +{max}% · 24h",
+  "בתקרה (+{max}%)": "At the cap (+{max}%)",
+  "✨ פעיל עד {when}": "✨ Live until {when}",
+  "🛡️ מגן עד {when}": "🛡️ Shielded until {when}",
+  "🛡️ פעיל עד {when}": "🛡️ Live until {when}",
+  "הנחת חנות {pct}%": "{pct}% shop discount",
+  "{pct}% הנחה על רכישת נשק וכל השדרוגים (מכרות, מחסנים, שדרוגי אימפריה) למשך 24 שעות.":
+    "{pct}% off weapons and every upgrade (mines, warehouses, empire upgrades) for 24 hours.",
+  "הפעל הנחה": "Start the discount",
+  "מגני תקיפה": "Raid shields",
+  "24 או 48 שעות · חידוש רק {minutes} דקות אחרי שנגמר":
+    "24 or 48 hours · renewable only {minutes} minutes after it ends",
+  "פעיל": "Live",
+  "התקיפה עצמה עדיין מתרחשת. לא ניתן לחדש בזמן שהמגן פעיל — רק {minutes} דקות אחרי שהוא נגמר.":
+    "The attack itself still happens. A running shield cannot be renewed — only {minutes} minutes after it ends.",
+  "חלון חשוף · ניתן לחדש ב־{when}": "Exposed window · renewable at {when}",
+  "{hours}ש׳": "{hours}h",
+  "חבילות תורות": "Turn packs",
+  "לכל חבילה קירור משלה": "each pack has its own cooldown",
+  "{hours} שעות": "{hours} hours",
+  "{minutes} דקות": "{minutes} minutes",
+  "זמין אחת ל־{cooldown}": "Available once every {cooldown}",
+  "זמין ב־{when}": "Available at {when}",
+  "קסמים ושירותים": "Spells and services",
+  "איפוס נקודות גיבור": "Hero point reset",
+  "משחרר את כל הנקודות שהקצית (התקפה/הגנה/משאבים) חזרה לנקודות פנויות, בלי לגעת ברמה. פעם אחת בעונה.":
+    "Frees every point you have allocated (attack/defence/resources) back into unspent points, without touching your level. Once per season.",
+  "כבר נוצל העונה": "Already used this season",
+  "מאפס...": "Resetting…",
+  "אפס": "Reset",
+  "קסם ריבית בנק": "Bank interest spell",
+  "צובר מיידית תשלום ריבית אחד לבנק, לפי הרמה שלך. ניתן להטיל אחת ל־24 שעות.":
+    "Credits one bank interest payment at once, at your level. Castable once every 24 hours.",
+  "בקירור · זמין ב־{when}": "Cooling down · available at {when}",
+  "מטיל...": "Casting…",
+  "הטל": "Cast",
+  "קסם ירידת עיר": "City descent spell",
+  "מוריד אותך עיר אחת בלבד — מעיר {from} ל{to}. אין החזר משאבים, והדרך חזרה היא ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{hours} שעה.":
+    "Takes you down exactly one city — from {from} to {to}. Nothing is refunded, and the only way back is founding the city again at full price. Castable once every {hours} hour.",
+  "זמין מעיר {min} ומעלה — אין לך עיר לוותר עליה":
+    "Available from city {min} up — you have no city to give up",
+  "רד לעיר {target}": "Drop to city {target}",
+
+  /* ------------------------------------------------------------------ */
+  /* the diamond store — real-money packages and the checkout            */
+  /* ------------------------------------------------------------------ */
+  "מבצע לזמן מוגבל!": "Limited-time offer!",
+  "כל חבילות היהלומים ב־{pct}% הנחה — מחכה לך ברגע שהחנות תיפתח.":
+    "Every diamond pack is {pct}% off — waiting for you the moment the store opens.",
+  "כל חבילות היהלומים ב־{pct}% הנחה. הזמן מוגבל — נצל את זה עכשיו.":
+    "Every diamond pack is {pct}% off. The clock is running — take it now.",
+  "החנות תיפתח ברגע שמערכת התשלומים תסיים את ההרצה. עד אז אפשר להרוויח יהלומים במשחק עצמו.":
+    "The store opens as soon as the payment system finishes its trial run. Until then you can earn diamonds in the game itself.",
+  "התשלומים מעובדים בצורה מאובטחת. היהלומים נזקפים לחשבונך מיד לאחר הרכישה.":
+    "Payments are processed securely. Diamonds land in your account the moment the purchase completes.",
+  "מערכת התשלומים בהרצה אחרונה. היהלומים נזקפים אוטומטית לחשבונך מיד עם סיום הרכישה.":
+    "The payment system is in its final trial run. Diamonds are credited to your account automatically the moment the purchase completes.",
+  "ערך": "value",
+  "בונוס": "bonus",
+  "רכישה מיידית": "Buy now",
+  "רכישה": "Buy",
+  "בקרוב": "Soon",
+  "אישור רכישה": "Confirm purchase",
+  "מעביר לתשלום מאובטח…": "Handing over to secure payment…",
+  "עוד רגע תועבר לעמוד הסליקה. אל תסגור את החלון.":
+    "You are about to be sent to the payment page. Do not close this window.",
+  "התשלום בוצע!": "Payment complete!",
+  "נזקפו {count} יהלומים לחשבונך.": "{count} diamonds have been credited to your account.",
+  "מעולה!": "Excellent!",
+  "התשלום בקרוב!": "Payment is coming soon!",
+  "הבנתי": "Got it",
+  "כולל בונוס": "Bonus included",
+  "לתשלום": "To pay",
+  "פרטים אלה נדרשים על ידי חברת הסליקה ולהפקת הקבלה.":
+    "The payment provider requires these details, and so does the receipt.",
+  "שם מלא": "Full name",
+  "ישראל ישראלי": "Jane Doe",
+  "טלפון נייד": "Mobile phone",
+  "פותח עמוד תשלום...": "Opening the payment page…",
+  "מעבד תשלום...": "Processing payment…",
+  "המשך לתשלום {price}": "Continue to pay {price}",
+  "שלם {price}": "Pay {price}",
+  "ביטול": "Cancel",
+  "בהשלמת הרכישה אתה מאשר את": "By completing this purchase you accept the",
+  "תנאי השימוש": "Terms of Service",
+  "ואת": "and the",
+  "מדיניות הביטולים": "Refund Policy",
+  "מצב הדגמה — לא מתבצע חיוב אמיתי עד לחיבור ספק התשלומים.":
+    "Demo mode — no real charge is made until the payment provider is connected.",
+
+  /* ------------------------------------------------------------------ */
+  /* the power cards on the base, and the hero's combined yield          */
+  /* ------------------------------------------------------------------ */
+  "כוח האימפריה": "Empire power",
+  "כוח התקפה": "Attack power",
+  "כוח הגנה": "Defence power",
+  "כוח מודיעין": "Intelligence power",
+  "כוח כללי": "Overall power",
+  "מהרכב הכוח": "What makes it up",
+  "{label} (+{pct}%)": "{label} (+{pct}%)",
+  "נשקי התקפה": "Attack weapons",
+  "נשקי הגנה": "Defence weapons",
+  "נשקי ריגול": "Spy weapons",
+  "כולל בונוסים פעילים (גיבור / קסם / עזרת ברית).":
+    "Includes every live bonus (hero / spell / guild aid).",
+  "כוח ההגנה בפועל בקרב, כולל בונוס מגן ובונוסים פעילים.":
+    "Your real defence power in battle, defender's bonus and live bonuses included.",
+  "בקרב הגנה מתקבל בונוס הגנה של 20%.": "Defending in battle grants a 20% defence bonus.",
+  "שדרוג מודיעין מכפיל אותו — ריגול מצליח כשהוא גדול מזה של היעד.":
+    "The intelligence upgrade multiplies it — a spy run succeeds when it beats the target's.",
+  "התקפה + הגנה + מודיעין": "attack + defence + intelligence",
+  "ניהול נשקים": "Manage weapons",
+  "ניהול נשקי ריגול": "Manage spy weapons",
+  "אימון צבא": "Train the army",
+  "אימון מרגלים": "Train spies",
+  "סך הכל מהגיבור": "Everything the hero pays",
+  "מה שאתה מקבל בפועל מהנקודות והחפצים יחד. שורות מודגשות פעילות; שורות עמומות ממתינות לחפץ מתאים.":
+    "What the points and the gear actually pay you, together. Bright rows are live; dim ones are waiting on the right item.",
+  "בונוסי קרב · באחוזים": "Battle bonuses · as percentages",
+  "תשואה קבועה מחפצים · בכמויות": "Flat yield from gear · as amounts",
+  "תפוקת משאבים · אחוזים + כמות": "Resource output · percentage + amount",
+  "נקודות": "Points",
+  "חפצים": "Gear",
+  "דמות": "Class",
+  "מנקודות התקפה ומחפצים לבושים": "from attack points and equipped gear",
+  "מנקודות הגנה ומחפצים לבושים": "from defence points and equipped gear",
+  "מחפצי ריגול לבושים בלבד": "from equipped spy gear only",
+  "נוסף בכל עדכון יומי": "added on every daily update",
+  "האחוזים מכפילים את תפוקת המכרות; הכמות הקבועה נוספת מעליה בכל עדכון רגיל.":
+    "The percentages multiply mine output; the flat amount is added on top of it on every regular update.",
+  "נקודות +{pct}% — מכפיל תפוקת מכרות": "Points +{pct}% — multiplies mine output",
+  "דמות +{pct}% — יתרון הסוחר": "Class +{pct}% — the Merchant's edge",
+  "חרב ומגן +{pct}% — מכפיל תפוקת מכרות":
+    "Sword and shield +{pct}% — multiplies mine output",
+  "כמות קבועה +{flat} —": "Flat amount +{flat} —",
+  "— בכל עדכון רגיל": "— on every regular update",
+  "מפרי שטן, מכנסיים או נעליים — המשאבים לפי דרגת החפץ":
+    "from a devil's fruit, trousers or boots — which resources depends on the item's rung",
+
+  /* ------------------------------------------------------------------ */
+  /* the chat dock                                                       */
+  /* ------------------------------------------------------------------ */
+  "פתיחת הצ׳אט": "Open chat",
+  "סגירת הצ׳אט": "Close chat",
+  "צ׳אט": "Chat",
+  "חדר כללי": "Public room",
+  "שיחות פרטיות": "Private chats",
+  "שיחות": "Conversations",
+  "שחקנים": "Players",
+  "({count} מחוברים)": "({count} online)",
+  "דבר אל האימפריה…": "Speak to the empire…",
+  "הודעה אל {name}…": "Message {name}…",
+  "שלח": "Send",
+  "אין עדיין הודעות בשיחה הזו — כתוב ראשון.":
+    "No messages in this conversation yet — write the first one.",
+  "החדר שקט. תהיה הראשון שמדבר.": "The room is quiet. Be the first to speak.",
+  "פתיחת שיחה פרטית": "Open a private chat",
+  "צוות": "Staff",
+  "פרופיל": "Profile",
+  "הסתרת ההודעה": "Hide this message",
+  "חיפוש שחקן לשיחה חדשה…": "Search for a player to talk to…",
+  "מחפש…": "Searching…",
+  "לא נמצא שחקן בשם הזה": "No player by that name",
+  "אין עדיין שחקנים אחרים במשחק.": "There are no other players in the game yet.",
+  "כל השחקנים כבר ברשימת השיחות שלך.":
+    "Every player is already in your conversation list.",
+  "חזרה לרשימת השיחות": "Back to the conversation list",
+  "מחובר": "online",
+  "הקהילה נפגשת בדיסקורד — הצטרפו": "The community meets on Discord — come along",
+
+  /* ------------------------------------------------------------------ */
+  /* דרך התהילה — the season pass ladder                                 */
+  /* ------------------------------------------------------------------ */
+  "דרך התהילה": "The Road of Glory",
+  "יום {day}": "Day {day}",
+  "פרימיום": "Premium",
+  "פרימיום פעיל": "Premium is live",
+  "שדרג": "Upgrade",
+  "שדרג עכשיו": "Upgrade now",
+  "חינמי": "Free",
+  "מסלול חינמי": "the free track",
+  "מסלול פרימיום": "the premium track",
+  "מסלול פרימיום (בנוסף)": "Premium track (on top)",
+  "מסלול פרימיום — נעול": "Premium track — locked",
+  "דרגות מוכנות לאיסוף": "tiers ready to collect",
+  "סגור את דרך התהילה": "Close the Road of Glory",
+  "מתאפס בעדכון היומי הבא בעוד": "Resets at the next daily update, in",
+  "— וכל יום שעובר בעונה מגדיל את התגמולים":
+    "— and every day of the season raises the rewards",
+  "מתחדש עכשיו…": "refreshing now…",
+  "{count} דרגות": "{count} tiers",
+  "מחכה לך לאיסוף": "waiting for you",
+  "אסוף את השלל": "Take the haul",
+  "אסוף את השלל החינמי": "Take the free haul",
+  "הרכישה נכשלה": "The purchase failed",
+  "כל פעולה במשחק מזכה בניסיון — תקוף או בנה כדי לפתוח את הדרגה הראשונה":
+    "Every action in the game earns experience — attack or build to open the first tier",
+  "אספת כל מה שנפתח — עלה דרגה כדי לפתוח עוד":
+    "You have taken everything that is open — climb a tier to open more",
+  "השלל נאסף": "Haul collected",
+  "סגור את סיכום השלל": "Dismiss the haul summary",
+  "דרגה נוכחית": "Current tier",
+  "מתוך {total}": "of {total}",
+  "{xp}/{max} ניסיון · {pct}% מהסולם": "{xp}/{max} XP · {pct}% of the ladder",
+  "כל הדרגות נפתחו": "Every tier is open",
+  "עוד {xp} ניסיון לדרגה {tier}": "{xp} XP to tier {tier}",
+  "דרגה {level} מתוך {total} — {pct}% מהסולם":
+    "Tier {level} of {total} — {pct}% of the ladder",
+  "{claimed}/{total} נאספו": "{claimed}/{total} collected",
+  "דרגות": "Tiers",
+  "אתה כאן": "you are here",
+  "מוכן": "READY",
+  "נעול מאחורי פרימיום": "locked behind premium",
+  "עדיין לא הושג": "not reached yet",
+  "דרגה {tier}, {track}: {reward} — {status}":
+    "Tier {tier}, {track}: {reward} — {status}",
+  "פתח את הצד הזהוב": "Open the golden side",
+  "פי {multiplier} שלל בכל אחת מ־{tiers} הדרגות · תשלום אחד לכל העונה":
+    "{multiplier}× the haul on every one of the {tiers} tiers · one payment for the whole season",
+  "זה מה שהמסלול הזהוב מוסיף בסבב אחד — ויש שני סבבים ביום":
+    "that is what the golden track adds in one cycle — and there are two cycles a day",
+  "יש לך {count}": "You have {count}",
+  "· נשאר פתוח עד סוף העונה": "· stays open to the end of the season",
+  "אין מספיק יהלומים ({have}/{price}": "Not enough diamonds ({have}/{price}",
+  "סבב מלא — כל {tiers} הדרגות": "A full cycle — all {tiers} tiers",
+  "חזרה לדרגה שלך ({tier})": "Back to your tier ({tier})",
+  "וואו! ניקית הכול 🔥": "Wow — you cleared the lot 🔥",
+  "סיימת את כל {total} הדרגות של דרך התהילה — ביום {day} של העונה. משוגע.":
+    "You finished all {total} tiers of the Road of Glory — on day {day} of the season. Ridiculous.",
+  "כל השלל של הסבב הזה": "Everything this cycle paid",
+  "סבב חדש נפתח בעדכון היומי הבא, בעוד": "A new cycle opens at the next daily update, in",
+  "הסולם יתמלא מחדש — וכל יום שעובר בעונה מגדיל את התגמולים בכל דרגה":
+    "The ladder refills — and every day of the season raises the reward on every tier",
+  "זה מה שהצד הזהוב היה מוסיף על השלל הזה":
+    "this is what the golden side would have added to that haul",
+  "יאללה, בחזרה לקרב": "Right — back to the fight",
+
+  /* ------------------------------------------------------------------ */
+  /* the mini-games: the pill, the board and the winners' rail           */
+  /* ------------------------------------------------------------------ */
+  "(אתה)": "(you)",
+  "🏆 זכה": "🏆 won",
+  "✅ פתר": "✅ solved",
+  "💀 נגמרו": "💀 out",
+  "⏳ משחק": "⏳ playing",
+  "כוסות": "Cups",
+  "כוס {n}": "Cup {n}",
+  "כוס {n} — הכדור כאן!": "Cup {n} — the ball is here!",
+  "כוס {n} — ריקה": "Cup {n} — empty",
+  "ספרה נכונה במקום הנכון": "right digit, right slot",
+  "ספרה נכונה במקום אחר": "right digit, wrong slot",
+  "לא בקוד": "not in the code",
+  "הכספת פתוחה 🎉": "The vault is open 🎉",
+  "הזן קוד בן {digits} ספרות": "Enter a {digits}-digit code",
+  "ספרה {n}": "Digit {n}",
+  "🔓 נסה לפרוץ": "🔓 Try the code",
+  "🏆 כבר זכו": "🏆 Already won",
+  "פרס:": "Prize:",
+  "זוכים": "Winners",
+  "משתתפים": "Players",
+  "נותר": "Left",
+  "🎉 ניצחת!": "🎉 You won!",
+  "✅ פתרת נכון": "✅ Solved it",
+  "הפרס נוסף לאימפריה שלך: {prize}": "The prize is in your empire: {prize}",
+  "כל הפרסים כבר חולקו — אבל כל הכבוד!":
+    "Every prize is already claimed — but well played.",
+  "😔 נגמרו הניסיונות": "😔 Out of attempts",
+  "יצאת מהמשחק, אבל הוא עדיין רץ — סגור את החלון והמשך לשחק; הכפתור למעלה יעדכן אותך מי זכה.":
+    "You are out of this one, but it is still running — close the window and carry on; the pill above will tell you who wins.",
+  "נותרו {count} ניסיונות": "{count} attempts left",
+  "המשחק ממשיך בלעדיך — עקוב אחרי המתחרים":
+    "The game runs on without you — follow the rivals",
+  "🏁 מי משחק עכשיו": "🏁 Who is playing now",
+  "עדיין אף אחד לא ניסה — היה הראשון!": "Nobody has tried yet — be the first.",
+  "ועוד {count} משתתפים": "and {count} more players",
+  "לקח את הפרס": "took the prize",
+  "ב־": "in",
+  "ניסיון אחרון": "Last attempt",
+  "נותרו {count}": "{count} left",
+  "אין עדיין זוכה": "No winner yet",
+
+  /* ------------------------------------------------------------------ */
+  /* the history tables: battles and spy missions                        */
+  /* ------------------------------------------------------------------ */
+  "חדש": "NEW",
+  "זמן": "Time",
+  "יריב": "Rival",
+  "פרטים": "Details",
+  "תוצאה": "Outcome",
+  "מידע שנחשף": "Intelligence gathered",
+  "אין דוחות קרב בקטגוריה זו.": "No battle reports in this category.",
+  "כבשת את היריב בהצלחה!": "You broke through!",
+  "התקפתך נהדפה.": "Your attack was thrown back.",
+  "הדפת את ההתקפה בהצלחה!": "You held the walls.",
+  "היריב פרץ את הגנתך.": "The rival broke your defence.",
+  "האבדות שלך:": "Your losses:",
+  "שלל:": "Plunder:",
+  "כאן מופיעים רק מרגלים שכוחות הביטחון שלך":
+    "Only the spies your own security forces",
+  "תפסו": "caught",
+  "— ריגול מוצלח נגדך נשאר חשאי ואינו נרשם.":
+    "appear here — a successful run against you stays secret and is never logged.",
+  "לא שלחת מרגלים עדיין.": "You have not sent any spies yet.",
+  "לא נתפסו מרגלים בשטחך.": "No spies have been caught on your ground.",
+  "המשימה הצליחה": "The mission succeeded",
+  "המרגל נתפס": "The spy was caught",
+  "תפסת את המרגל!": "You caught the spy!",
+  "כח מודיעין:": "Intelligence power:",
+  "(שלך) מול": "(yours) against",
+  "סיכוי:": "Odds:",
+  "המרגל חוסל לפני שאסף מידע — לא דלף דבר.":
+    "The spy was cut down before he gathered anything — nothing leaked.",
+  "המרגל אבד במשימה ולא הושג מידע.":
+    "The spy was lost on the mission and brought nothing back.",
+  "התיק המלא": "The full dossier",
+
+  /* ------------------------------------------------------------------ */
+  /* the warehouses                                                      */
+  /* ------------------------------------------------------------------ */
+  "יש להזין כמות": "Enter an amount",
+  "יש להזין מספר שלם גדול מ־0": "Enter a whole number greater than 0",
+  "הכמות גדולה מהמשאבים הזמינים": "That is more than you have available",
+  "הכמות גדולה מהכמות המאוחסנת במחסן": "That is more than the warehouse holds",
+  "פנוי:": "Free:",
+  "זמין אצלך:": "Available to you:",
+  "כמות": "Amount",
+  "כמות להפקדה או משיכה — {label}": "Amount to deposit or withdraw — {label}",
+  "מפקיד...": "Depositing…",
+  "מושך...": "Withdrawing…",
+  "הפקד": "Deposit",
+  "משוך": "Withdraw",
+  "הפקד הכל": "Deposit all",
+  "משוך הכל": "Withdraw all",
+  "משאבים במחסן מוגנים ואינם זמינים לשימוש עד שתמשוך אותם.":
+    "Resources in the warehouse are protected and cannot be spent until you withdraw them.",
+  "לרמה הבאה:": "Next level:",
+  "מקום אחסון": "of storage",
+  "🔧 שדרג לרמה {level}": "🔧 Upgrade to level {level}",
+
+  /* ------------------------------------------------------------------ */
+  /* the guild-war arena                                                 */
+  /* ------------------------------------------------------------------ */
+  "עכשיו": "just now",
+  "לפני {seconds} שנ׳": "{seconds}s ago",
+  "לפני {minutes} דק׳": "{minutes}m ago",
+  "לפני {hours} שע׳": "{hours}h ago",
+  "הקרב נפתח בעוד": "The battle opens in",
+  "נותר לקרב": "Left in the battle",
+  "המלחמה הבאה בעוד": "The next war in",
+  "נרשמו {count} בריתות. צריך לפחות {min} כדי שהמלחמה תתקיים — אחרת הערב מתבטל ואף אחד לא מקבל פרס.":
+    "{count} guilds have signed up. At least {min} are needed for the war to happen — otherwise the evening is called off and nobody is paid.",
+  "פחות מ־{min} בריתות נרשמו, ולכן המלחמה לא התקיימה. אין מנצחת ואין פרסים.":
+    "Fewer than {min} guilds signed up, so the war never happened. There is no victor and no prize.",
+  "כבשה את הזירה עם": "took the arena with",
+  "נקודות — הפרס מחולק שווה בשווה לכל חברי הברית":
+    "points — the prize is split evenly between every member of the guild",
+  "הקרב מתנהל": "The battle runs",
+  "אוטומטית": "on its own",
+  "בין": "between",
+  "ל־": "and",
+  "(שעון ישראל) — אין מה ללחוץ, המערכת מנהלת את כל ההתנגשויות לבד.":
+    "(Israel time) — there is nothing to press; the system runs every clash by itself.",
+  "בריתות בזירה": "Guilds in the arena",
+  "הברית שלך": "Your guild",
+  "סבב": "Round",
+  "טבלת הזירה": "The arena table",
+  "כוח הברית הוא הכוח הצבאי המשולב של כל החברים. הזירה עצמה נמדדת לפי החבר הממוצע — רוסטר גדול מעלה את הסכום, לא בהכרח את הסיכוי.":
+    "A guild's power is the combined military strength of all its members. The arena itself is measured by the average member — a big roster raises the total, not necessarily the odds.",
+  "אף ברית לא נרשמה עדיין למלחמה הקרובה — היו הראשונים.":
+    "No guild has signed up for the coming war yet — be the first.",
+  "כוח הברית": "Guild power",
+  "ניצחונות": "Wins",
+  "הפסדים": "Losses",
+  "לוחמי המלחמה": "The war's fighters",
+  "המערכת מסובבת חבר אחר של כל ברית לכל סבב — הטבלה מראה מי הביא הכי הרבה נקודות. אין כאן פרס אישי.":
+    "The system rotates a different member of each guild into every round — this table shows who brought in the most points. There is no personal prize here.",
+  "לוחם": "Fighter",
+  "פריצות": "Breakthroughs",
+  "הדיפות": "Holds",
+  "שידור חי מהזירה": "Live from the arena",
+  "הזירה נפתחת — הסבב הראשון עוד רגע.":
+    "The arena is opening — the first round is moments away.",
+  "עוד לא היו קרבות במלחמה הזו.": "No clashes in this war yet.",
+  "💥 פריצה": "💥 Breakthrough",
+  "🛡️ הדיפה": "🛡️ Held",
+  "הנקודות ל{guild}": "The points go to {guild}",
+
+  /* ------------------------------------------------------------------ */
+  /* the hero-item dialog                                                */
+  /* ------------------------------------------------------------------ */
+  "דרגה:": "Rarity:",
+  "רמת פריט:": "Item level:",
+  "סט:": "Set:",
+  "דרישת רמה": "Level requirement",
+  "גיבור רמה {level}": "Level {level} hero",
+  "שדרוג לרמה": "Upgrade to level",
+  "סט חדש": "New set",
+  "בונוס לאחר שדרוג": "Bonus after the upgrade",
+  "עלות": "Cost",
+  "🧪 שיקוי הנפח פעיל — {pct}% הנחה על השדרוג":
+    "🧪 The smith's brew is live — {pct}% off the upgrade",
+  "שדרוג": "Upgrade",
+  "שיא הסט ✦": "Set ceiling ✦",
+  "רמה מקסימלית ✦": "Max level ✦",
+  "אגדי הוא הרמה הגבוהה בסט": "Legendary is the top rung of the",
+  "— אין לאן לשדרג אותו יותר. הסט הבא (":
+    "set — there is nowhere left to upgrade it. The next set (",
+  ") מגיע רק כשלל מתקיפה מנצחת.": ") only arrives as plunder from a won attack.",
+  "— אין ציוד גבוה מזה במשחק.": "— there is no higher gear in the game.",
+  "החפץ נשמר עליך מהאיפוס וממשיך להעניק את הבונוס המלא. אם תסיר אותו — לא תוכל ללבוש אותו שוב עד שהגיבור יחזור לרמה":
+    "This piece survived the reset on you and still pays its full bonus. Take it off and you cannot wear it again until your hero is back at level",
+  "אישור — הסר ונעל עד רמה {level}": "Confirm — remove and lock until level {level}",
+  "הסר לתיק": "Move to the pack",
+  "עלה לרמה {level} כדי ללבוש": "Reach level {level} to wear this",
+  "לבש": "Wear",
+  "דרוש רמה {level}": "Needs level {level}",
+  "אגדי הוא שיא הסט {set} — הסט הבא מגיע כשלל":
+    "Legendary is the ceiling of the {set} set — the next set arrives as plunder",
+  "דרוש גיבור רמה {level} כדי לשדרג": "Upgrading needs a level {level} hero",
+  "אין מספיק זהב": "Not enough gold",
+  "שיא הסט": "Set ceiling",
+  "אישור זריקה": "Confirm discard",
+  "זרוק": "Discard",
+  "🎡 סיכוי {pct}% לזכות בסיבוב גלגל מזל מהזריקה":
+    "🎡 {pct}% chance the discard wins you a wheel spin",
+
+  /* ------------------------------------------------------------------ */
+  /* the bank, and the one-click actions the pass unlocks                */
+  /* ------------------------------------------------------------------ */
+  "זהב זמין:": "Gold available:",
+  "זהב בבנק:": "Gold in the bank:",
+  "סכום": "Amount",
+  "כמות זהב": "Amount of gold",
+  "הפקד לחיסכון": "Deposit to savings",
+  "משוך כספים": "Withdraw funds",
+  "ניצלת את כל ההפקדות עד העדכון היומי הבא.":
+    "You have used every deposit until the next daily update.",
+  "הפקדות מוגבלות לפי שדרוג כמות הפקדות בבנק.":
+    "Deposits are capped by the bank's deposit-count upgrade.",
+  "משיכות אינן מוגבלות.": "Withdrawals are unlimited.",
+  "הריבית מחושבת על הזהב שנמצא בבנק בלבד.":
+    "Interest is paid on the gold in the bank alone.",
+  "הריבית נכנסת בכל עדכון יומי.": "Interest lands on every daily update.",
+  "פעולות מהירות": "Quick actions",
+  "מציב...": "Assigning…",
+  "מחלק...": "Splitting…",
+  "מנקה...": "Clearing…",
+  "חלק שווה בין המשאבים": "Split evenly between the resources",
+  "נקה חלוקה": "Clear the assignment",
+  "הפקד הכל · {resource}": "Deposit all · {resource}",
+  "משוך הכל · {resource}": "Withdraw all · {resource}",
+  "הצב הכל · {resource}": "Assign all · {resource}",
+
+  /* ------------------------------------------------------------------ */
+  /* the boss arena — the assault playing itself out                     */
+  /* ------------------------------------------------------------------ */
+  "הקרב הוכרע": "The battle is decided",
+  "הקרב נגמר בעוד": "The battle ends in",
+  "מסכמים את השלל…": "Counting the haul…",
+  "סבב {round} מתוך {total}": "Round {round} of {total}",
+  "· המכה הבאה בעוד {seconds} שנ׳": "· next blow in {seconds}s",
+  "אל תסגור — דוח הקרב המלא נפתח בעוד רגע.":
+    "Do not close this — the full battle report opens in a moment.",
+  "הצבא נלחם לבד. אין מה ללחוץ — אפשר גם לצאת ולחזור.":
+    "The army fights on its own. There is nothing to press — you can leave and come back.",
+  "הפסים המוזהבים הם הנזק של התקיפה הזו. הפצעים נשארים עליו גם אחרי שהקרב נגמר.":
+    "The gold band is this assault's damage. The wounds stay on him after the battle ends.",
+  "הקרב הזה כבר הסתיים. הדוח נשלח אליך להודעות.":
+    "This battle is already over. The report has been sent to your messages.",
+  "הכוחות מסתערים על השער… המכה הראשונה נופלת עוד רגע.":
+    "The forces are storming the gate… the first blow lands in a moment.",
+  "הגיבור השתחרר.": "The hero broke loose.",
+  "{move} של {boss} לא הספיק — מכת זעם אחת הורידה לו {damage} חיים.":
+    "{boss}'s {move} was not enough — one fury blow took {damage} health off him.",
+  "— הקצינים ענו ב{tactic}": "— the officers answered with {tactic}",
+  ", וזו התשובה הנכונה: נזק כפול": ", and that was the right answer: double damage",
+  " ובקושי אבדות": " and almost no losses",
+  "(−{damage} חיים).": "(−{damage} health).",
+  "(−{damage} חיים, −{soldiers} חיילים).": "(−{damage} health, −{soldiers} soldiers).",
+  ", וזו התשובה הלא נכונה — היה צריך {tactic}. הנזק נחלש":
+    ", and that was the wrong answer — it should have been {tactic}. The damage was blunted",
+  "(−{damage} חיים, והמכה נכנסה: −{soldiers} חיילים).":
+    "(−{damage} health, and the blow landed: −{soldiers} soldiers).",
+  "אפשר לחזור לבוס העיר או לקרוא את הדוח בהודעות.":
+    "You can go back to the city boss or read the report in your messages.",
+  "אפשר לצאת ולעשות דברים אחרים — כשהקרב ייגמר תקבל הודעה עם כל השלל.":
+    "You can leave and do something else — when the battle ends you get a message with the whole haul.",
+  "לבסיס": "To the base",
+  "לבוס העיר": "To the city boss",
+  "הצבא שלך": "Your army",
+  "אבדות עד כה:": "Losses so far:",
+  "({lossPct}%). הצבא נסוג אם יאבד {routPct}%.":
+    "({lossPct}%). The army routs if it loses {routPct}%.",
+  "כל החיילים חוזרים הביתה — קרב מול הבוס לא עולה באף חייל.":
+    "Every soldier comes home — a boss fight costs you none of them.",
+  "מתמלא בכל סבב. כשהוא מתמלא הגיבור משתחרר במכה אחת גדולה.":
+    "Fills every round. When it fills, the hero breaks loose in one great blow.",
+  "שלל שנצבר עד כה": "Haul earned so far",
+  "נצבר לפי הנזק שנגרם עד כה. הפלת הבוס משלמת את האוצר כולו מעל זה, והכול משולם בסוף הקרב.":
+    "Earned on the damage landed so far. Killing the boss pays the whole treasure on top, and all of it settles when the battle ends.",
+  "יומן הקרב": "Battle log",
+  "הכוחות מתקרבים לשער…": "The forces are approaching the gate…",
+  "המהלך שלו": "His move",
+  "התשובה שלנו": "Our answer",
+  "נזק": "Damage",
+  "אבדות": "Losses",
+  "✔ קריאה נכונה": "✔ read right",
+  "✘ קריאה שגויה": "✘ read wrong",
+  "קריאות נכונות עד כה:": "Correct reads so far:",
+  "מתוך {total} — הן קובעות גם את דירוג הקרב וגם את גודל אוצר ההפלה.":
+    "of {total} — they set both the battle grade and the size of the kill treasure.",
+  "מה בעצם קורה כאן, ואיך משפרים את התוצאה":
+    "What is actually happening here, and how to do better",
+  "שילמת תורות ושלחת את הצבא. מרגע הלחיצה הכול כבר מוכרע — הדקה הזו היא הצפייה, לא ההחלטה.":
+    "You paid the turns and sent the army. From the moment you pressed, everything is already decided — this minute is the watching, not the deciding.",
+  "בכל סבב {boss} מבצע מהלך, והקצינים שלך מנסים לקרוא אותו ולענות בתשובה הנכונה. סיכוי הקריאה שלך כרגע:":
+    "Each round {boss} makes a move, and your officers try to read it and answer correctly. Your read chance right now:",
+  "— הוא נקבע ברמת הגיבור.": "— it comes from your hero's level.",
+  "כשהמונה נגמר משולם השלל": "When the clock runs out the haul is paid",
+  ", נכנסות האבדות": ", the losses land",
+  ", ונשלחת אליך הודעה עם הסיכום — גם אם עברת בינתיים למסך אחר.":
+    ", and a message with the summary is sent to you — even if you have moved to another screen.",
+  "שלוש התשובות": "The three answers",
+  "כדי לפגוע בו יותר:": "To hit him harder:",
+  "כוח התקיפה. עוד חיילים, נשקי תקיפה, ציוד ונקודות תקיפה לגיבור, באפ גילדה ושיקוי כוח — הנזק בכל סבב הוא אחוז מהכוח הזה.":
+    "attack power. More soldiers, attack weapons, gear and attack points on the hero, the guild buff and a power potion — each round's damage is a percentage of it.",
+  "כדי לאבד פחות חיילים:": "To lose fewer soldiers:",
+  "הגיבור. רמה גבוהה יותר = קריאות נכונות יותר, וסבב שנקרא נכון עולה כשליש מהדם.":
+    "the hero. A higher level means more correct reads, and a round read right costs a third of the blood.",
+  "כדי לקרוא אותו נכון יותר:": "To read him better:",
+  "הגיבור. רמה גבוהה יותר = יותר סבבים שנקראים נכון, וכל אחד מהם מכפיל את הנזק.":
+    "the hero. A higher level means more rounds read right, and each of those doubles the damage.",
+  "גיבור מת מוריד את הקריאה לניחוש ומבטל את הזעם.":
+    "A dead hero drops the read to a guess and cancels the fury.",
+  "השלל: {chip}% מהאוצר משולם לפי הנזק שגרמת — גם בקרב שלא הפיל אותו — והשאר ({kill}% + ציוד גיבור מובטח) משולם רק למי שמנחית את המכה האחרונה. הפצעים נשארים על הבוס בין תקיפות, אז כל תקיפה מקרבת את ההפלה.":
+    "The haul: {chip}% of the treasure is paid on the damage you landed — even in a battle that did not finish him — and the rest ({kill}% plus guaranteed hero gear) goes only to whoever lands the last blow. The wounds stay on the boss between assaults, so every assault brings the kill closer.",
+
+  /* ------------------------------------------------------------------ */
+  /* the bag, the paperdoll, the potion belt and the wheel               */
+  /* ------------------------------------------------------------------ */
+  "התיק": "The pack",
+  "חפצים שנלכדו בקרבות וממתינים בתיק. לחיצה על חפץ פותחת את פרטיו — שם אפשר ללבוש, לשדרג או לזרוק.":
+    "Gear taken in battle, waiting in the pack. Tap a piece for its details — that is where you wear, upgrade or discard it.",
+  "בטל": "Cancel",
+  "בחירה": "Select",
+  "הקטלוג המלא: כל החפצים הקיימים במשחק, מרמה 1 עד 100 בכל הדרגות":
+    "The full catalogue: every item in the game, from level 1 to 100 at every rarity",
+  "לכל הפריטים": "All items",
+  "נקה בחירה": "Clear selection",
+  "סמן הכל": "Select all",
+  "מקום בתיק: {slots} סלוטים (5 על 3). כשהתיק מלא — לא נלכדים חפצים חדשים בקרב ואי אפשר להסיר ציוד מהגיבור!":
+    "Pack space: {slots} slots (5 by 3). A full pack takes no new gear in battle, and nothing can come off the hero.",
+  "סלוטים": "slots",
+  "{count} נבחרו": "{count} selected",
+  "התיק מלא — חפצים חדשים לא ייכנסו. זרוק או שדרג כדי לפנות מקום.":
+    "The pack is full — nothing new will fit. Discard or upgrade to clear a slot.",
+  "{slot} רמה {level}": "{slot}, level {level}",
+  "לחץ לפרטים": "tap for details",
+  "זרוק הכל": "Discard all",
+  "שדרג הכל": "Upgrade all",
+  "חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים — ככל שהחפץ נדיר יותר, כך קשה יותר ללכוד אותו.":
+    "Gear is taken by winning attacks on other players — the rarer the piece, the harder it is to take.",
+  "שדרוג חפצים": "Upgrading gear",
+  "עומדים לשדרג {count} חפצים לדרגה הבאה.":
+    "You are about to upgrade {count} items to the next rung.",
+  "עלות כוללת": "Total cost",
+  "הזהב שלך": "Your gold",
+  "🧪 שיקוי הנפח פעיל — המחירים כאן כבר כוללים {pct}% הנחה.":
+    "🧪 The smith's brew is live — the prices here already include the {pct}% discount.",
+  "אין מספיק זהב לשדרוג הכל — ישודרגו הזולים ביותר עד שייגמר הזהב.":
+    "Not enough gold for all of them — the cheapest will be upgraded until the gold runs out.",
+  "משדרג…": "Upgrading…",
+  "אישור שדרוג": "Confirm upgrade",
+
+  "{slot} רמה {level} — פרטים": "{slot}, level {level} — details",
+  "יש חפץ חזק יותר בתיק": "There is a stronger piece in the pack",
+  "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. ריחוף מעל חפץ מציג את דרגתו והבונוסים שהוא מעניק. הלבשה והשדרוג נעשים בעמוד הגיבור.":
+    "The nine pieces the hero wears, each in its place on the body. Hover a piece for its rarity and the bonuses it pays. Wearing and upgrading happen on the hero screen.",
+  "תשעת חלקי הציוד שהגיבור לובש, כל אחד במקומו על הגוף. לחיצה על סלוט ריק בוחרת חפץ מהתיק; לחיצה על חפץ לבוש פותחת את פרטיו. הבונוסים שלהם מרוכזים ב'סך הכל מהגיבור' שלמטה.":
+    "The nine pieces the hero wears, each in its place on the body. Tap an empty socket to pick from the pack; tap a worn piece for its details. Their bonuses are totalled in \"Everything the hero pays\" below.",
+  "ציוד לבוש": "Gear worn",
+  "סלוט ריק": "empty socket",
+  "{count} בתיק — לחץ לבחירה": "{count} in the pack — tap to choose",
+  "אין חפץ כזה בתיק — לכוד אחד בתקיפה":
+    "no piece like this in the pack — take one in an attack",
+  "סלוט {slot} ריק": "{slot} socket, empty",
+  "סלוט {slot} ריק — בחר חפץ": "{slot} socket, empty — pick a piece",
+  "{stat} — בחר חפץ מהתיק כדי ללבוש אותו":
+    "{stat} — pick a piece from the pack to wear it",
+  "אין חפצי {slot} בתיק.": "No {slot} gear in the pack.",
+  "חפצים נלכדים בניצחון בתקיפה על שחקנים אחרים.":
+    "Gear is taken by winning attacks on other players.",
+
+  "שיקויים": "Potions",
+  "שיקויים נלכדים בניצחון בתקיפה. כל שיקוי מפעיל אפקט זמני על כל האימפריה — לחיצה פותחת את פרטיו ומאפשרת לשתות.":
+    "Potions are taken by winning attacks. Each one runs a timed effect over the whole empire — tap for its details and to drink it.",
+  "שיקויים נופלים מתקיפות מוצלחות. שתיית שיקוי שכבר פועל מאריכה אותו — לעולם לא בזבוז.":
+    "Potions drop from successful attacks. Drinking one that is already running extends it — never a waste.",
+  "{potion} — {tagline} ({duration})": "{potion} — {tagline} ({duration})",
+  " · אין לך אחד כזה": " · you have none of these",
+  "משך:": "Lasts:",
+  "בתרמיל:": "In the satchel:",
+  "פועל כרגע — נותר": "Running now — left",
+  "אין לך שיקוי כזה — נלכד בתקיפות מוצלחות":
+    "You have none of these — they drop from successful attacks",
+  "שותה…": "Drinking…",
+  "אין במלאי": "None in stock",
+  "שתה והארך": "Drink and extend",
+  "שתה": "Drink",
+
+  "גלגל המזל": "The Wheel of Fortune",
+  "הושלמו {count} סיבובים — הנה מה שזכית בו:":
+    "{count} spins done — here is what you won:",
+  "כבה צלילים": "Mute the sound",
+  "הפעל צלילים": "Unmute the sound",
+  "סיבובים זמינים": "Spins available",
+  "מחזור {cycle} לעונה — הפרסים גדלים בכל עדכון יומי!":
+    "Cycle {cycle} of the season — the prizes grow with every daily update.",
+  "פרס ״חפץ״ דורש לפחות מקום פנוי אחד בתיק הגיבור.":
+    "An \"item\" prize needs at least one free slot in the hero's pack.",
+  "סובב את כל הסיבובים הזמינים בבת אחת (עד 10)":
+    "Spin every available spin at once (up to 10)",
+  "מסתובב…": "Spinning…",
+  "סובב": "Spin",
+  "כפתור הבאטץ׳ מסובב את כל הסיבובים הזמינים בבת אחת (עד 10).":
+    "The batch button spins every available spin at once (up to 10).",
+
+  "ניסיונות": "attempts",
+  "זוכה בלבד": "winner only",
+  "אחר כך — הכפתור למעלה שומר לי אותו":
+    "Later — the pill above keeps it for me",
+
+  /* ------------------------------------------------------------------ */
+  /* sign-up, sign-in and the account itself                             */
+  /* ------------------------------------------------------------------ */
+  "שם האימפריה כבר תפוס, בחר שם אחר": "That empire name is taken — pick another",
+  "אירעה שגיאה ביצירת האימפריה, נסה שוב":
+    "Something went wrong founding the empire — try again",
+  "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר.":
+    "Too many sign-up attempts. Try again later.",
+  "כתובת האימייל כבר רשומה במערכת": "That email address is already registered",
+  "אירעה שגיאה בהרשמה, נסה שוב": "Something went wrong signing up — try again",
+  "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר.":
+    "Too many sign-in attempts. Try again later.",
+  "יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר.":
+    "Too many sign-in attempts for this account. Try again later.",
+  "אימייל או סיסמה שגויים": "Wrong email or password",
+  "יותר מדי נסיונות. נסה שוב מאוחר יותר.": "Too many attempts. Try again later.",
+  "החשבון הזה מחובר דרך Google בלבד ואין לו סיסמה לשינוי.":
+    "This account signs in with Google only and has no password to change.",
+  "הסיסמה הנוכחית שגויה": "That is not your current password",
+  "הסיסמה החדשה זהה לנוכחית": "The new password is the same as the current one",
+  "הסיסמה שונתה. כל המכשירים האחרים נותקו.":
+    "Password changed. Every other device has been signed out.",
+  "אימות מול Google נכשל, נסה שוב": "Verifying with Google failed — try again",
+  "כתובת האימייל של חשבון Google אינה מאומתת":
+    "That Google account's email address is not verified",
+  "כתובת האימייל הזו כבר רשומה עם סיסמה. התחבר עם האימייל והסיסמה שלך.":
+    "That email address is already registered with a password. Sign in with your email and password.",
+  "כתובת האימייל הזו כבר משויכת לחשבון Google אחר.":
+    "That email address is already linked to another Google account.",
+  "קישור אימות לא תקין": "That verification link is not valid",
+  "קישור האימות אינו תקין": "That verification link is not valid",
+  "פג תוקף הקישור — שלח לעצמך קישור חדש":
+    "The link has expired — send yourself a new one",
+  "הקישור כבר נוצל — שלח לעצמך קישור חדש":
+    "That link has already been used — send yourself a new one",
+  "נשלחו יותר מדי קישורים. נסה שוב בעוד שעה.":
+    "Too many links sent. Try again in an hour.",
+  "נשלחו יותר מדי קישורים. נסה שוב מאוחר יותר.":
+    "Too many links sent. Try again later.",
+  "האימייל שלך כבר מאומת": "Your email is already verified",
+  "שלחנו קישור אימות חדש. בדוק את תיבת הדואר.":
+    "A new verification link is on its way. Check your inbox.",
+  "שליחת המייל נכשלה. נסה שוב בעוד רגע.":
+    "Sending the email failed. Try again in a moment.",
+
+  /* the sign-up form's own validation (the zod schemas in actions/auth.ts) */
+  "בחר דמות גיבור": "Choose a hero class",
+  "שם חייב להכיל לפחות 2 תווים": "A name needs at least 2 characters",
+  "שם האימפריה חייב להכיל לפחות 2 תווים":
+    "An empire name needs at least 2 characters",
+  "כתובת אימייל לא תקינה": "That email address is not valid",
+  "סיסמה חייבת להכיל לפחות 8 תווים": "A password needs at least 8 characters",
+  "יש להזין סיסמה": "Enter a password",
+  "יש להזין את הסיסמה הנוכחית": "Enter your current password",
+  "סיסמה חדשה חייבת להכיל לפחות 8 תווים":
+    "A new password needs at least 8 characters",
+
+  /* hero gear */
+  "ברשותך מאז": "Yours since",
+  "לבש {item}": "Equip {item}",
+  "דרוש גיבור רמה {level}": "Needs a level {level} hero",
+
 };

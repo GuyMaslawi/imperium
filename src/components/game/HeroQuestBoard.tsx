@@ -94,6 +94,7 @@ export function HeroQuestBoard({
   serverNow,
   open,
 }: HeroQuestBoardProps) {
+  const t = useT();
   const router = useRouter();
   const now = useServerNow(serverNow);
   const [msg, setMsg] = useState<ActionState>({});
@@ -131,28 +132,29 @@ export function HeroQuestBoard({
   return (
     <section className="panel rounded-2xl border border-border-gold-strong p-4 md:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <Tip tip="הגיבור יוצא למסע אחד בכל פעם. כל עיר שאתה מקים פותחת מסע ארוך יותר — והשלל של כל המסעות גדל עם מספר הערים שלך ועם התקדמות העונה.">
+        <Tip tip={t("הגיבור יוצא למסע אחד בכל פעם. כל עיר שאתה מקים פותחת מסע ארוך יותר — והשלל של כל המסעות גדל עם מספר הערים שלך ועם התקדמות העונה.")}>
           <h2 className="flex cursor-help items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
-            <span aria-hidden>🧭</span> מסעות הגיבור
+            <span aria-hidden>🧭</span> {t("מסעות הגיבור")}
           </h2>
         </Tip>
         <span className="text-[11px] text-zinc-500">
-          נפתחו {Math.min(cities, HERO_QUESTS.length)} מתוך {HERO_QUESTS.length}
+          {t("נפתחו {open} מתוך {total}", {
+            open: Math.min(cities, HERO_QUESTS.length),
+            total: HERO_QUESTS.length,
+          })}
         </span>
       </div>
 
       <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
-        <b className="text-zinc-300">אף אחד לא יודע מה יחזור מהדרך.</b> כל מסע מגלגל
-        את מזלו שלו — לפעמים הגיבור חוזר חבול ועם מעט, ולפעמים נגררת אחריו עגלה שלמה.
-        מה שכן בטוח: השלל גדל עם מספר הערים שלך ועם התקדמות העונה, וכל מסע משלם אותו
-        ממוצע <b className="text-zinc-300">לכל שעה</b>. המסעות הארוכים קונים מחיר
-        תורות נמוך יותר לשעה וסיכויי שלל גבוהים בהרבה; הקצרים קונים חפצים לשעה ואת
-        החופש להגיב. הגיבור ממשיך להעניק את כל הבונוסים שלו גם בזמן שהוא בדרכים.
+        <b className="text-zinc-300">{t("אף אחד לא יודע מה יחזור מהדרך.")}</b>{" "}
+        {t("כל מסע מגלגל את מזלו שלו — לפעמים הגיבור חוזר חבול ועם מעט, ולפעמים נגררת אחריו עגלה שלמה. מה שכן בטוח: השלל גדל עם מספר הערים שלך ועם התקדמות העונה, וכל מסע משלם אותו ממוצע")}{" "}
+        <b className="text-zinc-300">{t("לכל שעה")}</b>
+        {t(". המסעות הארוכים קונים מחיר תורות נמוך יותר לשעה וסיכויי שלל גבוהים בהרבה; הקצרים קונים חפצים לשעה ואת החופש להגיב. הגיבור ממשיך להעניק את כל הבונוסים שלו גם בזמן שהוא בדרכים.")}
       </p>
 
       {!open && (
         <p className="mt-3 rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-xs text-zinc-400">
-          לוח המסעות סגור כרגע.
+          {t("לוח המסעות סגור כרגע.")}
         </p>
       )}
 
@@ -212,6 +214,7 @@ function ActiveQuestBanner({
   pending: boolean;
   onCollect: () => void;
 }) {
+  const t = useT();
   const quest = heroQuestByTier(active.tier);
   if (!quest) return null;
 
@@ -232,14 +235,14 @@ function ActiveQuestBanner({
           <span aria-hidden className="text-lg">
             {quest.sigil}
           </span>
-          {quest.name}
+          {t(quest.name)}
         </h3>
         <span
           className="nums flex items-center gap-1.5 rounded-lg border border-white/15 bg-black/60 px-2.5 py-1 text-xs font-bold"
           style={{ color: `rgb(${quest.accent})` }}
           dir="ltr"
         >
-          {done ? "חזר!" : formatCountdown(active.endsAt - now)}
+          {done ? t("חזר!") : formatCountdown(active.endsAt - now)}
         </span>
       </div>
 
@@ -250,8 +253,8 @@ function ActiveQuestBanner({
           done={done}
           tip={
             done
-              ? "לחץ כדי לראות מה הוא הביא — השלל, המזל שליווה אותו, וכל מה שנפל בדרך."
-              : "השלל נקבע ברגע שהוא יצא לדרך, אבל אף אחד בעיר עוד לא יודע מה יש בשק. הוא ייספר כשיחזור."
+              ? t("לחץ כדי לראות מה הוא הביא — השלל, המזל שליווה אותו, וכל מה שנפל בדרך.")
+              : t("השלל נקבע ברגע שהוא יצא לדרך, אבל אף אחד בעיר עוד לא יודע מה יש בשק. הוא ייספר כשיחזור.")
           }
         />
         <XpChip xp={active.xp} />
@@ -264,10 +267,10 @@ function ActiveQuestBanner({
         className={`btn mt-3 w-full py-2 text-sm ${done ? "btn-gold" : "btn-ghost"}`}
       >
         {pending
-          ? "אוסף…"
+          ? t("אוסף…")
           : done
-            ? "קבל את פני הגיבור ואסוף את השלל"
-            : "הגיבור בדרכים…"}
+            ? t("קבל את פני הגיבור ואסוף את השלל")
+            : t("הגיבור בדרכים…")}
       </button>
     </div>
   );
@@ -336,6 +339,7 @@ function HomecomingPanel({
   haul: HeroQuestHaul;
   onDismiss: () => void;
 }) {
+  const t = useT();
   const quest = heroQuestByTier(haul.tier);
   const fortune = heroQuestFortuneByKey(haul.fortune);
   const tone = FORTUNE_TONE[fortune.key] ?? FORTUNE_TONE.plain!;
@@ -350,16 +354,18 @@ function HomecomingPanel({
             <span aria-hidden className="text-lg">
               {quest?.sigil ?? "🧭"}
             </span>
-            {fortune.label}!
+            {t(fortune.label)}!
           </h3>
           <p className="mt-0.5 text-[11px] text-zinc-400">
-            הגיבור חזר מ&rdquo;{quest?.name ?? "המסע"}&rdquo;
+            {t("הגיבור חזר מ”{quest}”", {
+              quest: quest ? t(quest.name) : t("המסע"),
+            })}
           </p>
         </div>
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="סגור את סיכום המסע"
+          aria-label={t("סגור את סיכום המסע")}
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-[11px] text-zinc-400 transition hover:bg-white/10 hover:text-bone"
         >
           ✕
@@ -380,7 +386,7 @@ function HomecomingPanel({
                 +{formatNumber(entry.amount)}
               </span>
               <span className="text-[10px] font-bold leading-none text-zinc-400">
-                {HERO_QUEST_HAUL_LABEL[entry.kind]}
+                {t(HERO_QUEST_HAUL_LABEL[entry.kind])}
               </span>
             </div>
           );
@@ -392,7 +398,9 @@ function HomecomingPanel({
           {haul.levelsGained > 0 && (
             <li className="flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/10 px-2.5 py-1.5 text-xs font-bold text-gold-bright">
               <span aria-hidden>⬆️</span>
-              הגיבור עלה {haul.levelsGained > 1 ? `${haul.levelsGained} דרגות` : "דרגה"}!
+              {haul.levelsGained > 1
+                ? t("הגיבור עלה {count} דרגות!", { count: haul.levelsGained })
+                : t("הגיבור עלה דרגה!")}
             </li>
           )}
           {haul.item && (
@@ -400,9 +408,9 @@ function HomecomingPanel({
               className={`flex items-center gap-2 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs font-bold ${RARITY_META[haul.item.rarity].tone}`}
             >
               <span aria-hidden>🎁</span>
-              נמצא בדרך: {haul.item.label}
+              {t("נמצא בדרך:")} {haul.item.label}
               <span className="text-[10px] font-normal text-zinc-500">
-                — מחכה בתרמיל
+                — {t("מחכה בתרמיל")}
               </span>
             </li>
           )}
@@ -411,9 +419,9 @@ function HomecomingPanel({
               className={`flex items-center gap-2 rounded-lg border border-white/15 bg-black/50 px-2.5 py-1.5 text-xs font-bold ${POTION_META[haul.potion].tone}`}
             >
               <Icon name="potion" size={14} />
-              {POTION_META[haul.potion].label}
+              {t(POTION_META[haul.potion].label)}
               <span className="text-[10px] font-normal text-zinc-500">
-                — {POTION_META[haul.potion].tagline}
+                — {t(POTION_META[haul.potion].tagline)}
               </span>
             </li>
           )}
@@ -421,7 +429,7 @@ function HomecomingPanel({
       )}
 
       <p className="mt-2.5 text-[11px] italic leading-relaxed text-zinc-400">
-        {fortune.lore}
+        {t(fortune.lore)}
       </p>
     </div>
   );
@@ -455,13 +463,13 @@ function QuestRow({
   // Every reason the button can be dead, most specific first — the row states
   // exactly one of them rather than greying out silently.
   const blocked = !unlocked
-    ? `נפתח עם העיר ה-${tier}`
+    ? t("נפתח עם העיר ה-{tier}", { tier })
     : heroDead
-      ? "הגיבור מת"
+      ? t("הגיבור מת")
       : busy
-        ? "הגיבור כבר במסע"
+        ? t("הגיבור כבר במסע")
         : !affordable
-          ? `חסרות ${(cost - turns).toLocaleString("he-IL")} תורות`
+          ? t("חסרות {turns} תורות", { turns: formatNumber(cost - turns) })
           : null;
 
   return (
@@ -481,7 +489,10 @@ function QuestRow({
       {/* A rung he cannot be sent on yet is chained shut rather than greyed out:
           the seal states its own price and rattles when pulled. See QuestLock. */}
       {!unlocked && (
-        <QuestLock label={`${quest.name} — מסע נעול`} hint={`נפתח עם העיר ה-${tier}`} />
+        <QuestLock
+          label={t("{quest} — מסע נעול", { quest: t(quest.name) })}
+          hint={t("נפתח עם העיר ה-{tier}", { tier })}
+        />
       )}
 
       <div
@@ -492,18 +503,24 @@ function QuestRow({
         <div className="min-w-[13rem] flex-1">
           <h3 className="flex items-center gap-2 text-sm font-bold text-bone">
             <span aria-hidden>{quest.sigil}</span>
-            {quest.name}
+            {t(quest.name)}
             <span className="rounded-md border border-border-subtle px-1.5 py-px text-[10px] font-bold text-zinc-400">
               {heroQuestDurationLabel(t, tier)}
             </span>
           </h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{quest.lore}</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{t(quest.lore)}</p>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <MysteryChip tip="השלל של המסע הזה לא ידוע מראש: כל יציאה מגלגלת את מזלה שלה — לפעמים מעט, לפעמים עגלה שלמה. הגודל הממוצע נגזר ממספר הערים שלך ומיום העונה, ואותו לכל שעת מסע בכל הדרגות." />
+            <MysteryChip tip={t("השלל של המסע הזה לא ידוע מראש: כל יציאה מגלגלת את מזלה שלה — לפעמים מעט, לפעמים עגלה שלמה. הגודל הממוצע נגזר ממספר הערים שלך ומיום העונה, ואותו לכל שעת מסע בכל הדרגות.")} />
             <XpChip xp={heroQuestXp(tier)} />
             <Tip
-              tip={`סיכוי לחפץ גיבור בסיום המסע: ${Math.round(quest.itemChance * 100)}% · סיכוי לשיקוי: ${Math.round(quest.potionChance * 100)}% — שתי הגרלות נפרדות, ומסע יכול להחזיר את שניהם.`}
+              tip={t(
+                "סיכוי לחפץ גיבור בסיום המסע: {item}% · סיכוי לשיקוי: {potion}% — שתי הגרלות נפרדות, ומסע יכול להחזיר את שניהם.",
+                {
+                  item: Math.round(quest.itemChance * 100),
+                  potion: Math.round(quest.potionChance * 100),
+                }
+              )}
             >
               <span className="nums flex cursor-help items-center gap-1 rounded-lg border border-violet-400/30 bg-violet-950/30 px-1.5 py-0.5 text-[11px] font-bold text-violet-300">
                 <span aria-hidden>🎁</span>
@@ -516,7 +533,12 @@ function QuestRow({
         </div>
 
         <div className="flex shrink-0 flex-col items-stretch gap-1.5">
-          <Tip tip={`עלות שליחה: ${cost.toLocaleString("he-IL")} תורות — ${(cost / (quest.hours || 1)).toFixed(1)} לכל שעת מסע.`}>
+          <Tip
+            tip={t("עלות שליחה: {cost} תורות — {perHour} לכל שעת מסע.", {
+              cost: formatNumber(cost),
+              perHour: (cost / (quest.hours || 1)).toFixed(1),
+            })}
+          >
             <span
               className={`nums flex cursor-help items-center justify-center gap-1 rounded-lg border px-2 py-0.5 text-[11px] font-bold ${
                 affordable
@@ -525,7 +547,7 @@ function QuestRow({
               }`}
             >
               <Icon name="turns" size={12} />
-              <span dir="ltr">{cost.toLocaleString("he-IL")}</span>
+              <span dir="ltr">{formatNumber(cost)}</span>
             </span>
           </Tip>
           <button
@@ -538,7 +560,7 @@ function QuestRow({
             {/* A locked rung says nothing here: the chained plate over the row
                 already names the price, and on a phone the row is tall enough
                 that the two labels sit far apart and read as a duplicate. */}
-            {unlocked ? blocked ?? "שלח למסע" : "שלח למסע"}
+            {unlocked ? blocked ?? t("שלח למסע") : t("שלח למסע")}
           </button>
         </div>
       </div>
@@ -557,6 +579,7 @@ function QuestRow({
  * what kind of haul to expect, just never how big.
  */
 function MysteryChip({ tip, done = false }: { tip: string; done?: boolean }) {
+  const t = useT();
   return (
     <Tip tip={tip}>
       <span
@@ -575,7 +598,7 @@ function MysteryChip({ tip, done = false }: { tip: string; done?: boolean }) {
         <span dir="ltr" className="tracking-[0.2em]">
           ???
         </span>
-        <span>{done ? "מחכה בשער" : "שלל לא ידוע"}</span>
+        <span>{done ? t("מחכה בשער") : t("שלל לא ידוע")}</span>
       </span>
     </Tip>
   );
@@ -583,8 +606,9 @@ function MysteryChip({ tip, done = false }: { tip: string; done?: boolean }) {
 
 /** XP is the one payout that *is* fixed per rung, so it stays on the row. */
 function XpChip({ xp }: { xp: number }) {
+  const t = useT();
   return (
-    <Tip tip="ניסיון לגיבור — הדבר היחיד במסע שידוע מראש: הוא נקבע לפי דרגת המסע בלבד ולא מושפע ממזל.">
+    <Tip tip={t("ניסיון לגיבור — הדבר היחיד במסע שידוע מראש: הוא נקבע לפי דרגת המסע בלבד ולא מושפע ממזל.")}>
       <span
         className="nums flex cursor-help items-center gap-1 rounded-lg border border-gold/30 bg-gold/10 px-1.5 py-0.5 text-[11px] font-bold text-gold-bright"
         dir="ltr"

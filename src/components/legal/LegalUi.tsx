@@ -95,10 +95,27 @@ export function LegalShell({
                   </dd>
                 </div>
               )}
-              {operator.city && (
+              {operator.address && (
                 <div className="flex gap-2">
-                  <dt className="text-zinc-500">מקום העסק:</dt>
-                  <dd>{operator.city}</dd>
+                  <dt className="shrink-0 text-zinc-500">כתובת למשלוח דואר:</dt>
+                  <dd>{operator.address}</dd>
+                </div>
+              )}
+              {operator.phone && (
+                <div className="flex gap-2">
+                  <dt className="text-zinc-500">טלפון:</dt>
+                  <dd>
+                    {/* A real `tel:` link, not printed text — on the phone most
+                        buyers read this on, the whole point of publishing a
+                        number is that it can be dialled from here. */}
+                    <a
+                      href={`tel:${operator.phone.replace(/[^\d+]/g, "")}`}
+                      className="text-gold underline"
+                      dir="ltr"
+                    >
+                      {operator.phone}
+                    </a>
+                  </dd>
                 </div>
               )}
               <div className="flex gap-2">

@@ -20,6 +20,7 @@ import { StorageSilo, type SiloPulseKind } from "./StorageSilo";
 import { VipLockedAction } from "./VipLockedAction";
 import type { OreKind } from "./oreTint";
 import { formatNumber } from "@/lib/game/format";
+import { useT } from "@/i18n/client";
 
 export interface StorageCardProps {
   resourceType: "GOLD" | "WOOD" | "IRON" | "STONE";
@@ -52,6 +53,7 @@ export function StorageCard({
   upgradeCost,
   isVip,
 }: StorageCardProps) {
+  const t = useT();
   /** The resource this warehouse holds — drives its canonical icon and tint. */
   const storedResource = resourceType.toLowerCase() as OreKind;
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
@@ -88,19 +90,21 @@ export function StorageCard({
   const capacityPerLevel = level > 0 ? Math.round(capacity / level) : capacity;
 
   const validateAmount = (kind: "deposit" | "withdraw"): string | undefined => {
-    if (amount.trim() === "") return "יש להזין כמות";
+    if (amount.trim() === "") return t("יש להזין כמות");
     const value = Number(amount);
     if (!Number.isInteger(value) || value <= 0) {
-      return "יש להזין מספר שלם גדול מ־0";
+      return t("יש להזין מספר שלם גדול מ־0");
     }
     if (kind === "deposit" && value > availableWhole) {
-      return "הכמות גדולה מהמשאבים הזמינים";
+      return t("הכמות גדולה מהמשאבים הזמינים");
     }
     if (kind === "deposit" && value > freeSpace) {
-      return `אין מספיק מקום במחסן (מקום פנוי: ${formatAmount(freeSpace)})`;
+      return t("אין מספיק מקום במחסן (מקום פנוי: {free})", {
+        free: formatAmount(freeSpace),
+      });
     }
     if (kind === "withdraw" && value > storedWhole) {
-      return "הכמות גדולה מהכמות המאוחסנת במחסן";
+      return t("הכמות גדולה מהכמות המאוחסנת במחסן");
     }
     return undefined;
   };
@@ -153,9 +157,9 @@ export function StorageCard({
             className={RESOURCE_ICON_COLOR[storedResource]}
           />
           <div>
-            <h3 className="font-bold text-gold-bright">{label}</h3>
+            <h3 className="font-bold text-gold-bright">{t(label)}</h3>
             <p className="text-xs font-semibold text-gold">
-              רמה{" "}
+              {t("רמה")}{" "}
               <span className="nums" dir="ltr">
                 {level}
               </span>
@@ -178,7 +182,7 @@ export function StorageCard({
           a settled transfer runs crates through the hatch. */}
       <StorageSilo
         resource={storedResource}
-        label={label}
+        label={t(label)}
         stored={stored}
         capacity={capacity}
         pulse={pulse}
@@ -195,7 +199,7 @@ export function StorageCard({
             {formatAmount(stored)} / {formatAmount(capacity)}
           </span>
           <span>
-            פנוי:{" "}
+            {t("פנוי:")}{" "}
             <span className="nums" dir="ltr">
               {formatAmount(freeSpace)}
             </span>
@@ -204,7 +208,7 @@ export function StorageCard({
       </div>
 
       <p className="text-sm text-zinc-300">
-        זמין אצלך:{" "}
+        {t("זמין אצלך:")}{" "}
         <span className="nums font-bold text-gold-bright" dir="ltr">
           {formatAmount(available)}
         </span>
@@ -219,10 +223,10 @@ export function StorageCard({
           min={1}
           step={1}
           inputMode="numeric"
-          placeholder="כמות"
+          placeholder={t("כמות")}
           value={amount}
           onChange={(event) => setAmount(event.target.value)}
-          aria-label={`כמות להפקדה או משיכה — ${label}`}
+          aria-label={t("כמות להפקדה או משיכה — {label}", { label: t(label) })}
           aria-invalid={clientError ? true : undefined}
         />
         <div className="grid grid-cols-2 gap-2">
@@ -230,17 +234,17 @@ export function StorageCard({
             className="btn btn-dark w-full"
             formAction={depositAction}
             onClick={handleTransfer("deposit")}
-            pendingText="מפקיד..."
+            pendingText={t("מפקיד...")}
           >
-            הפקד
+            {t("הפקד")}
           </SubmitButton>
           <SubmitButton
             className="btn btn-dark w-full"
             formAction={withdrawAction}
             onClick={handleTransfer("withdraw")}
-            pendingText="מושך..."
+            pendingText={t("מושך...")}
           >
-            משוך
+            {t("משוך")}
           </SubmitButton>
           {isVip ? (
             <>
@@ -249,24 +253,24 @@ export function StorageCard({
                 className="btn btn-ghost w-full"
                 formAction={depositAllAction}
                 onClick={handleQuickAction("depositAll")}
-                pendingText="מפקיד..."
+                pendingText={t("מפקיד...")}
               >
-                הפקד הכל
+                {t("הפקד הכל")}
               </SubmitButton>
               <SubmitButton
                 variant="secondary"
                 className="btn btn-ghost w-full"
                 formAction={withdrawAllAction}
                 onClick={handleQuickAction("withdrawAll")}
-                pendingText="מושך..."
+                pendingText={t("מושך...")}
               >
-                משוך הכל
+                {t("משוך הכל")}
               </SubmitButton>
             </>
           ) : (
             <>
-              <VipLockedAction label="הפקד הכל" className="w-full" />
-              <VipLockedAction label="משוך הכל" className="w-full" />
+              <VipLockedAction label={t("הפקד הכל")} className="w-full" />
+              <VipLockedAction label={t("משוך הכל")} className="w-full" />
             </>
           )}
         </div>
@@ -277,7 +281,7 @@ export function StorageCard({
       />
 
       <p className="text-xs text-gold-dim">
-        משאבים במחסן מוגנים ואינם זמינים לשימוש עד שתמשוך אותם.
+        {t("משאבים במחסן מוגנים ואינם זמינים לשימוש עד שתמשוך אותם.")}
       </p>
 
       {/* -------- upgrade -------- */}
@@ -285,14 +289,14 @@ export function StorageCard({
         <input type="hidden" name="resourceType" value={resourceType} />
         <div className="panel-inset rounded-lg p-3 text-xs text-zinc-400">
           <p className="text-gold-bright">
-            לרמה הבאה:{" "}
+            {t("לרמה הבאה:")}{" "}
             <span className="nums font-bold text-emerald-400" dir="ltr">
               +{formatAmount(capacityPerLevel)}
             </span>{" "}
-            מקום אחסון
+            {t("מקום אחסון")}
           </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-            <span className="font-semibold text-gold-dim">עלות שדרוג:</span>
+            <span className="font-semibold text-gold-dim">{t("עלות שדרוג:")}</span>
             {(["gold", "wood", "iron", "stone"] as const).map((key) => (
               <span key={key} className="nums" dir="ltr">
                 <Icon
@@ -305,8 +309,8 @@ export function StorageCard({
             ))}
           </div>
         </div>
-        <SubmitButton className="btn btn-dark w-full" pendingText="משדרג...">
-          🔧 שדרג לרמה {level + 1}
+        <SubmitButton className="btn btn-dark w-full" pendingText={t("משדרג...")}>
+          {t("🔧 שדרג לרמה {level}", { level: level + 1 })}
         </SubmitButton>
       </form>
 

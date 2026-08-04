@@ -209,6 +209,7 @@ async function createEmpireForUser(
   empireName: string,
   heroClass: HeroClass
 ): Promise<AuthState | null> {
+  const t = await getT();
   const [activeSeason, tunables, owner] = await Promise.all([
     prisma.gameSeason.findFirst({ where: { isActive: true }, select: { id: true } }),
     getTunables(),
@@ -227,9 +228,9 @@ async function createEmpireForUser(
     });
   } catch (e) {
     if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
-      return { error: "שם האימפריה כבר תפוס, בחר שם אחר" };
+      return { error: t("שם האימפריה כבר תפוס, בחר שם אחר") };
     }
-    return { error: "אירעה שגיאה ביצירת האימפריה, נסה שוב" };
+    return { error: t("אירעה שגיאה ביצירת האימפריה, נסה שוב") };
   }
   return null;
 }
@@ -254,11 +255,12 @@ export async function register(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const t = await getT();
   // Throttle mass account/empire creation from one origin (resource exhaustion,
   // empire-name squatting). Generous enough not to hinder a real person.
   const ip = await clientIp();
   if (!(await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000))) {
-    return { error: "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר." };
+    return { error: t("יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר.") };
   }
 
   // Registration reopens with the next season, not before. The form is not even
@@ -277,7 +279,7 @@ export async function register(
     password: formData.get("password"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
+    return { error: t(parsed.error.issues[0].message) };
   }
   const { name, empireName, heroClass, email, password } = parsed.data;
 
@@ -329,10 +331,10 @@ export async function register(
     // Prisma P2002 to the same friendly message instead of crashing.
     if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
       const target = String((e as { meta?: { target?: unknown } }).meta?.target ?? "");
-      if (target.includes("name")) return { error: "שם האימפריה כבר תפוס, בחר שם אחר" };
-      return { error: "כתובת האימייל כבר רשומה במערכת" };
+      if (target.includes("name")) return { error: t("שם האימפריה כבר תפוס, בחר שם אחר") };
+      return { error: t("כתובת האימייל כבר רשומה במערכת") };
     }
-    return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
+    return { error: t("אירעה שגיאה בהרשמה, נסה שוב") };
   }
 
   // Best-effort: a mail hiccup must not undo a completed registration. The
@@ -365,13 +367,14 @@ export async function login(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const t = await getT();
   // Two-axis throttle against online brute force: a broad per-IP cap (a single
   // origin hammering many accounts) and a tighter per-email cap (many origins
   // targeting one account). Either tripping refuses the attempt before the user
   // lookup and the bcrypt compare, which is where the real cost of a flood is.
   const ip = await clientIp();
   if (!(await rateLimit(`login-ip:${ip}`, 30, 15 * 60 * 1000))) {
-    return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
+    return { error: t("יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר.") };
   }
 
   const parsed = loginSchema.safeParse({
@@ -379,7 +382,7 @@ export async function login(
     password: formData.get("password"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
+    return { error: t(parsed.error.issues[0].message) };
   }
   const { email, password } = parsed.data;
 
@@ -388,7 +391,7 @@ export async function login(
   // limiter only ever needs the key to be stable, never readable.
   const emailKey = createHash("sha256").update(email).digest("hex");
   if (!(await rateLimit(`login-email:${emailKey}`, 10, 15 * 60 * 1000))) {
-    return { error: "יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר." };
+    return { error: t("יותר מדי נסיונות התחברות לחשבון זה. נסה שוב מאוחר יותר.") };
   }
 
   const user = await prisma.user.findUnique({ where: { email } });
@@ -463,7 +466,7 @@ export async function login(
     // minutes remaining) was itself an enumeration oracle: only a real account
     // can ever be locked, so the distinctive lockout message answered "does
     // this address have an account?" with certainty.
-    return { error: "אימייל או סיסמה שגויים" };
+    return { error: t("אימייל או סיסמה שגויים") };
   }
   if (isBanned(user)) {
     return { error: banNotice(await getT(), user) };
@@ -527,6 +530,7 @@ export async function changePassword(
   _prev: AccountActionState,
   formData: FormData
 ): Promise<AccountActionState> {
+  const t = await getT();
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
@@ -534,14 +538,14 @@ export async function changePassword(
   // be used to brute-force the current password from inside the account.
   const ip = await clientIp();
   if (!(await rateLimit(`chpw:${userId}:${ip}`, 10, 15 * 60 * 1000))) {
-    return { error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
+    return { error: t("יותר מדי נסיונות. נסה שוב מאוחר יותר.") };
   }
 
   const parsed = changePasswordSchema.safeParse({
     currentPassword: formData.get("currentPassword"),
     newPassword: formData.get("newPassword"),
   });
-  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (!parsed.success) return { error: t(parsed.error.issues[0].message) };
   const { currentPassword, newPassword } = parsed.data;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -556,14 +560,14 @@ export async function changePassword(
   // session mint a password and take the account over permanently.
   if (!user.passwordHash) {
     return {
-      error: "החשבון הזה מחובר דרך Google בלבד ואין לו סיסמה לשינוי.",
+      error: t("החשבון הזה מחובר דרך Google בלבד ואין לו סיסמה לשינוי."),
     };
   }
   if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
-    return { error: "הסיסמה הנוכחית שגויה" };
+    return { error: t("הסיסמה הנוכחית שגויה") };
   }
   if (await bcrypt.compare(newPassword, user.passwordHash)) {
-    return { error: "הסיסמה החדשה זהה לנוכחית" };
+    return { error: t("הסיסמה החדשה זהה לנוכחית") };
   }
 
   const updated = await prisma.user.update({
@@ -582,7 +586,7 @@ export async function changePassword(
 
   // Re-issue with the new version so this device survives its own revocation.
   await createSession(userId, updated.tokenVersion);
-  return { success: "הסיסמה שונתה. כל המכשירים האחרים נותקו." };
+  return { success: t("הסיסמה שונתה. כל המכשירים האחרים נותקו.") };
 }
 
 /**
@@ -615,23 +619,24 @@ export async function signOutEverywhere(): Promise<void> {
  * returns an `AuthState` only on failure.
  */
 export async function googleSignIn(credential: string): Promise<AuthState> {
+  const t = await getT();
   const ip = await clientIp();
   if (!(await rateLimit(`google:${ip}`, 20, 15 * 60 * 1000))) {
-    return { error: "יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר." };
+    return { error: t("יותר מדי נסיונות התחברות. נסה שוב מאוחר יותר.") };
   }
 
   if (typeof credential !== "string" || !credential) {
-    return { error: "התחברות Google נכשלה, נסה שוב" };
+    return { error: t("התחברות Google נכשלה, נסה שוב") };
   }
 
   const identity = await verifyGoogleIdToken(credential);
   if (!identity) {
-    return { error: "אימות מול Google נכשל, נסה שוב" };
+    return { error: t("אימות מול Google נכשל, נסה שוב") };
   }
   // Only trust identities Google has verified — an unverified email could belong
   // to someone else and would let an attacker link into their account below.
   if (!identity.emailVerified) {
-    return { error: "כתובת האימייל של חשבון Google אינה מאומתת" };
+    return { error: t("כתובת האימייל של חשבון Google אינה מאומתת") };
   }
 
   const name = identity.name.slice(0, 40);
@@ -661,11 +666,11 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
       if (byEmail.passwordHash) {
         return {
           error:
-            "כתובת האימייל הזו כבר רשומה עם סיסמה. התחבר עם האימייל והסיסמה שלך.",
+            t("כתובת האימייל הזו כבר רשומה עם סיסמה. התחבר עם האימייל והסיסמה שלך."),
         };
       }
       if (byEmail.googleId && byEmail.googleId !== identity.googleId) {
-        return { error: "כתובת האימייל הזו כבר משויכת לחשבון Google אחר." };
+        return { error: t("כתובת האימייל הזו כבר משויכת לחשבון Google אחר.") };
       }
       user = await prisma.user.update({
         where: { id: byEmail.id },
@@ -713,7 +718,7 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
           where: { googleId: identity.googleId },
         });
       }
-      if (!user) return { error: "אירעה שגיאה בהרשמה, נסה שוב" };
+      if (!user) return { error: t("אירעה שגיאה בהרשמה, נסה שוב") };
     }
   }
 
@@ -749,8 +754,9 @@ export async function googleSignIn(credential: string): Promise<AuthState> {
 export async function verifyEmailToken(
   rawToken: string
 ): Promise<{ ok: boolean; error?: string }> {
+  const t = await getT();
   if (typeof rawToken !== "string" || !rawToken) {
-    return { ok: false, error: "קישור אימות לא תקין" };
+    return { ok: false, error: t("קישור אימות לא תקין") };
   }
 
   // Unauthenticated and directly callable, like every other export of a
@@ -759,18 +765,18 @@ export async function verifyEmailToken(
   // unauthenticated DB lookups an anonymous caller can drive.
   const ip = await clientIp();
   if (!(await rateLimit(`verify-token:${ip}`, 30, 60 * 60 * 1000))) {
-    return { ok: false, error: "יותר מדי נסיונות. נסה שוב מאוחר יותר." };
+    return { ok: false, error: t("יותר מדי נסיונות. נסה שוב מאוחר יותר.") };
   }
 
   const record = await prisma.emailVerificationToken.findUnique({
     where: { tokenHash: hashToken(rawToken) },
     select: { id: true, userId: true, expiresAt: true, consumedAt: true },
   });
-  if (!record) return { ok: false, error: "קישור האימות אינו תקין" };
+  if (!record) return { ok: false, error: t("קישור האימות אינו תקין") };
 
   const now = new Date();
   if (record.expiresAt < now) {
-    return { ok: false, error: "פג תוקף הקישור — שלח לעצמך קישור חדש" };
+    return { ok: false, error: t("פג תוקף הקישור — שלח לעצמך קישור חדש") };
   }
 
   const claimed = await prisma.emailVerificationToken.updateMany({
@@ -786,7 +792,7 @@ export async function verifyEmailToken(
     });
     return user?.emailVerified
       ? { ok: true }
-      : { ok: false, error: "הקישור כבר נוצל — שלח לעצמך קישור חדש" };
+      : { ok: false, error: t("הקישור כבר נוצל — שלח לעצמך קישור חדש") };
   }
 
   await prisma.user.update({
@@ -801,16 +807,17 @@ export async function resendVerificationEmail(
   _prev: AccountActionState,
   _formData: FormData
 ): Promise<AccountActionState> {
+  const t = await getT();
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
   // Mail costs money and inboxes are abusable; cap resends hard.
   const ip = await clientIp();
   if (!(await rateLimit(`verify-resend:${userId}`, 5, 60 * 60 * 1000))) {
-    return { error: "נשלחו יותר מדי קישורים. נסה שוב בעוד שעה." };
+    return { error: t("נשלחו יותר מדי קישורים. נסה שוב בעוד שעה.") };
   }
   if (!(await rateLimit(`verify-resend-ip:${ip}`, 20, 60 * 60 * 1000))) {
-    return { error: "נשלחו יותר מדי קישורים. נסה שוב מאוחר יותר." };
+    return { error: t("נשלחו יותר מדי קישורים. נסה שוב מאוחר יותר.") };
   }
 
   const user = await prisma.user.findUnique({
@@ -818,12 +825,12 @@ export async function resendVerificationEmail(
     select: { id: true, email: true, name: true, emailVerified: true },
   });
   if (!user) redirect("/login");
-  if (user.emailVerified) return { success: "האימייל שלך כבר מאומת" };
+  if (user.emailVerified) return { success: t("האימייל שלך כבר מאומת") };
 
   const sent = await sendVerificationEmail(user);
   return sent
-    ? { success: "שלחנו קישור אימות חדש. בדוק את תיבת הדואר." }
-    : { error: "שליחת המייל נכשלה. נסה שוב בעוד רגע." };
+    ? { success: t("שלחנו קישור אימות חדש. בדוק את תיבת הדואר.") }
+    : { error: t("שליחת המייל נכשלה. נסה שוב בעוד רגע.") };
 }
 
 const onboardingSchema = z.object({
@@ -840,6 +847,7 @@ export async function createEmpireForCurrentUser(
   _prev: AuthState,
   formData: FormData
 ): Promise<AuthState> {
+  const t = await getT();
   const userId = await getSessionUserId();
   if (!userId) redirect("/login");
 
@@ -871,7 +879,7 @@ export async function createEmpireForCurrentUser(
     heroClass: formData.get("heroClass"),
   });
   if (!parsed.success) {
-    return { error: parsed.error.issues[0].message };
+    return { error: t(parsed.error.issues[0].message) };
   }
 
   const err = await createEmpireForUser(

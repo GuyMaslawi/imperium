@@ -16,6 +16,7 @@ import { RESOURCE_META, STORAGE_META, STORAGE_TYPES } from "@/lib/game/constants
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
+import { useT } from "@/i18n/client";
 
 /**
  * The מפקדה dock: every one-click action the pass unlocks, gathered from the
@@ -29,12 +30,19 @@ import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR, type IconName } from "@/compo
  * skip, which is why their resources are sitting out when the raid lands.
  */
 
-/** One button: a label, an icon, the action, and whatever the action reads. */
+/**
+ * One button: a label, an icon, the action, and whatever the action reads.
+ *
+ * `label`/`labelParams` and `pendingText` stay in Hebrew here and go through
+ * `t()` where the button is drawn — the table is module-level data, and a
+ * rendered string in it could only ever be one language.
+ */
 interface QuickAction {
   key: string;
   icon: IconName;
   iconClass?: string;
   label: string;
+  labelParams?: Record<string, string>;
   pendingText: string;
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   /** Hidden fields posted with it — the per-resource actions need one. */
@@ -93,7 +101,8 @@ const SECTIONS: QuickSection[] = [
           key: `storeAll-${type}`,
           icon,
           iconClass,
-          label: `הפקד הכל · ${label}`,
+          label: "הפקד הכל · {resource}",
+          labelParams: { resource: label },
           pendingText: "מפקיד...",
           action: depositAllToStorage,
           fields: { resourceType: type },
@@ -102,7 +111,8 @@ const SECTIONS: QuickSection[] = [
           key: `releaseAll-${type}`,
           icon,
           iconClass,
-          label: `משוך הכל · ${label}`,
+          label: "משוך הכל · {resource}",
+          labelParams: { resource: label },
           pendingText: "מושך...",
           action: withdrawAllFromStorage,
           fields: { resourceType: type },
@@ -118,7 +128,8 @@ const SECTIONS: QuickSection[] = [
         key: `assignAll-${resource}`,
         icon: RESOURCE_ICON[resource],
         iconClass: RESOURCE_ICON_COLOR[resource],
-        label: `הצב הכל · ${RESOURCE_META[resource].label}`,
+        label: "הצב הכל · {resource}",
+        labelParams: { resource: RESOURCE_META[resource].label },
         pendingText: "מציב...",
         action: assignAllMineSlavesToResource,
         fields: { resource },
@@ -141,6 +152,7 @@ function QuickActionButton({
   meta: QuickAction;
   onResult: (state: ActionState) => void;
 }) {
+  const t = useT();
   const [state, formAction] = useActionState<ActionState, FormData>(meta.action, {});
 
   // The action state is a fresh object per submit, so an identical repeat still
@@ -159,15 +171,17 @@ function QuickActionButton({
           line these labels up along the dialog's right edge. */}
       <SubmitButton
         variant="secondary"
-        className="btn-ghost flex w-full items-center gap-1.5 px-3 py-2 text-right text-[13px] font-bold"
-        pendingText={meta.pendingText}
+        className="btn-ghost flex w-full items-center gap-1.5 px-3 py-2 text-start text-[13px] font-bold"
+        pendingText={t(meta.pendingText)}
       >
         <Icon
           name={meta.icon}
           size={15}
           className={`shrink-0 ${meta.iconClass ?? "text-crimson-bright"}`}
         />
-        {meta.label}
+        {t(meta.label, meta.labelParams && Object.fromEntries(
+          Object.entries(meta.labelParams).map(([k, v]) => [k, t(v)])
+        ))}
       </SubmitButton>
     </form>
   );
@@ -175,6 +189,7 @@ function QuickActionButton({
 
 /** The whole dock: three sections of buttons over one shared message line. */
 export function VipQuickActions() {
+  const t = useT();
   const [result, setResult] = useState<ActionState>({});
   const onResult = useCallback((state: ActionState) => setResult(state), []);
 
@@ -184,7 +199,7 @@ export function VipQuickActions() {
         <section key={section.title}>
           <h3 className="mb-2 flex items-center gap-1.5 text-xs font-bold tracking-wide text-gold-dim">
             <Icon name={section.icon} size={14} className="text-crimson-bright" />
-            {section.title}
+            {t(section.title)}
           </h3>
           <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
             {section.actions.map((action) => (

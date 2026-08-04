@@ -22,7 +22,7 @@ import {
   typingLabel,
 } from "@/lib/game/chat";
 import { ChatEmojiPicker } from "@/components/game/ChatEmojiPicker";
-import { useT } from "@/i18n/client";
+import { useDir, useT } from "@/i18n/client";
 import {
   getChatDirectory,
   getChatPulse,
@@ -138,6 +138,7 @@ export function ChatDock({
   discordUrl?: string | null;
 }) {
   const t = useT();
+  const dir = useDir();
   const mounted = useSyncExternalStore(
     subscribeStore,
     hydratedSnapshot,
@@ -475,11 +476,11 @@ export function ChatDock({
     <button
       type="button"
       onClick={() => openDock()}
-      aria-label="פתיחת הצ׳אט"
+      aria-label={t("פתיחת הצ׳אט")}
       className="chat-launcher group flex items-center gap-2 rounded-full border border-gold/50 bg-[#12100b]/95 px-3.5 py-2.5 text-gold-bright shadow-[0_10px_30px_rgba(0,0,0,0.75)] backdrop-blur-sm transition-colors hover:border-gold hover:bg-[#1b1710]"
     >
       <Icon name="chat" size={20} />
-      <span className="text-sm font-black tracking-wide">צ׳אט</span>
+      <span className="text-sm font-black tracking-wide">{t("צ׳אט")}</span>
       {unread > 0 ? (
         <span className="min-w-5 rounded-full bg-red-600 px-1.5 py-px text-center text-[10px] font-black text-white">
           {badge}
@@ -528,7 +529,11 @@ export function ChatDock({
             }
           }}
           rows={1}
-          placeholder={partner ? `הודעה אל ${partner.name}…` : "דבר אל האימפריה…"}
+          placeholder={
+            partner
+              ? t("הודעה אל {name}…", { name: partner.name })
+              : t("דבר אל האימפריה…")
+          }
           className="chat-scroll max-h-24 min-h-9 flex-1 resize-none rounded-lg border border-border-subtle bg-panel-inset px-2.5 py-2 text-sm text-bone-bright outline-none placeholder:text-bone-dim/70 focus:border-gold/60"
         />
         <button
@@ -537,7 +542,7 @@ export function ChatDock({
           disabled={sending || draft.trim().length === 0}
           className="btn btn-gold h-9 shrink-0 px-3 text-xs"
         >
-          {sending ? "…" : "שלח"}
+          {sending ? "…" : t("שלח")}
         </button>
       </div>
       {draftLength > CHAT_BODY_MAX - 60 && (
@@ -559,8 +564,8 @@ export function ChatDock({
       {lines.length === 0 && (
         <p className="mt-8 text-center text-xs text-bone-dim">
           {partner
-            ? "אין עדיין הודעות בשיחה הזו — כתוב ראשון."
-            : "החדר שקט. תהיה הראשון שמדבר."}
+            ? t("אין עדיין הודעות בשיחה הזו — כתוב ראשון.")
+            : t("החדר שקט. תהיה הראשון שמדבר.")}
         </p>
       )}
       {lines.map((line) => (
@@ -610,7 +615,7 @@ export function ChatDock({
                 <button
                   type="button"
                   onClick={() => openThread(line.empireId!, line.name)}
-                  title="פתיחת שיחה פרטית"
+                  title={t("פתיחת שיחה פרטית")}
                   className={`text-[11px] font-black text-gold-bright hover:underline ${
                     line.staff ? "staff-name" : ""
                   }`}
@@ -628,13 +633,13 @@ export function ChatDock({
               )}
               {line.staff && (
                 <span className="rounded bg-gold/20 px-1 text-[9px] font-black text-gold-bright">
-                  צוות
+                  {t("צוות")}
                 </span>
               )}
               {!line.mine && line.empireId && (
                 <Link
                   href={`/game/empires/${line.empireId}`}
-                  title="פרופיל"
+                  title={t("פרופיל")}
                   className="text-bone-dim transition-colors hover:text-gold-bright"
                 >
                   <Icon name="crown" size={11} />
@@ -647,7 +652,7 @@ export function ChatDock({
                 <button
                   type="button"
                   onClick={() => void hide(line.id)}
-                  title="הסתרת ההודעה"
+                  title={t("הסתרת ההודעה")}
                   className="text-[10px] text-bone-dim transition-colors hover:text-red-400"
                 >
                   ✕
@@ -678,17 +683,17 @@ export function ChatDock({
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="חיפוש שחקן לשיחה חדשה…"
+          placeholder={t("חיפוש שחקן לשיחה חדשה…")}
           className="w-full rounded-lg border border-border-subtle bg-panel-inset px-2.5 py-2 text-sm text-bone-bright outline-none placeholder:text-bone-dim/70 focus:border-gold/60"
         />
         {longEnough && (
           <div className="mt-1 overflow-hidden rounded-lg border border-border-subtle">
             {searching && (
-              <p className="px-2.5 py-2 text-xs text-bone-dim">מחפש…</p>
+              <p className="px-2.5 py-2 text-xs text-bone-dim">{t("מחפש…")}</p>
             )}
             {!searching && results.list.length === 0 && (
               <p className="px-2.5 py-2 text-xs text-bone-dim">
-                לא נמצא שחקן בשם הזה
+                {t("לא נמצא שחקן בשם הזה")}
               </p>
             )}
             {!searching &&
@@ -699,7 +704,7 @@ export function ChatDock({
                   onClick={() =>
                     openThread(player.id, player.name, player.online)
                   }
-                  className="flex w-full items-center gap-2 border-b border-border-subtle/60 px-2.5 py-2 text-right text-sm text-bone transition-colors last:border-0 hover:bg-white/5 hover:text-gold-bright"
+                  className="flex w-full items-center gap-2 border-b border-border-subtle/60 px-2.5 py-2 text-start text-sm text-bone transition-colors last:border-0 hover:bg-white/5 hover:text-gold-bright"
                 >
                   <PresenceDot online={player.online} />
                   {player.name}
@@ -712,7 +717,7 @@ export function ChatDock({
       {threads.length > 0 && (
         <>
           <p className="mb-1 px-1 text-[10px] font-black uppercase tracking-widest text-gold-dim">
-            שיחות
+            {t("שיחות")}
           </p>
           <ul className="mb-3 space-y-1">
             {threads.map((thread) => (
@@ -722,7 +727,7 @@ export function ChatDock({
                   onClick={() =>
                     openThread(thread.empireId, thread.name, thread.online)
                   }
-                  className="flex w-full items-center gap-2 rounded-lg border border-border-subtle bg-panel-inset px-2.5 py-2 text-right transition-colors hover:border-gold/50 hover:bg-white/5"
+                  className="flex w-full items-center gap-2 rounded-lg border border-border-subtle bg-panel-inset px-2.5 py-2 text-start transition-colors hover:border-gold/50 hover:bg-white/5"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
@@ -756,16 +761,16 @@ export function ChatDock({
           actually talk to". Players already in the list above are left out so
           each name appears once. */}
       <p className="mb-1 flex items-center gap-1.5 px-1 text-[10px] font-black uppercase tracking-widest text-gold-dim">
-        שחקנים
+        {t("שחקנים")}
         <span className="normal-case tracking-normal text-bone-dim">
-          ({onlineCount} מחוברים)
+          {t("({count} מחוברים)", { count: onlineCount })}
         </span>
       </p>
       {others.length === 0 ? (
         <p className="mt-4 text-center text-xs text-bone-dim">
           {roster.length === 0
-            ? "אין עדיין שחקנים אחרים במשחק."
-            : "כל השחקנים כבר ברשימת השיחות שלך."}
+            ? t("אין עדיין שחקנים אחרים במשחק.")
+            : t("כל השחקנים כבר ברשימת השיחות שלך.")}
         </p>
       ) : (
         <ul className="space-y-1">
@@ -776,7 +781,7 @@ export function ChatDock({
                 onClick={() =>
                   openThread(player.id, player.name, player.online)
                 }
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-right transition-colors hover:bg-white/5"
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-start transition-colors hover:bg-white/5"
               >
                 <PresenceDot online={player.online} />
                 <span
@@ -801,7 +806,7 @@ export function ChatDock({
 
   const panel = (
     <div
-      dir="rtl"
+      dir={dir}
       // dvh: at 72vh the panel is measured against the toolbar-collapsed height,
       // so on a phone the composer at its foot sat behind the URL bar and the
       // player could read the room but not write to it.
@@ -816,7 +821,7 @@ export function ChatDock({
                 setPartner(null);
                 setError(null);
               }}
-              aria-label="חזרה לרשימת השיחות"
+              aria-label={t("חזרה לרשימת השיחות")}
               className="flex h-6 w-6 items-center justify-center rounded text-bone-dim transition-colors hover:bg-white/10 hover:text-gold-bright"
             >
               ›
@@ -829,7 +834,7 @@ export function ChatDock({
               {partner.name}
             </Link>
             <span className="shrink-0 text-[10px] text-bone-dim">
-              {partnerOnline ? "מחובר" : "לא מחובר"}
+              {partnerOnline ? t("מחובר") : t("לא מחובר")}
             </span>
           </>
         ) : (
@@ -845,7 +850,7 @@ export function ChatDock({
                     : "text-bone-dim hover:text-bone"
                 }`}
               >
-                חדר כללי
+                {t("חדר כללי")}
               </button>
               <button
                 type="button"
@@ -856,7 +861,7 @@ export function ChatDock({
                     : "text-bone-dim hover:text-bone"
                 }`}
               >
-                שיחות פרטיות
+                {t("שיחות פרטיות")}
                 {unread > 0 && (
                   <span className="min-w-4 rounded-full bg-red-600 px-1 text-center text-[9px] font-black text-white">
                     {badge}
@@ -869,7 +874,7 @@ export function ChatDock({
         <button
           type="button"
           onClick={closeDock}
-          aria-label="סגירת הצ׳אט"
+          aria-label={t("סגירת הצ׳אט")}
           className="ms-auto flex h-6 w-6 shrink-0 items-center justify-center rounded text-bone-dim transition-colors hover:bg-white/10 hover:text-gold-bright"
         >
           ✕
@@ -883,7 +888,7 @@ export function ChatDock({
         <DiscordLink
           url={discordUrl}
           variant="strip"
-          label="הקהילה נפגשת בדיסקורד — הצטרפו"
+          label={t("הקהילה נפגשת בדיסקורד — הצטרפו")}
         />
       )}
 

@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { clientIp, rateLimit } from "@/lib/rateLimit";
 import { logError } from "@/server/errorLog";
 import { growCallbackSecretMatches } from "@/server/grow";
-import { settleGrowOrder } from "@/server/growSettle";
+import { settleOrder } from "@/server/orderSettle";
 
 /**
  * Grow's server-to-server payment callback.
@@ -143,7 +143,7 @@ export async function POST(
   }
 
   try {
-    const result = await settleGrowOrder({ purchaseId, orderId });
+    const result = await settleOrder({ purchaseId, orderId });
 
     // `unverified` means Grow's own lookup did not (yet) confirm the payment.
     // Answering 500 keeps the retry schedule alive, which is exactly the

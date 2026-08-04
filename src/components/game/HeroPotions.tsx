@@ -85,15 +85,16 @@ export function HeroPotions({ counts, activeUntil, serverNow }: PotionBeltProps)
     };
   }, [expired, router]);
 
+  const t = useT();
   const held = POTION_KINDS.reduce((sum, kind) => sum + counts[kind], 0);
 
   return (
     <div className="mt-6 border-t border-border-subtle pt-4">
       <div className="mx-auto w-full max-w-[25rem]">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Tip tip="שיקויים נלכדים בניצחון בתקיפה. כל שיקוי מפעיל אפקט זמני על כל האימפריה — לחיצה פותחת את פרטיו ומאפשרת לשתות.">
+          <Tip tip={t("שיקויים נלכדים בניצחון בתקיפה. כל שיקוי מפעיל אפקט זמני על כל האימפריה — לחיצה פותחת את פרטיו ומאפשרת לשתות.")}>
             <h2 className="cursor-help text-base font-bold tracking-wide text-gold-bright">
-              שיקויים
+              {t("שיקויים")}
             </h2>
           </Tip>
           <span className="nums text-xs text-zinc-400" dir="ltr">
@@ -115,8 +116,7 @@ export function HeroPotions({ counts, activeUntil, serverNow }: PotionBeltProps)
         </div>
 
         <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-          שיקויים נופלים מתקיפות מוצלחות. שתיית שיקוי שכבר פועל מאריכה אותו —
-          לעולם לא בזבוז.
+          {t("שיקויים נופלים מתקיפות מוצלחות. שתיית שיקוי שכבר פועל מאריכה אותו — לעולם לא בזבוז.")}
         </p>
       </div>
 
@@ -154,14 +154,18 @@ function PotionCube({
 
   return (
     <Tip
-      tip={`${meta.label} — ${meta.tagline} (${potionDurationLabel(t, kind)})${
-        owned ? "" : " · אין לך אחד כזה"
-      }`}
+      tip={
+        t("{potion} — {tagline} ({duration})", {
+          potion: t(meta.label),
+          tagline: t(meta.tagline),
+          duration: potionDurationLabel(t, kind),
+        }) + (owned ? "" : t(" · אין לך אחד כזה"))
+      }
     >
       <button
         type="button"
         onClick={onOpen}
-        aria-label={meta.label}
+        aria-label={t(meta.label)}
         className="panel-inset relative flex aspect-square w-full items-center justify-center rounded-xl p-1 transition hover:brightness-125"
         style={
           active
@@ -240,12 +244,14 @@ function PotionDialog({
         </div>
         <div className="flex-1 pt-1">
           <h2 id={titleId} className={`text-lg font-black ${meta.tone}`}>
-            {meta.label}
+            {t(meta.label)}
           </h2>
-          <p className="mt-1 text-xs text-zinc-400">{meta.tagline}</p>
+          <p className="mt-1 text-xs text-zinc-400">{t(meta.tagline)}</p>
           <p className="mt-1 text-xs text-zinc-500">
-            משך: <span className="text-zinc-300">{potionDurationLabel(t, kind)}</span>
-            {" · "}בתרמיל:{" "}
+            {t("משך:")}{" "}
+            <span className="text-zinc-300">{potionDurationLabel(t, kind)}</span>
+            {" · "}
+            {t("בתרמיל:")}{" "}
             <span className="nums text-zinc-200" dir="ltr">
               {count}
             </span>
@@ -253,7 +259,7 @@ function PotionDialog({
         </div>
         <button
           onClick={onClose}
-          aria-label="סגור"
+          aria-label={t("סגור")}
           className="btn btn-ghost -mt-1 h-8 w-8 !p-0 text-base"
         >
           ✕
@@ -262,11 +268,11 @@ function PotionDialog({
 
       <div className="rule-gold my-4" />
 
-      <p className="text-sm leading-relaxed text-zinc-300">{meta.description}</p>
+      <p className="text-sm leading-relaxed text-zinc-300">{t(meta.description)}</p>
 
       {active && (
         <div className="panel-inset mt-4 flex items-center justify-between rounded-lg p-3 text-xs">
-          <span className="text-zinc-400">פועל כרגע — נותר</span>
+          <span className="text-zinc-400">{t("פועל כרגע — נותר")}</span>
           <span className="nums font-black" style={{ color: meta.liquid.glow }} dir="ltr">
             {formatCountdown(activeUntil - now)}
           </span>
@@ -285,15 +291,21 @@ function PotionDialog({
 
       <div className="mt-4 grid grid-cols-2 gap-2">
         <button onClick={onClose} disabled={pending} className="btn btn-ghost py-2 text-sm">
-          סגור
+          {t("סגור")}
         </button>
         <button
           onClick={doDrink}
           disabled={pending || count === 0}
-          title={count === 0 ? "אין לך שיקוי כזה — נלכד בתקיפות מוצלחות" : undefined}
+          title={count === 0 ? t("אין לך שיקוי כזה — נלכד בתקיפות מוצלחות") : undefined}
           className="btn btn-gold py-2 text-sm"
         >
-          {pending ? "שותה…" : count === 0 ? "אין במלאי" : active ? "שתה והארך" : "שתה"}
+          {pending
+            ? t("שותה…")
+            : count === 0
+              ? t("אין במלאי")
+              : active
+                ? t("שתה והארך")
+                : t("שתה")}
         </button>
       </div>
     </Dialog>

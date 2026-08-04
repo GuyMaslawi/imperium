@@ -35,16 +35,25 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { SHIELD_ICON, SHIELD_TONE } from "@/components/game/ShieldBadges";
 import { formatNumber } from "@/lib/game/format";
-import { useT } from "@/i18n/client";
+import { useLocale, useT } from "@/i18n/client";
+import { LOCALE_TAG, type Locale } from "@/i18n/locale";
+import type { T } from "@/i18n/translate";
 
 /**
  * Date + time of an ISO timestamp, e.g. "20.07 · 14:30" — the day is shown so a
  * next-day expiry isn't mistaken for today. Deterministic — no Date.now in render.
  */
-function whenLabel(iso: string): string {
+function whenLabel(iso: string, locale: Locale): string {
   const d = new Date(iso);
-  const date = d.toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" });
-  const time = d.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+  const tag = LOCALE_TAG[locale];
+  const date = d.toLocaleDateString(tag, { day: "2-digit", month: "2-digit" });
+  // 24-hour on both sides: these chips are narrow, and an "AM"/"PM" suffix
+  // wraps them onto a second line.
+  const time = d.toLocaleTimeString(tag, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
   return `${date} · ${time}`;
 }
 
@@ -131,6 +140,8 @@ function ResourceBoostCard({
   activeUntil: string | null;
   diamonds: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(buyResourceBoost, {});
   const meta = RESOURCE_META[resource];
   const atCap = pct >= BOOST_MAX_PCT;
@@ -144,7 +155,7 @@ function ResourceBoostCard({
           className={RESOURCE_ICON_COLOR[resource]}
         />
       }
-      title={`תוספת ${meta.label}`}
+      title={t("תוספת {resource}", { resource: t(meta.label) })}
       badge={
         <span
           className={`nums shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-black ${
@@ -159,10 +170,13 @@ function ResourceBoostCard({
       }
       desc={
         <>
-          כל רכישה +{BOOST_STEP_PCT}% לתפוקה · עד +{BOOST_MAX_PCT}% · 24ש׳
+          {t("כל רכישה +{step}% לתפוקה · עד +{max}% · 24ש׳", {
+            step: BOOST_STEP_PCT,
+            max: BOOST_MAX_PCT,
+          })}
           {activeUntil && (
             <span className="mt-1 block text-emerald-400/90">
-              ✨ פעיל עד {whenLabel(activeUntil)}
+              {t("✨ פעיל עד {when}", { when: whenLabel(activeUntil, locale) })}
             </span>
           )}
         </>
@@ -172,14 +186,15 @@ function ResourceBoostCard({
         <input type="hidden" name="resource" value={resource} />
         {atCap ? (
           <span className="flex items-center justify-center gap-1 rounded-lg border border-gold/30 bg-gold/5 px-3 py-2 text-center text-xs font-semibold text-gold">
-            <Icon name="rankings" size={14} /> בתקרה (+{BOOST_MAX_PCT}%)
+            <Icon name="rankings" size={14} />{" "}
+            {t("בתקרה (+{max}%)", { max: BOOST_MAX_PCT })}
           </span>
         ) : (
           <SubmitButton
             className="btn btn-gold w-full px-3 py-2 text-sm"
             formAction={action}
             disabled={diamonds < BOOST_STEP_COST}
-            pendingText="רוכש..."
+            pendingText={t("רוכש...")}
           >
             +{BOOST_STEP_PCT}% · <Price cost={BOOST_STEP_COST} />
           </SubmitButton>
@@ -201,24 +216,31 @@ function DiscountCard({
   activeUntil: string | null;
   diamonds: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(buyShopDiscount, {});
   return (
     <ShopCard
       icon={<span className="text-lg">🏷️</span>}
-      title={`הנחת חנות ${SHOP_DISCOUNT_PCT}%`}
-      desc={`${SHOP_DISCOUNT_PCT}% הנחה על רכישת נשק וכל השדרוגים (מכרות, מחסנים, שדרוגי אימפריה) למשך 24 שעות.`}
+      title={t("הנחת חנות {pct}%", { pct: SHOP_DISCOUNT_PCT })}
+      desc={t(
+        "{pct}% הנחה על רכישת נשק וכל השדרוגים (מכרות, מחסנים, שדרוגי אימפריה) למשך 24 שעות.",
+        { pct: SHOP_DISCOUNT_PCT }
+      )}
     >
       <form>
         {activeUntil ? (
-          <ActiveBadge label={`✨ פעיל עד ${whenLabel(activeUntil)}`} />
+          <ActiveBadge
+            label={t("✨ פעיל עד {when}", { when: whenLabel(activeUntil, locale) })}
+          />
         ) : (
           <SubmitButton
             className="btn btn-gold w-full px-3 py-2 text-sm"
             formAction={action}
             disabled={diamonds < SHOP_DISCOUNT_COST}
-            pendingText="רוכש..."
+            pendingText={t("רוכש...")}
           >
-            הפעל הנחה · <Price cost={SHOP_DISCOUNT_COST} />
+            {t("הפעל הנחה")} · <Price cost={SHOP_DISCOUNT_COST} />
           </SubmitButton>
         )}
       </form>
@@ -229,9 +251,17 @@ function DiscountCard({
 
 /* ------------------------------ turn packages ------------------------------ */
 
-/** "12 שעות" / "45 דקות" from a whole number of hours. */
-function cooldownLabel(hours: number): string {
-  return hours >= 1 ? `${hours} שעות` : `${Math.round(hours * 60)} דקות`;
+/**
+ * "12 שעות" / "45 דקות" from a whole number of hours.
+ *
+ * Takes the translator rather than returning a rendered string, for the reason
+ * every duration label in the game does: the branch between the two units is
+ * part of the sentence, not a value a dictionary can carry.
+ */
+function cooldownLabel(t: T, hours: number): string {
+  return hours >= 1
+    ? t("{hours} שעות", { hours })
+    : t("{minutes} דקות", { minutes: Math.round(hours * 60) });
 }
 
 /** One turn package as a card, sized to match the rest of the shop grid. */
@@ -250,6 +280,8 @@ function TurnPackageCard({
   readyAt: string | null;
   diamonds: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(buyTurns, {});
 
   return (
@@ -258,9 +290,9 @@ function TurnPackageCard({
       <p className="nums mt-2 text-2xl font-black leading-none text-amber-300" dir="ltr">
         {formatNumber(turns)}
       </p>
-      <p className="mt-1 text-[11px] text-zinc-500">תורות</p>
+      <p className="mt-1 text-[11px] text-zinc-500">{t("תורות")}</p>
       <p className="mt-2 text-[11px] text-zinc-500">
-        זמין אחת ל־{cooldownLabel(cooldownHours)}
+        {t("זמין אחת ל־{cooldown}", { cooldown: cooldownLabel(t, cooldownHours) })}
       </p>
 
       <div className="mt-auto grid w-full gap-1.5 pt-3">
@@ -268,16 +300,16 @@ function TurnPackageCard({
           <input type="hidden" name="packageIndex" value={index} />
           {readyAt ? (
             <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-2 py-2 text-center text-[11px] font-semibold text-zinc-400">
-              זמין ב־{whenLabel(readyAt)}
+              {t("זמין ב־{when}", { when: whenLabel(readyAt, locale) })}
             </span>
           ) : (
             <SubmitButton
               className="btn btn-gold w-full px-3 py-2 text-sm"
               formAction={action}
               disabled={diamonds < cost}
-              pendingText="רוכש..."
+              pendingText={t("רוכש...")}
             >
-              קנה · <Price cost={cost} />
+              {t("קנה")} · <Price cost={cost} />
             </SubmitButton>
           )}
         </form>
@@ -307,6 +339,8 @@ function ShieldCard({
   readyAt: string | null;
   diamonds: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(buyRaidShield, {});
   const meta = SHIELDS.find((s) => s.key === shieldKey)!;
 
@@ -318,31 +352,35 @@ function ShieldCard({
           <Icon name={SHIELD_ICON[shieldKey]} size={15} />
         </span>
       }
-      title={meta.label}
+      title={t(meta.label)}
       badge={
         activeUntil ? (
           <span className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-black text-emerald-300">
-            פעיל
+            {t("פעיל")}
           </span>
         ) : null
       }
       desc={
         <>
-          {meta.desc} התקיפה עצמה עדיין מתרחשת. לא ניתן לחדש בזמן שהמגן פעיל —
-          רק {SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שהוא נגמר.
+          {t(meta.desc)}{" "}
+          {t("התקיפה עצמה עדיין מתרחשת. לא ניתן לחדש בזמן שהמגן פעיל — רק {minutes} דקות אחרי שהוא נגמר.", {
+            minutes: SHIELD_RENEW_COOLDOWN_MINUTES,
+          })}
           {activeUntil && (
             <span className="mt-1 block text-emerald-400/90">
-              🛡️ מגן עד {whenLabel(activeUntil)}
+              {t("🛡️ מגן עד {when}", { when: whenLabel(activeUntil, locale) })}
             </span>
           )}
         </>
       }
     >
       {activeUntil ? (
-        <ActiveBadge label={`🛡️ פעיל עד ${whenLabel(activeUntil)}`} />
+        <ActiveBadge
+          label={t("🛡️ פעיל עד {when}", { when: whenLabel(activeUntil, locale) })}
+        />
       ) : readyAt ? (
         <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-[11px] font-semibold text-zinc-400">
-          חלון חשוף · ניתן לחדש ב־{whenLabel(readyAt)}
+          {t("חלון חשוף · ניתן לחדש ב־{when}", { when: whenLabel(readyAt, locale) })}
         </span>
       ) : (
         // A form per duration rather than one form with two submitters: the
@@ -356,9 +394,9 @@ function ShieldCard({
               <SubmitButton
                 className="btn btn-gold w-full px-2 py-2 text-xs"
                 disabled={diamonds < d.cost}
-                pendingText="רוכש..."
+                pendingText={t("רוכש...")}
               >
-                {d.hours}ש׳ · <Price cost={d.cost} />
+                {t("{hours}ש׳", { hours: d.hours })} · <Price cost={d.cost} />
               </SubmitButton>
             </form>
           ))}
@@ -380,6 +418,7 @@ function HeroResetCard({
   used: boolean;
   diamonds: number;
 }) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     resetHeroPointsWithDiamonds,
     {}
@@ -387,7 +426,7 @@ function HeroResetCard({
   return (
     <ShopCard
       icon={<span className="text-lg">🔄</span>}
-      title="איפוס נקודות גיבור"
+      title={t("איפוס נקודות גיבור")}
       badge={
         <span
           className="nums shrink-0 rounded-full border border-border-subtle bg-panel px-2.5 py-0.5 text-xs font-black text-gold-bright"
@@ -396,21 +435,21 @@ function HeroResetCard({
           {allocatedPoints}
         </span>
       }
-      desc="משחרר את כל הנקודות שהקצית (התקפה/הגנה/משאבים) חזרה לנקודות פנויות, בלי לגעת ברמה. פעם אחת בעונה."
+      desc={t("משחרר את כל הנקודות שהקצית (התקפה/הגנה/משאבים) חזרה לנקודות פנויות, בלי לגעת ברמה. פעם אחת בעונה.")}
     >
       <form>
         {used ? (
           <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            כבר נוצל העונה
+            {t("כבר נוצל העונה")}
           </span>
         ) : (
           <SubmitButton
             className="btn btn-gold w-full px-3 py-2 text-sm"
             formAction={action}
             disabled={diamonds < HERO_POINTS_RESET_COST || allocatedPoints === 0}
-            pendingText="מאפס..."
+            pendingText={t("מאפס...")}
           >
-            אפס · <Price cost={HERO_POINTS_RESET_COST} />
+            {t("אפס")} · <Price cost={HERO_POINTS_RESET_COST} />
           </SubmitButton>
         )}
       </form>
@@ -430,6 +469,8 @@ function BankInterestCard({
   readyAt: string | null;
   diamonds: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(
     castBankInterestSpell,
     {}
@@ -437,7 +478,7 @@ function BankInterestCard({
   return (
     <ShopCard
       icon={<Icon name="bank" size={18} className="text-gold" />}
-      title="קסם ריבית בנק"
+      title={t("קסם ריבית בנק")}
       badge={
         <span
           className="nums inline-flex shrink-0 items-center gap-1 rounded-full border border-border-subtle bg-panel px-2.5 py-0.5 text-xs font-black text-emerald-400"
@@ -447,21 +488,21 @@ function BankInterestCard({
           {formatNumber(preview)}
         </span>
       }
-      desc="צובר מיידית תשלום ריבית אחד לבנק, לפי הרמה שלך. ניתן להטיל אחת ל־24 שעות."
+      desc={t("צובר מיידית תשלום ריבית אחד לבנק, לפי הרמה שלך. ניתן להטיל אחת ל־24 שעות.")}
     >
       <form>
         {readyAt ? (
           <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            בקירור · זמין ב־{whenLabel(readyAt)}
+            {t("בקירור · זמין ב־{when}", { when: whenLabel(readyAt, locale) })}
           </span>
         ) : (
           <SubmitButton
             className="btn btn-gold w-full px-3 py-2 text-sm"
             formAction={action}
             disabled={diamonds < BANK_INTEREST_SPELL_COST || preview <= 0}
-            pendingText="מטיל..."
+            pendingText={t("מטיל...")}
           >
-            הטל · <Price cost={BANK_INTEREST_SPELL_COST} />
+            {t("הטל")} · <Price cost={BANK_INTEREST_SPELL_COST} />
           </SubmitButton>
         )}
       </form>
@@ -489,6 +530,7 @@ function CityDowngradeCard({
   diamonds: number;
 }) {
   const t = useT();
+  const locale = useLocale();
   const [state, action] = useActionState<ActionState, FormData>(
     castCityDowngradeSpell,
     {}
@@ -499,7 +541,7 @@ function CityDowngradeCard({
   return (
     <ShopCard
       icon={<Icon name="base" size={18} className="text-crimson" />}
-      title="קסם ירידת עיר"
+      title={t("קסם ירידת עיר")}
       badge={
         <span
           className="nums shrink-0 rounded-full border border-border-subtle bg-panel px-2.5 py-0.5 text-xs font-black text-gold-bright"
@@ -508,34 +550,36 @@ function CityDowngradeCard({
           {eligible ? `${cities} → ${target}` : cities}
         </span>
       }
-      desc={
-        <>
-          {/* The name already carries its own "(tier)" — printing the bare
-              number again here would nest one parenthesis inside another. */}
-          מוריד אותך עיר אחת בלבד — מעיר {cityName(t, cities)} ל
-          {cityName(t, eligible ? target : cities)}. אין החזר משאבים, והדרך חזרה היא
-          ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{CITY_DOWNGRADE_COOLDOWN_HOURS}{" "}
-          שעה.
-        </>
-      }
+      /* The name already carries its own "(tier)" — printing the bare number
+         again here would nest one parenthesis inside another. */
+      desc={t(
+        "מוריד אותך עיר אחת בלבד — מעיר {from} ל{to}. אין החזר משאבים, והדרך חזרה היא ייסוד העיר מחדש במחיר המלא. ניתן להטיל אחת ל־{hours} שעה.",
+        {
+          from: cityName(t, cities),
+          to: cityName(t, eligible ? target : cities),
+          hours: CITY_DOWNGRADE_COOLDOWN_HOURS,
+        }
+      )}
     >
       <form>
         {!eligible ? (
           <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-[11px] font-semibold text-zinc-400">
-            זמין מעיר {CITY_DOWNGRADE_MIN_CITIES} ומעלה — אין לך עיר לוותר עליה
+            {t("זמין מעיר {min} ומעלה — אין לך עיר לוותר עליה", {
+              min: CITY_DOWNGRADE_MIN_CITIES,
+            })}
           </span>
         ) : readyAt ? (
           <span className="block rounded-lg border border-zinc-600/40 bg-zinc-700/10 px-3 py-2 text-center text-xs font-semibold text-zinc-400">
-            בקירור · זמין ב־{whenLabel(readyAt)}
+            {t("בקירור · זמין ב־{when}", { when: whenLabel(readyAt, locale) })}
           </span>
         ) : (
           <SubmitButton
             className="btn btn-gold w-full px-3 py-2 text-sm"
             formAction={action}
             disabled={diamonds < CITY_DOWNGRADE_COST}
-            pendingText="מטיל..."
+            pendingText={t("מטיל...")}
           >
-            רד לעיר {target} · <Price cost={CITY_DOWNGRADE_COST} />
+            {t("רד לעיר {target}", { target })} · <Price cost={CITY_DOWNGRADE_COST} />
           </SubmitButton>
         )}
       </form>
@@ -579,13 +623,14 @@ export function DiamondShop({
   cityDowngradeReadyAt,
   shields,
 }: DiamondShopProps) {
+  const t = useT();
   return (
     <div className="space-y-7">
       <section>
         <SectionTitle
           icon={<Icon name="mine" size={20} className="text-crimson" />}
-          title="בונוס תפוקת משאבים"
-          hint={`עד +${BOOST_MAX_PCT}% לכל משאב · 24ש׳`}
+          title={t("בונוס תפוקת משאבים")}
+          hint={t("עד +{max}% לכל משאב · 24ש׳", { max: BOOST_MAX_PCT })}
         />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {boosts.map((b) => (
@@ -597,8 +642,10 @@ export function DiamondShop({
       <section>
         <SectionTitle
           icon={<Icon name="shield" size={20} className="text-crimson" />}
-          title="מגני תקיפה"
-          hint={`24 או 48 שעות · חידוש רק ${SHIELD_RENEW_COOLDOWN_MINUTES} דקות אחרי שנגמר`}
+          title={t("מגני תקיפה")}
+          hint={t("24 או 48 שעות · חידוש רק {minutes} דקות אחרי שנגמר", {
+            minutes: SHIELD_RENEW_COOLDOWN_MINUTES,
+          })}
         />
         <div className="grid gap-3 sm:grid-cols-2">
           {SHIELDS.map((s) => (
@@ -616,8 +663,8 @@ export function DiamondShop({
       <section>
         <SectionTitle
           icon={<Icon name="turns" size={20} className="text-crimson" />}
-          title="חבילות תורות"
-          hint="לכל חבילה קירור משלה"
+          title={t("חבילות תורות")}
+          hint={t("לכל חבילה קירור משלה")}
         />
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {TURN_PACKAGES.map((pkg, i) => (
@@ -637,7 +684,7 @@ export function DiamondShop({
       <section>
         <SectionTitle
           icon={<Icon name="spark" size={20} className="text-crimson" />}
-          title="קסמים ושירותים"
+          title={t("קסמים ושירותים")}
         />
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <DiscountCard activeUntil={discountActiveUntil} diamonds={diamonds} />
