@@ -6,8 +6,12 @@ import { DiscordLink } from "@/components/ui/DiscordLink";
 import { DiscordJoin } from "@/components/game/DiscordJoin";
 import { discordInviteUrl } from "@/server/discord";
 import { COMMUNITY_HIGHLIGHTS, COMMUNITY_RULES } from "@/lib/community";
+import { getT } from "@/i18n/server";
 
-export const metadata = { title: "קהילה | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("קהילה | KRALDOR") };
+}
 
 /**
  * Bubbles drifting up behind the banner. Fixed table, never Math.random(): the
@@ -34,13 +38,14 @@ const BUBBLES = [
  * invite is validated rather than trusted (see parseDiscordInvite).
  */
 export default async function CommunityPage() {
+  const t = await getT();
   const empire = await requireEmpire();
   const discord = discordInviteUrl();
 
   return (
     <div className="space-y-6">
       <SectionHeading
-        title="קהילה"
+        title={t("קהילה")}
         ornament={<Icon name="discord" size={20} className="text-crimson" />}
       />
 
@@ -61,12 +66,12 @@ export default async function CommunityPage() {
         <div className="disc-body text-center">
           <Icon name="discord" size={46} className="disc-mark mx-auto text-[#8b95ff]" />
           <h2 className="mt-3 text-xl font-black tracking-wide text-gold-bright sm:text-2xl">
-            הערוץ של קראלדור
+              {t("הערוץ של קראלדור")}
           </h2>
           <p className="mx-auto mt-2 max-w-xl text-sm leading-relaxed text-bone/85">
-            הדירוג הוא רק חצי מהמשחק. החצי השני הוא מי שיושב מהצד השני של המסך —
-            בריתות שמתגבשות, טקטיקות שמתחלפות, וכל הכרזה על Happy Hour או סיזן חדש
-            שנוחתת שם קודם.
+              {t("הדירוג הוא רק חצי מהמשחק. החצי השני הוא מי שיושב מהצד השני של המסך — בריתות שמתגבשות, טקטיקות שמתחלפות, וכל הכרזה על Happy Hour או סיזן חדש שנוחתת שם קודם.")}
+
+
           </p>
 
           <div className="mt-5 flex flex-col items-center gap-2">
@@ -76,10 +81,10 @@ export default async function CommunityPage() {
               <>
                 <span className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-black/40 px-5 py-2 text-sm font-bold text-gold-dim">
                   <Icon name="lock" size={16} />
-                  הערוץ נבנה בימים אלה
+              {t("הערוץ נבנה בימים אלה")}
                 </span>
                 <p className="text-xs text-zinc-500">
-                  ברגע שהוא ייפתח, הקישור יופיע כאן ובכל מסכי המשחק.
+              {t("ברגע שהוא ייפתח, הקישור יופיע כאן ובכל מסכי המשחק.")}
                 </p>
               </>
             )}
@@ -115,7 +120,7 @@ export default async function CommunityPage() {
       <div className="panel-inset mx-auto max-w-4xl rounded-xl p-5">
         <h2 className="mb-3 flex items-center gap-2 text-base font-bold tracking-wide text-gold-bright">
           <Icon name="shield" size={20} className="text-crimson-bright" />
-          כללי הבית
+            {t("כללי הבית")}
         </h2>
         <ul className="space-y-2">
           {COMMUNITY_RULES.map((rule) => (
@@ -128,8 +133,8 @@ export default async function CommunityPage() {
       </div>
 
       <p className="mx-auto max-w-4xl text-center text-xs text-zinc-500">
-        מעדיפים להישאר בתוך המשחק? הצ׳אט החי בפינה השמאלית התחתונה פתוח תמיד — חדר
-        כללי ושיחות פרטיות.
+          {t("מעדיפים להישאר בתוך המשחק? הצ׳אט החי בפינה השמאלית התחתונה פתוח תמיד — חדר כללי ושיחות פרטיות.")}
+
       </p>
     </div>
   );

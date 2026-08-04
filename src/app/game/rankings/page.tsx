@@ -17,9 +17,12 @@ import { PresenceDot } from "@/components/ui/PresenceDot";
 import { PlayerLink } from "@/components/ui/PlayerLink";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "דירוג | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("דירוג | קראלדור") };
+}
 
 /** Page links to draw around the current one, either side. */
 const PAGER_SPREAD = 2;
@@ -33,7 +36,7 @@ const PAGER_SPREAD = 2;
  * shows ten rows at a time, an empire ranked 140th is fourteen clicks from
  * home, and the page it lives on changes as other players rise and fall.
  */
-function Pager({
+async function Pager({
   page,
   pageCount,
   myPage,
@@ -42,6 +45,7 @@ function Pager({
   pageCount: number;
   myPage: number;
 }) {
+  const t = await getT();
   if (pageCount <= 1) return null;
 
   const href = (n: number) => `/game/rankings?page=${n}`;
@@ -53,11 +57,11 @@ function Pager({
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border-subtle px-4 py-3">
       <span className="text-[11px] text-zinc-500">
-        עמוד{" "}
+        {t("עמוד")}{" "}
         <span className="nums font-bold text-gold-bright" dir="ltr">
           {page}
         </span>{" "}
-        מתוך{" "}
+        {t("מתוך")}{" "}
         <span className="nums font-bold text-zinc-300" dir="ltr">
           {pageCount}
         </span>
@@ -66,7 +70,7 @@ function Pager({
       <div className="flex flex-wrap items-center gap-1.5">
         {page > 1 && (
           <Link href={href(page - 1)} className="btn btn-ghost px-2.5 py-1 text-xs">
-            ← הקודם
+            {t("← הקודם")}
           </Link>
         )}
         {first > 1 && <span className="px-1 text-xs text-zinc-600">…</span>}
@@ -88,12 +92,12 @@ function Pager({
         {last < pageCount && <span className="px-1 text-xs text-zinc-600">…</span>}
         {page < pageCount && (
           <Link href={href(page + 1)} className="btn btn-ghost px-2.5 py-1 text-xs">
-            הבא →
+            {t("הבא →")}
           </Link>
         )}
         {page !== myPage && (
           <Link href={href(myPage)} className="btn btn-ghost px-2.5 py-1 text-xs text-gold">
-            <Icon name="crown" size={13} className="inline-block align-middle" /> הדף שלי
+            <Icon name="crown" size={13} className="inline-block align-middle" /> {t("הדף שלי")}
           </Link>
         )}
       </div>
@@ -169,7 +173,7 @@ export default async function RankingsPage({
     <div className="space-y-6">
       {/* Other players train, attack and rise in rank — keep the table live. */}
       <AutoRefresh intervalMs={30_000} />
-      <SectionHeading title="דירוג" ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
+        <SectionHeading title={t("דירוג")} ornament={<Icon name="rankings" size={22} className="text-crimson" />} />
 
       {/* -------- city boss -------- */}
       <CityBossBanner state={bossState} cities={myCity} />
@@ -187,11 +191,11 @@ export default async function RankingsPage({
             {/* Was "דירוג לפי ואלקריה" — a name left over from an early
                 prototype that referred to nothing in the game. The ladder is
                 one city's, so it is named after that city. */}
-            דירוג {myCityName}
-            <Tip tip={`${cityFullName(t, myCity)} — הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.`}>
+              {t("דירוג {city}", { city: myCityName })}
+              <Tip tip={t("{city} — הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.", { city: cityFullName(t, myCity) })}>
               <span className="cursor-help rounded-full border border-border-subtle bg-panel-inset px-2 py-0.5 text-[11px] font-normal text-zinc-300">
                 <Icon name="base" size={12} className="inline-block align-middle text-crimson-bright" />{" "}
-                עיר{" "}
+                {t("עיר")}{" "}
                 <span className="nums font-bold text-gold-bright" dir="ltr">
                   {myCity}
                 </span>{" "}
@@ -199,7 +203,7 @@ export default async function RankingsPage({
                 <span className="nums font-bold text-emerald-400" dir="ltr">
                   {total}
                 </span>{" "}
-                אימפריות
+                {t("אימפריות")}
               </span>
             </Tip>
           </h2>
@@ -209,14 +213,14 @@ export default async function RankingsPage({
               or in its own tooltip), so the key only repeated itself. */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <span className="text-xs text-zinc-400">
-              הדירוג שלך:{" "}
+              {t("הדירוג שלך:")}{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
                 {myRank}
               </span>
             </span>
             {/* Interaction is city-scoped; the cross-game boards live on their own page. */}
             <Link href="/game/leaderboards" className="btn btn-ghost px-3 py-1.5 text-xs">
-              <Icon name="rankings" size={14} className="inline-block align-middle" /> טבלאות מובילים
+            <Icon name="rankings" size={14} className="inline-block align-middle" /> {t("טבלאות מובילים")}
             </Link>
           </div>
         </div>
@@ -231,10 +235,10 @@ export default async function RankingsPage({
             <thead>
               <tr className="border-y border-border-subtle text-right text-xs text-gold-dim">
                 <th className="px-2 py-2.5 font-semibold sm:px-4">#</th>
-                <th className="px-2 py-2.5 font-semibold sm:px-4">שם הצבא</th>
-                <th className="hidden px-4 py-2.5 font-semibold sm:table-cell">ברית</th>
-                <th className="px-2 py-2.5 font-semibold sm:px-4">זהב</th>
-                <th className="px-2 py-2.5 font-semibold sm:px-4">חיילים</th>
+                <th className="px-2 py-2.5 font-semibold sm:px-4">{t("שם הצבא")}</th>
+                <th className="hidden px-4 py-2.5 font-semibold sm:table-cell">{t("ברית")}</th>
+                <th className="px-2 py-2.5 font-semibold sm:px-4">{t("זהב")}</th>
+                <th className="px-2 py-2.5 font-semibold sm:px-4">{t("חיילים")}</th>
               </tr>
             </thead>
             <tbody>
@@ -311,7 +315,7 @@ export default async function RankingsPage({
                               this game and it is the hero's, so the word only
                               cost width. */}
                           <span className="nums text-xs text-gold-dim">
-                            רמה{" "}
+                            {t("רמה")}{" "}
                             <span className="font-bold text-gold-bright">
                               {empire.hero?.level ?? 1}
                             </span>
@@ -323,11 +327,16 @@ export default async function RankingsPage({
                               every row, and the tooltip teaches it once. */}
                           {(empire.hero?.resets ?? 0) > 0 && (
                             <Tip
-                              tip={`תג איפוס: הגיבור הגיע לרמה 100 ואופס ${
-                                empire.hero!.resets === 1
-                                  ? "פעם אחת"
-                                  : `${empire.hero!.resets} פעמים`
-                              }. כל איפוס מוסיף +25% ליוקרה שלו.`}
+                              tip={t("תג איפוס: הגיבור הגיע לרמה 100 ואופס {times}. כל איפוס מוסיף +25% ליוקרה שלו.", {
+                                times:
+                                  empire.hero!.resets === 1
+                                    ? t("פעם אחת")
+                                    : t("{count} פעמים", { count: empire.hero!.resets }),
+                              })}
+
+
+
+
                             >
                               <span
                                 className="nums mr-1 cursor-help rounded border border-purple-400/50 bg-purple-950/60 px-1 text-[10px] font-black text-purple-300 align-middle"
@@ -339,7 +348,7 @@ export default async function RankingsPage({
                           )}
                           {isMe && (
                             <span className="mr-1.5 whitespace-nowrap rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
-                              הצבא שלך
+                              {t("הצבא שלך")}
                             </span>
                           )}
                           {/* One readable line under the name. It used to be a
@@ -357,7 +366,7 @@ export default async function RankingsPage({
                                 whole page is about, right where the reader is
                                 looking, instead of only in the header pill. */}
                             <span className="text-zinc-400">
-                              עיר{" "}
+                              {t("עיר")}{" "}
                               <span className="font-bold text-bone">
                                 {myCityName}
                               </span>
@@ -387,7 +396,7 @@ export default async function RankingsPage({
                       {guildMember && guildRole ? (
                         <span
                           className="inline-flex items-center gap-1 text-xs font-semibold text-gold"
-                          title={`${guildRole.label} בברית ${guildMember.guild.name}`}
+                          title={t("{role} בברית {guild}", { role: t(guildRole.label), guild: guildMember.guild.name })}
                         >
                           <span aria-hidden>{guildRole.icon}</span>
                           {guildMember.guild.name}
@@ -435,25 +444,27 @@ export default async function RankingsPage({
       <div>
         <h2 className="mb-1 flex items-center justify-center gap-2 text-base font-bold tracking-wide text-gold-bright">
           <Icon name="crown" size={20} className="text-crimson-bright" />
-          היכל התהילה
+            {t("היכל התהילה")}
         </h2>
         <p className="mb-3 text-center text-[11px] text-zinc-500">
           {hall ? (
             <>
-              כך הסתיימה <span className="font-bold text-gold-dim">{hall.seasonName}</span>{" "}
-              ב־{formatDate(hall.endsAt, locale)}. העונה הנוכחית אינה משפיעה על הלוחות
-              האלה — הם נחרתו ברגע שהעונה ננעלה.
+              {t("כך הסתיימה")}{" "}
+              <span className="font-bold text-gold-dim">{hall.seasonName}</span>{" "}
+              {t("ב־{date}. העונה הנוכחית אינה משפיעה על הלוחות האלה — הם נחרתו ברגע שהעונה ננעלה.", { date: formatDate(hall.endsAt, locale) })}
+
+
             </>
           ) : (
-            "מתעדכן פעם אחת, בסיום כל עונה."
+            t("מתעדכן פעם אחת, בסיום כל עונה.")
           )}
         </p>
 
         {!hall ? (
           <div className="panel rounded-xl p-6 text-center">
             <p className="text-sm text-zinc-500">
-              עוד לא הסתיימה אף עונה. הלוחות הראשונים ייחרתו כאן בסיום העונה
-              הנוכחית.
+              {t("עוד לא הסתיימה אף עונה. הלוחות הראשונים ייחרתו כאן בסיום העונה הנוכחית.")}
+
             </p>
           </div>
         ) : (
@@ -471,10 +482,10 @@ export default async function RankingsPage({
                       size={16}
                       className="shrink-0 text-crimson-bright"
                     />
-                    {board.title}
+                    {t(board.title)}
                   </h3>
                   <span className="shrink-0 text-[10px] text-zinc-500">
-                    {board.unit}
+                    {t(board.unit)}
                   </span>
                 </div>
                 <ol className="space-y-2 text-sm">

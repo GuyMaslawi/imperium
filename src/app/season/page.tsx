@@ -9,9 +9,12 @@ import { SeasonCountdown } from "@/components/game/SeasonCountdown";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon, type IconName } from "@/components/ui/Icon";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "העונה הסתיימה | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("העונה הסתיימה | קראלדור") };
+}
 export const dynamic = "force-dynamic";
 
 /**
@@ -42,14 +45,15 @@ const EMBERS = [
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-function Totals({ totals }: { totals: SeasonRecap["totals"] }) {
+async function Totals({ totals }: { totals: SeasonRecap["totals"] }) {
+  const t = await getT();
   const cells: { label: string; value: string; icon: IconName }[] = [
-    { label: "אימפריות", value: formatNumber(totals.empires), icon: "base" },
-    { label: "בריתות", value: formatNumber(totals.guilds), icon: "guild" },
-    { label: "קרבות", value: formatNumber(totals.battles), icon: "attack" },
-    { label: "זהב שנשדד", value: formatCompact(totals.goldPlundered), icon: "gold" },
-    { label: "חיילים שנפלו", value: formatCompact(totals.soldiersLost), icon: "army" },
-    { label: "נלקחו בשבי", value: formatCompact(totals.soldiersEnslaved), icon: "citizens" },
+    { label: t("אימפריות"), value: formatNumber(totals.empires), icon: "base" },
+    { label: t("בריתות"), value: formatNumber(totals.guilds), icon: "guild" },
+    { label: t("קרבות"), value: formatNumber(totals.battles), icon: "attack" },
+    { label: t("זהב שנשדד"), value: formatCompact(totals.goldPlundered), icon: "gold" },
+    { label: t("חיילים שנפלו"), value: formatCompact(totals.soldiersLost), icon: "army" },
+    { label: t("נלקחו בשבי"), value: formatCompact(totals.soldiersEnslaved), icon: "citizens" },
   ];
 
   return (
@@ -72,7 +76,7 @@ function Totals({ totals }: { totals: SeasonRecap["totals"] }) {
 }
 
 export default async function SeasonEndPage() {
-  const { locale } = await getI18n();
+  const { t, locale } = await getI18n();
   const gate = await getSeasonGate();
 
   // A live season has no story to tell yet — send everyone back where they
@@ -131,7 +135,7 @@ export default async function SeasonEndPage() {
           <span aria-hidden className="ssn-glow" />
           <div className="ssn-body space-y-4 py-8 text-center">
             <p className="ssn-kicker text-xs font-bold tracking-[0.3em] text-crimson-bright">
-              העונה הסתיימה
+          {t("העונה הסתיימה")}
             </p>
             <h1 className="ssn-title text-3xl font-black text-gold-bright sm:text-4xl">
               {gate.seasonName}
@@ -142,8 +146,8 @@ export default async function SeasonEndPage() {
               </p>
             )}
             <p className="mx-auto max-w-xl text-sm text-zinc-400">
-              השערים נעולים. הדירוג הסופי נחתם ונכנס להיכל התהילה, ולא ניתן עוד
-              לשנות דבר בעולם הזה.
+          {t("השערים נעולים. הדירוג הסופי נחתם ונכנס להיכל התהילה, ולא ניתן עוד לשנות דבר בעולם הזה.")}
+
             </p>
           </div>
         </div>
@@ -154,8 +158,8 @@ export default async function SeasonEndPage() {
             <>
               <p className="mb-3 text-xs font-bold tracking-wide text-gold-dim">
                 {gate.nextSeasonName
-                  ? `${gate.nextSeasonName} נפתחת בעוד`
-                  : "העונה הבאה נפתחת בעוד"}
+                ? t("{season} נפתחת בעוד", { season: gate.nextSeasonName })
+                : t("העונה הבאה נפתחת בעוד")}
               </p>
               <SeasonCountdown
                 serverNow={now}
@@ -170,14 +174,14 @@ export default async function SeasonEndPage() {
                   first page load after the countdown hits zero. */}
               {restarts && (
                 <p className="mt-3 text-xs text-zinc-400">
-                  כשהשערים ייפתחו העולם יתאפס — כל אימפריה מתחילה מאפס והבריתות
-                  מתפרקות. רק היהלומים נשארים איתכם. 💎
+              {t("כשהשערים ייפתחו העולם יתאפס — כל אימפריה מתחילה מאפס והבריתות מתפרקות. רק היהלומים נשארים איתכם. 💎")}
+
                 </p>
               )}
             </>
           ) : (
             <p className="text-sm text-zinc-400">
-              מועד העונה הבאה טרם נקבע. חזרו לכאן בקרוב.
+            {t("מועד העונה הבאה טרם נקבע. חזרו לכאן בקרוב.")}
             </p>
           )}
         </div>
@@ -185,7 +189,7 @@ export default async function SeasonEndPage() {
         {/* -------- the podium -------- */}
         {champions.length > 0 && (
           <div className="mt-8">
-            <SectionHeading title="אלופי העונה" ornament="👑" />
+          <SectionHeading title={t("אלופי העונה")} ornament="👑" />
             {/* Second place left, first in the middle, third right — the podium
                 order, not the reading order, so the tallest step is central.
                 `order` is a visual reshuffle only; the DOM stays 1-2-3 for a
@@ -219,7 +223,7 @@ export default async function SeasonEndPage() {
                   >
                     {formatCompact(c.power)}
                   </p>
-                  <p className="text-[11px] text-zinc-500">כוח צבאי</p>
+                    <p className="text-[11px] text-zinc-500">{t("כוח צבאי")}</p>
                   {/* Only when it was actually credited: a champion whose empire
                       was already gone keeps his place and his record, but the
                       card must not claim he collected anything. */}
@@ -232,7 +236,7 @@ export default async function SeasonEndPage() {
                     </p>
                   )}
                   <p className="mt-2 text-[11px] text-zinc-400">
-                    {c.cities} ערים · גיבור {c.heroLevel}
+                    {t("{cities} ערים · גיבור {level}", { cities: c.cities, level: c.heroLevel })}
                     {c.guildName ? ` · ${c.guildName}` : ""}
                   </p>
                 </div>
@@ -244,7 +248,7 @@ export default async function SeasonEndPage() {
         {/* -------- what happened this season -------- */}
         {recap && (
           <div className="mt-8 space-y-5">
-            <SectionHeading title="העונה במספרים" ornament="⚔" />
+          <SectionHeading title={t("העונה במספרים")} ornament="⚔" />
             <Totals totals={recap.totals} />
 
             {recap.boards.length > 0 && (
@@ -294,7 +298,7 @@ export default async function SeasonEndPage() {
 
         {!recap && champions.length === 0 && (
           <p className="mt-8 text-center text-sm text-zinc-500">
-            העונה נסגרה לפני שנרשמו בה תוצאות.
+            {t("העונה נסגרה לפני שנרשמו בה תוצאות.")}
           </p>
         )}
       </OrnateFrame>

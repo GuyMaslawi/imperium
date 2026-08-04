@@ -2074,6 +2074,8 @@ export const EN: Record<string, string> = {
   "כוח התקפה": "Attack power",
   "כוח הגנה": "Defence power",
   "כוח מודיעין": "Intelligence power",
+  "הברית החזקה": "The strongest guild",
+  "כוח חברי הברית": "Guild members' power",
   "כוח כללי": "Overall power",
   "מהרכב הכוח": "What makes it up",
   "{label} (+{pct}%)": "{label} (+{pct}%)",
@@ -2334,7 +2336,7 @@ export const EN: Record<string, string> = {
   "נקודות — הפרס מחולק שווה בשווה לכל חברי הברית":
     "points — the prize is split evenly between every member of the guild",
   "הקרב מתנהל": "The battle runs",
-  "אוטומטית": "on its own",
+  "אוטומטית": "automatically",
   "בין": "between",
   "ל־": "and",
   "(שעון ישראל) — אין מה ללחוץ, המערכת מנהלת את כל ההתנגשויות לבד.":
@@ -3233,6 +3235,165 @@ export const EN: Record<string, string> = {
     "Hero experience from this battle, split the same way as the haul: by the damage landed, with the full bonus on the kill.",
   "ניסיון שהתקבל": "Experience earned",
   "שלל הבוס:": "Boss drop:",
+
+  /* ------------------------------------------------------------------ */
+  /* the hero screen, the inbox, the global boards and the error screens */
+  /* ------------------------------------------------------------------ */
+  "גיבור | KRALDOR": "Hero | KRALDOR",
+  "תג איפוס: הגיבור הגיע לרמה {max} ואופס {times}. כל איפוס העניק {citizens} אזרחים, {turns} תורות ו-{points} נקודות פתיחה נוספות לצמיתות.":
+    "Reset badge: the hero reached level {max} and was reset {times}. Each reset paid {citizens} citizens, {turns} turns and {points} more permanent starting points.",
+  "פעם אחת": "once",
+  "{count} פעמים": "{count} times",
+  "הגיבור מת — כל הבונוסים שלו מושבתים עד שיקום לתחייה":
+    "The hero is dead — every bonus he carries is off until he is raised",
+  "חיי הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה {damage} נקודות. באפס הגיבור מת.":
+    "The hero's health — every attack that breaks your defence takes {damage} points off it. At zero he dies.",
+  "חיי הגיבור. כל תקיפה שפורצת את ההגנה שלך מורידה {damage} נקודות; באפס הגיבור מת וכל הבונוסים שלו מושבתים.":
+    "The hero's health. Every attack that breaks your defence takes {damage} points off it; at zero he dies and every bonus he carries is off.",
+  "על המחלקה": "About the class",
+  "יתרון המחלקה — בונוס קבוע שנבחר בעת ההרשמה":
+    "The class advantage — a standing bonus, chosen at sign-up",
+  "ניסיון מצטבר מקרבות — ניצחון בתקיפה מעניק הכי הרבה, וגם הגנה מוצלחת מזכה. כל עליית רמה מעניקה נקודת גיבור.":
+    "Experience earned in battle — a won attack pays the most, and a successful defence counts too. Every level pays a hero point.",
+  "שלוש התכונות שנקודות הגיבור מחזקות. חפצי הגיבור אינם משנים אחוזים אלה — התרומה שלהם מרוכזת ב״סך הכל מהגיבור״ שלמטה.":
+    "The three stats hero points strengthen. Hero gear does not touch these percentages — its contribution is totalled in \"Everything the hero pays\" below.",
+  "נקודות גיבור": "Hero points",
+  "נקודות גיבור שטרם הוקצו — מתקבלת נקודה בכל עליית רמה. כל נקודה = ‎+1% לצמיתות.":
+    "Hero points you have not spent — one arrives with every level. Each is a permanent ‎+1%.",
+  "פנויות": "unspent",
+  "חנות פריטים וחיזוקים לגיבור — בקרוב": "A shop for hero gear and boosts — coming soon",
+  "חנות גיבור": "Hero shop",
+
+  "הודעות | קראלדור": "Messages | Kraldor",
+  "מגדל היונים": "The Pigeon Tower",
+  "הודעות חדשות מתוך": "new messages out of",
+  "אין דואר חדש — ": "No new mail — ",
+  "בתיבה": "in the box",
+  "תיבת הדואר שלך — הודעות משחקנים והתראות מהמערכת.":
+    "Your inbox — messages from players and alerts from the game.",
+  "אין הודעות עדיין": "No messages yet",
+  "הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת יופיעו כאן.":
+    "Player messages, attack alerts, spies caught and system notices all land here.",
+  "שחקן שנמחק": "a deleted player",
+  "מאת": "From",
+  "לצפייה בדוח המלא": "Read the full report",
+
+  "טבלאות מובילים | KRALDOR": "Leaderboards | KRALDOR",
+  "טבלאות מובילים": "Leaderboards",
+  "אין נתונים עדיין.": "No data yet.",
+  "את/ה": "you",
+  "דירוג גלובלי על פני כל השחקנים במשחק — ליד כל שם מופיעה העיר שבה הוא יושב.":
+    "A global ranking across every player in the game — each name carries the city they sit in.",
+  "דירוג העיר שלי": "My city's ladder",
+  "הבנק הגדול ביותר": "The biggest bank",
+  "הריגול הגבוה ביותר": "The highest intelligence",
+  "הגניבות הגדולות ביותר": "The biggest heists",
+  "היום": "Today",
+  "השבוע": "This week",
+  "לא נגנב זהב היום עדיין.": "No gold has been stolen today yet.",
+  "לא נגנב זהב השבוע עדיין.": "No gold has been stolen this week yet.",
+
+  "לא נמצא": "Not found",
+  "המשאב שחיפשת לא קיים או שאין לך גישה אליו — ייתכן שהאימפריה, הקרב או הדוח נמחקו.":
+    "What you were looking for does not exist, or you have no access to it — the empire, battle or report may have been deleted.",
+  "לדירוג": "To the rankings",
+  "משהו השתבש": "Something went wrong",
+  "אירעה שגיאה בטעינת המסך. אפשר לנסות שוב או לחזור לבסיס.":
+    "The screen failed to load. Try again, or head back to your base.",
+  "🔄 נסה שוב": "🔄 Try again",
+
+  /* ------------------------------------------------------------------ */
+  /* the city ladder, the prize hall, the sealed season and the community */
+  /* ------------------------------------------------------------------ */
+  "דירוג | קראלדור": "Rankings | Kraldor",
+  "עמוד": "Page",
+  "מתוך": "of",
+  "← הקודם": "← Previous",
+  "הבא →": "Next →",
+  "הדף שלי": "My page",
+  "דירוג {city}": "{city} ladder",
+  "{city} — הדירוג מציג רק את האימפריות בעיר שלך. ניתן לרגל ולתקוף רק אימפריות בעיר שלך.":
+    "{city} — the ladder shows only the empires in your city. You can only spy on and attack empires in your own city.",
+  "עיר": "City",
+  "הדירוג שלך:": "Your rank:",
+  "שם הצבא": "Army name",
+  "תג איפוס: הגיבור הגיע לרמה 100 ואופס {times}. כל איפוס מוסיף +25% ליוקרה שלו.":
+    "Reset badge: the hero reached level 100 and was reset {times}. Each reset adds +25% to his prestige.",
+  "{role} בברית {guild}": "{role} of {guild}",
+  "היכל התהילה": "The Hall of Fame",
+  "כך הסתיימה": "This is how",
+  "ב־{date}. העונה הנוכחית אינה משפיעה על הלוחות האלה — הם נחרתו ברגע שהעונה ננעלה.":
+    "ended, on {date}. The current season does not touch these boards — they were carved the moment that season was sealed.",
+  "מתעדכן פעם אחת, בסיום כל עונה.": "Updated once, when each season closes.",
+  "עוד לא הסתיימה אף עונה. הלוחות הראשונים ייחרתו כאן בסיום העונה הנוכחית.":
+    "No season has ended yet. The first boards will be carved here when the current one closes.",
+
+  "פרסי העונה | KRALDOR": "Season prizes | KRALDOR",
+  "פרסי העונה": "Season prizes",
+  "הפרס הראשון": "First prize",
+  "יהלומים לאלוף העונה": "diamonds to the season's champion",
+  "גם המקום השני והשלישי זוכים — {second} ו־{third} יהלומים, {pool} בסך הכול. הדירוג נקבע לפי הכוח הצבאי בסיום העונה, וכל עוד העונה רצה כל תקיפה יכולה להזיז כיסא.":
+    "Second and third place are paid too — {second} and {third} diamonds, {pool} in all. The ranking is decided by military power at the season's close, and while the season runs any attack can move a seat.",
+  "{season} — הפרסים מוענקים בעוד": "{season} — prizes are awarded in",
+  "מועד סיום העונה טרם נקבע — הפרסים ממתינים לעונה מתוזמנת.":
+    "The season's closing time is not set yet — the prizes wait on a scheduled season.",
+  "מחזיק בכיסא": "Holding the seat",
+  "הכיסא עדיין פנוי": "The seat is still empty",
+  "חשבונות ההנהלה אינם משתתפים בדירוג ואינם זכאים לפרסים.":
+    "Staff accounts are out of the ranking and are not eligible for prizes.",
+  "— שמירה על המקום עד נעילת העונה שווה": "— holding it to the season's close is worth",
+  "המקום שלך בדירוג הכללי:": "Your place in the overall ranking:",
+  "— חסרים לך": "— you are short by",
+  "כוח צבאי כדי לעלות על הפודיום.": "military power to reach the podium.",
+  " — הפודיום עדיין לא מלא, כל מקום פנוי שם שווה יהלומים.":
+    " — the podium is not full yet, and every free seat on it is worth diamonds.",
+  "איך זוכים": "How you win",
+  "• הדירוג הוא גלובלי — כל השחקנים במשחק, לא רק העיר שלך.":
+    "• The ranking is global — every player in the game, not just your city.",
+  "• מדד הדירוג הוא הכוח הצבאי: הצבא, הנשק שבידיו והבונוסים של הגיבור.":
+    "• The measure is military power: the army, the weapons in its hands and the hero's bonuses.",
+  "• שוויון נשבר לפי רמת הגיבור, ואחריה מספר האיפוסים שלו.":
+    "• A tie is broken by hero level, and then by the number of resets.",
+  "• חשבונות ההנהלה אינם משתתפים ואינם תופסים מקום בפודיום.":
+    "• Staff accounts do not take part and never occupy a podium seat.",
+  "• הדירוג הקובע הוא זה שנחתם ברגע נעילת העונה, והיהלומים נכנסים לחשבון":
+    "• The ranking that counts is the one sealed at the season's close, and the diamonds land in the account",
+  "באותו רגע — עם הודעה לתיבת הדואר. אין צורך לאסוף דבר.":
+    "at that moment — with a message to your inbox. There is nothing to collect.",
+  "לטבלת הדירוג": "To the ladder",
+
+  "העונה הסתיימה | קראלדור": "The season has ended | Kraldor",
+  "העונה הסתיימה": "The season has ended",
+  "השערים נעולים. הדירוג הסופי נחתם ונכנס להיכל התהילה, ולא ניתן עוד לשנות דבר בעולם הזה.":
+    "The gates are sealed. The final ranking is signed and carved into the Hall of Fame, and nothing in this world can be changed any more.",
+  "{season} נפתחת בעוד": "{season} opens in",
+  "העונה הבאה נפתחת בעוד": "The next season opens in",
+  "כשהשערים ייפתחו העולם יתאפס — כל אימפריה מתחילה מאפס והבריתות מתפרקות. רק היהלומים נשארים איתכם. 💎":
+    "When the gates open the world resets — every empire starts from nothing and every guild is dissolved. Only your diamonds stay with you. 💎",
+  "מועד העונה הבאה טרם נקבע. חזרו לכאן בקרוב.":
+    "The next season's date is not set yet. Come back soon.",
+  "אלופי העונה": "The season's champions",
+  "{cities} ערים · גיבור {level}": "{cities} cities · hero {level}",
+  "העונה במספרים": "The season in numbers",
+  "העונה נסגרה לפני שנרשמו בה תוצאות.":
+    "The season closed before any results were recorded.",
+  "אימפריות": "Empires",
+  "בריתות": "Guilds",
+  "קרבות": "Battles",
+  "זהב שנשדד": "Gold plundered",
+  "חיילים שנפלו": "Soldiers lost",
+  "נלקחו בשבי": "Taken captive",
+
+  "קהילה | KRALDOR": "Community | KRALDOR",
+  "הערוץ של קראלדור": "The Kraldor channel",
+  "הדירוג הוא רק חצי מהמשחק. החצי השני הוא מי שיושב מהצד השני של המסך — בריתות שמתגבשות, טקטיקות שמתחלפות, וכל הכרזה על Happy Hour או סיזן חדש שנוחתת שם קודם.":
+    "The ladder is only half the game. The other half is whoever is on the far side of the screen — guilds forming, tactics shifting, and every Happy Hour or new-season announcement landing there first.",
+  "הערוץ נבנה בימים אלה": "The channel is being built",
+  "ברגע שהוא ייפתח, הקישור יופיע כאן ובכל מסכי המשחק.":
+    "The moment it opens, the link appears here and on every screen in the game.",
+  "כללי הבית": "House rules",
+  "מעדיפים להישאר בתוך המשחק? הצ׳אט החי בפינה השמאלית התחתונה פתוח תמיד — חדר כללי ושיחות פרטיות.":
+    "Prefer to stay in the game? The live chat in the bottom-left corner is always open — a public room and private conversations.",
 
   /* hero gear */
   "ברשותך מאז": "Yours since",

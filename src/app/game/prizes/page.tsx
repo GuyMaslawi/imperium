@@ -12,9 +12,12 @@ import { SeasonCountdown } from "@/components/game/SeasonCountdown";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Icon } from "@/components/ui/Icon";
 import { PlayerLink } from "@/components/ui/PlayerLink";
-import { getI18n } from "@/i18n/server";
+import { getI18n, getT } from "@/i18n/server";
 
-export const metadata = { title: "פרסי העונה | KRALDOR" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("פרסי העונה | KRALDOR") };
+}
 
 /**
  * The prize hall — what the season is worth.
@@ -100,7 +103,7 @@ export default async function PrizesPage() {
       {/* A seat can change hands with a single attack — keep the hall live. */}
       <AutoRefresh intervalMs={45_000} />
       <SectionHeading
-        title="פרסי העונה"
+        title={t("פרסי העונה")}
         ornament={<Icon name="gift" size={22} className="text-crimson" />}
       />
 
@@ -126,7 +129,7 @@ export default async function PrizesPage() {
         ))}
         <div className="prize-body space-y-3 px-4 py-9 text-center">
           <p className="prize-kicker text-xs font-bold tracking-[0.3em] text-crimson-bright">
-            הפרס הראשון
+            {t("הפרס הראשון")}
           </p>
           {/* The winner's purse, not the pool. The pool was the headline for
               about an hour and read as first place's prize — a bigger number in
@@ -138,13 +141,17 @@ export default async function PrizesPage() {
             </span>
           </h2>
           <p className="text-sm font-bold tracking-wide text-gold-bright">
-            יהלומים לאלוף העונה
+            {t("יהלומים לאלוף העונה")}
           </p>
           <p className="mx-auto max-w-xl text-xs text-zinc-400">
-            גם המקום השני והשלישי זוכים — {formatNumber(SEASON_PRIZES[1].diamonds)} ו־
-            {formatNumber(SEASON_PRIZES[2].diamonds)} יהלומים, {formatNumber(PRIZE_POOL)}{" "}
-            בסך הכול. הדירוג נקבע לפי הכוח הצבאי בסיום העונה, וכל עוד העונה רצה
-            כל תקיפה יכולה להזיז כיסא.
+            {t("גם המקום השני והשלישי זוכים — {second} ו־{third} יהלומים, {pool} בסך הכול. הדירוג נקבע לפי הכוח הצבאי בסיום העונה, וכל עוד העונה רצה כל תקיפה יכולה להזיז כיסא.", {
+              second: formatNumber(SEASON_PRIZES[1].diamonds),
+              third: formatNumber(SEASON_PRIZES[2].diamonds),
+              pool: formatNumber(PRIZE_POOL),
+            })}
+
+
+
           </p>
         </div>
       </div>
@@ -160,7 +167,7 @@ export default async function PrizesPage() {
           <>
             <p className="mb-3 text-xs font-bold tracking-wide text-gold-dim">
               <Icon name="turns" size={14} className="inline-block align-middle" />{" "}
-              {season.name} — הפרסים מוענקים בעוד
+              {t("{season} — הפרסים מוענקים בעוד", { season: season.name })}
             </p>
             <SeasonCountdown
               serverNow={now.getTime()}
@@ -171,7 +178,7 @@ export default async function PrizesPage() {
           </>
         ) : (
           <p className="text-sm text-zinc-400">
-            מועד סיום העונה טרם נקבע — הפרסים ממתינים לעונה מתוזמנת.
+            {t("מועד סיום העונה טרם נקבע — הפרסים ממתינים לעונה מתוזמנת.")}
           </p>
         )}
       </div>
@@ -248,13 +255,13 @@ export default async function PrizesPage() {
                     {champ ? (
                       <>
                         <p className="text-[10px] uppercase tracking-widest text-zinc-500">
-                          מחזיק בכיסא
+                          {t("מחזיק בכיסא")}
                         </p>
                         <p className="mt-1 truncate text-sm font-bold text-gold-bright">
                           <PlayerLink empireId={champ.empireId} name={champ.empireName} />
                           {isMe && (
                             <span className="mr-1.5 rounded-full bg-gold/15 px-1.5 align-middle text-[10px] font-bold text-gold">
-                              את/ה
+                              {t("את/ה")}
                             </span>
                           )}
                         </p>
@@ -266,12 +273,12 @@ export default async function PrizesPage() {
                           {formatCompact(champ.power)}
                         </p>
                         <p className="text-[11px] text-zinc-500">
-                          כוח צבאי · {cityFullName(t, champ.cities)}
+                          {t("כוח צבאי")} · {cityFullName(t, champ.cities)}
                           {champ.guildName ? ` · ${champ.guildName}` : ""}
                         </p>
                       </>
                     ) : (
-                      <p className="py-2 text-sm text-zinc-500">הכיסא עדיין פנוי</p>
+                      <p className="py-2 text-sm text-zinc-500">{t("הכיסא עדיין פנוי")}</p>
                     )}
                   </div>
                 </div>
@@ -303,13 +310,13 @@ export default async function PrizesPage() {
       <div className="panel-gold rounded-xl p-4">
         {me.isStaff ? (
           <p className="text-sm text-zinc-400">
-            חשבונות ההנהלה אינם משתתפים בדירוג ואינם זכאים לפרסים.
+            {t("חשבונות ההנהלה אינם משתתפים בדירוג ואינם זכאים לפרסים.")}
           </p>
         ) : mySeat ? (
           <p className="text-sm text-zinc-200">
-            את/ה{" "}
-            <strong className="text-gold-bright">{SEASON_PRIZES[mySeat.rank - 1].label}</strong>{" "}
-            — שמירה על המקום עד נעילת העונה שווה{" "}
+            {t("את/ה")}{" "}
+            <strong className="text-gold-bright">{t(SEASON_PRIZES[mySeat.rank - 1].label)}</strong>{" "}
+            {t("— שמירה על המקום עד נעילת העונה שווה")}{" "}
             <strong className="nums text-cyan-300" dir="ltr">
               {formatNumber(SEASON_PRIZES[mySeat.rank - 1].diamonds)}
             </strong>{" "}
@@ -317,21 +324,21 @@ export default async function PrizesPage() {
           </p>
         ) : (
           <p className="text-sm text-zinc-200">
-            המקום שלך בדירוג הכללי:{" "}
+            {t("המקום שלך בדירוג הכללי:")}{" "}
             <strong className="nums text-gold-bright" dir="ltr">
               {formatNumber(myRank)}
             </strong>
             {gap > 0 ? (
               <>
                 {" "}
-                — חסרים לך{" "}
+                {t("— חסרים לך")}{" "}
                 <strong className="nums text-gold-bright" dir="ltr" title={formatNumber(gap)}>
                   {formatCompact(gap)}
                 </strong>{" "}
-                כוח צבאי כדי לעלות על הפודיום.
+                {t("כוח צבאי כדי לעלות על הפודיום.")}
               </>
             ) : (
-              " — הפודיום עדיין לא מלא, כל מקום פנוי שם שווה יהלומים."
+              t(" — הפודיום עדיין לא מלא, כל מקום פנוי שם שווה יהלומים.")
             )}
           </p>
         )}
@@ -341,25 +348,27 @@ export default async function PrizesPage() {
       <div className="panel rounded-xl p-4">
         <h3 className="mb-2 flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
           <Icon name="reports" size={16} className="text-crimson-bright" />
-          איך זוכים
+          {t("איך זוכים")}
         </h3>
         <ul className="space-y-1.5 text-xs text-zinc-400">
-          <li>• הדירוג הוא גלובלי — כל השחקנים במשחק, לא רק העיר שלך.</li>
-          <li>• מדד הדירוג הוא הכוח הצבאי: הצבא, הנשק שבידיו והבונוסים של הגיבור.</li>
-          <li>• שוויון נשבר לפי רמת הגיבור, ואחריה מספר האיפוסים שלו.</li>
-          <li>• חשבונות ההנהלה אינם משתתפים ואינם תופסים מקום בפודיום.</li>
+          <li>{t("• הדירוג הוא גלובלי — כל השחקנים במשחק, לא רק העיר שלך.")}</li>
+          <li>{t("• מדד הדירוג הוא הכוח הצבאי: הצבא, הנשק שבידיו והבונוסים של הגיבור.")}</li>
+          <li>{t("• שוויון נשבר לפי רמת הגיבור, ואחריה מספר האיפוסים שלו.")}</li>
+          <li>{t("• חשבונות ההנהלה אינם משתתפים ואינם תופסים מקום בפודיום.")}</li>
           <li>
-            • הדירוג הקובע הוא זה שנחתם ברגע נעילת העונה, והיהלומים נכנסים
-            לחשבון <strong className="text-gold-bright">אוטומטית</strong> באותו
-            רגע — עם הודעה לתיבת הדואר. אין צורך לאסוף דבר.
+            {t("• הדירוג הקובע הוא זה שנחתם ברגע נעילת העונה, והיהלומים נכנסים לחשבון")}{" "}
+            <strong className="text-gold-bright">{t("אוטומטית")}</strong>{" "}
+            {t("באותו רגע — עם הודעה לתיבת הדואר. אין צורך לאסוף דבר.")}
+
+
           </li>
         </ul>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link href="/game/rankings" className="btn btn-gold px-4 py-2 text-sm">
-            <Icon name="rankings" size={16} className="inline-block align-middle" /> לטבלת הדירוג
+          <Icon name="rankings" size={16} className="inline-block align-middle" /> {t("לטבלת הדירוג")}
           </Link>
           <Link href="/game/leaderboards" className="btn btn-ghost px-4 py-2 text-sm">
-            <Icon name="crown" size={16} className="inline-block align-middle" /> טבלאות מובילים
+          <Icon name="crown" size={16} className="inline-block align-middle" /> {t("טבלאות מובילים")}
           </Link>
         </div>
       </div>
