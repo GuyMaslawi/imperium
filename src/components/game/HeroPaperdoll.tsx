@@ -148,7 +148,10 @@ export function HeroPaperdoll({
         return (
           <div
             key={slot}
-            className="absolute w-[17%] min-w-[54px] -translate-x-1/2 -translate-y-1/2"
+            // The floor keeps a medallion tappable in a narrow frame; on a phone
+            // the frame itself is only ~16rem wide, and a 54px floor there eats
+            // so far into the middle that the figure is all sockets and no hero.
+            className="absolute w-[17%] min-w-[46px] -translate-x-1/2 -translate-y-1/2 sm:min-w-[54px]"
             style={{ left: `${a.x}%`, top: `${a.y}%` }}
           >
             <span aria-hidden className={`absolute ${CONNECTOR[a.reach]}`} />

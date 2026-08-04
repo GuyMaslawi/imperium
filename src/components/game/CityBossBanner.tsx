@@ -132,37 +132,47 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             beside it collapses to four short rows. At this size the portrait is
             also finally worth the expensive tier — every boss ships a depth map
             (public/boss/*-depth.png), so `rich` buys real volume here where it
-            would have been wasted on the 76px strip this used to be. */}
-        <div className="relative h-[168px] sm:h-auto sm:min-h-[240px]">
-          {/* Crest underlay: a missing portrait file still reads as deliberate art
-              rather than as a broken image. */}
-          <div
-            aria-hidden
-            className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-[rgb(var(--boss-accent)/0.35)] to-black"
-          >
-            <Icon name="attack" size={56} className="text-black/40" />
+            would have been wasted on the 76px strip this used to be.
+
+            Stacked on a phone that column was a 390×168 letterbox over art that
+            is 3:4, and `cover` threw away nearly two thirds of the tyrant —
+            what survived was a strip of helmet with no face under it. So below
+            `sm` the portrait is not a band at all: it is a card cut to the
+            artwork's own ratio, centred on the accent wash, holding the whole
+            figure in about the height the letterbox cost. At `sm` the column is
+            tall enough for the bleed again and the card dissolves into it. */}
+        <div className="relative flex h-[188px] items-center justify-center sm:block sm:h-auto sm:min-h-[240px]">
+          <div className="relative h-[172px] w-[129px] overflow-hidden rounded-xl border border-[rgb(var(--boss-accent))]/35 sm:absolute sm:inset-0 sm:h-auto sm:w-auto sm:rounded-none sm:border-0">
+            {/* Crest underlay: a missing portrait file still reads as deliberate art
+                rather than as a broken image. */}
+            <div
+              aria-hidden
+              className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-[rgb(var(--boss-accent)/0.35)] to-black"
+            >
+              <Icon name="attack" size={56} className="text-black/40" />
+            </div>
+            <LivingPortrait
+              src={bossImage(boss.key)}
+              alt={`${bossName} — ${t(boss.title)}`}
+              className={`absolute inset-0 ${dead ? "grayscale" : ""}`}
+              accent={boss.accent}
+              embers={dead ? 0 : 8}
+              tilt={9}
+              drift={20}
+              rich={!dead}
+            >
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25"
+              />
+              {/* The seam into the dossier: only once the two sit side by side —
+                  on the phone card there is no edge to blend into. */}
+              <div
+                aria-hidden
+                className="absolute inset-y-0 left-0 hidden w-10 bg-gradient-to-l from-transparent to-[#0a0709] sm:block"
+              />
+            </LivingPortrait>
           </div>
-          <LivingPortrait
-            src={bossImage(boss.key)}
-            alt={`${bossName} — ${t(boss.title)}`}
-            className={`absolute inset-0 ${dead ? "grayscale" : ""}`}
-            accent={boss.accent}
-            embers={dead ? 0 : 8}
-            tilt={9}
-            drift={20}
-            rich={!dead}
-          >
-            <div
-              aria-hidden
-              className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/25"
-            />
-            {/* The seam into the dossier: a bottom fade while stacked, an edge
-                fade once the two sit side by side. */}
-            <div
-              aria-hidden
-              className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0a0709] to-transparent sm:inset-x-auto sm:inset-y-0 sm:left-0 sm:h-auto sm:w-10 sm:bg-gradient-to-l sm:from-transparent sm:to-[#0a0709]"
-            />
-          </LivingPortrait>
           {myKills > 0 && (
             <div className="absolute inset-x-0 bottom-1.5 flex justify-center">
               <Tip

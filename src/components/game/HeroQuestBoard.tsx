@@ -474,7 +474,16 @@ function QuestRow({
 
   return (
     <li
-      className={`panel-inset rounded-xl p-3 transition ${unlocked ? "" : "quest-row-locked"}`}
+      // A locked rung is an advertisement, not a control, and on a phone nine of
+      // them in a row were 1,900px of scroll between the hero and everything
+      // under him. So below `sm` a sealed rung keeps only what an advertisement
+      // needs — the name, the length, the odds — and drops the lore and the
+      // action column it cannot use anyway (the plate on the chains already
+      // names the price, and the button under them is unclickable). The floor is
+      // what the padlock rig needs to hang without being clipped.
+      className={`panel-inset rounded-xl p-3 transition ${
+        unlocked ? "" : "quest-row-locked min-h-[7.5rem] sm:min-h-0"
+      }`}
       // A 3px stripe in the quest's own colour down the leading edge — the one
       // thing that keeps ten near-identical rows from reading as a wall.
       style={
@@ -508,7 +517,13 @@ function QuestRow({
               {heroQuestDurationLabel(t, tier)}
             </span>
           </h3>
-          <p className="mt-1 text-[11px] leading-relaxed text-zinc-500">{t(quest.lore)}</p>
+          <p
+            className={`mt-1 text-[11px] leading-relaxed text-zinc-500 ${
+              unlocked ? "" : "hidden sm:block"
+            }`}
+          >
+            {t(quest.lore)}
+          </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <MysteryChip tip={t("השלל של המסע הזה לא ידוע מראש: כל יציאה מגלגלת את מזלה שלה — לפעמים מעט, לפעמים עגלה שלמה. הגודל הממוצע נגזר ממספר הערים שלך ומיום העונה, ואותו לכל שעת מסע בכל הדרגות.")} />
@@ -532,7 +547,11 @@ function QuestRow({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+        <div
+          className={`shrink-0 flex-col items-stretch gap-1.5 ${
+            unlocked ? "flex" : "hidden sm:flex"
+          }`}
+        >
           <Tip
             tip={t("עלות שליחה: {cost} תורות — {perHour} לכל שעת מסע.", {
               cost: formatNumber(cost),

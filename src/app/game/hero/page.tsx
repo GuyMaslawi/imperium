@@ -139,10 +139,23 @@ export default async function HeroPage() {
         {/* The bag column (15 sockets + the belt) is the tallest thing in this
             row, so the figure is sized to reach it — a 13/19 portrait at 26rem
             lands within a hair of the bag's height instead of stopping a third
-            of the way up and leaving dead panel under it. */}
-        <div className="grid md:grid-cols-[minmax(0,290px)_1fr] xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)_25rem]">
-          {/* paperdoll (right in RTL) — the 9 pieces sit on the figure itself */}
-          <div className="relative">
+            of the way up and leaving dead panel under it.
+
+            That three-column form needs 26rem + 25rem + something to live in
+            between, and it used to open at `xl` — where the shell's own nav rail
+            leaves the page barely 930px. The middle column came out about 40px
+            wide and the bars and the class name wrapped one word per line. It
+            waits for `2xl` now; the two-column form covers every laptop under
+            it, with the bag full width beneath the pair. */}
+        <div className="grid md:grid-cols-[minmax(0,290px)_1fr] 2xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)_25rem]">
+          {/* paperdoll (right in RTL) — the 9 pieces sit on the figure itself.
+              Capped and centred on a phone: at the full 390px of a handset the
+              13/19 frame stands 570px tall, which is two thirds of the viewport
+              spent on one picture before a single number is visible. Held to
+              16rem it is a figure you take in at a glance, and the bars, the
+              points and the bag all move up into the first screen. The cap
+              lifts at md, where the grid gives the column its own width. */}
+          <div className="relative mx-auto w-full max-w-[16rem] sm:max-w-[18rem] md:max-w-none">
             <HeroPaperdoll
               portrait={heroClassImage(hero.heroClass)}
               portraitAlt={classMeta.label}
@@ -239,7 +252,7 @@ export default async function HeroPage() {
             {/* -------- bars, then the points right under them --------
                 One narrow column: health and xp on top, the three stat rows
                 below them, with the bag filling the space to their left. */}
-            <div className="grid flex-1 content-center gap-3 md:grid-cols-2 xl:grid-cols-1">
+            <div className="grid flex-1 content-center gap-3 md:grid-cols-2 2xl:grid-cols-1">
               {/* the two bars that move between battles */}
               <div className="flex flex-col justify-center gap-3">
                 <div>
@@ -308,7 +321,7 @@ export default async function HeroPage() {
           </div>
 
           {/* -------- the bag (left in RTL) -------- */}
-          <div className="border-t border-border-subtle p-4 md:col-span-2 md:p-5 xl:col-span-1 xl:border-s xl:border-t-0 xl:p-4">
+          <div className="border-t border-border-subtle p-4 md:col-span-2 md:p-5 2xl:col-span-1 2xl:border-s 2xl:border-t-0 2xl:p-4">
             <HeroBag
               items={bagItems}
               heroLevel={hero.level}

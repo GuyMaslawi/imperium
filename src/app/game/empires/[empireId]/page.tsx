@@ -293,7 +293,14 @@ export default async function EmpireProfilePage({
                 band beside the figure, and a paperdoll pinned to the start edge
                 of an otherwise empty panel is most of why this page read as
                 half-drawn. */}
-            <div className={`w-full max-w-[320px] ${isMe ? "mx-auto" : ""}`}>
+            {/* 16rem on a phone, same as the hero page's own figure: at 320px
+                the 13/19 frame is 467px tall and the dossier under it starts
+                below the fold. */}
+            <div
+              className={`mx-auto w-full max-w-[16rem] sm:max-w-[320px] ${
+                isMe ? "" : "sm:mx-0"
+              }`}
+            >
               <HeroPaperdoll
                 readOnly
                 portrait={heroClassImage(heroClassKey)}
