@@ -77,6 +77,12 @@ const PAID_STATUS_CODES = new Set(["000"]);
 /** PayPlus stamps its own callbacks with this User-Agent. */
 const CALLBACK_USER_AGENT = "PayPlus";
 
+/**
+ * `vat_type` on an invoice line: 0 = VAT included, 1 = VAT not included,
+ * 2 = **exempt from VAT** — which is what an עוסק פטור sells under.
+ */
+const VAT_EXEMPT = 2;
+
 /** How long a PayPlus call may hang before the checkout gives up on it. */
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -296,15 +302,42 @@ export class PayPlusProvider implements OrderPaymentProvider {
 
   async createOrder(input: OrderInput): Promise<OrderResult> {
     const base = appBaseUrl();
+    const amount = Math.round(input.amountIls * 100) / 100;
     const body = {
       payment_page_uid: this.config.pageUid,
       // Whole agorot. A float with a trailing 0.00000001 is a mismatch at
       // settlement time, where the comparison is exact.
-      amount: Math.round(input.amountIls * 100) / 100,
+      amount,
       currency_code: STORE_CURRENCY,
-      // PayPlus emails the receipt an עוסק פטור has to issue per sale.
+      language_code: "he",
+      // Payment *confirmation* mail. Not the tax receipt — that is a separate
+      // PayPlus module ("חשבוניות דיגיטליות") which has to be subscribed and
+      // switched on for this payment page before any document is issued at all.
       sendEmailApproval: true,
       sendEmailFailure: false,
+      // ---------------------------------------------------------------- VAT
+      // The operator is an **עוסק פטור**: exempt from charging VAT. Left to its
+      // default, PayPlus would issue every receipt with VAT broken out — a wrong
+      // tax document, on every sale, that someone would have to unwind with
+      // רשות המסים afterwards.
+      //
+      // This costs nothing while the invoicing module is off (no document is
+      // produced either way), which is exactly why it is set now rather than
+      // discovered on the first real sale.
+      //
+      // VERIFY on the first issued receipt that it shows no VAT line. If the
+      // business ever becomes an עוסק מורשה this flips to `true` and
+      // `VAT_EXEMPT` below becomes 0 ("VAT included") — the prices in
+      // DIAMOND_PACKAGES are consumer-facing and therefore already VAT-inclusive.
+      paying_vat: false,
+      items: [
+        {
+          name: payplusText(input.description, 80),
+          quantity: 1,
+          price: amount,
+          vat_type: VAT_EXEMPT,
+        },
+      ],
       // `charge_method` is deliberately omitted so the page's own configured
       // method applies. The documented enum is ambiguous about which number is a
       // plain charge, and guessing wrong here means either a J2-style

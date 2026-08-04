@@ -208,6 +208,30 @@ describe("createOrder", () => {
     expect(sent).not.toHaveProperty("charge_method");
   });
 
+  it("bills as VAT-exempt, because the operator is an עוסק פטור", async () => {
+    // The failure this guards against is silent and expensive: left to PayPlus's
+    // default, every issued receipt breaks out VAT the operator is not
+    // registered to charge — a wrong tax document per sale, discovered only
+    // after the money is real.
+    configure();
+    const calls = stubPayPlus({
+      results: { status: "success" },
+      data: { page_request_uid: "r", payment_page_link: "u" },
+    });
+    await payplusProvider()!.createOrder(ORDER);
+
+    const sent = calls[0].body as Record<string, never>;
+    expect(sent.paying_vat).toBe(false);
+    const items = sent.items as unknown as { price: number; quantity: number; vat_type: number }[];
+    expect(items).toHaveLength(1);
+    expect(items[0].vat_type).toBe(2); // 2 = exempt
+    // The line total must be the amount actually charged, or the receipt and the
+    // charge disagree — which is the one discrepancy an auditor always finds.
+    expect(items[0].price).toBe(69.9);
+    expect(items[0].quantity).toBe(1);
+    expect(sent.amount).toBe(69.9);
+  });
+
   it("uses the production host only when told to", async () => {
     configure({ PAYPLUS_ENV: "production" });
     const calls = stubPayPlus({
