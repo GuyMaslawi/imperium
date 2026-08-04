@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/admin";
+import { DEFAULT_TUNABLES, getTunables } from "@/lib/game/config";
+import { BREAK_UNITS, formatBreakHours, splitBreakHours } from "@/lib/game/seasonCycle";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledBool, LabeledInput, EditorSection } from "@/components/admin/fields";
@@ -11,6 +13,7 @@ import {
   shortenSeason,
   deleteSeason,
   resetSeason,
+  saveSeasonCycle,
 } from "@/server/actions/admin";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +21,131 @@ export const dynamic = "force-dynamic";
 export default async function AdminSeasonsPage() {
   await requireAdmin();
 
-  const [seasons, counts, archived] = await Promise.all([
+  const [seasons, counts, archived, tunables] = await Promise.all([
     prisma.gameSeason.findMany({ orderBy: { createdAt: "desc" } }),
     prisma.empire.groupBy({ by: ["seasonId"], _count: { _all: true } }),
     // Which seasons already have a record in the hall. Read off the archive
     // table rather than a relation — SeasonChampion holds none, so that a
     // deleted season keeps its champions.
     prisma.seasonChampion.groupBy({ by: ["seasonId"], _count: { _all: true } }),
+    getTunables(),
   ]);
   const countBySeason = new Map(counts.map((c) => [c.seasonId, c._count._all]));
   const archivedBySeason = new Map(archived.map((a) => [a.seasonId, a._count._all]));
   const totalEmpires = counts.reduce((sum, c) => sum + c._count._all, 0);
+  const cycle = tunables.season;
+  // The stored hours, back in the unit they were most likely typed in, so the
+  // field reopens saying "3 ימים" rather than "72 שעות".
+  const breakField = splitBreakHours(cycle.breakHours);
+
+  // The season the cycle will open next: the earliest unclosed one booked to
+  // start from here on. The same row `getSeasonGate` will pick up when its hour
+  // comes, so what this panel promises is what actually happens.
+  const now = new Date();
+  const upcoming = seasons
+    .filter((s) => !s.isActive && !s.closedAt && s.startsAt >= now)
+    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())[0];
 
   return (
     <div className="space-y-6">
       <SectionHeading title="עונות" ornament="📅" />
+
+      {/* -------- the cycle that runs without an admin -------- */}
+      <EditorSection title="מחזור העונות — אוטומטי" icon="🔄">
+        <p className="text-[12px] leading-relaxed text-zinc-400">
+          כשהשעון של העונה הפעילה מגיע לתאריך הסיום, המשחק ננעל <strong className="text-red-300">לכל
+          השחקנים</strong> מיד: כל דף באתר מוביל לדף סיום העונה, עם המובילים וספירה לאחור. אחרי
+          ההפסקה שמוגדרת כאן העונה הבאה נפתחת מעצמה — המספר עולה באחד (למשל
+          <span dir="ltr"> עונה 3 ← עונה 4</span>), והעולם מתאפס: כל אימפריה נבנית מחדש,
+          הגילדות מתפרקות, ו<strong className="text-emerald-300">רק יתרת היהלומים</strong> עוברת
+          עם השחקן (גם VIP וארנק הקהילה מתאפסים). אין צורך בשום פעולה ידנית.
+        </p>
+        <ActionForm action={saveSeasonCycle} submitLabel="שמור הגדרות מחזור">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {/* The break: any number, in whichever unit the admin is thinking
+                in. Stored as hours either way (see breakToHours) — the pair is
+                a typing convenience, not a second source of truth. */}
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-gold-dim">ההפסקה בין עונות</span>
+              <div className="flex gap-2">
+                <input
+                  name="season.breakValue"
+                  type="number"
+                  min={0}
+                  step="any"
+                  defaultValue={breakField.value}
+                  dir="ltr"
+                  className="w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 outline-none transition-colors focus:border-gold/60"
+                />
+                <select
+                  name="season.breakUnit"
+                  defaultValue={breakField.unit}
+                  className="rounded-lg border border-border-subtle bg-panel-inset px-3 py-2 text-sm text-zinc-100 outline-none transition-colors focus:border-gold/60"
+                >
+                  {BREAK_UNITS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <span className="block text-[11px] text-zinc-500">
+                כמה זמן המשחק סגור. 0 = העונה הבאה נפתחת מיד.
+              </span>
+            </div>
+            <LabeledInput
+              label="אורך העונה הבאה (ימים)"
+              name="season.lengthDays"
+              type="number"
+              min={1}
+              max={3650}
+              step="any"
+              defaultValue={cycle.lengthDays}
+              hint={`כל מספר ימים. ברירת מחדל: ${DEFAULT_TUNABLES.season.lengthDays}`}
+            />
+            <LabeledBool
+              label="לפתוח את העונה הבאה אוטומטית?"
+              name="season.autoNext"
+              defaultValue={cycle.autoNext >= 1}
+              trueLabel="כן — המחזור ממשיך"
+              falseLabel="לא — נשאר סגור"
+            />
+            <LabeledBool
+              label="לאפס את העולם בפתיחת עונה?"
+              name="season.autoRestart"
+              defaultValue={cycle.autoRestart >= 1}
+              trueLabel="כן — כולם מתחילים מאפס"
+              falseLabel="לא — ממשיכים כרגיל"
+            />
+          </div>
+        </ActionForm>
+        {/* What those numbers actually booked. A schedule an admin cannot see is
+            a schedule they cannot trust. */}
+        <div className="space-y-2 rounded-lg border border-border-subtle bg-panel-inset p-3 text-[12px] text-zinc-400">
+          {/* The settings above, read back as a sentence. A number field can be
+              misread; "הפסקה של יומיים, ואז עונה של 30 ימים" cannot. */}
+          <p>
+            כרגע:{" "}
+            <strong className="text-gold-bright">{formatBreakHours(cycle.breakHours)}</strong>{" "}
+            הפסקה, ואז עונה של{" "}
+            <strong className="text-gold-bright">{cycle.lengthDays}</strong> ימים.
+          </p>
+          <p>
+            {upcoming ? (
+              <>
+                העונה הבאה בתור:{" "}
+                <strong className="text-gold-bright">{upcoming.name}</strong> — נפתחת ב־
+                <LocalTime iso={upcoming.startsAt.toISOString()} /> ומסתיימת ב־
+                <LocalTime iso={upcoming.endsAt.toISOString()} />.
+              </>
+            ) : cycle.autoNext >= 1 ? (
+              "עדיין לא נקבעה עונה הבאה — היא תיווצר אוטומטית ברגע שהעונה הפעילה תסתיים."
+            ) : (
+              "פתיחה אוטומטית כבויה — כשהעונה הפעילה תסתיים המשחק יישאר סגור עד שתפעיל עונה ידנית."
+            )}
+          </p>
+        </div>
+      </EditorSection>
 
       <EditorSection title="עונה חדשה" icon="➕">
         <ActionForm action={createSeason} submitLabel="צור עונה">

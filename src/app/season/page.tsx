@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import { getSeasonGate, readRecap, type SeasonRecap } from "@/server/seasonClose";
+import { getTunables } from "@/lib/game/config";
 import { formatCompact, formatDate, formatNumber } from "@/lib/game/format";
 import { SeasonCountdown } from "@/components/game/SeasonCountdown";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
@@ -76,7 +77,7 @@ export default async function SeasonEndPage() {
   // came from rather than showing an empty ceremonial page.
   if (gate.open) redirect((await getSessionUserId()) ? "/game/base" : "/login");
 
-  const [season, champions] = await Promise.all([
+  const [season, champions, tunables] = await Promise.all([
     prisma.gameSeason.findUnique({
       where: { id: gate.seasonId },
       select: { startsAt: true, endsAt: true, recap: true },
@@ -97,9 +98,11 @@ export default async function SeasonEndPage() {
         prizeDiamonds: true,
       },
     }),
+    getTunables(),
   ]);
 
   const recap = readRecap(season?.recap ?? null);
+  const restarts = tunables.season.autoRestart >= 1;
   // The countdown ticks in server time — see SeasonCountdown.
   const now = new Date().getTime();
 
@@ -159,6 +162,16 @@ export default async function SeasonEndPage() {
               <p className="mt-3 text-[11px] text-zinc-500">
                 {formatDate(gate.nextStartsAt)}
               </p>
+              {/* Said here, before it happens, and only when it is actually
+                  going to: the restart is the single biggest thing about the
+                  next season, and nobody should meet it as a surprise on the
+                  first page load after the countdown hits zero. */}
+              {restarts && (
+                <p className="mt-3 text-xs text-zinc-400">
+                  כשהשערים ייפתחו העולם יתאפס — כל אימפריה מתחילה מאפס והבריתות
+                  מתפרקות. רק היהלומים נשארים איתכם. 💎
+                </p>
+              )}
             </>
           ) : (
             <p className="text-sm text-zinc-400">

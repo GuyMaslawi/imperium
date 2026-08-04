@@ -13,6 +13,7 @@ import { verifyGoogleIdToken } from "@/lib/google";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { getTunables } from "@/lib/game/config";
 import { appBaseUrl, sendMail } from "@/server/mailer";
+import { seasonClosedError } from "@/server/seasonGuard";
 import {
   LOGIN_TIMING_DUMMY_HASH,
   hashPassword,
@@ -247,6 +248,14 @@ export async function register(
   if (!(await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000))) {
     return { error: "יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר." };
   }
+
+  // Registration reopens with the next season, not before. The form is not even
+  // reachable during the break (`/register` redirects to `/season`), so this is
+  // the POST-level half of that gate: an empire created now would be wiped by
+  // the world restart the moment the next season opens, and the account would
+  // have spent the whole break unable to reach a single game screen.
+  const shut = await seasonClosedError();
+  if (shut) return { error: shut };
 
   const parsed = registerSchema.safeParse({
     name: formData.get("name"),
@@ -840,6 +849,10 @@ export async function createEmpireForCurrentUser(
     select: { id: true },
   });
   if (existing) redirect("/game/base");
+
+  // No new empires between seasons — same reason as in `register`.
+  const shut = await seasonClosedError();
+  if (shut) return { error: shut };
 
   const parsed = onboardingSchema.safeParse({
     empireName: formData.get("empireName"),

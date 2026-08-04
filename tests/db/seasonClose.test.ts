@@ -42,10 +42,27 @@ let seasonId = "";
  */
 const createdSeasons: string[] = [];
 
+/**
+ * When this file started, for cleaning up the seasons it did *not* create.
+ *
+ * Sealing a season now books its successor (see `scheduleNextSeason`), so every
+ * close here leaves behind a row with an id nothing recorded. Name-matching
+ * cannot find them: `nextSeasonName` raises the last run of digits in the name,
+ * and the tag above is `Date.now().toString(36)` — digits and all — so the
+ * successor of `sc1a5b-s3` is `sc1a6b-s3`, which no longer carries the tag.
+ * Left behind, those rows are future-dated unclosed seasons that the gate on a
+ * dev machine will eventually *open*, wiping the developer's world on an
+ * unrelated page load. So cleanup goes by "created since this file started",
+ * which the suite's serial execution makes exact.
+ */
+const SUITE_START = new Date();
+
 afterAll(async () => {
   await prisma.seasonChampion.deleteMany({ where: { seasonId: { in: createdSeasons } } });
   await prisma.seasonBoardEntry.deleteMany({ where: { seasonId: { in: createdSeasons } } });
   await prisma.gameSeason.deleteMany({ where: { id: { in: createdSeasons } } });
+  // …and the successors those closes booked — see SUITE_START.
+  await prisma.gameSeason.deleteMany({ where: { createdAt: { gte: SUITE_START } } });
   await prisma.guild.deleteMany({ where: { name: { startsWith: TAG } } });
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
   await prisma.$disconnect();
@@ -151,6 +168,10 @@ beforeEach(async () => {
   await prisma.user.deleteMany({ where: { email: { endsWith: `@${TAG}.test` } } });
   // Memberships cascade off the empires above; the guild rows themselves do not.
   await prisma.guild.deleteMany({ where: { name: { startsWith: TAG } } });
+  // And the successor the previous test's close booked. `scheduleNextSeason`
+  // stands down whenever *any* future season is already on the books, so a
+  // leftover one would silently disable the booking in the next test.
+  await prisma.gameSeason.deleteMany({ where: { createdAt: { gte: SUITE_START } } });
   seasonId = await makeSeason(`s${Math.random().toString(36).slice(2, 7)}`);
 });
 

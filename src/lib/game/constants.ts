@@ -25,6 +25,25 @@ export type ResourceKey = keyof typeof RESOURCE_META;
 /** The four storable resources — each has a dedicated warehouse. */
 export type StorableResource = "gold" | "wood" | "iron" | "stone";
 
+/**
+ * Ceiling on any single counter the game keeps in a Prisma `Int` column — a
+ * weapon stack, a unit count in the army.
+ *
+ * This is the *database's* limit, not a game rule, and it is the only thing
+ * that bounds a purchase: buy as many as the treasury can pay for. Postgres
+ * stores those columns as int4 (max 2,147,483,647) and rejects anything past it
+ * rather than truncating — the statement dies with an out-of-range conversion
+ * error, the action falls into its generic catch, and nothing is saved.
+ *
+ * The value matches ADMIN_INT_MAX (lib/admin.ts) deliberately, so the admin
+ * editor can still show and re-save any stack the game itself allows. It is
+ * kept here rather than imported from there because `lib/admin` is
+ * `server-only` and these bounds are needed in client cards too. The billion of
+ * headroom below int4's max is the same headroom ADMIN_INT_MAX leaves, and for
+ * the same reason: these counters keep growing after the write.
+ */
+export const COLUMN_INT_MAX = 1_000_000_000; // 1e9
+
 /* ------------------------------ update cadence ------------------------------ */
 
 export const GAME_TIMEZONE = "Asia/Jerusalem";

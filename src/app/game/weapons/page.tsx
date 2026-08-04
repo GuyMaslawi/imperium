@@ -1,4 +1,5 @@
 import { requireEmpire } from "@/lib/auth";
+import { getT } from "@/i18n/server";
 import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { WeaponsTabs, type WeaponsTabData } from "@/components/game/WeaponsTabs";
@@ -13,7 +14,10 @@ import {
   weaponTierUnlockCost,
 } from "@/lib/game/weapons";
 
-export const metadata = { title: "נשקים | קראלדור" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: t("נשקים | קראלדור") };
+}
 
 const TAB_POWER_LABELS = {
   ATTACK: "כוח התקפה כולל מנשקים",
@@ -33,6 +37,7 @@ export default async function WeaponsPage({
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const empire = await requireEmpire();
+  const t = await getT();
   const { tab } = await searchParams;
   // `Object.hasOwn` guard, not a bare index: TAB_PARAM_TO_CATEGORY is a plain
   // object literal, so `?tab=constructor` (or toString / valueOf / hasOwnProperty)
@@ -59,9 +64,9 @@ export default async function WeaponsPage({
     const meta = WEAPON_CATEGORY_META[category];
     return {
       category,
-      label: meta.label,
+      label: t(meta.label),
       icon: meta.icon,
-      totalPowerLabel: TAB_POWER_LABELS[category],
+      totalPowerLabel: t(TAB_POWER_LABELS[category]),
       totalPower: weaponsPower(empire.weapons, category),
       unlockedTier: sharedTier,
       maxTier: MAX_WEAPON_TIER,
@@ -90,7 +95,7 @@ export default async function WeaponsPage({
 
   return (
     <div className="space-y-6">
-      <SectionHeading title="חנות נשקים" ornament="🛍️" />
+      <SectionHeading title={t("חנות נשקים")} ornament="🛍️" />
 
       <WeaponsTabs
         tabs={tabs}

@@ -10,6 +10,7 @@ import { Tip } from "@/components/ui/Tip";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { formatCompact } from "@/lib/game/format";
 import { useScrollLock } from "@/components/ui/scrollLock";
+import { useT, useDir } from "@/i18n/client";
 import { LivingPortrait } from "@/components/game/LivingPortrait";
 
 type NavItem = {
@@ -131,6 +132,8 @@ function BurgerGlyph({ open }: { open: boolean }) {
  */
 export function MobileMenu(props: SidebarProps) {
   const pathname = usePathname();
+  const t = useT();
+  const dir = useDir();
   const [open, setOpen] = useState(false);
   // Portals cannot render on the server; until hydration the command bar paints
   // an inert copy of the glyph so the bar never flashes a hole where it goes.
@@ -236,7 +239,10 @@ export function MobileMenu(props: SidebarProps) {
             />
 
             <aside
-              dir="rtl"
+              // The drawer is portaled to <body>, outside the command bar's
+              // dir="ltr" wrapper — so it has to name the document's direction
+              // rather than inherit the one above it.
+              dir={dir}
               // Any nav link tapped inside the drawer closes it (delegated click).
               onClick={(e) => {
                 if ((e.target as HTMLElement).closest("a")) setOpen(false);
@@ -245,18 +251,28 @@ export function MobileMenu(props: SidebarProps) {
               // of the tab order and out of the accessibility tree entirely.
               inert={!open}
               data-at-end={String(atEnd)}
-              className={`ornate-shell nav-drawer flex w-[86vw] max-w-xs flex-col rounded-l-lg transition-transform duration-200 ${
+              // The width is expressed as "everything but the strip the
+              // hamburger stands in" rather than a flat 86vw, so the button is
+              // always *beside* the panel and never over its ornate edge. At
+              // 86vw a 320px phone left only 45px of margin — three pixels
+              // narrower than the button — and the two overlapped.
+              className={`ornate-shell nav-drawer flex w-[calc(100vw-3.5rem)] max-w-xs flex-col rounded-l-lg transition-transform duration-200 ${
                 open ? "translate-x-0" : "translate-x-full"
               }`}
             >
               {/* The frame clips and the border stays painted; this is the one
-                  thing that scrolls. Top padding clears the command bar the
-                  hamburger sits in, and belongs to the scroller so the ornate
-                  edge still starts at the top of the panel. */}
+                  thing that scrolls.
+
+                  Padding is uniform: the drawer does NOT need to clear the
+                  command bar. The hamburger sits in the strip to the side of
+                  the panel (see the width above), so a header-height top pad
+                  bought nothing but a 60px empty band above the first row —
+                  and cost 60px of nav, which is the difference between the list
+                  fitting on a phone and not. */}
               <div
                 ref={scrollRef}
                 onScroll={syncEnd}
-                className="nav-drawer-scroll flex flex-col gap-4 p-3 pt-[calc(var(--header-h)+0.75rem)]"
+                className="nav-drawer-scroll flex flex-col gap-4 p-3"
               >
                 <SidebarContent {...props} pathname={pathname} />
               </div>
@@ -272,7 +288,7 @@ export function MobileMenu(props: SidebarProps) {
               <button
                 type="button"
                 onClick={() => setOpen((v) => !v)}
-                aria-label={open ? "סגירת תפריט" : "פתיחת תפריט"}
+                aria-label={open ? t("סגירת תפריט") : t("פתיחת תפריט")}
                 aria-expanded={open}
                 className={`pointer-events-auto flex h-10 w-10 items-center justify-center rounded-md border bg-black/30 backdrop-blur transition-colors ${
                   open
@@ -311,6 +327,7 @@ function SidebarContent({
   guildWarLive = false,
   pathname,
 }: SidebarProps & { pathname: string }) {
+  const t = useT();
   // One flat list — no section headings. History lives in the top command bar
   // (see InboxNav), so it deliberately has no entry here.
   //
@@ -332,10 +349,10 @@ function SidebarContent({
   // The navigation still feels instant without it: every /game route has a
   // loading.tsx, so the skeleton paints immediately on click.
   const navItems: NavItem[] = [
-    { href: "/game/base", label: "בסיס", icon: "base" },
+    { href: "/game/base", label: t("בסיס"), icon: "base" },
     {
       href: "/game/hero",
-      label: "גיבור",
+      label: t("גיבור"),
       icon: "hero",
       // A returned hero is one thing to collect, so it wears the same gold
       // "1" the achievements row does rather than inventing a second dialect
@@ -343,21 +360,21 @@ function SidebarContent({
       badge: heroQuestReady ? 1 : 0,
       badgeTone: "attention",
     },
-    { href: "/game/rankings", label: "דירוג", icon: "rankings" },
+    { href: "/game/rankings", label: t("דירוג"), icon: "rankings" },
     // The prize hall is deliberately absent: it rides in the top command bar
     // beside the inbox (see InboxNav), where the season's stakes are visible
     // from every screen rather than only from an open nav list.
-    { href: "/game/weapons", label: "מפעל", icon: "factory" },
-    { href: "/game/army", label: "ניהול", icon: "army", badge: recruits },
+    { href: "/game/weapons", label: t("מפעל"), icon: "factory" },
+    { href: "/game/army", label: t("ניהול"), icon: "army", badge: recruits },
     // Idle mine slaves read exactly like waiting recruits on the row above:
     // a neutral count of something sitting unused, not an alert.
     {
       href: "/game/production",
-      label: "מכונות",
+      label: t("מכונות"),
       icon: "mine",
       badge: freeMineSlaves,
     },
-    { href: "/game/guild", label: "ברית", icon: "guild" },
+    { href: "/game/guild", label: t("ברית"), icon: "guild" },
     // Guild-only, and hidden rather than disabled: a locked door on the nav for
     // a screen a guildless player can do nothing with is just noise. The page
     // enforces the same rule itself — see /game/war.
@@ -365,30 +382,30 @@ function SidebarContent({
       ? [
           {
             href: "/game/war",
-            label: "מלחמת בריתות",
+            label: t("מלחמת בריתות"),
             icon: "attack" as IconName,
             badge: guildWarLive ? 1 : 0,
-            badgeText: "חי",
+            badgeText: t("חי"),
             badgeTone: "attention" as const,
           },
         ]
       : []),
-    { href: "/game/diamonds", label: "יהלומים", icon: "diamond" },
-    { href: "/game/bank", label: "בנק", icon: "bank" },
-    { href: "/game/storage", label: "מחסנים", icon: "storage" },
+    { href: "/game/diamonds", label: t("יהלומים"), icon: "diamond" },
+    { href: "/game/bank", label: t("בנק"), icon: "bank" },
+    { href: "/game/storage", label: t("מחסנים"), icon: "storage" },
     {
       href: "/game/achievements",
-      label: "הישגים",
+      label: t("הישגים"),
       icon: "achievements",
       badge: collectableAchievements,
       badgeTone: "attention",
     },
-    { href: "/game/upgrades", label: "שדרוגים", icon: "upgrades" },
-    { href: "/game/guide", label: "מדריך", icon: "reports" },
+    { href: "/game/upgrades", label: t("שדרוגים"), icon: "upgrades" },
+    { href: "/game/guide", label: t("מדריך"), icon: "reports" },
     // Points at the game's own community page rather than straight out to
     // Discord: the invite may not exist yet, the page works either way, and a
     // player who lands there also gets the house rules and the welcome purse.
-    { href: "/game/community", label: "קהילה", icon: "discord" },
+    { href: "/game/community", label: t("קהילה"), icon: "discord" },
   ];
 
   const xpPct = heroXpMax > 0 ? Math.round((heroXp / heroXpMax) * 100) : 0;
@@ -401,7 +418,7 @@ function SidebarContent({
           <form action={logout}>
             <button
               type="submit"
-              title="התנתקות"
+              title={t("התנתקות")}
               className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-red-500/50 hover:text-red-400"
             >
               <Icon name="logout" size={17} />
@@ -409,14 +426,14 @@ function SidebarContent({
           </form>
           <Link
             href="/game/settings"
-            title="הגדרות"
+            title={t("הגדרות")}
             className="flex h-8 w-8 items-center justify-center rounded-md border border-border-subtle text-zinc-400 transition-colors hover:border-crimson/50 hover:text-crimson-bright"
           >
             <Icon name="settings" size={17} />
           </Link>
         </div>
         <div className="min-w-0 text-right">
-          <p className="text-[11px] text-zinc-400">ברוך שובך,</p>
+          <p className="text-[11px] text-zinc-400">{t("ברוך שובך,")}</p>
           <p className="flex items-center justify-end gap-1.5 truncate font-black text-gold-bright">
             {empireName}
             <Icon name="crown" size={16} className="shrink-0 text-crimson-bright" />
@@ -457,13 +474,21 @@ function SidebarContent({
               )}
             </div>
             <span className="absolute -bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-0.5 whitespace-nowrap">
-              <Tip tip="רמת הגיבור — עולה מניסיון שנצבר בקרבות">
+              <Tip tip={t("רמת הגיבור — עולה מניסיון שנצבר בקרבות")}>
                 <span className="rounded bg-amber-500 px-1.5 text-[10px] font-black text-black shadow">
                   {heroLevel}
                 </span>
               </Tip>
               {heroResets > 0 && (
-                <Tip tip={`תג איפוס: הגיבור הגיע לרמה 100 ואופס ${heroResets === 1 ? "פעם אחת" : `${heroResets} פעמים`}`}>
+                <Tip
+                  tip={
+                    heroResets === 1
+                      ? t("תג איפוס: הגיבור הגיע לרמה 100 ואופס פעם אחת")
+                      : t("תג איפוס: הגיבור הגיע לרמה 100 ואופס {count} פעמים", {
+                          count: heroResets,
+                        })
+                  }
+                >
                   <span className="rounded bg-purple-600 px-1 text-[10px] font-black text-white shadow">
                     ↻{heroResets}
                   </span>
@@ -484,7 +509,7 @@ function SidebarContent({
               {/* On the trailing edge, on the same column as the two numbers
                   below it: every row of the card now reads "what it is" on one
                   side and "which one / how much" on the other. */}
-              <Tip tip="מקצוע הגיבור">
+              <Tip tip={t("מקצוע הגיבור")}>
                 <span className="truncate rounded-full border border-border-subtle bg-black/30 px-2 py-0.5 text-[10px] font-bold text-zinc-400">
                   {heroClass}
                 </span>
@@ -496,36 +521,40 @@ function SidebarContent({
                 hero is out of the fight until he is raised. */}
             {heroDead ? (
               <Tip
-                tip="הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
+                tip={t(
+                  "הגיבור נפל בקרב — כל נקודותיו והבונוסים שלו מושבתים עד שיקום לתחייה. לחץ לפרטים."
+                )}
                 className="w-full"
               >
                 <Link
                   href="/game/hero"
                   className="flex w-full items-center justify-center gap-1 rounded-full border border-red-500/50 bg-red-950/60 px-2 py-1 text-[10px] font-black text-red-300"
                 >
-                  💀 הגיבור מת
+                  {t("💀 הגיבור מת")}
                 </Link>
               </Tip>
             ) : (
               <HeroGauge
                 icon="heart"
-                label="חיים"
+                label={t("חיים")}
                 value={`${heroHealthPct}%`}
                 accent="text-red-300"
                 tone="health"
                 meterValue={heroHealthPct}
-                tip="חיי הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה מהם"
+                tip={t("חיי הגיבור — כל תקיפה שפורצת את ההגנה שלך מורידה מהם")}
               />
             )}
             <HeroGauge
               icon="spark"
-              label="ניסיון"
+              label={t("ניסיון")}
               value={`${formatCompact(heroXp)}/${formatCompact(heroXpMax)} · ${xpPct}%`}
               accent="text-purple-300"
               tone="xp"
               meterValue={heroXp}
               meterMax={heroXpMax}
-              tip="ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה. במלוא הבר הגיבור עולה רמה"
+              tip={t(
+                "ניסיון הגיבור — נצבר מקרבות: ניצחון בתקיפה מעניק הכי הרבה, גם הגנה מוצלחת מזכה. במלוא הבר הגיבור עולה רמה"
+              )}
             />
           </div>
         </div>
@@ -535,7 +564,7 @@ function SidebarContent({
             name, and only present when there is something to spend. */}
         {heroPoints > 0 && (
           <Tip
-            tip="נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)"
+            tip={t("נקודות גיבור פנויות — הקצה אותן בעמוד הגיבור (כל נקודה = +1%)")}
             className="mt-2 block w-full"
           >
             <Link
@@ -543,7 +572,7 @@ function SidebarContent({
               className="flex w-full items-center justify-center gap-1 rounded-full border border-purple-400/50 bg-purple-600/25 px-2 py-0.5 text-[10px] font-black text-purple-200"
             >
               <Icon name="spark" size={11} />
-              {heroPoints} נקודות פנויות
+              {t("{points} נקודות פנויות", { points: heroPoints })}
             </Link>
           </Tip>
         )}

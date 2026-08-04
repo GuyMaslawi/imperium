@@ -202,3 +202,36 @@ export function formatGameDateTime(date: Date): string {
     timeStyle: "short",
   }).format(date);
 }
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * A wait, in the largest unit that still says something true: "בעוד **3 שעות**",
+ * "בעוד **3 ימים**" — the Hebrew a player would use out loud, duals included
+ * (שעתיים, יומיים), never "2 שעות".
+ *
+ * The unit is chosen by size, not by a fixed scale: under an hour it is minutes,
+ * under a day it is hours, and from a day up it is days. A break of 30 hours is
+ * therefore "בעוד יום" and not "בעוד 30 שעות", which is how the wait is actually
+ * spoken about.
+ *
+ * **Always rounded down.** Every caller is a countdown to something that opens,
+ * and the two directions of error are not equal: rounding up sends a player back
+ * *after* the thing has started. Down at worst brings them early, to a page that
+ * is already telling them the exact time.
+ */
+export function formatWaitDuration(ms: number): string {
+  if (ms < MINUTE_MS) return "רגע";
+  if (ms < HOUR_MS) {
+    const minutes = Math.floor(ms / MINUTE_MS);
+    return minutes === 1 ? "דקה" : minutes === 2 ? "שתי דקות" : `${minutes} דקות`;
+  }
+  if (ms < DAY_MS) {
+    const hours = Math.floor(ms / HOUR_MS);
+    return hours === 1 ? "שעה" : hours === 2 ? "שעתיים" : `${hours} שעות`;
+  }
+  const days = Math.floor(ms / DAY_MS);
+  return days === 1 ? "יום" : days === 2 ? "יומיים" : `${days} ימים`;
+}

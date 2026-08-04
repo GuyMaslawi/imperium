@@ -599,16 +599,18 @@ model EmpireBot {
   id       String @id @default(cuid())
   empireId String @unique
 
-  /// Military power the garrison below was sized for. Kept for the admin list
-  /// and for re-arming: the realised figure drifts a little from it, because
-  /// soldiers and weapons only come in whole units.
+  /// Military power the garrison below fields, for the admin list. Every bot is
+  /// planted with the same fixed garrison (see BOT_SOLDIERS), so this is now the
+  /// bodies alone — the column is kept because it is what the list prints and
+  /// because a garrison that carries weapons again would need it.
   targetPower Float
 
   /// The garrison itself, exactly as it is written back on a refill.
   soldiers       Int
   spies          Int
-  /// Weapon tier the three stacks below are bought at — the highest tier this
+  /// Weapon tier the three stacks below are recorded at — the highest tier this
   /// empire's city and hero level would legitimately unlock (weaponTierGate).
+  /// Bots buy none, so the three quantities are zero.
   weaponTier     Int
   attackWeapons  Int
   defenseWeapons Int

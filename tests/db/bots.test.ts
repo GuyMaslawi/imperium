@@ -7,7 +7,8 @@ import { createBots, planBots, rearmBot, restoreBotGarrison } from "@/server/bot
 import { applyPendingUpdates } from "@/lib/game/updates";
 import { notStaffOrBot } from "@/lib/bot";
 import { computePower } from "@/server/empirePower";
-import { BOT_RESTORE_MS } from "@/lib/game/bots";
+import { BOT_RESTORE_MS, BOT_SOLDIERS } from "@/lib/game/bots";
+import { ENSLAVE_MIN_SOLDIERS, isProductionBuilding } from "@/lib/game/constants";
 
 /**
  * Bots, end to end against the real database.
@@ -42,7 +43,7 @@ afterAll(async () => {
 });
 
 beforeAll(async () => {
-  const plans = await planBots({ cities: [TIER], perCity: 2, power: 250_000, spreadPct: 0 });
+  const plans = await planBots({ cities: [TIER], perCity: 2 });
   const { created } = await createBots(plans);
   expect(created).toBe(2);
   plantedIds = (
@@ -94,7 +95,7 @@ describe("a planted bot", () => {
     expect(contending).toBe(0);
   });
 
-  it("fields the power its garrison was built for", async () => {
+  it("fields the fixed garrison and nothing else", async () => {
     const bot = await prisma.empire.findUniqueOrThrow({
       where: { id: plantedIds[0] },
       select: {
@@ -104,22 +105,43 @@ describe("a planted bot", () => {
         bot: { select: { targetPower: true, soldiers: true } },
       },
     });
+    expect(bot.army?.soldiers).toBe(BOT_SOLDIERS);
     expect(bot.army?.soldiers).toBe(bot.bot?.soldiers);
+    expect(bot.army?.spies).toBe(0);
+    // Nothing to buy an arsenal with, so no arsenal rows at all.
+    expect(bot.weapons).toHaveLength(0);
     // The stored figure is the computed one — the invariant empirePower guards.
     expect(bot.militaryPower).toBe(computePower(bot.army, bot.weapons).militaryPower);
     expect(bot.militaryPower).toBeCloseTo(bot.bot!.targetPower, 5);
   });
 
-  it("owns mines with slaves on them, so a raid on it is worth something", async () => {
-    const mines = await prisma.building.findMany({
-      where: { empireId: plantedIds[0], type: { in: ["GOLD_MINE", "IRON_MINE"] } },
-      select: { level: true, slavesAssigned: true },
+  it("holds too few soldiers to be farmed for slaves", async () => {
+    // The bot rebuilds every hour, so a garrison at or above the enslavement
+    // floor would be an unlimited supply of mine slaves to whoever found it.
+    const bot = await prisma.empireBot.findUniqueOrThrow({
+      where: { empireId: plantedIds[0] },
     });
+    expect(bot.soldiers).toBeLessThan(ENSLAVE_MIN_SOLDIERS);
+  });
+
+  it("owns mines with slaves on them, so a raid on it is worth something", async () => {
+    const bot = await prisma.empire.findUniqueOrThrow({
+      where: { id: plantedIds[0] },
+      select: {
+        army: { select: { mineSlaves: true } },
+        buildings: { select: { type: true, level: true, slavesAssigned: true } },
+      },
+    });
+    const mines = bot.buildings.filter((b) => isProductionBuilding(b.type));
     expect(mines.length).toBeGreaterThan(0);
     for (const mine of mines) {
       expect(mine.level).toBeGreaterThan(1);
       expect(mine.slavesAssigned).toBeGreaterThan(0);
     }
+    // The pool covers what stands in the mines — the invariant every assignment
+    // is validated against.
+    const assigned = mines.reduce((sum, m) => sum + m.slavesAssigned, 0);
+    expect(bot.army?.mineSlaves).toBeGreaterThanOrEqual(assigned);
   });
 });
 

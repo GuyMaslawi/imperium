@@ -14,6 +14,7 @@ import type {
   WeaponGateStatus,
 } from "@/lib/game/weapons";
 import type { AvailableResources } from "@/components/game/WeaponCard";
+import { useT } from "@/i18n/client";
 
 const COST_RESOURCES = [
   { key: "gold", icon: "gold" },
@@ -54,6 +55,7 @@ export function NextWeaponCard({
   /** Active shop-discount percent (0 when none). */
   discountPct: number;
 }) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(
     unlockNextWeaponTier,
     {}
@@ -87,20 +89,20 @@ export function NextWeaponCard({
           <WeaponArt weapon={weapon} locked />
           <div className="min-w-0">
             <p className="mb-0.5 text-[11px] font-bold tracking-wide text-gold-bright">
-              ← הנשק הבא
+              {t("← הנשק הבא")}
             </p>
             <h3 className="truncate font-bold text-gold-bright">
-              {weapon.name}
+              {t(weapon.name)}
             </h3>
             <p className="flex items-center gap-2 text-xs font-semibold text-gold-dim">
               <span>
-                רמה{" "}
+                {t("רמה")}{" "}
                 <span className="nums" dir="ltr">
                   {weapon.tier}
                 </span>
               </span>
               <span className="rounded-full border border-gold/40 bg-gold/10 px-2 py-px text-[11px] text-gold-bright">
-                🔒 נעול
+                {t("🔒 נעול")}
               </span>
             </p>
           </div>
@@ -108,20 +110,22 @@ export function NextWeaponCard({
 
         {/* details */}
         <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-sm text-zinc-400/90">{weapon.description}</p>
+          <p className="text-sm text-zinc-400/90">{t(weapon.description)}</p>
 
           {/* chips hug their content — a full-width panel here left a wide
               empty strip beside the numbers */}
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="panel-inset rounded-lg px-3 py-1.5 text-zinc-400">
-              עוצמה ליחידה:{" "}
+              {t("עוצמה ליחידה:")}{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
                 <Icon name="spark" size={14} className="inline align-[-2px]" />{" "}
                 {weapon.power}
               </span>
             </span>
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1 panel-inset rounded-lg px-3 py-1.5 text-zinc-400">
-              <span className="font-semibold text-gold-dim">עלות ליחידה:</span>
+              <span className="font-semibold text-gold-dim">
+                {t("עלות ליחידה:")}
+              </span>
               {COST_RESOURCES.map(({ key, icon }) => {
                 if (weapon.cost[key] <= 0) return null;
                 const net = discountedAmount(weapon.cost[key], discountPct);
@@ -129,7 +133,9 @@ export function NextWeaponCard({
                 return (
                   <span
                     key={key}
-                    title={missing ? "אין מספיק מהמשאב הזה ליחידה אחת" : undefined}
+                    title={
+                      missing ? t("אין מספיק מהמשאב הזה ליחידה אחת") : undefined
+                    }
                   >
                     <Icon
                       name={icon}
@@ -162,7 +168,7 @@ export function NextWeaponCard({
           {(hasCityGate || hasHeroGate) && (
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <span className="font-semibold text-gold-dim">
-                דרישות לרמה הבאה:
+                {t("דרישות לרמה הבאה:")}
               </span>
               {hasCityGate && (
                 <span
@@ -172,17 +178,11 @@ export function NextWeaponCard({
                       : "border-red-400/40 bg-red-500/10 font-semibold text-red-400"
                   }`}
                 >
-                  {gate.citiesMet ? "✓" : "🔒"} 🏰 עיר{" "}
-                  <span className="nums" dir="ltr">
-                    {gate.cities}
-                  </span>{" "}
-                  <span className="text-zinc-500">
-                    (אתה בעיר{" "}
-                    <span className="nums" dir="ltr">
-                      {cities}
-                    </span>
-                    )
-                  </span>
+                  {gate.citiesMet ? "✓" : "🔒"}{" "}
+                  {t("🏰 עיר {required} (אתה בעיר {current})", {
+                    required: gate.cities,
+                    current: cities,
+                  })}
                 </span>
               )}
               {hasHeroGate && (
@@ -193,24 +193,18 @@ export function NextWeaponCard({
                       : "border-red-400/40 bg-red-500/10 font-semibold text-red-400"
                   }`}
                 >
-                  {gate.heroLevelMet ? "✓" : "🔒"} ⚔️ גיבור רמה{" "}
-                  <span className="nums" dir="ltr">
-                    {gate.heroLevel}
-                  </span>{" "}
-                  <span className="text-zinc-500">
-                    (רמה{" "}
-                    <span className="nums" dir="ltr">
-                      {heroLevel}
-                    </span>
-                    )
-                  </span>
+                  {gate.heroLevelMet ? "✓" : "🔒"}{" "}
+                  {t("⚔️ גיבור רמה {required} (רמה {current})", {
+                    required: gate.heroLevel,
+                    current: heroLevel,
+                  })}
                 </span>
               )}
             </div>
           )}
 
           <p className="text-xs text-zinc-500">
-            פתיחה מקדמת את הנשק הבא בכל הקטגוריות — התקפה, הגנה וריגול.
+            {t("פתיחה מקדמת את הנשק הבא בכל הקטגוריות — התקפה, הגנה וריגול.")}
           </p>
         </div>
 
@@ -219,14 +213,16 @@ export function NextWeaponCard({
           <form action={action} className="space-y-2">
             <input type="hidden" name="category" value={category} />
             <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-400">
-              <span className="font-semibold text-gold-dim">עלות פתיחה:</span>
+              <span className="font-semibold text-gold-dim">
+                {t("עלות פתיחה:")}
+              </span>
               {COST_RESOURCES.map(({ key, icon }) => {
                 const net = discountedAmount(unlockCost[key], discountPct);
                 const missing = available[key] < net;
                 return (
                   <span
                     key={key}
-                    title={missing ? "אין מספיק מהמשאב הזה לפתיחה" : undefined}
+                    title={missing ? t("אין מספיק מהמשאב הזה לפתיחה") : undefined}
                   >
                     <Icon
                       name={icon}
@@ -256,10 +252,10 @@ export function NextWeaponCard({
             </div>
             <SubmitButton
               className="btn btn-gold w-full"
-              pendingText="פותח..."
+              pendingText={t("פותח...")}
               disabled={!gate.met}
             >
-              {gate.met ? "🔓 פתח נשק הבא" : "🔒 דרישות לא הושלמו"}
+              {gate.met ? t("🔓 פתח נשק הבא") : t("🔒 דרישות לא הושלמו")}
             </SubmitButton>
           </form>
 

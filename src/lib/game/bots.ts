@@ -1,5 +1,9 @@
-import { MAX_CITIES, SOLDIER_POWER, SPY_POWER, cityHeroLevelRequired } from "./constants";
-import { bossPower } from "./bosses";
+import {
+  ENSLAVE_MIN_SOLDIERS,
+  MAX_CITIES,
+  SOLDIER_POWER,
+  cityHeroLevelRequired,
+} from "./constants";
 import { HERO_MAX_LEVEL } from "./hero";
 import {
   MAX_WEAPON_TIER,
@@ -11,11 +15,10 @@ import {
 /**
  * Bot empires — the garrisons an admin plants in a city tier.
  *
- * This module is the *arithmetic* of a bot: what it is called, how strong it is
- * by default, and how a power figure is spent on soldiers, spies and weapons.
- * Nothing here touches the database — src/server/bots.ts does the planting and
- * the refilling, and the admin page reads these same functions to preview what
- * it is about to create.
+ * This module is the *arithmetic* of a bot: what it is called, what it fields
+ * and what its mines are worth. Nothing here touches the database —
+ * src/server/bots.ts does the planting and the refilling, and the admin page
+ * reads these same functions to describe what it is about to create.
  *
  * The problem a bot solves is a city with one player in it. Combat is confined
  * to your own city tier (see attackEmpire / spyOnEmpire), so the first player to
@@ -28,45 +31,28 @@ import {
 /* ------------------------------ how strong ------------------------------ */
 
 /**
- * A bot's default power, as a fraction of the city boss's.
+ * The whole of a bot's garrison: nineteen soldiers, no spies, no weapons.
  *
- * `bossPower` is the game's own answer to "what does an empire of this tier
- * hold" — its doc says an army at parity with it fells the tyrant in one good
- * sortie. A target should be softer than that: a bot is what a player raids on
- * the way to the boss, not a second boss. At 60% a tier-appropriate player wins
- * comfortably, an under-levelled one still loses.
- */
-export const BOT_POWER_OF_BOSS = 0.6;
-
-/** The default military power for a bot planted in `cities`, before any spread. */
-export function botDefaultPower(cities: number): number {
-  return Math.round(bossPower(cities) * BOT_POWER_OF_BOSS);
-}
-
-/**
- * Floor for any bot's power. A city whose only resident is a fresh arrival
- * averages almost nothing, and a bot mirroring that average would be a target
- * worth zero turns — it dies to a single soldier and drops a purse of nothing.
- */
-export const BOT_MIN_POWER = 1_000;
-
-/** Widest random spread (±%) around the requested power the admin may ask for. */
-export const BOT_SPREAD_MAX_PCT = 90;
-
-/**
- * Hard ceiling on any single stack a garrison is built with.
+ * Bots used to be *sized* — a power figure, taken from the city's own average or
+ * typed by the admin, spent on bodies and an arsenal so the garrison read as a
+ * plausible neighbour. It did not survive contact with the game. The figure a
+ * high city averages is enormous, and a bot built at it is not a target on the
+ * way to the boss but the hardest empire in the tier, standing at the top of the
+ * ladder the player is trying to climb.
  *
- * Every count a bot is stored as — soldiers, spies, each weapon quantity — lands
- * in an `Int` column, and Postgres `int4` stops at 2,147,483,647. A stack past
- * that is not a large bot, it is a failed insert: the whole plant throws and
- * `createBots` reports the city as "nothing created", which is what a tier whose
- * only resident is rich enough to size a bot past the column did.
+ * Nineteen is not a round number, it is {@link ENSLAVE_MIN_SOLDIERS} minus one:
+ * enslavement only fires on a defender holding *twenty* soldiers or more, so a
+ * garrison of nineteen can never be turned into mine slaves however many times
+ * it is farmed. That is the point. A bot is planted so the lone resident of a
+ * high city has somebody to attack and somebody to spy; it is not meant to be an
+ * income stream, and every version of it that carried a real army was one —
+ * a rebuilt garrison every hour is an infinite supply of bodies to enslave.
  *
- * Kept an order of magnitude clear of the limit so the derived figures — the
- * mine slaves that follow from the soldiers, a raider's share of them — have
- * room of their own.
+ * So what is left is exactly the minimum that makes the target legal and worth
+ * loading: an army that is not empty, mines that produce something to plunder,
+ * and no power at all beyond the nineteen bodies themselves.
  */
-export const BOT_MAX_STACK = 2_000_000_000;
+export const BOT_SOLDIERS = ENSLAVE_MIN_SOLDIERS - 1;
 
 /** Bots an admin may create in one submit, across all selected cities. */
 export const BOT_BATCH_MAX = 50;
@@ -92,79 +78,23 @@ export function botHeroLevel(cities: number): number {
   return Math.min(HERO_MAX_LEVEL, Math.max(1, cityHeroLevelRequired(tier - 1) || 1));
 }
 
-/** Power of one weapon at `tier` in a category, or 0 if the tier does not exist. */
-function weaponPowerAt(category: "ATTACK" | "DEFENSE" | "SPY", tier: number): number {
-  const weapon = weaponsOfCategory(category).find((w) => w.tier === tier);
-  return weapon?.power ?? 0;
-}
-
 /**
- * Smallest stack a bot's arsenal is allowed to consist of.
+ * The weapon tier this empire's city and hero level would legitimately unlock.
  *
- * Weapon power grows ×2.5 a tier while the gate that unlocks it grows with the
- * city, so the two are not on the same curve at all: a tier-10 city unlocks tier
- * 30, where one weapon is worth ~2.4 trillion power — five orders of magnitude
- * past the whole bot. Buying at the highest *unlocked* tier would round the
- * entire arsenal to zero and leave a bot made of soldiers alone.
- *
- * So the tier is chosen by what the budget can actually field. Ten is the point
- * where rounding stops mattering: a stack that size lands within a few percent
- * of its share, and the arsenal still reads as a serious one rather than as a
- * museum piece bought to be counted.
+ * A bot buys none of them — every stack is zero — but the tier is still stored
+ * and still granted as an unlock, so a spy who gets into a bot reads a dossier
+ * that is *consistent*: an empire of this city, at this hero level, with an
+ * empty armoury. A tier nobody here could have reached would read as a bug.
  */
-const MIN_WEAPON_STACK = 10;
-
-/**
- * The weapon tier a bot arms itself at: the best tier its city and hero level
- * could legitimately have unlocked, stepped down until the budget can field a
- * real stack of it.
- *
- * Bots buy real weapons from the real table, gated by the real gate — a spy who
- * gets into one reads an arsenal that could belong to a neighbour.
- */
-export function botWeaponTier(cities: number, heroLevel: number, stackBudget = 0): number {
+export function botWeaponTier(cities: number, heroLevel: number): number {
   let unlocked = 1;
   for (let tier = 1; tier <= MAX_WEAPON_TIER; tier++) {
     if (weaponGateStatus(tier, cities, heroLevel).met) unlocked = tier;
   }
-  if (stackBudget <= 0) return unlocked;
-
-  for (let tier = unlocked; tier > 1; tier--) {
-    // The dearest of the three categories decides: they are bought at one tier,
-    // so the tier has to be one all three stacks survive.
-    const dearest = Math.max(
-      weaponPowerAt("ATTACK", tier),
-      weaponPowerAt("DEFENSE", tier),
-      weaponPowerAt("SPY", tier)
-    );
-    if (dearest > 0 && stackBudget / dearest >= MIN_WEAPON_STACK) return tier;
-  }
-  return 1;
+  return unlocked;
 }
 
 /* ------------------------------ the garrison ------------------------------ */
-
-/**
- * How a bot's power is split. Military power counts soldiers once plus attack
- * and defence weapons (see getEmpireMilitaryPower), so these three sum to 1 and
- * the realised figure lands on the requested one.
- *
- * Weighted towards defence because of what a bot is for: it is attacked far more
- * often than the ladder position suggests, and the defender's own +20% already
- * rides on the defence half. An even split made bots that lost every fight to
- * anyone who could see them.
- */
-const POWER_SPLIT = { soldiers: 0.34, attack: 0.28, defense: 0.38 } as const;
-
-/**
- * Intelligence, as a fraction of military power. Spy power is a separate figure
- * that never enters the ladder, so this is additive rather than a share — it
- * buys the bot enough of a counter-intelligence rating that scouting it is a
- * real check against the spy's own, not a formality.
- */
-const SPY_SHARE = 0.35;
-/** Of that intelligence, how much comes from spies rather than spy weapons. */
-const SPY_FROM_BODIES = 0.6;
 
 export interface BotGarrison {
   soldiers: number;
@@ -176,75 +106,25 @@ export interface BotGarrison {
 }
 
 /**
- * Whole units, never negative — a stack of 0.4 catapults is a stack of none —
- * and never past what the column holds (see {@link BOT_MAX_STACK}).
- */
-function units(power: number, each: number): number {
-  if (each <= 0) return 0;
-  return Math.min(BOT_MAX_STACK, Math.max(0, Math.round(power / each)));
-}
-
-/**
- * The most power a bot spends on *bodies*, however much it is asked to field.
+ * What a bot is built with, and rebuilt to: {@link BOT_SOLDIERS} soldiers and
+ * nothing else. It takes no power argument because there is nothing left to
+ * spend one on — see the note on {@link BOT_SOLDIERS} for why.
  *
- * A soldier is worth a flat {@link SOLDIER_POWER} while the weapon table pays
- * ×2.5 a tier, so power at the top of the game lives in arsenals and not in men:
- * the tier-4 resident this cap was written for carries 4.4 *trillion* power
- * behind 1,890 soldiers. "Match the city" hands that whole figure here, and a
- * third of it spent at 10 power a head asks for 150 billion soldiers — which is
- * not a big garrison but a failed insert, and would be an economy-ending one if
- * it landed: a won attack enslaves a share of the defender's soldiers, and that
- * share of 150 billion is a purse no game recovers from.
- *
- * So the bodies are capped at what the tier's own yardstick buys — the boss
- * curve, the game's statement of what an empire of this tier holds — and every
- * point of power past it goes to the arsenal, which is exactly where the
- * neighbour the bot is imitating keeps its own.
+ * The city and hero level survive only to name the weapon tier the (empty)
+ * armoury is recorded at.
  */
-function bodyBudget(power: number, cities: number): number {
-  return Math.min(power, botDefaultPower(cities));
-}
-
-/**
- * Spend a power budget on an army and an arsenal.
- *
- * The realised military power is close to `power` but not equal to it: every
- * stack rounds to whole units. `botRealisedPower` reports what was actually
- * bought, and the caller stores that — never the request — as the bot's power.
- */
-export function botGarrison(power: number, cities: number, heroLevel: number): BotGarrison {
-  const budget = Math.max(0, power);
-  const bodies = bodyBudget(budget, cities);
-
-  // Whatever the soldier share could not spend on men rides on the arsenal
-  // instead, split between attack and defence in their own ratio — so the bot
-  // still fields the power it was asked for, out of the weapons a resident of
-  // this city would have bought it with.
-  const arms = POWER_SPLIT.attack + POWER_SPLIT.defense;
-  const surplus = (budget - bodies) * POWER_SPLIT.soldiers;
-  const attackPower = budget * POWER_SPLIT.attack + (surplus * POWER_SPLIT.attack) / arms;
-  const defensePower = budget * POWER_SPLIT.defense + (surplus * POWER_SPLIT.defense) / arms;
-  const spyWeaponPower = budget * SPY_SHARE * (1 - SPY_FROM_BODIES);
-
-  // Sized off the smallest of the three shares, so no stack is the one that
-  // rounds away at the tier the other two can afford.
-  const weaponTier = botWeaponTier(
-    cities,
-    heroLevel,
-    Math.min(attackPower, defensePower, spyWeaponPower)
-  );
-
+export function botGarrison(cities: number, heroLevel: number): BotGarrison {
   return {
-    soldiers: units(bodies * POWER_SPLIT.soldiers, SOLDIER_POWER),
-    spies: units(bodies * SPY_SHARE * SPY_FROM_BODIES, SPY_POWER),
-    weaponTier,
-    attackWeapons: units(attackPower, weaponPowerAt("ATTACK", weaponTier)),
-    defenseWeapons: units(defensePower, weaponPowerAt("DEFENSE", weaponTier)),
-    spyWeapons: units(spyWeaponPower, weaponPowerAt("SPY", weaponTier)),
+    soldiers: BOT_SOLDIERS,
+    spies: 0,
+    weaponTier: botWeaponTier(cities, heroLevel),
+    attackWeapons: 0,
+    defenseWeapons: 0,
+    spyWeapons: 0,
   };
 }
 
-/** The weapon keys a garrison's three stacks are bought as. */
+/** The weapon keys a garrison's three (empty) stacks are recorded under. */
 export function botWeaponKeys(weaponTier: number): {
   attack: string;
   defense: string;
@@ -255,7 +135,12 @@ export function botWeaponKeys(weaponTier: number): {
   return { attack: keyOf("ATTACK"), defense: keyOf("DEFENSE"), spy: keyOf("SPY") };
 }
 
-/** Military power a garrison actually fields — soldiers + attack + defence weapons. */
+/**
+ * Military power a garrison actually fields — soldiers + attack + defence
+ * weapons, the ladder's own formula. With an empty armoury that is the bodies
+ * alone, which is the whole of a bot's power by design; the arithmetic is kept
+ * general so the figure stays true if a garrison ever carries weapons again.
+ */
 export function botRealisedPower(garrison: BotGarrison): number {
   const keys = botWeaponKeys(garrison.weaponTier);
   return (
@@ -268,7 +153,19 @@ export function botRealisedPower(garrison: BotGarrison): number {
 /* ------------------------------ the economy ------------------------------ */
 
 /**
- * A bot's mine level and slave count, derived from its garrison.
+ * Slaves on each of a bot's mines.
+ *
+ * This used to follow the garrison — one slave per ten soldiers — which is no
+ * longer a scale of anything now that every bot fields the same nineteen. It is
+ * therefore its own number, and the one knob left that decides what a raid on a
+ * bot is worth. Kept deliberately small: a bot is a sparring partner, not a
+ * revenue stream, and its mines are only there so the raid has *something* in
+ * it. Raise this if bots should be worth farming for resources.
+ */
+export const BOT_MINE_SLAVES = 5;
+
+/**
+ * A bot's mine level and slave count.
  *
  * Bots hold no stored (warehoused) resources on purpose — plunder only reaches
  * the *available* balance, and a bot whose purse is locked away is a bot worth
@@ -277,18 +174,15 @@ export function botRealisedPower(garrison: BotGarrison): number {
  * a bot's backlog the moment a raider loads it as a target, so the haul is
  * whatever it has genuinely produced since it was last robbed.
  *
- * The level tracks the tier and the slaves track the army, which keeps a bot's
- * income in the same neighbourhood as a real resident of its city rather than
- * on a curve of its own.
+ * The level tracks the tier — production is `level × 2` per assigned slave, so
+ * a bot in a high city is still worth more per raid than one in a low city,
+ * which is the only way its income is allowed to differ.
  */
-export function botMineSetup(
-  cities: number,
-  soldiers: number
-): { level: number; slavesPerMine: number } {
+export function botMineSetup(cities: number): { level: number; slavesPerMine: number } {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));
   return {
     level: Math.max(1, tier * 4),
-    slavesPerMine: Math.max(5, Math.round(soldiers / 10)),
+    slavesPerMine: BOT_MINE_SLAVES,
   };
 }
 

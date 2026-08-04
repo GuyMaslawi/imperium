@@ -8,6 +8,8 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { usePulse } from "@/components/ui/motion";
 import { MusterYard } from "./MusterYard";
 import { formatNumber } from "@/lib/game/format";
+import { COLUMN_INT_MAX } from "@/lib/game/constants";
+import { useT } from "@/i18n/client";
 
 export interface TrainCardProps {
   unit: "soldiers" | "spies" | "mineSlaves";
@@ -28,6 +30,7 @@ export function TrainCard({
   power,
   availableCitizens,
 }: TrainCardProps) {
+  const t = useT();
   const [state, action] = useActionState<ActionState, FormData>(trainUnits, {});
 
   // Every settled training order marches the recruits into the yard. The
@@ -44,9 +47,9 @@ export function TrainCard({
         <div className="flex items-center gap-3">
           <Icon name={icon} size={30} className="text-gold-bright" />
           <div>
-            <h3 className="font-bold text-gold-bright">{label}</h3>
+            <h3 className="font-bold text-gold-bright">{t(label)}</h3>
             <p className="text-xs text-gold-dim">
-              ברשותך:{" "}
+              {t("ברשותך:")}{" "}
               <span className="nums font-bold text-gold-bright" dir="ltr">
                 {formatNumber(owned)}
               </span>
@@ -59,7 +62,7 @@ export function TrainCard({
             <span className="nums" dir="ltr">
               {power}
             </span>{" "}
-            עוצמה
+            {t("עוצמה")}
           </span>
         )}
       </div>
@@ -67,34 +70,35 @@ export function TrainCard({
       {/* the parade ground: one silhouette rank standing for what you hold */}
       <MusterYard unit={unit} label={label} owned={owned} power={power} pulse={pulse} />
 
-      <p className="text-sm text-zinc-400">{description}</p>
+      <p className="text-sm text-zinc-400">{t(description)}</p>
 
       <p className="text-xs text-zinc-400">
-        <span className="font-semibold text-gold-dim">עלות:</span> אזרח אחד
+        <span className="font-semibold text-gold-dim">{t("עלות:")}</span>{" "}
+        {t("אזרח אחד")}
       </p>
 
       <form action={action} className="mt-auto space-y-2">
         <input type="hidden" name="unit" value={unit} />
         <label className="block space-y-1">
           <span className="text-xs text-gold-dim">
-            כמות לאימון (אזרחים פנויים:{" "}
-            <span className="nums" dir="ltr">
-              {formatNumber(availableCitizens)}
-            </span>
-            )
+            {t("כמות לאימון (אזרחים פנויים: {available})", {
+              available: formatNumber(availableCitizens),
+            })}
           </span>
           <input
             type="number"
             name="quantity"
             min={1}
-            max={availableCitizens}
+            // Free citizens, held to what the army column can store — see
+            // COLUMN_INT_MAX. Nothing else caps an order.
+            max={Math.min(availableCitizens, Math.max(0, COLUMN_INT_MAX - owned))}
             defaultValue={1}
             required
             className="nums w-full rounded-lg border border-border-subtle bg-panel-inset px-3 py-1.5 text-sm text-zinc-100 outline-none focus:border-gold"
           />
         </label>
-        <SubmitButton className="btn btn-dark w-full" pendingText="מאמן...">
-          ביצוע אימון
+        <SubmitButton className="btn btn-dark w-full" pendingText={t("מאמן...")}>
+          {t("ביצוע אימון")}
         </SubmitButton>
       </form>
 

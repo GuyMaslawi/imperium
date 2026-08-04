@@ -4,29 +4,28 @@ import { useState } from "react";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { LabeledInput } from "@/components/admin/fields";
 import { cityAt } from "@/lib/game/cities";
-import { formatCompact } from "@/lib/game/format";
-import { BOT_BATCH_MAX, BOT_SPREAD_MAX_PCT } from "@/lib/game/bots";
+import { BOT_BATCH_MAX, BOT_SOLDIERS } from "@/lib/game/bots";
 import type { AdminActionState } from "@/server/actions/admin";
 
-/** One city tier as the planter sees it: who lives there, and what a bot would cost to match. */
+/** One city tier as the planter sees it: who lives there. */
 export interface BotCityStat {
   cities: number;
   /** Real residents — staff and bots excluded. */
   players: number;
   bots: number;
-  /** The power a bot planted here would be built at, on "match the city". */
-  baseline: number;
 }
 
 /**
  * The city picker.
  *
- * Which tiers to plant in is the only decision here that needs a screen rather
- * than a number box, because it is the one made by looking: the admin is hunting
- * for the tier where somebody is stranded alone, and the answer is "the row that
- * says 1 player, 0 bots". So each tier carries its own headcount and the power a
- * bot would be built at, and a tier with exactly one resident is called out —
- * that player currently has nobody to attack and nobody to spy.
+ * Which tiers to plant in is very nearly the only decision here, and it is the
+ * one made by looking: the admin is hunting for the tier where somebody is
+ * stranded alone, and the answer is "the row that says 1 player, 0 bots". So
+ * each tier carries its own headcount and a tier with exactly one resident is
+ * called out — that player currently has nobody to attack and nobody to spy.
+ *
+ * There is nothing to size. Every bot is planted with the same fixed garrison
+ * (see BOT_SOLDIERS), so the only other input is how many.
  */
 export function BotPlanter({
   action,
@@ -98,17 +97,14 @@ export function BotPlanter({
                 <span className="nums" dir="ltr">
                   {stat.bots}
                 </span>{" "}
-                בוטים · כוח מותאם{" "}
-                <span className="nums text-gold-dim" dir="ltr">
-                  {formatCompact(stat.baseline)}
-                </span>
+                בוטים
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <LabeledInput
           label="בוטים לכל עיר"
           name="perCity"
@@ -117,23 +113,7 @@ export function BotPlanter({
           max={BOT_BATCH_MAX}
           value={perCity}
           onValueChange={setPerCity}
-        />
-        <LabeledInput
-          label="כוח צבאי"
-          name="power"
-          type="number"
-          min={0}
-          placeholder="ריק = מותאם לעיר"
-          hint="השאר ריק כדי לבנות כל בוט לפי ממוצע הכוח של תושבי העיר שלו"
-        />
-        <LabeledInput
-          label="פיזור ±%"
-          name="spreadPct"
-          type="number"
-          min={0}
-          max={BOT_SPREAD_MAX_PCT}
-          defaultValue={25}
-          hint="הגרלה סביב הכוח, כדי שכמה בוטים באותה עיר לא יֵצאו זהים"
+          hint={`כל בוט נשתל עם ${BOT_SOLDIERS} חיילים בלבד — בלי מרגלים ובלי נשק`}
         />
       </div>
     </ActionForm>

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import { formatNumber } from "@/lib/game/format";
 import { useCountUp } from "@/components/ui/motion";
+import { useT } from "@/i18n/client";
 
 /**
  * The forge behind the weapon shop: a furnace burning, a hammer working the
@@ -74,6 +75,7 @@ export function ArmoryForge({
   unlockedTier,
   maxTier,
 }: ArmoryForgeProps) {
+  const t = useT();
   const tint = FORGE_TINT[category];
   const shownPower = useCountUp(totalPower);
 
@@ -89,7 +91,16 @@ export function ArmoryForge({
       className="smithy"
       style={style}
       role="img"
-      aria-label={`נפחיית ${label} — ${powerLabel}: ${formatNumber(totalPower)}, שכבה ${unlockedTier} מתוך ${maxTier}`}
+      aria-label={t(
+        "נפחיית {label} — {powerLabel}: {power}, שכבה {tier} מתוך {maxTier}",
+        {
+          label,
+          powerLabel,
+          power: formatNumber(totalPower),
+          tier: unlockedTier,
+          maxTier,
+        }
+      )}
     >
       <span className="smithy-wall" aria-hidden />
       <span className="smithy-heat" aria-hidden />

@@ -64,7 +64,7 @@ import {
   type ActiveEmpireUpgradeType,
 } from "@/lib/game/constants";
 import { POTION_STACK_CAP } from "@/lib/game/potions";
-import { BOT_BATCH_MAX, BOT_MIN_POWER, BOT_SPREAD_MAX_PCT } from "@/lib/game/bots";
+import { BOT_BATCH_MAX, BOT_SOLDIERS } from "@/lib/game/bots";
 import { applyPendingUpdates } from "@/lib/game/updates";
 import {
   castBankInterest,
@@ -94,6 +94,11 @@ import {
   mergeTunables,
   type GameTunables,
 } from "@/lib/game/config";
+import {
+  breakToHours,
+  formatBreakHours as formatBreak,
+  isBreakUnit,
+} from "@/lib/game/seasonCycle";
 import { newEmpireData } from "@/lib/game/createEmpire";
 import { hashPassword } from "@/lib/password";
 import { syncEmpirePower } from "@/server/empirePower";
@@ -104,6 +109,7 @@ import {
   archiveSeasonStandings,
   closeSeason,
 } from "@/server/seasonClose";
+import { restartWorld } from "@/server/seasonRestart";
 import { announceToDiscord, gameLink } from "@/server/discord";
 
 export interface AdminActionState {
@@ -2765,6 +2771,77 @@ function parseDate(formData: FormData, key: string): Date {
   return d;
 }
 
+/**
+ * The season cycle's own settings: how long the break is, how long the next
+ * season runs, and whether the whole thing turns by itself at all.
+ *
+ * These four live in the global tunables (`season` in lib/game/config.ts) like
+ * every other number an admin can move, and they are therefore also editable on
+ * /admin/balance. They get a second home here because this is where an admin
+ * thinks about them — reading "24 שעות הפסקה" next to the season that is
+ * running is the difference between a setting and a schedule.
+ *
+ * Writes only its own group. The overlay is merged onto the tunables as they
+ * are right now, so saving the break length can never quietly restore some
+ * other page's field to its default.
+ *
+ * The break arrives as a free number plus a unit (`breakValue` + `breakUnit`)
+ * and is stored in hours — see `breakToHours`. The raw `season.breakHours`
+ * field is still accepted, because /admin/balance renders every tunable
+ * generically and posts exactly that.
+ */
+export async function saveSeasonCycle(
+  _prev: AdminActionState,
+  formData: FormData
+): Promise<AdminActionState> {
+  try {
+    const admin = await requireAdmin();
+    const current = await getTunables();
+    const season: Record<string, number> = { ...current.season };
+    for (const field of Object.keys(DEFAULT_TUNABLES.season)) {
+      const raw = formData.get(`season.${field}`);
+      const n = Number(raw);
+      if (raw != null && raw !== "" && Number.isFinite(n)) season[field] = n;
+    }
+
+    // The break, as it was actually typed. Takes precedence over any
+    // `breakHours` above: this panel posts the pair, and a stale hidden field
+    // must not win over the number the admin is looking at.
+    const breakRaw = formData.get("season.breakValue");
+    const breakUnit = formData.get("season.breakUnit");
+    const breakValue = Number(breakRaw);
+    if (breakRaw != null && breakRaw !== "" && Number.isFinite(breakValue)) {
+      if (!isBreakUnit(breakUnit)) return { error: "יחידת זמן לא תקינה להפסקה" };
+      season.breakHours = breakToHours(breakValue, breakUnit);
+    }
+    // mergeTunables re-clamps every group to its bounds, so an out-of-range
+    // break length arrives as the nearest legal one rather than as a game that
+    // never reopens.
+    const merged = mergeTunables({ ...current, season });
+    await prisma.gameConfig.upsert({
+      where: { id: "singleton" },
+      create: { id: "singleton", data: merged as unknown as Prisma.InputJsonValue },
+      update: { data: merged as unknown as Prisma.InputJsonValue },
+    });
+    await logAdmin(admin, {
+      action: "config.season",
+      targetType: "config",
+      summary: `מחזור העונות עודכן — הפסקה ${formatBreak(merged.season.breakHours)}, עונה ${merged.season.lengthDays} ימים`,
+      details: merged.season as unknown as Prisma.InputJsonValue,
+    });
+    revalidatePath("/admin/seasons");
+    revalidatePath("/admin/balance");
+    // Says what was *stored*, not what was typed. The bounds in
+    // lib/game/config.ts clamp silently, and an admin who asked for a ten-year
+    // break has to see that they got one year rather than discover it later.
+    return {
+      success: `נשמר — הפסקה של ${formatBreak(merged.season.breakHours)}, ואז עונה של ${merged.season.lengthDays} ימים`,
+    };
+  } catch (e) {
+    return toErr(e);
+  }
+}
+
 export async function createSeason(
   _prev: AdminActionState,
   formData: FormData
@@ -2874,7 +2951,10 @@ export async function activateSeason(
           data: { endsAt: now },
         });
       }
-      await closeSeason(outgoing.id, now);
+      // No successor is booked for it: the admin is standing right here naming
+      // the successor. Letting the close schedule its own would leave a second,
+      // auto-created season in the list that nobody asked for and nothing opens.
+      await closeSeason(outgoing.id, now, { scheduleNext: false });
     }
 
     // One transaction, so the game is never left with the old season closed and
@@ -3066,76 +3146,23 @@ export async function resetSeason(
         ? await archiveSeasonStandings(activeSeason.id)
         : 0;
 
-    // Bots do not survive a world restart, and are removed rather than rebuilt.
-    //
-    // Rebuilding one is not an option: `newEmpireData` produces a starter empire
-    // with no garrison and no `EmpireBot` row (the old one cascades away with
-    // the empire), so the loop below would leave a flagged husk that the refill
-    // can never repair. Nor should they carry over on principle — a reset puts
-    // every player back on an equal footing at one city, which is the one
-    // situation where the city ladder is crowded and nobody needs a target
-    // planted for them. The admin plants fresh ones once the field spreads out.
-    //
-    // Deleting the *user* is what takes the empire with it (cascade), and it
-    // also keeps the reset from leaving accounts behind that inflate every
-    // player count in the admin.
-    const botUsers = await prisma.empire.findMany({
-      where: { isBot: true },
-      select: { userId: true },
-    });
-
-    // Carry over only the identity + diamond balance of each empire — plus the
-    // staff flag, which is not a game asset but a statement about whether the
-    // account competes at all, and must survive a world restart.
-    const empires = await prisma.empire.findMany({
-      where: notBot,
-      select: { userId: true, name: true, diamonds: true, isStaff: true },
-    });
-
-    await prisma.$transaction(
-      async (tx) => {
-        // Guilds first: members, spells and treasury transactions cascade off.
-        await tx.guild.deleteMany({});
-        // The bot accounts, which take their empires and garrisons with them.
-        if (botUsers.length > 0) {
-          await tx.user.deleteMany({
-            where: { id: { in: botUsers.map((b) => b.userId) } },
-          });
-        }
-        // Then every empire — all per-empire records cascade, and diamond
-        // purchases detach (SetNull) rather than disappear.
-        await tx.empire.deleteMany({});
-        // Rebuild a pristine empire for each player, preserving only the name,
-        // season assignment and diamond balance.
-        for (const e of empires) {
-          const data = newEmpireData(
-            e.userId,
-            e.name,
-            activeSeason?.id,
-            tunables.starting,
-            undefined,
-            e.isStaff
-          );
-          data.diamonds = e.diamonds;
-          // No new-player shield on a season reset: everyone restarts equal and
-          // may compete immediately. The shield is only for genuine mid-season
-          // registrations joining among established players.
-          data.protectedUntil = null;
-          await tx.empire.create({ data });
-        }
-      },
+    // The same rebuild the automatic season opening runs (server/seasonRestart.ts)
+    // — one implementation, so the button and the clock can never produce two
+    // different kinds of fresh world.
+    const { empiresRebuilt, botsRemoved } = await prisma.$transaction(
+      (tx) => restartWorld(tx, activeSeason?.id, tunables),
       { timeout: 120_000 }
     );
 
     await logAdmin(admin, {
       action: "season.reset",
       targetType: "season",
-      summary: `אופסה העונה — ${empires.length} אימפריות אותחלו, כל הגילדות נמחקו${
-        botUsers.length > 0 ? `, ${botUsers.length} בוטים הוסרו` : ""
+      summary: `אופסה העונה — ${empiresRebuilt} אימפריות אותחלו, כל הגילדות נמחקו${
+        botsRemoved > 0 ? `, ${botsRemoved} בוטים הוסרו` : ""
       }${archived > 0 ? " (הדירוג נשמר)" : ""}`,
       details: {
-        empiresReset: empires.length,
-        botsRemoved: botUsers.length,
+        empiresReset: empiresRebuilt,
+        botsRemoved,
         archivedChampions: archived,
       },
     });
@@ -3145,8 +3172,8 @@ export async function resetSeason(
     revalidatePath("/game", "layout");
     return {
       success:
-        `העונה אופסה — ${empires.length} שחקנים התחילו מחדש` +
-        (botUsers.length > 0 ? `, ${botUsers.length} בוטים הוסרו` : "") +
+        `העונה אופסה — ${empiresRebuilt} שחקנים התחילו מחדש` +
+        (botsRemoved > 0 ? `, ${botsRemoved} בוטים הוסרו` : "") +
         (archived > 0 ? ", והדירוג הסופי נשמר בהיכל התהילה" : ""),
     };
   } catch (e) {
@@ -4084,13 +4111,10 @@ export async function createBotEmpires(
       };
     }
 
-    // Blank means "match the city" — the tier's own average, resolved per city
-    // inside planBots. A typed figure is used as-is for every selected tier.
-    const requested = optNum(formData, "power", 0);
-    const power = requested > 0 ? Math.max(BOT_MIN_POWER, clampNum(requested)) : null;
-    const spreadPct = clampLevel(optNum(formData, "spreadPct", 0), 0, BOT_SPREAD_MAX_PCT);
-
-    const plans = await planBots({ cities, perCity, power, spreadPct });
+    // No power to choose: every bot is planted with the same fixed garrison
+    // (BOT_SOLDIERS soldiers, no weapons), so the city and the count are the
+    // whole of the decision.
+    const plans = await planBots({ cities, perCity });
     const { created, failed, reason } = await createBots(plans);
     if (created === 0) {
       // The reason travels because "try again" was the wrong advice: a batch
@@ -4102,7 +4126,7 @@ export async function createBotEmpires(
       action: "bots.create",
       targetType: "bot",
       summary: `נשתלו ${created} בוטים בערים ${cities.join(", ")}`,
-      details: { cities, perCity, power, spreadPct, created, failed },
+      details: { cities, perCity, soldiers: BOT_SOLDIERS, created, failed },
     });
     revalidatePath("/admin/bots");
     revalidatePath("/game", "layout");

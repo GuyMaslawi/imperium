@@ -35,9 +35,13 @@ import { getCollectableAchievements } from "@/server/achievementState";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
 import { DiscordLink } from "@/components/ui/DiscordLink";
 import { Tip } from "@/components/ui/Tip";
+import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
 import { discordInviteUrl } from "@/server/discord";
+import { getI18n } from "@/i18n/server";
 
 export default async function GameLayout({ children }: { children: ReactNode }) {
+  const { t, dir } = await getI18n();
+
   // requireEmpire applies all pending regular/daily updates (lazy game clock).
   const empire = await requireEmpire();
 
@@ -201,18 +205,25 @@ export default async function GameLayout({ children }: { children: ReactNode }) 
           // hover target over nothing.
           discordUrl ? (
             <Tip
-              tip="קהילת קראלדור בדיסקורד — עדכונים, שעות שמחה, מיני-משחקים ושאר השחקנים. נפתח בלשונית חדשה"
+              tip={t(
+                "קהילת קראלדור בדיסקורד — עדכונים, שעות שמחה, מיני-משחקים ושאר השחקנים. נפתח בלשונית חדשה"
+              )}
               side="bottom"
             >
-              <DiscordLink url={discordUrl} variant="topbar" label="דיסקורד" />
+              <DiscordLink
+                url={discordUrl}
+                variant="topbar"
+                label={t("דיסקורד")}
+              />
             </Tip>
           ) : null
         }
         admin={admin ? <AdminNav /> : null}
+        language={<LanguageSwitch compact />}
       />
 
       <div
-        dir="rtl"
+        dir={dir}
         // The chat dock is fixed to the bottom-left corner of every game screen,
         // so the last thing on a page was always sitting underneath it. The
         // trailing padding is the dock's own height plus its offset, which buys

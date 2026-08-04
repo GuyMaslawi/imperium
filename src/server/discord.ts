@@ -66,6 +66,13 @@ const CHANNEL_ENV: Record<DiscordChannel, string> = {
  * the game's news somewhere nobody is reading.
  */
 function webhookUrl(channel: DiscordChannel): string | null {
+  // Never from a test run. The DB suite calls the real `closeSeason` two dozen
+  // times per `npm run test:db`, and importing `@/lib/prisma` loads `.env` into
+  // process.env as a side effect — so without this line every test run posts
+  // twenty "the season is over" announcements into the players' channel. Vitest
+  // sets VITEST in every worker; nothing in dev or production does.
+  if (process.env.VITEST) return null;
+
   const raw = process.env[CHANNEL_ENV[channel]]?.trim();
   if (!raw) return null;
   try {

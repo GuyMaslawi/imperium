@@ -17,9 +17,11 @@ import { awardSeasonPassXp } from "@/server/seasonPassXp";
 import { captureSpyIntel } from "@/server/spyIntelCapture";
 import { seasonPassSpendUnits } from "@/lib/game/seasonPass";
 import { secureRandom } from "@/lib/game/random";
+import { formatNumber } from "@/lib/game/format";
 import {
   BUILDING_META,
   cityHeroLevelRequired,
+  COLUMN_INT_MAX,
   EMPIRE_UPGRADE_META,
   EMPIRE_UPGRADE_TYPES,
   empireUpgradeMaxLevel,
@@ -74,6 +76,7 @@ import {
   weaponsPower,
 } from "@/lib/game/weapons";
 import type { ActiveEmpireUpgradeType } from "@/lib/game/constants";
+import { getT, type T } from "@/i18n/server";
 import { logError } from "@/server/errorLog";
 import { syncEmpirePower } from "@/server/empirePower";
 
@@ -87,6 +90,7 @@ export interface ActionState {
  * stock in its warehouse, point the player at withdrawing it.
  */
 function insufficientResourcesError(
+  t: T,
   empire: FullEmpire,
   cost: Record<StorableResource, number>,
   fallback: string
@@ -96,7 +100,7 @@ function insufficientResourcesError(
     return empire[key] < cost[key] && storage.storedAmount > 0;
   });
   return canWithdrawToCover
-    ? "אין מספיק משאבים זמינים. ניתן למשוך משאבים מהמחסן."
+    ? t("אין מספיק משאבים זמינים. ניתן למשוך משאבים מהמחסן.")
     : fallback;
 }
 
@@ -119,8 +123,9 @@ export async function upgradeMine(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = resourceSchema.safeParse(formData.get("resource"));
-  if (!parsed.success) return { error: "סוג משאב לא תקין" };
+  if (!parsed.success) return { error: t("סוג משאב לא תקין") };
   const type: BuildingType = RESOURCE_TO_MINE[parsed.data];
 
   try {
@@ -129,9 +134,9 @@ export async function upgradeMine(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const building = empire.buildings.find((b) => b.type === type);
-      if (!building) return { error: "המכרה לא נמצא" };
+      if (!building) return { error: t("המכרה לא נמצא") };
       if (building.level >= MINE_MAX_LEVEL) {
-        return { error: "המכרה כבר ברמה המקסימלית" };
+        return { error: t("המכרה כבר ברמה המקסימלית") };
       }
 
       const discountPct = await getShopDiscountPct(empireId, tx);
@@ -146,7 +151,7 @@ export async function upgradeMine(
         empire.stone < cost.stone
       ) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
 
@@ -169,7 +174,7 @@ export async function upgradeMine(
       });
       if (paid.count === 0) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
       // Guarded on the exact level the price was quoted from, so two concurrent
@@ -194,7 +199,10 @@ export async function upgradeMine(
       await awardSeasonPassXp(tx, empireId, "mineUpgrade");
 
       return {
-        success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + 1}!`,
+        success: t("{building} שודרג לרמה {level}!", {
+          building: t(BUILDING_META[type].label),
+          level: building.level + 1,
+        }),
       };
     });
 
@@ -202,7 +210,7 @@ export async function upgradeMine(
     return result;
   } catch (err) {
     await logError("game.upgradeMine", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -217,8 +225,9 @@ export async function upgradeMineToMax(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = resourceSchema.safeParse(formData.get("resource"));
-  if (!parsed.success) return { error: "סוג משאב לא תקין" };
+  if (!parsed.success) return { error: t("סוג משאב לא תקין") };
   const type: BuildingType = RESOURCE_TO_MINE[parsed.data];
 
   try {
@@ -227,9 +236,9 @@ export async function upgradeMineToMax(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const building = empire.buildings.find((b) => b.type === type);
-      if (!building) return { error: "המכרה לא נמצא" };
+      if (!building) return { error: t("המכרה לא נמצא") };
       if (building.level >= MINE_MAX_LEVEL) {
-        return { error: "המכרה כבר ברמה המקסימלית" };
+        return { error: t("המכרה כבר ברמה המקסימלית") };
       }
       if (!isVip(empire)) return { error: VIP_REQUIRED_ERROR };
 
@@ -275,7 +284,7 @@ export async function upgradeMineToMax(
           discountPct
         );
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
 
@@ -302,7 +311,7 @@ export async function upgradeMineToMax(
           discountPct
         );
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
       // Guarded on the level the whole plan was costed from — see upgradeMine
@@ -322,7 +331,10 @@ export async function upgradeMineToMax(
       await awardSeasonPassXp(tx, empireId, "mineUpgrade", Math.min(levels, 5));
 
       return {
-        success: `${BUILDING_META[type].label} שודרג לרמה ${building.level + levels}!`,
+        success: t("{building} שודרג לרמה {level}!", {
+          building: t(BUILDING_META[type].label),
+          level: building.level + levels,
+        }),
       };
     });
 
@@ -330,7 +342,7 @@ export async function upgradeMineToMax(
     return result;
   } catch (err) {
     await logError("game.upgradeMineToMax", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -352,6 +364,10 @@ async function applyAssignments(
     empire: FullEmpire
   ) => Map<BuildingType, number> | { error: string }
 ): Promise<ActionState & { assigned?: Map<BuildingType, number> }> {
+  // getT() is React-cached per request, so an internal helper resolving the
+  // translator itself is free — and it beats threading `t` through every
+  // caller's signature.
+  const t = await getT();
   return prisma.$transaction(async (tx) => {
     // Serialize concurrent assignments for this empire. Each mine's slave count
     // is read here and written unguarded below; a single-mine assignment keeps
@@ -378,13 +394,15 @@ async function applyAssignments(
     let sum = 0;
     for (const amount of next.values()) {
       if (amount < 0 || !Number.isInteger(amount)) {
-        return { error: "כמות עבדי מכרות לא תקינה" };
+        return { error: t("כמות עבדי מכרות לא תקינה") };
       }
       sum += amount;
     }
     if (sum > totalSlaves) {
       return {
-        error: `אין מספיק עבדי מכרות (סה"כ עבדי מכרות: ${totalSlaves})`,
+        error: t('אין מספיק עבדי מכרות (סה"כ עבדי מכרות: {total})', {
+          total: totalSlaves,
+        }),
       };
     }
 
@@ -405,6 +423,7 @@ export async function assignMineSlavesToResource(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = z
     .object({
       resource: resourceSchema,
@@ -414,7 +433,7 @@ export async function assignMineSlavesToResource(
       resource: formData.get("resource"),
       amount: formData.get("amount"),
     });
-  if (!parsed.success) return { error: "כמות עבדי מכרות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות עבדי מכרות לא תקינה") };
   const { resource, amount } = parsed.data;
   const mineType = RESOURCE_TO_MINE[resource];
 
@@ -429,7 +448,9 @@ export async function assignMineSlavesToResource(
         const available =
           totalSlaves - (sum - amount);
         return {
-          error: `אין מספיק עבדי מכרות פנויים (ניתן להציב כאן עד ${Math.max(0, available)})`,
+          error: t("אין מספיק עבדי מכרות פנויים (ניתן להציב כאן עד {max})", {
+            max: Math.max(0, available),
+          }),
         };
       }
       return next;
@@ -438,11 +459,14 @@ export async function assignMineSlavesToResource(
 
     revalidateGame();
     return {
-      success: `הוצבו ${amount} עבדי מכרות ב${BUILDING_META[mineType].label}`,
+      success: t("הוצבו {count} עבדי מכרות ב{mine}", {
+        count: amount,
+        mine: t(BUILDING_META[mineType].label),
+      }),
     };
   } catch (err) {
     await logError("game.assignMineSlavesToResource", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -454,8 +478,9 @@ export async function assignAllMineSlavesToResource(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = resourceSchema.safeParse(formData.get("resource"));
-  if (!parsed.success) return { error: "סוג משאב לא תקין" };
+  if (!parsed.success) return { error: t("סוג משאב לא תקין") };
   const resource: StorableResource = parsed.data;
   const mineType = RESOURCE_TO_MINE[resource];
 
@@ -475,16 +500,20 @@ export async function assignAllMineSlavesToResource(
 
     revalidateGame();
     return {
-      success: `כל ${total} עבדי המכרות הוצבו ב${RESOURCE_META[resource].label}`,
+      success: t("כל {total} עבדי המכרות הוצבו ב{resource}", {
+        total,
+        resource: t(RESOURCE_META[resource].label),
+      }),
     };
   } catch (err) {
     await logError("game.assignAllMineSlavesToResource", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
 /** VIP: an even four-way split. See assignAllMineSlavesToResource. */
 export async function splitMineSlavesEqually(): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await applyAssignments(empireId, (totalSlaves, _current, empire) => {
@@ -502,14 +531,15 @@ export async function splitMineSlavesEqually(): Promise<ActionState> {
     if (result.error) return { error: result.error };
 
     revalidateGame();
-    return { success: "עבדי המכרות חולקו שווה בשווה בין ארבעת המשאבים" };
+    return { success: t("עבדי המכרות חולקו שווה בשווה בין ארבעת המשאבים") };
   } catch (err) {
     await logError("game.splitMineSlavesEqually", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
 export async function clearMineSlaveAssignments(): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
     const result = await applyAssignments(empireId, () => {
@@ -520,29 +550,36 @@ export async function clearMineSlaveAssignments(): Promise<ActionState> {
     if (result.error) return { error: result.error };
 
     revalidateGame();
-    return { success: "החלוקה נוקתה — כל עבדי המכרות פנויים" };
+    return { success: t("החלוקה נוקתה — כל עבדי המכרות פנויים") };
   } catch (err) {
     await logError("game.clearMineSlaveAssignments", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
 /* ------------------------------ train units ------------------------------ */
 
+/**
+ * Like a weapons order, an army order is bounded only by what pays for it —
+ * here, free citizens. The 100,000 that used to sit here was well under what a
+ * grown empire holds, so "train everything" simply failed. See COLUMN_INT_MAX.
+ */
 const trainSchema = z.object({
   unit: z.enum(["soldiers", "spies", "mineSlaves"]),
-  quantity: z.coerce.number().int().min(1).max(100_000),
+  quantity: z.coerce.number().int().min(1).max(COLUMN_INT_MAX),
 });
 
 export async function trainUnits(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
+
   const parsed = trainSchema.safeParse({
     unit: formData.get("unit"),
     quantity: formData.get("quantity"),
   });
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const unit: UnitKey = parsed.data.unit;
   const quantity = parsed.data.quantity;
 
@@ -556,8 +593,21 @@ export async function trainUnits(
       if (unit === "spies") {
         const spyCenter = empire.buildings.find((b) => b.type === "SPY_CENTER");
         if (!spyCenter || spyCenter.level < 1) {
-          return { error: "נדרש מרכז מודיעין כדי להכשיר מרגלים" };
+          return { error: t("נדרש מרכז מודיעין כדי להכשיר מרגלים") };
         }
+      }
+
+      // Checked before the debit: an error returned from the callback commits
+      // the transaction, so citizens taken here would never come back.
+      const held = empire.army?.[unit] ?? 0;
+      if (held + quantity > COLUMN_INT_MAX) {
+        return {
+          error: t("לא ניתן להחזיק יותר מ-{max} {unit} — יש לך כבר {owned}", {
+            max: formatNumber(COLUMN_INT_MAX),
+            unit: t(meta.labelPlural),
+            owned: formatNumber(held),
+          }),
+        };
       }
 
       // Training is free of resources — each unit converts one citizen.
@@ -569,13 +619,20 @@ export async function trainUnits(
         data: { citizens: { decrement: citizensNeeded } },
       });
       if (debited.count === 0) {
-        return { error: "אין מספיק אזרחים פנויים לאימון" };
+        return { error: t("אין מספיק אזרחים פנויים לאימון") };
       }
-      await tx.army.upsert({
-        where: { empireId },
-        create: { empireId, [unit]: quantity },
-        update: { [unit]: { increment: quantity } },
+      // Guarded increment for the same reason the weapons order uses one: the
+      // ceiling check above read a snapshot, and two orders settling together
+      // must not push the column past int4. A conflict throws, which rolls the
+      // citizens back with it.
+      const mustered = await tx.army.updateMany({
+        where: { empireId, [unit]: { lte: COLUMN_INT_MAX - quantity } },
+        data: { [unit]: { increment: quantity } },
       });
+      if (mustered.count === 0) {
+        if (empire.army) throw new Error("army stack ceiling conflict");
+        await tx.army.create({ data: { empireId, [unit]: quantity } });
+      }
       await syncEmpirePower(tx, empireId);
       await awardSeasonPassXp(
         tx,
@@ -584,14 +641,19 @@ export async function trainUnits(
         seasonPassSpendUnits("trainUnits", citizensNeeded)
       );
 
-      return { success: `אומנו ${quantity} ${meta.labelPlural} בהצלחה!` };
+      return {
+        success: t("אומנו {count} {unit} בהצלחה!", {
+          count: formatNumber(quantity),
+          unit: t(meta.labelPlural),
+        }),
+      };
     });
 
     revalidateGame();
     return result;
   } catch (err) {
     await logError("game.trainUnits", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -664,17 +726,18 @@ export async function spyOnEmpire(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = targetSchema.safeParse({
     targetEmpireId: formData.get("targetEmpireId"),
   });
-  if (!parsed.success) return { error: "יעד לא תקין" };
+  if (!parsed.success) return { error: t("יעד לא תקין") };
   const { targetEmpireId } = parsed.data;
 
   let outcome: { error: string } | { reportId: string };
   try {
     const empireId = await requireOwnEmpireId();
     if (empireId === targetEmpireId) {
-      return { error: "לא ניתן לרגל אחרי האימפריה שלך" };
+      return { error: t("לא ניתן לרגל אחרי האימפריה שלך") };
     }
 
     // Read before the transaction opens. `getTunables` goes to the database on a
@@ -688,21 +751,21 @@ export async function spyOnEmpire(
     outcome = await prisma.$transaction(async (tx) => {
       const attacker = await applyPendingUpdates(empireId, tx);
       if (!attacker.army || attacker.army.spies < 1) {
-        return { error: "נדרש לפחות מרגל אחד למשימת ריגול" };
+        return { error: t("נדרש לפחות מרגל אחד למשימת ריגול") };
       }
       if (attacker.turns < SPY_TURN_COST) {
-        return { error: "אין לך מספיק תורות לביצוע ריגול." };
+        return { error: t("אין לך מספיק תורות לביצוע ריגול.") };
       }
 
       const defender = await applyPendingUpdates(targetEmpireId, tx).catch(
         () => null
       );
-      if (!defender) return { error: "האימפריה המבוקשת לא נמצאה" };
+      if (!defender) return { error: t("האימפריה המבוקשת לא נמצאה") };
 
       // You may only operate against empires in your own city — an empire is
       // "in your city" when it holds the same number of cities as you.
       if (defender.cities !== attacker.cities) {
-        return { error: "לא ניתן לרגל אחר אימפריה שאינה בעיר שלך." };
+        return { error: t("לא ניתן לרגל אחר אימפריה שאינה בעיר שלך.") };
       }
 
       // Shielded newcomers and banned accounts are off-limits.
@@ -713,7 +776,7 @@ export async function spyOnEmpire(
       // All validations passed — the mission launches, so it costs turns
       // whether the spy succeeds or fails.
       if (!(await spendTurns(tx, empireId, SPY_TURN_COST))) {
-        return { error: "אין לך מספיק תורות לביצוע ריגול." };
+        return { error: t("אין לך מספיק תורות לביצוע ריגול.") };
       }
       // Acting aggressively drops your own new-player shield.
       await dropOwnShield(tx, empireId, attacker, now);
@@ -795,7 +858,10 @@ export async function spyOnEmpire(
             empireId: targetEmpireId,
             kind: "SPY",
             title: "🕵️ מרגל נתפס בשטחך!",
-            body: `כוחות הביטחון שלך תפסו מרגל של ${attacker.name} לפני שהספיק לאסוף מידע.`,
+            body: t(
+              "כוחות הביטחון שלך תפסו מרגל של {attacker} לפני שהספיק לאסוף מידע.",
+              { attacker: attacker.name }
+            ),
           },
         });
       }
@@ -809,7 +875,7 @@ export async function spyOnEmpire(
     revalidateGame();
   } catch (err) {
     await logError("game.spyOnEmpire", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 
   if ("error" in outcome) return outcome;
@@ -823,17 +889,18 @@ export async function attackEmpire(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = targetSchema.safeParse({
     targetEmpireId: formData.get("targetEmpireId"),
   });
-  if (!parsed.success) return { error: "יעד לא תקין" };
+  if (!parsed.success) return { error: t("יעד לא תקין") };
   const { targetEmpireId } = parsed.data;
 
   let outcome: { error: string } | { reportId: string };
   try {
     const empireId = await requireOwnEmpireId();
     if (empireId === targetEmpireId) {
-      return { error: "לא ניתן לתקוף את האימפריה שלך" };
+      return { error: t("לא ניתן לתקוף את האימפריה שלך") };
     }
 
     // Hoisted above the transaction for the reason spelled out in spyOnEmpire —
@@ -862,13 +929,13 @@ export async function attackEmpire(
 
       const attacker = await applyPendingUpdates(empireId, tx);
       if (attacker.turns < ATTACK_TURN_COST) {
-        return { error: "אין לך מספיק תורות לביצוע תקיפה." };
+        return { error: t("אין לך מספיק תורות לביצוע תקיפה.") };
       }
 
       const defender = await applyPendingUpdates(targetEmpireId, tx).catch(
         () => null
       );
-      if (!defender) return { error: "האימפריה המבוקשת לא נמצאה" };
+      if (!defender) return { error: t("האימפריה המבוקשת לא נמצאה") };
 
       // Allies don't raid each other. Checked before the city gate so a
       // guildmate hears the real reason, and inside the transaction so leaving
@@ -876,14 +943,16 @@ export async function attackEmpire(
       const allied = await sharedGuild(empireId, targetEmpireId, tx);
       if (allied) {
         return {
-          error: `לא ניתן לתקוף חבר לברית — שניכם בברית ${allied.name}.`,
+          error: t("לא ניתן לתקוף חבר לברית — שניכם בברית {guild}.", {
+            guild: allied.name,
+          }),
         };
       }
 
       // Combat is confined to your own city — an empire is "in your city" when
       // it holds the same number of cities as you.
       if (defender.cities !== attacker.cities) {
-        return { error: "לא ניתן לתקוף אימפריה שאינה בעיר שלך." };
+        return { error: t("לא ניתן לתקוף אימפריה שאינה בעיר שלך.") };
       }
 
       // Shielded newcomers and banned accounts can't be attacked.
@@ -917,13 +986,13 @@ export async function attackEmpire(
       const defenderArmy = defender.army;
 
       if (!attackerArmy || attackerArmy.soldiers === 0) {
-        return { error: "אין לך צבא לתקיפה — אמן חיילים קודם" };
+        return { error: t("אין לך צבא לתקיפה — אמן חיילים קודם") };
       }
 
       // All validations passed — the attack launches, so it costs turns
       // whether the attacker wins or loses.
       if (!(await spendTurns(tx, empireId, ATTACK_TURN_COST))) {
-        return { error: "אין לך מספיק תורות לביצוע תקיפה." };
+        return { error: t("אין לך מספיק תורות לביצוע תקיפה.") };
       }
       // Acting aggressively drops your own new-player shield.
       await dropOwnShield(tx, empireId, attacker, now);
@@ -1290,6 +1359,18 @@ export async function attackEmpire(
       });
 
       // The defender wasn't in the room — drop the battle alert in their inbox.
+      //
+      // Deliberately NOT run through `t()`, and this is the one place in the
+      // file where that is the right call. `getT()` resolves the language of
+      // whoever is making the request — here, the *attacker* — while the only
+      // person who will ever read this row is the defender. Translating it now
+      // would freeze the message in a language chosen by their enemy.
+      //
+      // Doing this properly means storing the message as a kind plus its
+      // parameters and rendering it in the reader's language when the inbox is
+      // opened, which is a schema change (Message gains `kind`/`params`) plus a
+      // renderer over every message the game writes. Until that lands, a Hebrew
+      // row is at least consistent with every other stored message.
       await tx.message.create({
         data: {
           empireId: targetEmpireId,
@@ -1332,7 +1413,7 @@ export async function attackEmpire(
     revalidateGame();
   } catch (err) {
     await logError("game.attackEmpire", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 
   if ("error" in outcome) return outcome;
@@ -1348,8 +1429,9 @@ export async function upgradeStorage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = storageTypeSchema.safeParse(formData.get("resourceType"));
-  if (!parsed.success) return { error: "סוג מחסן לא תקין" };
+  if (!parsed.success) return { error: t("סוג מחסן לא תקין") };
   const resourceType = parsed.data;
 
   try {
@@ -1358,7 +1440,7 @@ export async function upgradeStorage(
     const result = await prisma.$transaction(async (tx) => {
       const empire = await applyPendingUpdates(empireId, tx);
       const storage = empire.storages.find((s) => s.resourceType === resourceType);
-      if (!storage) return { error: "המחסן לא נמצא" };
+      if (!storage) return { error: t("המחסן לא נמצא") };
 
       const discountPct = await getShopDiscountPct(empireId, tx);
       const cost = applyShopDiscount(storageUpgradeCost(storage.level), discountPct);
@@ -1370,9 +1452,10 @@ export async function upgradeStorage(
       ) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים לשדרוג המחסן"
+            t("אין מספיק משאבים לשדרוג המחסן")
           ),
         };
       }
@@ -1396,9 +1479,10 @@ export async function upgradeStorage(
       if (paid.count === 0) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים לשדרוג המחסן"
+            t("אין מספיק משאבים לשדרוג המחסן")
           ),
         };
       }
@@ -1418,9 +1502,11 @@ export async function upgradeStorage(
 
       const newCapacity = storageCapacityForLevel(storage.level + 1);
       return {
-        success: `${STORAGE_META[resourceType].label} שודרג לרמה ${
-          storage.level + 1
-        } (קיבולת: ${newCapacity.toLocaleString("he-IL")})`,
+        success: t("{storage} שודרג לרמה {level} (קיבולת: {capacity})", {
+          storage: t(STORAGE_META[resourceType].label),
+          level: storage.level + 1,
+          capacity: formatNumber(newCapacity),
+        }),
       };
     });
 
@@ -1428,7 +1514,7 @@ export async function upgradeStorage(
     return result;
   } catch (err) {
     await logError("game.upgradeStorage", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -1467,6 +1553,7 @@ async function runStorageTransfer(
     empireId: string
   ) => Promise<ActionState>
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -1475,7 +1562,7 @@ async function runStorageTransfer(
       const storage = empire.storages.find(
         (s) => s.resourceType === resourceType
       );
-      if (!storage) return { error: "המחסן לא נמצא" };
+      if (!storage) return { error: t("המחסן לא נמצא") };
 
       const resourceKey = STORAGE_META[resourceType].resourceKey;
       const capacity = storageCapacityForLevel(storage.level);
@@ -1496,7 +1583,7 @@ async function runStorageTransfer(
     return result;
   } catch (err) {
     await logError("game.upgradeStorage", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -1506,6 +1593,7 @@ async function transferToStorage(
   empireId: string,
   amount: number
 ): Promise<ActionState> {
+  const t = await getT();
   // Conditional updates so a concurrent transfer can never drive the
   // available balance negative or push the warehouse past capacity.
   const debited = await tx.empire.updateMany({
@@ -1513,7 +1601,7 @@ async function transferToStorage(
     data: { [ctx.resourceKey]: { decrement: amount } },
   });
   if (debited.count === 0) {
-    return { error: "אין מספיק משאבים זמינים לאחסון" };
+    return { error: t("אין מספיק משאבים זמינים לאחסון") };
   }
   const stored = await tx.resourceStorage.updateMany({
     where: {
@@ -1525,7 +1613,10 @@ async function transferToStorage(
   // Throw (instead of returning an error) so the debit above rolls back.
   if (stored.count === 0) throw new Error("storage capacity exceeded");
   return {
-    success: `אוחסנו ${amount.toLocaleString("he-IL")} ${ctx.resourceLabel} במחסן`,
+    success: t("אוחסנו {amount} {resource} במחסן", {
+      amount: formatNumber(amount),
+      resource: t(ctx.resourceLabel),
+    }),
   };
 }
 
@@ -1535,19 +1626,23 @@ async function transferFromStorage(
   empireId: string,
   amount: number
 ): Promise<ActionState> {
+  const t = await getT();
   const withdrawn = await tx.resourceStorage.updateMany({
     where: { id: ctx.storage.id, storedAmount: { gte: amount } },
     data: { storedAmount: { decrement: amount } },
   });
   if (withdrawn.count === 0) {
-    return { error: "אין מספיק משאבים במחסן" };
+    return { error: t("אין מספיק משאבים במחסן") };
   }
   await tx.empire.update({
     where: { id: empireId },
     data: { [ctx.resourceKey]: { increment: amount } },
   });
   return {
-    success: `נמשכו ${amount.toLocaleString("he-IL")} ${ctx.resourceLabel} מהמחסן`,
+    success: t("נמשכו {amount} {resource} מהמחסן", {
+      amount: formatNumber(amount),
+      resource: t(ctx.resourceLabel),
+    }),
   };
 }
 
@@ -1555,20 +1650,23 @@ export async function depositToStorage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = storageTransferSchema.safeParse({
     resourceType: formData.get("resourceType"),
     amount: formData.get("amount"),
   });
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const { resourceType, amount } = parsed.data;
 
   return runStorageTransfer(resourceType, async (ctx, tx, empireId) => {
     if (amount > ctx.available) {
-      return { error: "אין מספיק משאבים זמינים לאחסון" };
+      return { error: t("אין מספיק משאבים זמינים לאחסון") };
     }
     if (amount > ctx.freeSpace) {
       return {
-        error: `אין מספיק מקום במחסן (מקום פנוי: ${ctx.freeSpace.toLocaleString("he-IL")})`,
+        error: t("אין מספיק מקום במחסן (מקום פנוי: {free})", {
+          free: formatNumber(ctx.freeSpace),
+        }),
       };
     }
     return transferToStorage(ctx, tx, empireId, amount);
@@ -1579,17 +1677,20 @@ export async function withdrawFromStorage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = storageTransferSchema.safeParse({
     resourceType: formData.get("resourceType"),
     amount: formData.get("amount"),
   });
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const { resourceType, amount } = parsed.data;
 
   return runStorageTransfer(resourceType, async (ctx, tx, empireId) => {
     if (amount > ctx.storedAmount) {
       return {
-        error: `אין מספיק משאבים במחסן (מאוחסן: ${ctx.storedAmount.toLocaleString("he-IL")})`,
+        error: t("אין מספיק משאבים במחסן (מאוחסן: {stored})", {
+          stored: formatNumber(ctx.storedAmount),
+        }),
       };
     }
     return transferFromStorage(ctx, tx, empireId, amount);
@@ -1605,14 +1706,15 @@ export async function depositAllToStorage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = storageTypeSchema.safeParse(formData.get("resourceType"));
-  if (!parsed.success) return { error: "סוג מחסן לא תקין" };
+  if (!parsed.success) return { error: t("סוג מחסן לא תקין") };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
     if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
-    if (ctx.freeSpace < 1) return { error: "המחסן מלא — שדרג אותו כדי לאחסן עוד" };
+    if (ctx.freeSpace < 1) return { error: t("המחסן מלא — שדרג אותו כדי לאחסן עוד") };
     const amount = Math.min(ctx.available, ctx.freeSpace);
-    if (amount < 1) return { error: "אין משאבים זמינים לאחסון" };
+    if (amount < 1) return { error: t("אין משאבים זמינים לאחסון") };
     return transferToStorage(ctx, tx, empireId, amount);
   });
 }
@@ -1622,12 +1724,13 @@ export async function withdrawAllFromStorage(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = storageTypeSchema.safeParse(formData.get("resourceType"));
-  if (!parsed.success) return { error: "סוג מחסן לא תקין" };
+  if (!parsed.success) return { error: t("סוג מחסן לא תקין") };
 
   return runStorageTransfer(parsed.data, async (ctx, tx, empireId) => {
     if (!ctx.isVip) return { error: VIP_REQUIRED_ERROR };
-    if (ctx.storedAmount < 1) return { error: "המחסן ריק" };
+    if (ctx.storedAmount < 1) return { error: t("המחסן ריק") };
     return transferFromStorage(ctx, tx, empireId, ctx.storedAmount);
   });
 }
@@ -1649,8 +1752,9 @@ export async function upgradeEmpireUpgrade(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   const parsed = empireUpgradeTypeSchema.safeParse(formData.get("upgradeType"));
-  if (!parsed.success) return { error: "סוג שדרוג לא תקין" };
+  if (!parsed.success) return { error: t("סוג שדרוג לא תקין") };
   const upgradeType = parsed.data;
 
   try {
@@ -1667,7 +1771,7 @@ export async function upgradeEmpireUpgrade(
 
       const maxLevel = empireUpgradeMaxLevel(upgradeType, empire.cities);
       if (maxLevel !== undefined && upgrade.level >= maxLevel) {
-        return { error: "רמה מקסימלית" };
+        return { error: t("רמה מקסימלית") };
       }
 
       const discountPct = await getShopDiscountPct(empireId, tx);
@@ -1682,7 +1786,7 @@ export async function upgradeEmpireUpgrade(
         empire.stone < cost.stone
       ) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
 
@@ -1704,7 +1808,7 @@ export async function upgradeEmpireUpgrade(
       });
       if (paid.count === 0) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים לשדרוג"),
+          error: insufficientResourcesError(t, empire, cost, t("אין מספיק משאבים לשדרוג")),
         };
       }
       // Guarded on the level that was both max-checked and priced above.
@@ -1729,9 +1833,10 @@ export async function upgradeEmpireUpgrade(
       await awardSeasonPassXp(tx, empireId, "empireUpgrade");
 
       return {
-        success: `${EMPIRE_UPGRADE_META[upgradeType].label} שודרג לרמה ${
-          upgrade.level + 1
-        }!`,
+        success: t("{upgrade} שודרג לרמה {level}!", {
+          upgrade: t(EMPIRE_UPGRADE_META[upgradeType].label),
+          level: upgrade.level + 1,
+        }),
       };
     });
 
@@ -1739,7 +1844,7 @@ export async function upgradeEmpireUpgrade(
     return result;
   } catch (err) {
     await logError("game.upgradeEmpireUpgrade", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -1757,6 +1862,7 @@ export async function foundCity(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -1764,12 +1870,12 @@ export async function foundCity(
       const empire = await applyPendingUpdates(empireId, tx);
 
       if (empire.cities >= MAX_CITIES) {
-        return { error: `הגעת לרמת העיר המרבית (${MAX_CITIES}).` };
+        return { error: t("הגעת לרמת העיר המרבית ({max}).", { max: MAX_CITIES }) };
       }
       const heroRequired = cityHeroLevelRequired(empire.cities);
       if ((empire.hero?.level ?? 1) < heroRequired) {
         return {
-          error: `נדרש גיבור ברמה ${heroRequired} כדי לעלות עיר.`,
+          error: t("נדרש גיבור ברמה {level} כדי לעלות עיר.", { level: heroRequired }),
         };
       }
 
@@ -1781,14 +1887,21 @@ export async function foundCity(
         empire.stone < cost.stone
       ) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים כדי לעלות עיר."),
+          error: insufficientResourcesError(
+            t,
+            empire,
+            cost,
+            t("אין מספיק משאבים כדי לעלות עיר.")
+          ),
         };
       }
       // Soldiers are only a requirement — the empire must field a garrison of
       // this size, but upgrading the city never consumes it.
       if ((empire.army?.soldiers ?? 0) < cost.soldiers) {
         return {
-          error: `נדרשים ${cost.soldiers.toLocaleString("he-IL")} חיילים בצבא כדי לעלות עיר.`,
+          error: t("נדרשים {soldiers} חיילים בצבא כדי לעלות עיר.", {
+            soldiers: formatNumber(cost.soldiers),
+          }),
         };
       }
 
@@ -1824,7 +1937,12 @@ export async function foundCity(
       });
       if (paid.count === 0) {
         return {
-          error: insufficientResourcesError(empire, cost, "אין מספיק משאבים כדי לעלות עיר."),
+          error: insufficientResourcesError(
+            t,
+            empire,
+            cost,
+            t("אין מספיק משאבים כדי לעלות עיר.")
+          ),
         };
       }
 
@@ -1832,7 +1950,9 @@ export async function foundCity(
       await awardSeasonPassXp(tx, empireId, "foundCity");
 
       return {
-        success: `עלית לעיר ${empire.cities + 1}! התפוקה שלך גדלה בהתאם.`,
+        success: t("עלית לעיר {city}! התפוקה שלך גדלה בהתאם.", {
+          city: empire.cities + 1,
+        }),
       };
     });
 
@@ -1840,7 +1960,7 @@ export async function foundCity(
     return result;
   } catch (err) {
     await logError("game.foundCity", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -1859,24 +1979,39 @@ function sharedUnlockedTier(empire: FullEmpire): number {
   );
 }
 
+/**
+ * Nothing caps a weapons order but the treasury — the bound below is the int4
+ * ceiling of `EmpireWeapon.quantity`, not a game rule. See COLUMN_INT_MAX.
+ *
+ * It used to be a flat 1,000,000, which a late-game treasury clears easily: the
+ * order was rejected outright ("כמות לא תקינה"), and pressing "הכל" with more
+ * than a million affordable filled the box with a number the server would not
+ * take, so the button appeared to do nothing at all.
+ */
 const buyWeaponSchema = z.object({
   weaponKey: z.string().min(1),
-  quantity: z.coerce.number().int().min(1).max(1_000_000),
+  quantity: z.coerce.number().int().min(1).max(COLUMN_INT_MAX),
 });
 
 export async function buyWeapon(
   _prev: ActionState,
   formData: FormData
 ): Promise<ActionState> {
+  // Every message this action can answer with is written in the reader's
+  // language — an action's `error` lands in a FormMessage on the same screen
+  // whose labels are already translated, so a Hebrew sentence there would be
+  // the one untranslated thing on an English page.
+  const t = await getT();
+
   const parsed = buyWeaponSchema.safeParse({
     weaponKey: formData.get("weaponKey"),
     quantity: formData.get("quantity"),
   });
-  if (!parsed.success) return { error: "כמות לא תקינה" };
+  if (!parsed.success) return { error: t("כמות לא תקינה") };
   const { weaponKey, quantity } = parsed.data;
 
   const weapon = weaponByKey(weaponKey);
-  if (!weapon) return { error: "נשק לא מוכר" };
+  if (!weapon) return { error: t("נשק לא מוכר") };
 
   try {
     const empireId = await requireOwnEmpireId();
@@ -1885,7 +2020,21 @@ export async function buyWeapon(
       const empire = await applyPendingUpdates(empireId, tx);
 
       if (weapon.tier > sharedUnlockedTier(empire)) {
-        return { error: "הנשק נעול — פתח נשק מתקדם כדי לקנות אותו" };
+        return { error: t("הנשק נעול — פתח נשק מתקדם כדי לקנות אותו") };
+      }
+
+      // The stack itself has to stay inside its column, and this check runs
+      // *before* the debit: an error returned from the callback commits the
+      // transaction, so a payment taken here would never be given back.
+      const owned =
+        empire.weapons.find((w) => w.weaponKey === weaponKey)?.quantity ?? 0;
+      if (owned + quantity > COLUMN_INT_MAX) {
+        return {
+          error: t(
+            "לא ניתן להחזיק יותר מ-{max} יחידות מאותו נשק — יש לך כבר {owned}",
+            { max: formatNumber(COLUMN_INT_MAX), owned: formatNumber(owned) }
+          ),
+        };
       }
 
       // Buying uses only available balances — warehouse stock is protected.
@@ -1907,9 +2056,10 @@ export async function buyWeapon(
       ) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים זמינים לקנייה."
+            t("אין מספיק משאבים זמינים לקנייה.")
           ),
         };
       }
@@ -1933,17 +2083,29 @@ export async function buyWeapon(
       if (paid.count === 0) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים זמינים לקנייה."
+            t("אין מספיק משאבים זמינים לקנייה.")
           ),
         };
       }
-      await tx.empireWeapon.upsert({
-        where: { empireId_weaponKey: { empireId, weaponKey } },
-        create: { empireId, weaponKey, quantity },
-        update: { quantity: { increment: quantity } },
+      // Guarded increment, so the ceiling holds against a concurrent buy too —
+      // the check above read a snapshot. Count 0 means either there is no row
+      // yet (the create below) or a parallel order got in first and took the
+      // stack past the ceiling, which throws and rolls the payment back.
+      const stacked = await tx.empireWeapon.updateMany({
+        where: {
+          empireId,
+          weaponKey,
+          quantity: { lte: COLUMN_INT_MAX - quantity },
+        },
+        data: { quantity: { increment: quantity } },
       });
+      if (stacked.count === 0) {
+        if (owned > 0) throw new Error("weapon stack ceiling conflict");
+        await tx.empireWeapon.create({ data: { empireId, weaponKey, quantity } });
+      }
       await syncEmpirePower(tx, empireId);
       await awardSeasonPassXp(
         tx,
@@ -1956,7 +2118,10 @@ export async function buyWeapon(
       );
 
       return {
-        success: `נקנו ${quantity.toLocaleString("he-IL")} ${weapon.name} בהצלחה!`,
+        success: t("נקנו {count} {weapon} בהצלחה!", {
+          count: formatNumber(quantity),
+          weapon: t(weapon.name),
+        }),
       };
     });
 
@@ -1964,7 +2129,7 @@ export async function buyWeapon(
     return result;
   } catch (err) {
     await logError("game.buyWeapon", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -1972,6 +2137,7 @@ export async function unlockNextWeaponTier(
   _prev: ActionState,
   _formData: FormData
 ): Promise<ActionState> {
+  const t = await getT();
   try {
     const empireId = await requireOwnEmpireId();
 
@@ -1982,7 +2148,7 @@ export async function unlockNextWeaponTier(
       // all categories, and advancing it opens the next weapon in all three.
       const currentTier = sharedUnlockedTier(empire);
       if (currentTier >= MAX_WEAPON_TIER) {
-        return { error: "כל הנשקים פתוחים." };
+        return { error: t("כל הנשקים פתוחים.") };
       }
       const targetTier = currentTier + 1;
 
@@ -1993,13 +2159,26 @@ export async function unlockNextWeaponTier(
       if (!gate.met) {
         const needs: string[] = [];
         if (!gate.citiesMet) {
-          needs.push(`${gate.cities} ערים (יש לך ${empire.cities})`);
+          needs.push(
+            t("{required} ערים (יש לך {current})", {
+              required: gate.cities,
+              current: empire.cities,
+            })
+          );
         }
         if (!gate.heroLevelMet) {
-          needs.push(`גיבור ברמה ${gate.heroLevel} (הגיבור שלך ברמה ${heroLevel})`);
+          needs.push(
+            t("גיבור ברמה {required} (הגיבור שלך ברמה {current})", {
+              required: gate.heroLevel,
+              current: heroLevel,
+            })
+          );
         }
         return {
-          error: `כדי לפתוח רמה ${targetTier} צריך ${needs.join(" ו-")}.`,
+          error: t("כדי לפתוח רמה {tier} צריך {needs}.", {
+            tier: targetTier,
+            needs: needs.join(t(" ו-")),
+          }),
         };
       }
 
@@ -2013,9 +2192,10 @@ export async function unlockNextWeaponTier(
       ) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים לפתיחת הנשק הבא"
+            t("אין מספיק משאבים לפתיחת הנשק הבא")
           ),
         };
       }
@@ -2039,9 +2219,10 @@ export async function unlockNextWeaponTier(
       if (paid.count === 0) {
         return {
           error: insufficientResourcesError(
+            t,
             empire,
             cost,
-            "אין מספיק משאבים לפתיחת הנשק הבא"
+            t("אין מספיק משאבים לפתיחת הנשק הבא")
           ),
         };
       }
@@ -2080,7 +2261,9 @@ export async function unlockNextWeaponTier(
       if (advanced === 0) throw new Error("weapon tier unlock conflict");
 
       return {
-        success: `נפתחה רמה ${targetTier} לכל הנשקים — התקפה, הגנה וריגול!`,
+        success: t("נפתחה רמה {tier} לכל הנשקים — התקפה, הגנה וריגול!", {
+          tier: targetTier,
+        }),
       };
     });
 
@@ -2088,7 +2271,7 @@ export async function unlockNextWeaponTier(
     return result;
   } catch (err) {
     await logError("game.unlockNextWeaponTier", err);
-    return { error: "אירעה שגיאה, נסה שוב" };
+    return { error: t("אירעה שגיאה, נסה שוב") };
   }
 }
 
@@ -2099,5 +2282,6 @@ export async function unlockNextWeaponTier(
  * The action is kept so any old client form gets a clear rejection.
  */
 export async function renameEmpire(): Promise<ActionState> {
-  return { error: "שם האימפריה נעול למשך העונה ולא ניתן לשינוי." };
+  const t = await getT();
+  return { error: t("שם האימפריה נעול למשך העונה ולא ניתן לשינוי.") };
 }

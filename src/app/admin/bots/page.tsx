@@ -5,14 +5,12 @@ import { Icon } from "@/components/ui/Icon";
 import { ActionForm } from "@/components/admin/ActionForm";
 import { EditorSection } from "@/components/admin/fields";
 import { BotPlanter, type BotCityStat } from "@/components/admin/BotPlanter";
-import { botsPerCity, cityPowerBaseline, listBots, playersPerCity } from "@/server/bots";
+import { botsPerCity, listBots, playersPerCity } from "@/server/bots";
 import { createBotEmpires, deleteBotEmpire, rearmBotEmpire } from "@/server/actions/admin";
-import { BOT_RESTORE_MS } from "@/lib/game/bots";
+import { BOT_RESTORE_MS, BOT_SOLDIERS } from "@/lib/game/bots";
 import { cityAt } from "@/lib/game/cities";
 import { MAX_CITIES } from "@/lib/game/constants";
 import { formatCompact, formatNumber } from "@/lib/game/format";
-import { weaponByKey } from "@/lib/game/weapons";
-import { botWeaponKeys } from "@/lib/game/bots";
 
 export const dynamic = "force-dynamic";
 
@@ -27,16 +25,12 @@ export default async function AdminBotsPage() {
     listBots(),
   ]);
 
-  // One baseline query per tier — ten small aggregates, and they are what the
-  // planter shows beside each city, so they have to be the same figures the
-  // server will build with.
-  const stats: BotCityStat[] = await Promise.all(
-    Array.from({ length: MAX_CITIES }, (_, i) => i + 1).map(async (cities) => ({
+  const stats: BotCityStat[] = Array.from({ length: MAX_CITIES }, (_, i) => i + 1).map(
+    (cities) => ({
       cities,
       players: players.get(cities) ?? 0,
       bots: bots.get(cities) ?? 0,
-      baseline: await cityPowerBaseline(cities),
-    }))
+    })
   );
 
   // One clock for the whole list, so two bots refilled in the same second do not
@@ -56,6 +50,11 @@ export default async function AdminBotsPage() {
         מכרות שמייצרים שלל אמיתי, והוא מתאושש בעצמו — חיל המצב שלו נבנה מחדש
         לכל היותר פעם ב-{Math.round(BOT_RESTORE_MS / 60_000)} דקות, ברגע
         שמישהו טוען אותו כמטרה.
+        <br />
+        חיל המצב זהה לכל הבוטים ובכל הערים:{" "}
+        <span className="font-bold text-gold-bright">{BOT_SOLDIERS} חיילים</span>{" "}
+        בלבד, בלי מרגלים ובלי נשק — פחות מהמינימום שממנו תקיפה מנצחת משעבדת
+        חיילים, כך שאי אפשר לחקלא בוטים לעבדים.
         <br />
         בוטים אינם מתחרים: הם מסוננים מהפודיום ומפרסי העונה, מהיכל התהילה, משיאי
         העולם ומכל הלוחות הגלובליים, והם לא מקבלים שידורים ולא מתנות.
@@ -81,8 +80,10 @@ export default async function AdminBotsPage() {
             {rows.map((bot) => {
               const empire = bot.empire;
               const city = cityAt(empire.cities);
-              const keys = botWeaponKeys(bot.weaponTier);
-              const weaponName = weaponByKey(keys.attack)?.name ?? `דרג ${bot.weaponTier}`;
+              // A bot planted before the garrison was fixed still carries the
+              // arsenal it was built with, until it is re-armed or the repair
+              // script is run — so this is read from the row, not assumed.
+              const weapons = bot.attackWeapons + bot.defenseWeapons + bot.spyWeapons;
               // Soldiers below the stored garrison mean it has been raided since
               // its last refill — the one number that says whether this bot is
               // still doing its job.
@@ -137,11 +138,23 @@ export default async function AdminBotsPage() {
                         <span className="nums" dir="ltr">
                           {formatNumber(empire.army?.spies ?? 0)}
                         </span>{" "}
-                        מרגלים · {weaponName} (דרג{" "}
-                        <span className="nums" dir="ltr">
-                          {bot.weaponTier}
-                        </span>
-                        ) · באוצר{" "}
+                        מרגלים ·{" "}
+                        {weapons === 0 ? (
+                          "ללא נשק"
+                        ) : (
+                          <span className="text-red-300">
+                            נשק ישן:{" "}
+                            <span className="nums" dir="ltr">
+                              {formatNumber(weapons)}
+                            </span>{" "}
+                            (דרג{" "}
+                            <span className="nums" dir="ltr">
+                              {bot.weaponTier}
+                            </span>
+                            )
+                          </span>
+                        )}{" "}
+                        · באוצר{" "}
                         <span className="nums text-gold-dim" dir="ltr">
                           {formatCompact(empire.gold)}
                         </span>{" "}

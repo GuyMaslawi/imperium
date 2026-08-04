@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSessionUserId } from "@/lib/auth";
 import { verifyEmailToken } from "@/server/actions/auth";
+import { requireOpenSeason } from "@/server/seasonGuard";
 import { AuthShell } from "@/components/auth/AuthShell";
 import { ResendVerification } from "@/components/auth/ResendVerification";
 import { FormMessage } from "@/components/ui/FormMessage";
 
 export const metadata = { title: "אימות אימייל | קראלדור" };
+export const dynamic = "force-dynamic";
 
 /**
  * Two jobs in one route:
@@ -25,6 +27,11 @@ export default async function VerifyEmailPage({
 }: {
   searchParams: Promise<{ token?: string }>;
 }) {
+  // Shut with the rest of the site between seasons (see seasonGuard). A link
+  // that expires unclicked during the break costs its owner nothing: there is
+  // no game to be verified into yet, and "שלח לי שוב" is waiting for them the
+  // moment the next season opens.
+  await requireOpenSeason();
   const { token } = await searchParams;
 
   if (token) {

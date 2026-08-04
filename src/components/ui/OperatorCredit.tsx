@@ -1,4 +1,5 @@
 import { getLegalOperator } from "@/lib/legal";
+import { getT } from "@/i18n/server";
 
 /**
  * The copyright line at the bottom of every public screen.
@@ -18,10 +19,11 @@ import { getLegalOperator } from "@/lib/legal";
  * clock for the same reason — a client-rendered year would differ from the
  * server's markup on New Year's Eve and hydrate mismatched.
  */
-export function OperatorCredit({ className = "" }: { className?: string }) {
+export async function OperatorCredit({ className = "" }: { className?: string }) {
   const { name } = getLegalOperator();
   const configured = !!process.env.LEGAL_OPERATOR_NAME?.trim();
   if (!configured) return null;
+  const t = await getT();
 
   return (
     <p className={`text-center text-[11px] text-zinc-600 ${className}`}>
@@ -31,7 +33,7 @@ export function OperatorCredit({ className = "" }: { className?: string }) {
         © {new Date().getFullYear()} {name}
       </span>
       {" · "}
-      כל הזכויות שמורות
+      {t("כל הזכויות שמורות")}
     </p>
   );
 }

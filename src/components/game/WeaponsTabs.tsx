@@ -12,6 +12,7 @@ import {
 } from "@/components/game/WeaponCard";
 import { NextWeaponCard } from "@/components/game/NextWeaponCard";
 import { ArmoryForge } from "@/components/game/ArmoryForge";
+import { useT } from "@/i18n/client";
 
 export interface WeaponsTabData {
   category: "ATTACK" | "DEFENSE" | "SPY";
@@ -47,6 +48,7 @@ export function WeaponsTabs({
   /** Active shop-discount percent (0 when no discount spell is running). */
   discountPct: number;
 }) {
+  const t = useT();
   const [activeCategory, setActiveCategory] = useState(
     initialCategory ?? tabs[0]?.category
   );
@@ -77,13 +79,11 @@ export function WeaponsTabs({
               ✨
             </span>
             <div className="min-w-0">
-              <p className="font-bold text-emerald-300">קסם הנחה פעיל!</p>
+              <p className="font-bold text-emerald-300">{t("קסם הנחה פעיל!")}</p>
               <p className="text-xs text-emerald-200/80">
-                כל הנשקים והפתיחות ב־
-                <span className="nums font-bold" dir="ltr">
-                  {discountPct}%
-                </span>{" "}
-                הנחה כל עוד הקסם פעיל.
+                {t("כל הנשקים והפתיחות ב־{pct}% הנחה כל עוד הקסם פעיל.", {
+                  pct: discountPct,
+                })}
               </p>
             </div>
             <span
@@ -114,7 +114,7 @@ export function WeaponsTabs({
 
       {!next && (
         <div className="panel-gold rounded-xl p-4 text-center text-sm font-bold text-gold-bright">
-          🎉 המפעל במקסימום! כל הנשקים פתוחים.
+          {t("🎉 המפעל במקסימום! כל הנשקים פתוחים.")}
         </div>
       )}
 

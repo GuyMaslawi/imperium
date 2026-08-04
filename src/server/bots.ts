@@ -9,10 +9,7 @@ import { BUILDING_TYPES, isProductionBuilding } from "@/lib/game/constants";
 import { WEAPON_CATEGORIES } from "@/lib/game/weapons";
 import { computePower } from "@/server/empirePower";
 import {
-  BOT_MIN_POWER,
   BOT_RESTORE_MS,
-  BOT_SPREAD_MAX_PCT,
-  botDefaultPower,
   botFallbackName,
   botGarrison,
   botHeroLevel,
@@ -35,7 +32,7 @@ import {
  * enslavement, produces from its mines and gets settled by the same code that
  * does it for a player.
  *
- * The arithmetic — names, power curve, how a power figure is spent — lives in
+ * The arithmetic — names, the fixed garrison, the mines — lives in
  * src/lib/game/bots.ts, which is pure and tested. This module is the I/O.
  */
 
@@ -61,44 +58,6 @@ export interface BotPlan {
   /** Military power actually fielded — what lands in `Empire.militaryPower`. */
   power: number;
   garrison: BotGarrison;
-}
-
-/* ------------------------------ sizing ------------------------------ */
-
-/**
- * The power to build a bot in `cities` at, when the admin asked for "match the
- * city" rather than naming a figure.
- *
- * The average of the tier's actual residents, because that is the question being
- * asked: a bot is there to be a plausible neighbour, and a plausible neighbour
- * is one of comparable strength. Bots and staff are excluded from the average or
- * it would drift towards itself with every bot planted — three bots at 60% of
- * the boss, averaged in, would pull the fourth down, and the fifth further.
- *
- * An empty tier (or one whose residents are all brand new) falls back to the
- * boss curve, which is the game's own statement of what an empire of this tier
- * is worth. So does a tier whose average is below {@link BOT_MIN_POWER}: a bot
- * mirroring a day-one player is a target that dies to one soldier.
- */
-export async function cityPowerBaseline(cities: number): Promise<number> {
-  const stats = await prisma.empire.aggregate({
-    where: { ...notStaffOrBot, cities },
-    _avg: { militaryPower: true },
-  });
-  const average = Math.round(stats._avg.militaryPower ?? 0);
-  return Math.max(BOT_MIN_POWER, average || botDefaultPower(cities));
-}
-
-/**
- * Scatter a power figure by up to ±`spreadPct`, so a city planted with five bots
- * gets five different neighbours rather than five copies of one. Rolled per bot.
- */
-function scatter(power: number, spreadPct: number): number {
-  const pct = Math.max(0, Math.min(BOT_SPREAD_MAX_PCT, spreadPct));
-  if (pct === 0) return power;
-  // randomInt is [min, max) — the +1 makes the top of the range reachable.
-  const roll = randomInt(-pct, pct + 1) / 100;
-  return Math.max(BOT_MIN_POWER, Math.round(power * (1 + roll)));
 }
 
 /**
@@ -132,9 +91,6 @@ function freeName(taken: Set<string>): string {
 export async function planBots(params: {
   cities: number[];
   perCity: number;
-  /** Requested military power, or null for "match the city". */
-  power: number | null;
-  spreadPct: number;
 }): Promise<BotPlan[]> {
   const taken = new Set(
     (await prisma.empire.findMany({ select: { name: true } })).map((e) => e.name)
@@ -142,22 +98,18 @@ export async function planBots(params: {
 
   const plans: BotPlan[] = [];
   for (const cities of params.cities) {
-    const baseline = params.power ?? (await cityPowerBaseline(cities));
     const heroLevel = botHeroLevel(cities);
     for (let i = 0; i < params.perCity; i++) {
       const name = freeName(taken);
       taken.add(name);
-      const garrison = botGarrison(
-        scatter(Math.max(BOT_MIN_POWER, baseline), params.spreadPct),
-        cities,
-        heroLevel
-      );
+      // Every bot in every city gets the same garrison; only the name, the city
+      // and the hero level differ. See BOT_SOLDIERS for why there is nothing to
+      // size any more.
+      const garrison = botGarrison(cities, heroLevel);
       plans.push({
         cities,
         name,
         heroLevel,
-        // The realised figure, never the request: whole units only, so the two
-        // differ, and the one the ladder will show is this one.
         power: botRealisedPower(garrison),
         garrison,
       });
@@ -212,9 +164,9 @@ async function plantBot(
   data.protectedUntil = null;
   delete data.messages;
 
-  // Mines big enough to feed the tier the bot lives in — this is where every
-  // resource a raider ever takes off it comes from.
-  const mines = botMineSetup(plan.cities, plan.garrison.soldiers);
+  // Mines sized to the tier the bot lives in — this is where every resource a
+  // raider ever takes off it comes from.
+  const mines = botMineSetup(plan.cities);
   data.buildings = {
     create: BUILDING_TYPES.map((type) => ({
       type,
@@ -227,8 +179,11 @@ async function plantBot(
     create: {
       soldiers: plan.garrison.soldiers,
       spies: plan.garrison.spies,
-      // Assigned to the mines above — the pool column is what is *unassigned*.
-      mineSlaves: 0,
+      // `mineSlaves` is the *total* the empire owns and `slavesAssigned` is how
+      // many of them stand in each mine — `applyAssignments` refuses any split
+      // whose sum exceeds it. So the pool has to cover what was just assigned
+      // above, or the bot is an empire holding fewer slaves than it employs.
+      mineSlaves: mines.slavesPerMine * BUILDING_TYPES.filter(isProductionBuilding).length,
     },
   };
 
@@ -240,8 +195,9 @@ async function plantBot(
       { weaponKey: keys.spy, quantity: plan.garrison.spyWeapons },
     ].filter((w) => w.weaponKey && w.quantity > 0),
   };
-  // The tier it fields is the tier it has unlocked, in all three categories —
-  // so a spy dossier on a bot reads consistently.
+  // The unlocks are granted in all three categories even though every stack is
+  // empty — so a spy dossier reads as an empire of this city with a bare
+  // armoury, rather than as one that never reached the weapons it plainly could.
   data.weaponUnlocks = {
     create: WEAPON_CATEGORIES.map((category) => ({
       category,

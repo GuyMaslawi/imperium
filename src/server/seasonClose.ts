@@ -2,21 +2,42 @@ import "server-only";
 import { cache } from "react";
 import type { Prisma, SeasonBoardKind } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { formatGameDateTime } from "@/lib/game/time";
+import { formatGameDateTime, formatWaitDuration } from "@/lib/game/time";
 import { announceToDiscord, gameLink } from "@/server/discord";
 import { notStaffOrBot } from "@/lib/bot";
 import { prizeForRank } from "@/lib/game/prizes";
 import { formatNumber } from "@/lib/game/format";
+import { getTunables, type GameTunables } from "@/lib/game/config";
+import {
+  nextSeasonName,
+  nextSeasonWindow,
+  seasonHeadline,
+  seasonLengthMs,
+} from "@/lib/game/seasonCycle";
+import { restartWorld } from "@/server/seasonRestart";
 
 /**
- * The end of a season, and the gate it closes behind it.
+ * The season cycle: the end of one season, the break, and the start of the next.
  *
  * A season is a fixed window: it starts at `startsAt` and it is over at
  * `endsAt`. When the clock runs out the game does not keep going quietly — the
- * season is sealed, its final standings are archived, and **every game screen
+ * season is sealed, its final standings are archived, and **the whole site
  * shuts** until the next season's `startsAt` arrives. In between, all anyone
  * can reach is `/season`: the recap of what just happened plus a countdown to
- * the next one.
+ * the next one. (`/game` is shut by `requireEmpire`, everything in front of it
+ * by server/seasonGuard.ts.)
+ *
+ * ## The cycle turns by itself
+ *
+ * Sealing a season also **books its successor** — `scheduleNextSeason`, inside
+ * the closing transaction, from two numbers the admin sets once
+ * (`season.breakHours`, `season.lengthDays` in lib/game/config.ts) — and the
+ * successor's name is the same name with its number raised by one. When its
+ * hour comes, `openSeason` opens it and **restarts the world**: every empire
+ * back to the opening bundle with its diamonds, every guild dissolved. So the
+ * full loop — play, seal, break, wipe, play again — runs with nobody at the
+ * wheel, and an admin who wants a hand in it turns off `autoNext` (stay shut
+ * until I say so) or `autoRestart` (open without wiping).
  *
  * ## Why this is lazy, and why that is safe
  *
@@ -488,18 +509,12 @@ async function buildRecap(
 /**
  * The line that introduces the podium in the channel.
  *
- * Counted rather than hardcoded at three: a season can close with fewer empires
- * than `PODIUM_SIZE` (an early season, a game that was just reset), and "שלושת
- * החזקים" over two names is the kind of small lie players notice.
- *
- * Written the way the players talk — short, no ceremony. The old line ("קבלו את
- * שלושת השחקנים שהחזיקו מעמד כל הסיזן והוכיחו את עצמם") read like a speech; a
- * teenager skims past it.
+ * Counted rather than hardcoded at three: a season can close with a single
+ * empire on the podium (an early season, a game that was just reset), and
+ * "לזוכים" over one name is the kind of small lie players notice.
  */
 function podiumIntro(count: number): string {
-  return count === 1
-    ? "הכי חזק בסיזן 👑"
-    : `${count === 2 ? "שני" : "שלושת"} הכי חזקים בסיזן 👑`;
+  return count === 1 ? "ברכות לזוכה 👑" : "ברכות לזוכים 👑";
 }
 
 /**
@@ -512,9 +527,11 @@ function podiumIntro(count: number): string {
  * That is why it is posted from every path that can flip a season live, not
  * only from the admin's own click.
  *
- * It deliberately does not say anybody was reset. Activating a season carries
- * every empire into it untouched (`resetSeason` is the separate, confirmed
- * wipe), so the only thing this may promise is what actually rolls over.
+ * It says the world was restarted **only when it was**. An automatic opening
+ * wipes it (see `openSeason`); an admin activating a season by hand carries
+ * every empire over untouched. Announcing the wrong one of those two is how a
+ * player finds out their empire is gone from a Discord post that told them it
+ * would not be.
  *
  * Fires **after** the activation has committed, and cannot fail it —
  * `announceToDiscord` swallows everything. Callers must have won whatever guard
@@ -524,19 +541,72 @@ function podiumIntro(count: number): string {
  * The deadline goes in as Jerusalem wall time: the announcer runs on a server
  * set to UTC, and a season end announced three hours early is simply wrong.
  */
-export async function announceSeasonStart(season: {
-  name: string;
-  endsAt: Date;
-}): Promise<void> {
+export async function announceSeasonStart(
+  season: { name: string; endsAt: Date },
+  { restarted = false }: { restarted?: boolean } = {}
+): Promise<void> {
   await announceToDiscord({
     kind: "season",
     channel: "events",
-    title: `🚀 ${season.name} התחילה`,
+    title: `🚀 ${seasonHeadline(season.name)} נפתחה!`,
     body:
-      `סיזן חדש באוויר. 🏁\n⏳ נגמר ב-${formatGameDateTime(season.endsAt)}\n\n` +
-      "דרך התהילה מתאפסת — הסולם חוזר לאפס והפרימיום נקנה מחדש.\n" +
-      "מי שמסיים בטופ 3 כשהשעון נגמר נכנס להיכל התהילה. 🏆",
+      "בהצלחה לכולם! 🔥\n\n" +
+      (restarted
+        ? "העולם אופס — כל אימפריה מתחילה מאפס והגילדות התפרקו. רק היהלומים נשארים איתכם. 💎\n"
+        : "") +
+      `⏳ נגמרת ב-${formatGameDateTime(season.endsAt)}`,
     url: gameLink("/game/base"),
+  });
+}
+
+/* ---------------------------- the next one ---------------------------- */
+
+/**
+ * Line up the season that follows the one just sealed.
+ *
+ * This is what makes the cycle turn on its own. A season closing is the only
+ * moment at which the next one's dates are actually knowable — they are counted
+ * from the close, not from the calendar — so the successor is created right
+ * here, inside the closing transaction, and the countdown on `/season` has
+ * something true to count towards from the very first page load after the
+ * deadline.
+ *
+ * Both numbers are admin-tunable (`season.breakHours`, `season.lengthDays` — see
+ * lib/game/config.ts), so the length of the shutdown and the length of the next
+ * season are set once in the panel and never touched again.
+ *
+ * Three things it refuses to do:
+ *  - **Schedule on top of the admin.** If any unclosed season is already booked
+ *    to start at or after this one's end, that is the successor; a second row
+ *    would either steal its slot or sit unopened forever.
+ *  - **Run at all with `autoNext` off.** That switch is the whole point of
+ *    having one: it stops the game reopening by itself while someone is fixing
+ *    something, and leaves the break running until an admin opens a season.
+ *  - **Start before the close.** `startsAt` is counted from the moment the
+ *    season actually ended (`closedAt`, which is ≥ `endsAt` — a season shortened
+ *    into the past closes later than it "ended"), so a zero-hour break opens the
+ *    next season now rather than in the past.
+ */
+async function scheduleNextSeason(
+  tx: Prisma.TransactionClient,
+  season: { id: string; name: string; endsAt: Date },
+  tunables: GameTunables,
+  closedAt: Date
+): Promise<{ id: string; name: string; startsAt: Date; endsAt: Date } | null> {
+  if (tunables.season.autoNext < 1) return null;
+
+  const existing = await tx.gameSeason.findFirst({
+    where: { id: { not: season.id }, closedAt: null, startsAt: { gte: season.endsAt } },
+    select: { id: true },
+  });
+  if (existing) return null;
+
+  const window = nextSeasonWindow({ endsAt: season.endsAt, closedAt }, tunables.season);
+  const seasonCount = await tx.gameSeason.count();
+
+  return tx.gameSeason.create({
+    data: { name: nextSeasonName(season.name, seasonCount), ...window },
+    select: { id: true, name: true, startsAt: true, endsAt: true },
   });
 }
 
@@ -744,14 +814,26 @@ export async function archiveSeasonStandings(seasonId: string): Promise<number> 
  *
  * Archiving *and paying the podium* happen inside the same transaction as the
  * stamp, so a season can never end up sealed with an empty hall of fame, nor
- * with a published podium whose winners were never paid.
+ * with a published podium whose winners were never paid. The next season is
+ * booked in the same breath (`scheduleNextSeason`), so the game is never sealed
+ * without a date on which it reopens.
+ *
+ * `scheduleNext: false` is for the one caller that is choosing the successor
+ * itself — the admin activating a specific season, which force-closes the
+ * outgoing one on the way. Booking another one behind its back would leave a
+ * season nobody asked for sitting in the schedule.
  *
  * Returns whether *this* call was the one that closed it.
  */
 export async function closeSeason(
   seasonId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  { scheduleNext = true }: { scheduleNext?: boolean } = {}
 ): Promise<boolean> {
+  // Read before the transaction: it is a database round trip of its own, and it
+  // is the same for every racing caller.
+  const tunables = await getTunables();
+
   const closed = await prisma.$transaction(
     async (tx) => {
       const season = await tx.gameSeason.findUnique({
@@ -769,7 +851,12 @@ export async function closeSeason(
       await archiveSeason(tx, season);
       // The prizes, in the same breath as the seal — see payPodiumPrizes.
       await payPodiumPrizes(tx, season.id, season.name, now);
-      return season.name;
+      // And the date the game comes back. Inside the same transaction as the
+      // seal, so "shut" and "reopens then" are one fact, never two.
+      const next = scheduleNext
+        ? await scheduleNextSeason(tx, season, tunables, now)
+        : null;
+      return { name: season.name, next };
     },
     { timeout: 30_000 }
   );
@@ -792,8 +879,7 @@ export async function closeSeason(
     await announceToDiscord({
       kind: "season",
       channel: "events",
-      // "הטופ 3" only when there really are three — see podiumIntro.
-      title: `🏆 ${closed} נגמרה — ${podium.length === 3 ? "הנה הטופ 3" : "הנה הזוכים"}`,
+      title: `🏆 ${seasonHeadline(closed.name)} הסתיימה!`,
       body:
         (podium.length > 0
           ? `${podiumIntro(podium.length)}\n\n` +
@@ -811,17 +897,125 @@ export async function closeSeason(
               .join("\n")
           : "הסיזן נגמר בלי זוכים.") +
         "\n\n" +
-        (podium.length === 0
-          ? ""
-          : podium.length === 1
-            ? "הוא נכנס להיכל התהילה. "
-            : "הם נכנסים להיכל התהילה. ") +
-        "סיזן חדש בדרך — כולם מתחילים מאפס. 🔄",
+        // "When are we back?" is the only other thing this post has to answer —
+        // it is the last thing players read before the game shuts. As a wait
+        // rather than a date ("בעוד יום", "בעוד 3 שעות"): the break is measured
+        // in hours from this very moment, so that is the shape it is understood
+        // in, and the exact time is on /season for anyone who wants it.
+        (closed.next
+          ? `ניפגש בעונה הבאה בעוד ${formatWaitDuration(closed.next.startsAt.getTime() - now.getTime())} 🔄`
+          : "ניפגש בעונה הבאה בקרוב 🔄"),
       url: gameLink("/game/rankings"),
     });
   }
 
   return closed !== null;
+}
+
+/* ------------------------------ opening ------------------------------ */
+
+/** What an opening actually did, for the log line and the announcement. */
+export interface SeasonOpened {
+  seasonId: string;
+  seasonName: string;
+  /** Empires rebuilt from scratch — 0 when the world was carried over. */
+  empiresRebuilt: number;
+  botsRemoved: number;
+  /** Whether the world was wiped (`season.autoRestart`). */
+  restarted: boolean;
+}
+
+/**
+ * Open a scheduled season — the moment the game comes back.
+ *
+ * This is the other half of `closeSeason`, and it runs the same way: lazily, on
+ * whichever request first sees `startsAt` in the past, with a guarded
+ * `updateMany` as the mutex. Exactly one of a hundred simultaneous page loads
+ * flips `isActive` and does the work; the rest simply find the game open.
+ *
+ * **It restarts the world**, unless `season.autoRestart` is turned off. A season
+ * is a race, and a race everybody starts halfway through is not one — so every
+ * empire goes back to the opening bundle (keeping its diamonds) and every guild
+ * is dissolved, exactly as the admin's reset button does it, through the same
+ * `restartWorld`. The season pass resets itself: `loadCycle` clears premium and
+ * the ladder the first time it sees a different active season.
+ *
+ * All of it — the flag, the wipe and the rebuild — is one transaction, because
+ * every intermediate state is a broken game: an active season whose players
+ * still hold last season's armies, or worse, a world deleted under a season
+ * that never became active. If the request dies halfway the whole thing rolls
+ * back and the next page load runs it again from the start.
+ *
+ * A season whose own `endsAt` has already passed when its turn comes (the server
+ * was down for a month, an admin scheduled it and forgot) is **pushed forward**
+ * rather than opened into its own grave — opening it unchanged would seal the
+ * game again on the very next page load, and the cycle would stop for good.
+ *
+ * Returns null when this caller was not the one that opened it.
+ */
+export async function openSeason(
+  season: { id: string; name: string; endsAt: Date },
+  now: Date = new Date()
+): Promise<SeasonOpened | null> {
+  const tunables = await getTunables();
+  const restart = tunables.season.autoRestart >= 1;
+  // Its clock ran out before it ever started: give it its full length from now.
+  const revised =
+    season.endsAt <= now
+      ? {
+          startsAt: now,
+          endsAt: new Date(now.getTime() + seasonLengthMs(tunables.season.lengthDays)),
+        }
+      : {};
+
+  const opened = await prisma.$transaction(
+    async (tx) => {
+      // The mutex. The precondition lives in the WHERE, so two requests that
+      // both read `isActive: false` cannot both proceed: the second blocks on
+      // the row until the first commits, then re-evaluates it and matches
+      // nothing. Everything below therefore runs exactly once.
+      const claimed = await tx.gameSeason.updateMany({
+        where: { id: season.id, isActive: false },
+        data: { isActive: true, ...revised },
+      });
+      if (claimed.count === 0) return null;
+
+      await tx.gameSeason.updateMany({
+        where: { isActive: true, id: { not: season.id } },
+        data: { isActive: false },
+      });
+
+      if (restart) {
+        const { empiresRebuilt, botsRemoved } = await restartWorld(tx, season.id, tunables);
+        return { empiresRebuilt, botsRemoved };
+      }
+      // Carried over instead: every empire still has to be re-homed onto the
+      // season it is actually being played in — `Empire.seasonId` drives the
+      // admin's broadcast and ban targeting and the counts on the seasons page.
+      await tx.empire.updateMany({ data: { seasonId: season.id } });
+      return { empiresRebuilt: 0, botsRemoved: 0 };
+    },
+    // The rebuild writes one empire per player. Given the same headroom the
+    // admin's reset runs with, since it is the very same work.
+    { timeout: 120_000 }
+  );
+
+  if (!opened) return null;
+
+  // After the commit, and only by the caller that won the claim — the same rule
+  // the close follows. `announceToDiscord` swallows its own failures, so a
+  // Discord outage can never undo a season that has already opened.
+  await announceSeasonStart(
+    { name: season.name, endsAt: revised.endsAt ?? season.endsAt },
+    { restarted: restart }
+  );
+
+  return {
+    seasonId: season.id,
+    seasonName: season.name,
+    restarted: restart,
+    ...opened,
+  };
 }
 
 /* -------------------------------- gate -------------------------------- */
@@ -847,16 +1041,18 @@ export type SeasonGate =
  * look like. A game with no seasons configured must not lock itself out.
  *
  * Three things happen here, in order, and all of them are lazy:
- *  1. an active season past `endsAt` is closed (archived) on the spot;
- *  2. a scheduled successor whose `startsAt` has arrived is activated, which
- *     reopens the game by itself — the countdown on /season is a promise the
- *     server has to keep without an admin awake at 3am;
+ *  1. an active season past `endsAt` is closed (archived) on the spot, and the
+ *     next one is booked from the admin's break length in the same transaction;
+ *  2. a scheduled successor whose `startsAt` has arrived is opened, which
+ *     restarts the world and reopens the game by itself — the countdown on
+ *     /season is a promise the server has to keep without an admin awake at 3am;
  *  3. whatever is left is reported as open or shut.
  *
- * Deliberately **not** an auto-reset. Activating the next season carries every
- * empire into it untouched; wiping the world is `resetSeason`, which stays a
- * deliberate, confirmed admin action — nothing implicit should ever delete
- * every player's progress.
+ * Between them those three steps are the whole season cycle, turning with
+ * nobody at the wheel: play, seal, break, wipe, play again. Every knob it uses
+ * is in the admin panel (lib/game/config.ts, `season`), including the two that
+ * stop it — `autoNext` (book no successor) and `autoRestart` (open without
+ * wiping).
  *
  * `cache`d per request: it is called from `requireEmpire` *and*
  * `getActiveEmpireId`, and a page load hits both.
@@ -881,30 +1077,19 @@ export const getSeasonGate = cache(async (): Promise<SeasonGate> => {
     closedAt = reread?.closedAt ?? now;
   }
 
-  // The next season is the earliest one scheduled to start after this one ended.
+  // The next season is the earliest unclosed one scheduled to start at or after
+  // this one ended. `gte`, not `gt`: with the break set to zero hours the
+  // successor starts on the very instant its predecessor ended, and a `gt` here
+  // would leave it invisible forever.
   const next = await prisma.gameSeason.findFirst({
-    where: { id: { not: active.id }, startsAt: { gt: active.endsAt } },
+    where: { id: { not: active.id }, closedAt: null, startsAt: { gte: active.endsAt } },
     orderBy: { startsAt: "asc" },
     select: { id: true, name: true, startsAt: true, endsAt: true },
   });
 
+  // Its hour has come — see openSeason for the mutex and the restart.
   if (next && next.startsAt <= now) {
-    // Its hour has come. Guarded the same way as the close, so simultaneous
-    // requests cannot both run the swap.
-    const claimed = await prisma.gameSeason.updateMany({
-      where: { id: next.id, isActive: false },
-      data: { isActive: true },
-    });
-    if (claimed.count > 0) {
-      await prisma.gameSeason.updateMany({
-        where: { isActive: true, id: { not: next.id } },
-        data: { isActive: false },
-      });
-      // Only the request that won the guard above announces — everyone else
-      // crossing `startsAt` in the same second just finds the game open. Same
-      // rule as the close: after the write, never inside it.
-      await announceSeasonStart(next);
-    }
+    await openSeason(next, now);
     return { open: true };
   }
 

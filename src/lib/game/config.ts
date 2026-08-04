@@ -80,6 +80,32 @@ export interface GameTunables {
     /** Percent off every diamond package price (0 = full price). */
     purchaseDiscountPct: number;
   };
+  /**
+   * The season cycle, run without an admin: how long the game stays shut
+   * between one season and the next, how long the next one lasts, and whether
+   * the world is rebuilt when it opens. See server/seasonClose.ts — the season
+   * that closes schedules its own successor from these numbers.
+   */
+  season: {
+    /**
+     * Hours between a season closing and the next one opening. The whole game
+     * is shut for exactly this long: everyone sees /season and its countdown.
+     */
+    breakHours: number;
+    /** Length, in days, of each automatically scheduled season. */
+    lengthDays: number;
+    /**
+     * 0 stops the cycle: a closed season schedules no successor and the game
+     * stays shut until an admin opens one by hand. 1 keeps it running.
+     */
+    autoNext: number;
+    /**
+     * 1 = opening the next season rebuilds the world — every empire restarts
+     * from the opening bundle (diamonds kept) and every guild is dissolved, so
+     * a season really is a fresh race. 0 carries everyone over untouched.
+     */
+    autoRestart: number;
+  };
 }
 
 export const DEFAULT_TUNABLES: GameTunables = {
@@ -127,6 +153,14 @@ export const DEFAULT_TUNABLES: GameTunables = {
   },
   diamondStore: {
     purchaseDiscountPct: 0,
+  },
+  season: {
+    // A day of downtime: long enough that the end of a season is an event
+    // players come back for, short enough that nobody drifts away.
+    breakHours: 24,
+    lengthDays: 30,
+    autoNext: 1,
+    autoRestart: 1,
   },
 };
 
@@ -208,6 +242,16 @@ export const TUNABLE_META: Record<
       purchaseDiscountPct: { label: "אחוז הנחה על מחירי חבילות יהלומים (0-100)" },
     },
   },
+  season: {
+    label: "מחזור העונות — אוטומטי",
+    icon: "🔄",
+    fields: {
+      breakHours: { label: "שעות הפסקה בין עונה לעונה" },
+      lengthDays: { label: "אורך העונה הבאה (ימים)" },
+      autoNext: { label: "פתיחת העונה הבאה אוטומטית (1 = כן, 0 = לא)" },
+      autoRestart: { label: "איפוס העולם בפתיחת עונה (1 = כן, 0 = לא)" },
+    },
+  },
 };
 
 /**
@@ -274,6 +318,17 @@ const TUNABLE_BOUNDS: {
   diamondStore: {
     purchaseDiscountPct: [0, 100],
   },
+  season: {
+    // Zero is a legitimate answer ("open the next one immediately"), a year is
+    // the ceiling — beyond that the countdown stops being a promise.
+    breakHours: [0, 8760],
+    // Never zero: a season whose end is its own start would be closed by the
+    // gate on the page load that opened it, shutting the game in a loop.
+    lengthDays: [1, 3650],
+    // Read as `>= 1`, like every other switch here, so a stray 0.5 is "off".
+    autoNext: [0, 1],
+    autoRestart: [0, 1],
+  },
 };
 
 function mergeGroup<T extends Record<string, number>>(
@@ -312,6 +367,7 @@ export function mergeTunables(overlay: unknown): GameTunables {
       o.diamondStore,
       TUNABLE_BOUNDS.diamondStore
     ),
+    season: mergeGroup(DEFAULT_TUNABLES.season, o.season, TUNABLE_BOUNDS.season),
   };
 }
 

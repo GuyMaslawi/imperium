@@ -4,6 +4,7 @@ import { formatCompact, formatNumber } from "@/lib/game/format";
 import { Tip } from "@/components/ui/Tip";
 import { Icon, RESOURCE_ICON_COLOR, type IconName } from "@/components/ui/Icon";
 import { LogoMark } from "@/components/ui/Logo";
+import { getT } from "@/i18n/server";
 
 /**
  * Top command bar: the six spendable balances shown as pills, plus the brand
@@ -56,12 +57,13 @@ const PILLS: PillConfig[] = [
   },
 ];
 
-export function ResourceBar({
+export async function ResourceBar({
   resources,
   mobileMenu,
   inbox,
   discord,
   admin,
+  language,
 }: {
   resources: Record<ResourceKey, number>;
   /** Mobile-only nav trigger, rendered at the start of the bar (hidden at lg+). */
@@ -76,7 +78,14 @@ export function ResourceBar({
   discord?: ReactNode;
   /** Admin control-center pill — the layout passes it for admins only. */
   admin?: ReactNode;
+  /**
+   * The HE/EN switch. It lives in the command bar rather than under settings
+   * because the player most likely to need it is one who cannot read the menu
+   * that would lead there.
+   */
+  language?: ReactNode;
 }) {
+  const t = await getT();
   return (
     <header
       dir="ltr"
@@ -93,14 +102,14 @@ export function ResourceBar({
             scroller, which is the same as not showing them. */}
         <div className="hidden min-w-0 flex-1 items-center gap-2 overflow-x-auto lg:flex">
           {PILLS.map((p) => (
-            <Tip key={p.key} tip={p.tip} side="bottom">
+            <Tip key={p.key} tip={t(p.tip)} side="bottom">
               <div className={`res-pill ${p.borderClass}`}>
                 {/* Icon wears the canonical resource tint; the number keeps the
                     pill's own accent, which is a bar-layout choice, not an
                     identity for the resource. */}
                 <Icon name={p.icon} size={20} className={`shrink-0 ${RESOURCE_ICON_COLOR[p.key]}`} />
                 <div className="flex flex-col items-start leading-tight">
-                  <span className="text-[10px] font-medium text-zinc-400">{p.label}</span>
+                  <span className="text-[10px] font-medium text-zinc-400">{t(p.label)}</span>
                   <span className={`nums text-sm font-extrabold ${p.numClass}`} dir="ltr">
                     {formatNumber(resources[p.key])}
                   </span>
@@ -122,6 +131,9 @@ export function ResourceBar({
         {/* control center (admins only) */}
         {admin}
 
+        {/* language switch, immediately before the emblem */}
+        {language}
+
         {/* brand emblem */}
         <div className="flex shrink-0 items-center gap-2">
           <span className="hidden text-sm font-black tracking-[0.2em] text-bone-bright sm:inline">
@@ -139,7 +151,7 @@ export function ResourceBar({
           pill still carries the full story in its tip. */}
       <div className="mx-auto flex max-w-[1900px] items-stretch gap-1 px-2 pb-1.5 sm:gap-1.5 sm:px-3 lg:hidden">
         {PILLS.map((p) => (
-          <Tip key={p.key} tip={p.tip} side="bottom" className="min-w-0 flex-1">
+          <Tip key={p.key} tip={t(p.tip)} side="bottom" className="min-w-0 flex-1">
             {/* Icon over number, not beside it: stacked, the whole pill width is
                 the number's, so "22.3K" still reads at 320px. */}
             <div className={`res-pill-mini w-full ${p.borderClass}`}>

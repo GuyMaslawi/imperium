@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { Tip } from "@/components/ui/Tip";
 import { useInboxPulse } from "./inboxPulse";
+import { useT, useDir } from "@/i18n/client";
 
 export type InboxNavProps = {
   /**
@@ -79,6 +80,8 @@ export function InboxNav({
   collectableAchievements = 0,
 }: InboxNavProps) {
   const pathname = usePathname();
+  const t = useT();
+  const dir = useDir();
 
   /**
    * The live counts, once the shared poller has answered. Being attacked or
@@ -99,18 +102,22 @@ export function InboxNav({
   const allEntries: Entry[] = [
     {
       href: "/game/reports",
-      label: "היסטוריה",
+      label: t("היסטוריה"),
       icon: "reports",
-      tip: "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי. ההתראה נדלקת רק כשתוקפים או מרגלים עליי",
+      tip: t(
+        "היסטוריית קרבות וריגול — תקיפות עליי, תקיפות שלי, ריגול עליי וריגול שלי. ההתראה נדלקת רק כשתוקפים או מרגלים עליי"
+      ),
       count: liveReports,
       tone: "red",
       clearsOnVisit: true,
     },
     {
       href: "/game/messages",
-      label: "הודעות",
+      label: t("הודעות"),
       icon: "messages",
-      tip: "תיבת הדואר: הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת",
+      tip: t(
+        "תיבת הדואר: הודעות משחקנים, התראות על התקפות, מרגלים שנתפסו ועדכוני מערכת"
+      ),
       count: liveMessages,
       tone: "green",
       clearsOnVisit: true,
@@ -120,17 +127,19 @@ export function InboxNav({
       // nav list: what the ladder is actually worth should be one glance away
       // from every screen, on the same row the player already watches.
       href: "/game/prizes",
-      label: "פרסים",
+      label: t("פרסים"),
       icon: "crown",
-      tip: "פרסי העונה — יהלומים לשלושת הראשונים בסיום העונה, והדירוג החי שקובע מי יושב על כל מדרגה",
+      tip: t(
+        "פרסי העונה — יהלומים לשלושת הראשונים בסיום העונה, והדירוג החי שקובע מי יושב על כל מדרגה"
+      ),
       count: 0,
       tone: "gold",
     },
     {
       href: "/game/achievements",
-      label: "תגמולים",
+      label: t("תגמולים"),
       icon: "gift",
-      tip: "יש לך הישגים שהושלמו וממתינים לאיסוף — היכנס ואסוף את התגמולים",
+      tip: t("יש לך הישגים שהושלמו וממתינים לאיסוף — היכנס ואסוף את התגמולים"),
       count: collectableAchievements,
       tone: "gold",
       onlyWhenWaiting: true,
@@ -161,7 +170,9 @@ export function InboxNav({
     .filter((e) => !e.onlyWhenWaiting || e.count > 0);
 
   return (
-    <div dir="rtl" className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+    // Inside the command bar, which is dir="ltr" so the emblem keeps the same
+    // corner in both languages — these pills read in the document's direction.
+    <div dir={dir} className="flex shrink-0 items-center gap-1.5 sm:gap-2">
       {entries.map((e) => {
         const active = pathname.startsWith(e.href);
         const tone = TONE[e.tone];
@@ -175,7 +186,9 @@ export function InboxNav({
               // server again every time any page in the game is opened.
               prefetch={false}
               aria-label={
-                e.count > 0 ? `${e.label} — ${e.count} חדשים` : e.label
+                e.count > 0
+                  ? t("{label} — {count} חדשים", { label: e.label, count: e.count })
+                  : e.label
               }
               className={`res-pill relative gap-1.5 px-2 py-1.5 font-bold transition-colors sm:px-2.5 ${
                 active ? tone.active : `${tone.idle} hover:text-white`
