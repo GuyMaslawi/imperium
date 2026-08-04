@@ -16,6 +16,7 @@
     "db:wipe": "tsx scripts/wipe-data.ts",
     "db:admin": "tsx scripts/grant-admin.ts",
     "mail:test": "tsx scripts/test-mail.ts",
+    "vercel:env": "bash scripts/vercel-env-sync.sh",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
