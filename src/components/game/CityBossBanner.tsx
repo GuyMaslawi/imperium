@@ -212,6 +212,80 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
             </Tip>
           </div>
 
+          {/* ---------------- the hoard ----------------
+              The bait, and the first thing under his name. Everything else in
+              this slab is a price — turns, blood, how many marches it takes —
+              and the one number that answers "why would I pay it" used to live
+              folded away behind a disclosure nobody opens, while the row on
+              screen quoted the *chip* a single assault takes off (800 gold,
+              against the 750,000 he is actually sitting on). That reads as a
+              tyrant who is not worth the walk.
+
+              So the pile comes first, at the size of the pile — the whole life's
+              haul, gear and captives included — and the assault projection below
+              it is re-read for what it is: the bite you take out of this, per
+              march. Quoted live: `lifeHaul` already carries the season day, the
+              city tier, the admin multiplier and a running Happy Hour. */}
+          <div className="relative overflow-hidden rounded-lg border border-gold/45 bg-black/50 px-2.5 py-2">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_140%_at_100%_0%,rgba(212,165,74,0.22),transparent_65%)]"
+            />
+            {/* Label and pile share one row wherever they fit: the slab was put
+                on a diet once already so it would not push the ladder under the
+                fold, and the hoard has to earn its height back. */}
+            <div className="relative">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <span className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-gold-bright">
+                  <Icon name="gift" size={13} /> {t("{boss} יושב על", { boss: bossName })}
+                </span>
+                {BOSS_REWARD_RESOURCES.map((res) => (
+                  <Tip key={res} tip={t(RESOURCE_META[res].label)}>
+                    <span className="nums inline-flex cursor-help items-center gap-1 text-sm font-black text-zinc-100">
+                      <Icon
+                        name={RESOURCE_ICON[res]}
+                        size={15}
+                        className={RESOURCE_ICON_COLOR[res]}
+                      />
+                      <span dir="ltr">{formatNumber(lifeHaul[res])}</span>
+                    </span>
+                  </Tip>
+                ))}
+                <Tip
+                  tip={t("שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.")}
+                >
+                  <span className="nums inline-flex cursor-help items-center gap-1 text-sm font-black text-emerald-300">
+                    <Icon name="mine" size={15} />
+                    <span dir="ltr">{formatNumber(lifeHaul.slaves)}</span>
+                  </span>
+                </Tip>
+                <Tip
+                  tip={t(
+                    "הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה."
+                  )}
+                >
+                  <span className="inline-flex cursor-help items-center gap-1 rounded border border-purple-500/50 bg-purple-950/50 px-1.5 py-0.5 text-[11px] font-black text-purple-300">
+                    <Icon name="spark" size={12} /> {t("ציוד מובטח")}
+                  </span>
+                </Tip>
+                <span className="nums inline-flex items-center gap-1 text-[11px] font-black text-gold">
+                  <Icon name="hero" size={13} />
+                  <span dir="ltr">+{formatNumber(heroXp)}</span>
+                  <span className="font-normal text-zinc-500">{t("ניסיון")}</span>
+                </span>
+              </div>
+              <p className="nums mt-1 text-[11px] leading-relaxed text-zinc-400">
+                {t(
+                  "{chip}% מהאוצר מתחלק לפי הנזק שאתה גורם — משולם על כל תקיפה, גם כזו שלא הפילה אותו. את השאר ({kill}%, והציוד) לוקח מי שמפיל אותו.",
+                  {
+                    chip: Math.round(BOSS_CHIP_SHARE * 100),
+                    kill: Math.round(BOSS_KILL_SHARE * 100),
+                  }
+                )}
+              </p>
+            </div>
+          </div>
+
           {/* health, or the revive clock in its place — one row either way */}
           {dead ? (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-gold/30 bg-black/40 px-2.5 py-2">
@@ -281,7 +355,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 </p>
               </div>
               <div>
-                <p className="font-bold text-gold-dim">{t("ותשלם לך בערך")}</p>
+                <p className="font-bold text-gold-dim">{t("ותכניס לך מהאוצר")}</p>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   {BOSS_REWARD_RESOURCES.map((res) => (
                     <span
@@ -385,7 +459,7 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
               >
                 ▸
               </span>
-              {t("שלל, איך הקרב עובד, וסיפור הרקע")}
+              {t("איך הקרב עובד, איך מתחלק האוצר, וסיפור הרקע")}
               {conquerors.length > 0 && <> · {t("מפילי {boss}", { boss: bossName })}</>}
             </summary>
 
@@ -557,49 +631,16 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
                 </div>
               </div>
 
-              {/* -------- spoils -------- */}
+              {/* -------- how the hoard is split --------
+                  The pile itself is printed above, unfolded, where it can pull
+                  somebody into the fight; what is left here is the fine print
+                  behind it — the grade bonus and what makes the pile grow —
+                  which is read once and never again. */}
               <div className="border-t border-border-subtle pt-3">
                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.2em] text-gold-dim">
-                  <Icon name="gift" size={13} /> {t("שלל מלא על הבוס הזה")}
+                  <Icon name="gift" size={13} /> {t("איך מתחלק האוצר")}
                 </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {BOSS_REWARD_RESOURCES.map((res) => (
-                    <span
-                      key={res}
-                      className="nums inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-panel-inset px-2 py-1 text-xs font-bold text-zinc-200"
-                    >
-                      <Icon
-                        name={RESOURCE_ICON[res]}
-                        size={13}
-                        className={RESOURCE_ICON_COLOR[res]}
-                      />
-                      <span dir="ltr">{formatNumber(lifeHaul[res])}</span>
-                      <span className="text-[10px] font-normal text-zinc-500">
-                        {t(RESOURCE_META[res].label)}
-                      </span>
-                    </span>
-                  ))}
-                  <Tip tip={t("שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.")}>
-                    <span className="nums inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-2 py-1 text-xs font-bold text-emerald-300">
-                      <Icon name="mine" size={13} />
-                      <span dir="ltr">{formatNumber(lifeHaul.slaves)}</span>
-                      <span className="text-[10px] font-normal text-emerald-500/80">
-                        {t("עבדים")}
-                      </span>
-                    </span>
-                  </Tip>
-                  <Tip tip={t("הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה.")}>
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-purple-500/40 bg-purple-950/40 px-2 py-1 text-xs font-bold text-purple-300">
-                      <Icon name="spark" size={13} /> {t("ציוד מובטח בהפלה")}
-                    </span>
-                  </Tip>
-                  <span className="nums inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-panel-inset px-2 py-1 text-xs font-bold text-zinc-200">
-                    <Icon name="hero" size={13} className="text-gold" />
-                    <span dir="ltr">+{formatNumber(heroXp)}</span>
-                    <span className="text-[10px] font-normal text-zinc-500">{t("ניסיון")}</span>
-                  </span>
-                </div>
-                <p className="nums mt-1.5 text-[11px] text-zinc-500">
+                <p className="nums text-xs leading-relaxed text-zinc-400">
                   {t(
                     "{chip}% מהשלל משולם לפי הנזק שאתה מספיק לגרום — גם בתקיפה שלא הפילה אותו. השאר ({kill}%) הוא אוצר ההפלה, שגדל עד ×{grade} בקרב מושלם. השלל גדל עם התקדמות העונה ועם מספר הערים שלך.",
                     {

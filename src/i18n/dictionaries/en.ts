@@ -1898,8 +1898,12 @@ export const EN: Record<string, string> = {
     "Wounded {pct}% by one assault — the wounds stay until he falls",
   "פצוע ב־{pct}% מ־{sorties} תקיפות — הפצעים נשארים עד שהוא נופל":
     "Wounded {pct}% across {sorties} assaults — the wounds stay until he falls",
+  "{boss} יושב על": "{boss} is sitting on",
+  "ציוד מובטח": "Gear guaranteed",
+  "{chip}% מהאוצר מתחלק לפי הנזק שאתה גורם — משולם על כל תקיפה, גם כזו שלא הפילה אותו. את השאר ({kill}%, והציוד) לוקח מי שמפיל אותו.":
+    "{chip}% of the hoard is split by the damage you deal — paid out on every assault, even one that did not finish him. The rest ({kill}%, and the gear) goes to whoever brings him down.",
   "תקיפה אחת תוריד לו": "One assault takes off",
-  "ותשלם לך בערך": "and pays you roughly",
+  "ותכניס לך מהאוצר": "and takes out of the hoard",
   "ותעלה לך": "and costs you",
   "{boss} עדיין חזק ממך.": "{boss} is still stronger than you.",
   "בקצב הזה צריך כ־{sorties} תקיפות כדי להפיל אותו, וכל אחת עולה {turns} תורות":
@@ -1910,7 +1914,8 @@ export const EN: Record<string, string> = {
   "הקרב רץ — צפה בו": "The battle is running — watch it",
   "תקיפה עולה {cost} תורות ורצה כדקה. הצבא נלחם לבד {rounds} סבבים — תקבל הודעה עם השלל כשהקרב נגמר, גם אם עברת לדף אחר.":
     "An assault costs {cost} turns and runs about a minute. The army fights {rounds} rounds on its own — you get a message with the haul when it ends, even if you have moved on to another page.",
-  "שלל, איך הקרב עובד, וסיפור הרקע": "Spoils, how the fight works, and the lore",
+  "איך הקרב עובד, איך מתחלק האוצר, וסיפור הרקע":
+    "How the fight works, how the hoard is split, and the lore",
   "מפילי {boss}": "Those who felled {boss}",
   "איך הקרב עובד": "How the fight works",
   "לוחצים תקיפה פעם אחת. הצבא יוצא ל־{rounds} סבבים לאורך כדקה, ובכל סבב הקצינים מנסים לקרוא את המהלך של {boss} ולענות עליו. קריאה נכונה מכפילה את הנזק":
@@ -1962,13 +1967,12 @@ export const EN: Record<string, string> = {
   ". החייה אותו לפני שתתקוף.": ". Raise him before you march.",
   "כל רמה מוסיפה לסיכוי הקריאה (עד {max}%) ומחזקת את מכת הזעם. גיבור מת מאבד את שניהם.":
     "Every level adds to the read chance (up to {max}%) and sharpens the fury blow. A dead hero loses both.",
-  "שלל מלא על הבוס הזה": "The full haul on this boss",
+  "איך מתחלק האוצר": "How the hoard is split",
   "שבויים ששוחררו ממכלאות הבוס — מצטרפים למאגר עבדי המכרות הפנוי שלך.":
     "Captives freed from the boss's pens — they join your pool of free mine slaves.",
   "עבדים": "slaves",
   "הבוס תמיד מפיל ציוד גיבור — ולעולם לא ציוד פשוט. דירוג קרב מושלם (S) מעלה את הרצפה בדרגה.":
     "The boss always drops hero gear — and never common gear. A perfect battle grade (S) raises the floor by one rarity.",
-  "ציוד מובטח בהפלה": "Gear guaranteed on the kill",
   "{chip}% מהשלל משולם לפי הנזק שאתה מספיק לגרום — גם בתקיפה שלא הפילה אותו. השאר ({kill}%) הוא אוצר ההפלה, שגדל עד ×{grade} בקרב מושלם. השלל גדל עם התקדמות העונה ועם מספר הערים שלך.":
     "{chip}% of the haul is paid out for the damage you manage to land — even on an assault that did not finish him. The rest ({kill}%) is the kill treasure, which grows up to ×{grade} in a perfect battle. The haul grows with the season's progress and with the number of cities you hold.",
 
