@@ -18,6 +18,9 @@ import { useLocale, useT } from "@/i18n/client";
  * game's numbers (production, plunder immunity, turns), so a 1000-diamond item
  * with a crown on it invites exactly the wrong assumption; the line about
  * "חיסכון בלחיצות בלבד" is there to be read before the purchase, not after it.
+ *
+ * All of that is sales copy, so an owner never sees it — for them the card is a
+ * one-line badge saying the seal is theirs and since when.
  */
 export function VipCard({
   diamonds,
@@ -32,6 +35,28 @@ export function VipCard({
   const [state, action] = useActionState<ActionState, FormData>(buyVip, {});
   const owned = vipSince != null;
 
+  // Once it is bought there is nothing left to sell: the perks are already
+  // living in the top bar, so the pitch collapses to a one-line receipt.
+  if (owned) {
+    return (
+      <section className="panel-gold flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl px-3 py-2">
+        <h2 className="flex items-center gap-2 text-sm font-bold tracking-wide text-gold-bright">
+          <Icon name="crown" size={16} className="text-crimson-bright" />
+          {t(VIP_LABEL)}
+          <span className="rounded bg-gold/20 px-1.5 py-0.5 text-[10px] font-black text-gold-bright">
+            VIP
+          </span>
+        </h2>
+        <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
+          {t("ברשותך מאז")}{" "}
+          <span className="nums" dir="ltr">
+            {formatDate(new Date(vipSince), locale)}
+          </span>
+        </span>
+      </section>
+    );
+  }
+
   return (
     <section className="panel-gold rounded-xl p-4">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
@@ -42,18 +67,9 @@ export function VipCard({
             VIP
           </span>
         </h2>
-        {owned ? (
-          <span className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400">
-            {t("ברשותך מאז")}{" "}
-            <span className="nums" dir="ltr">
-              {formatDate(new Date(vipSince), locale)}
-            </span>
-          </span>
-        ) : (
-          <span className="text-[11px] text-zinc-500">
-            {t("רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד")}
-          </span>
-        )}
+        <span className="text-[11px] text-zinc-500">
+          {t("רכישה חד־פעמית · לא פג תוקף · חיסכון בלחיצות בלבד")}
+        </span>
       </div>
 
       <p className="mt-2 text-sm text-zinc-300">
@@ -80,33 +96,26 @@ export function VipCard({
         ))}
       </div>
 
-      {owned ? (
-        <p className="mt-4 flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-400">
-          <Icon name="crown" size={16} />
-          {t("הפעולות המהירות פתוחות — פתח את ״מפקדה״ בסרגל העליון")}
-        </p>
-      ) : (
-        <form className="mt-4">
-          <SubmitButton
-            className="btn btn-gold w-full px-4 py-2.5 font-black"
-            formAction={action}
-            disabled={diamonds < VIP_COST}
-            pendingText={t("רוכש...")}
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              <Icon name="crown" size={16} />
-              {t("רכוש {pass} ·", { pass: t(VIP_LABEL) })}
-              <span className="nums inline-flex items-center gap-1" dir="ltr">
-                {VIP_COST}
-                <Icon name="diamond" size={14} className="text-cyan-100" />
-              </span>
+      <form className="mt-4">
+        <SubmitButton
+          className="btn btn-gold w-full px-4 py-2.5 font-black"
+          formAction={action}
+          disabled={diamonds < VIP_COST}
+          pendingText={t("רוכש...")}
+        >
+          <span className="flex items-center justify-center gap-1.5">
+            <Icon name="crown" size={16} />
+            {t("רכוש {pass} ·", { pass: t(VIP_LABEL) })}
+            <span className="nums inline-flex items-center gap-1" dir="ltr">
+              {VIP_COST}
+              <Icon name="diamond" size={14} className="text-cyan-100" />
             </span>
-          </SubmitButton>
-        </form>
-      )}
+          </span>
+        </SubmitButton>
+      </form>
 
       <div className="mt-3">
-        <FormMessage error={state.error} success={owned ? undefined : state.success} />
+        <FormMessage error={state.error} success={state.success} />
       </div>
     </section>
   );

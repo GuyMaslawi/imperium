@@ -2861,8 +2861,6 @@ export const EN: Record<string, string> = {
     "One-off purchase · never expires · saves clicks and nothing else",
   "פותח את כפתורי ״הכל״ שכבר קיימים במשחק — בבנק, במחסנים ובמכרות — ואת כפתור ״מפקדה״ בסרגל העליון שמפעיל אותם מכל מסך. אין כאן פעולה חדשה: כל מצב שהם מגיעים אליו, אפשר להגיע אליו גם ידנית. לא נותן משאבים, לא נותן עוצמה ולא מגן על האימפריה.":
     "Unlocks the \"all\" buttons the game already has — in the bank, the warehouses and the mines — and the \"Command\" button in the top bar that reaches them from any screen. There is no new action here: every state they reach, you can reach by hand. It grants no resources, no power and no protection.",
-  "הפעולות המהירות פתוחות — פתח את ״מפקדה״ בסרגל העליון":
-    "The quick actions are open — use \"Command\" in the top bar",
   "רכוש {pass} ·": "Buy {pass} ·",
   "מפקדה": "Command",
   "מפקדה מהירה": "Quick command",

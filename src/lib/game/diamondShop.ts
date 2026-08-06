@@ -28,7 +28,7 @@ export const BOOSTABLE_RESOURCES: StorableResource[] = ["gold", "wood", "iron", 
 export const SHOP_DISCOUNT_PCT = 20;
 export const SHOP_DISCOUNT_DURATION_HOURS = 24;
 export const SHOP_DISCOUNT_DURATION_MS = SHOP_DISCOUNT_DURATION_HOURS * 3_600_000;
-export const SHOP_DISCOUNT_COST = 150;
+export const SHOP_DISCOUNT_COST = 300;
 
 export interface ResourceCost {
   gold: number;
@@ -88,14 +88,14 @@ export const TURN_PACKAGE_KINDS: DiamondEffectKind[] = TURN_PACKAGES.map(
 /* ------------------------------ hero points reset ------------------------------ */
 
 /** Diamonds to refund all allocated hero points to "unspent" (once/season). */
-export const HERO_POINTS_RESET_COST = 100;
+export const HERO_POINTS_RESET_COST = 2000;
 
 /* ------------------------------ hero revival ------------------------------ */
 
 /**
  * Diamonds to raise a fallen hero back to full health on the spot, instead of
- * waiting out the hour (HERO_REVIVE_HOURS). Deliberately the most expensive
- * thing in the shop: the alternative is free, it just costs patience.
+ * waiting out the hour (HERO_REVIVE_HOURS). Deliberately steep: the alternative
+ * is free, it just costs patience.
  */
 export const HERO_REVIVE_COST = 500;
 
@@ -174,7 +174,7 @@ export const SHIELD_RENEW_COOLDOWN_MS = SHIELD_RENEW_COOLDOWN_MINUTES * 60_000;
 
 /* ------------------------------ bank interest spell ------------------------------ */
 
-export const BANK_INTEREST_SPELL_COST = 60;
+export const BANK_INTEREST_SPELL_COST = 700;
 export const BANK_INTEREST_COOLDOWN_HOURS = 24;
 export const BANK_INTEREST_COOLDOWN_MS = BANK_INTEREST_COOLDOWN_HOURS * 3_600_000;
 
@@ -192,7 +192,7 @@ export const BANK_INTEREST_COOLDOWN_MS = BANK_INTEREST_COOLDOWN_HOURS * 3_600_00
  * mine multiplier, population ceiling and the bracket he is matched in — and the
  * way back up is the ordinary price of founding the city again.
  */
-export const CITY_DOWNGRADE_COST = 500;
+export const CITY_DOWNGRADE_COST = 400;
 
 /** Below this city count the spell is refused: you cannot give up your last city. */
 export const CITY_DOWNGRADE_MIN_CITIES = 2;

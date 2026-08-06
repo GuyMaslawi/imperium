@@ -686,7 +686,7 @@ export function DiamondShop({
           icon={<Icon name="spark" size={20} className="text-crimson" />}
           title={t("קסמים ושירותים")}
         />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <DiscountCard activeUntil={discountActiveUntil} diamonds={diamonds} />
           <BankInterestCard
             preview={interestPreview}
