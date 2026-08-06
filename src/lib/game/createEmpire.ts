@@ -10,6 +10,7 @@ import {
 } from "./constants";
 import { DEFAULT_TUNABLES, type GameTunables } from "./config";
 import { INITIAL_WEAPON_UNLOCKED_TIER, WEAPON_CATEGORIES } from "./weapons";
+import { computePower } from "@/server/empirePower";
 
 /**
  * New-player starting balance: enough resources for the first upgrades and
@@ -78,6 +79,17 @@ export function newEmpireData(
         mineSlaves: starting.mineSlaves,
       },
     },
+    // The denormalised power figures, written with the army that produces them.
+    //
+    // They are not zero on a fresh empire — the starting bundle is a small
+    // working army, and 10 soldiers plus 2 spies is a real (small) ranking. Left
+    // at the column default they read as an empire with nothing, which is what
+    // emptied כוח כללי and הריגול הגבוה ביותר for a whole new season: those
+    // boards drop rows whose value is 0, so every player was filtered out until
+    // his first settle happened to repair the column. See server/empirePower.ts
+    // — every write that changes an army writes these in the same breath, and
+    // creation is a write that changes an army.
+    ...computePower({ soldiers: starting.soldiers, spies: starting.spies }, []),
     storages: {
       create: STORAGE_TYPES.map((resourceType) => ({ resourceType, level: 1 })),
     },

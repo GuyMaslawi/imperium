@@ -7,6 +7,7 @@ import { startBossAssault, settleDueAssault } from "@/server/bossSiege";
 import { bossReward } from "@/lib/game/bosses";
 import { seasonPassDay } from "@/lib/game/seasonPass";
 import {
+  BOSS_CASUALTIES,
   BOSS_CHIP_SHARE,
   BOSS_GRADE_BONUS,
   BOSS_KILL_SHARE,
@@ -199,7 +200,14 @@ describe("the grade is scored on the battle that was fought", () => {
     // the battle actually inflicted, not on the empty army the settle found.
     if (report.victory) {
       expect(report.grade).toBe(fromPlan);
-      expect(plan.soldiersLost).toBeGreaterThan(0); // there WAS blood to score
+      // While the tyrant draws no blood (BOSS_ROUND_LOSS_BASE is 0 — see the note
+      // on it) every plan records zero casualties, so "there WAS blood to score"
+      // is vacuous rather than false, and asserting it would fail on a deliberate
+      // design decision. The invariant above is the one that caught the exploit
+      // and it stands either way: the grade comes from the stored plan, not from
+      // the live army. Gated on the same switch every screen reads, so restoring
+      // casualties restores this assertion on the same deploy.
+      if (BOSS_CASUALTIES) expect(plan.soldiersLost).toBeGreaterThan(0);
     }
   });
 });

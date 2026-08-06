@@ -1003,14 +1003,15 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* the rotating face. transform + filter are both driven inline: filter carries
-   a touch of motion blur that lifts off as the wheel slows. */
+/* the rotating face, driven inline by transform alone. No motion blur and no
+   filter of any kind: the wedge labels are children of this element, so a
+   filter here made every prize on the wheel soft to read. */
 .wheel-face {
   position: absolute;
   inset: 21px;
   border-radius: 999px;
   transform-origin: 50% 50%;
-  will-change: transform, filter;
+  will-change: transform;
   backface-visibility: hidden;
 }
 
@@ -1021,11 +1022,13 @@ body {
   inset: 21px;
   border-radius: 999px;
   pointer-events: none;
+  /* Kept deliberately thin. This film sits over the prize labels, so anything
+     heavier reads as haze on the very text the player is trying to read. */
   background:
-    radial-gradient(115% 85% at 32% 3%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.045) 26%, transparent 52%),
-    radial-gradient(75% 55% at 72% 104%, rgba(150, 190, 255, 0.07), transparent 62%);
+    radial-gradient(115% 85% at 32% 3%, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02) 26%, transparent 52%),
+    radial-gradient(75% 55% at 72% 104%, rgba(150, 190, 255, 0.035), transparent 62%);
   box-shadow:
-    inset 0 0 36px rgba(0, 0, 0, 0.7),
+    inset 0 0 26px rgba(0, 0, 0, 0.5),
     inset 0 0 0 1px rgba(0, 0, 0, 0.65);
 }
 
@@ -1189,9 +1192,6 @@ body {
   .wheel-spark,
   .wheel-shock {
     display: none;
-  }
-  .wheel-face {
-    filter: none !important;
   }
 }
 

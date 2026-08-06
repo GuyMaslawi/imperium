@@ -50,6 +50,26 @@ const nextConfig: NextConfig = {
   // advisories for.
   poweredByHeader: false,
 
+  /**
+   * `/game` is a bare alias for `/game/base` — there is no dashboard at the top
+   * of the game, only the base.
+   *
+   * It lives here rather than in a `page.tsx` that calls `redirect()`, because a
+   * page whose whole body is a redirect still has to be *rendered* to issue one,
+   * and rendering a route that immediately redirects made the App Router throw
+   * "Rendered more hooks than during the previous render" (React #310) on every
+   * visit. The navigation recovered — the player did land on the base — but at
+   * the cost of a thrown error, a remount of the whole tree, and a row in
+   * `ErrorLog` for every player who ever typed `/game` or followed a stale link.
+   *
+   * The docs are explicit about this case: "If you'd like to redirect before the
+   * render process, use next.config.js or Proxy" (01-app/02-guides/redirecting).
+   * Answered here, nothing renders at all — the 308 goes out on the request.
+   */
+  async redirects() {
+    return [{ source: "/game", destination: "/game/base", permanent: true }];
+  },
+
   async headers() {
     return [
       {

@@ -256,12 +256,7 @@ export async function register(
   formData: FormData
 ): Promise<AuthState> {
   const t = await getT();
-  // Throttle mass account/empire creation from one origin (resource exhaustion,
-  // empire-name squatting). Generous enough not to hinder a real person.
   const ip = await clientIp();
-  if (!(await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000))) {
-    return { error: t("יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר.") };
-  }
 
   // Registration reopens with the next season, not before. The form is not even
   // reachable during the break (`/register` redirects to `/season`), so this is
@@ -282,6 +277,31 @@ export async function register(
     return { error: t(parsed.error.issues[0].message) };
   }
   const { name, empireName, heroClass, email, password } = parsed.data;
+
+  // Throttle mass account/empire creation from one origin (resource exhaustion,
+  // empire-name squatting).
+  //
+  // **Charged after validation, not before**, and this is the part that matters:
+  // the budget used to be spent by any POST at all, so a *rejected* form — an
+  // empire name already taken, a password one character short, a typo'd email —
+  // cost a try. At the old ceiling of five per hour, a new player who fumbled
+  // the form five times was locked out of the game for an hour having never
+  // created anything. Everything above this line is a cheap parse; nothing has
+  // been written and no hash computed, so refusing to charge for it gives an
+  // attacker nothing and gives an honest player their retries back.
+  //
+  // Twenty rather than five because the key is an **IP, not a person**. Israeli
+  // mobile carriers put many subscribers behind one CGNAT address, and a family,
+  // a dorm or an office share one too — at five, the sixth genuine player behind
+  // a shared address is turned away on the busiest night the game will have. The
+  // ceiling still bounds the expensive work below (one bcrypt hash per allowed
+  // attempt) and still makes automated mass signup from one origin useless, and
+  // it is not the real defence against alt rings in any case: that is the
+  // shared-IP clustering the admin monitor surfaces (see getSharedIpClusters),
+  // which reports on signups rather than blocking them.
+  if (!(await rateLimit(`register:${ip}`, 20, 60 * 60 * 1000))) {
+    return { error: t("יותר מדי נסיונות הרשמה. נסה שוב מאוחר יותר.") };
+  }
 
   // No pre-flight "does this email exist?" query: it was both a TOCTOU race with
   // the insert and an enumeration oracle (a fast email-taken reply, returned

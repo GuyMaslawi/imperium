@@ -31,8 +31,6 @@ const SEG = 360 / WHEEL_PRIZES.length;
 const SPIN_MS = 4600;
 const SETTLE_MS = 620;
 const OVERSHOOT = 5.5;
-/** When the motion blur starts lifting, as a fraction of the coast. */
-const BLUR_LIFT_AT = 0.55;
 
 const SOUND_KEY = "kraldor-wheel-sound";
 
@@ -105,7 +103,6 @@ export function WheelOfFortune({
   const [rotation, setRotation] = useState(0);
   /** "spin" is the long coast, "settle" the short push back into the detent. */
   const [phase, setPhase] = useState<"idle" | "spin" | "settle">("idle");
-  const [blur, setBlur] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState<{
     prize: WheelPrizeDef;
@@ -292,11 +289,9 @@ export function WheelOfFortune({
   /** Coast to `target`, overshoot, settle back, then reveal. */
   function launch(target: number, reveal: () => void) {
     setPhase("spin");
-    setBlur(1.7);
     setRotation(target + OVERSHOOT);
     requestAnimationFrame(trackPawl);
 
-    after(SPIN_MS * BLUR_LIFT_AT, () => setBlur(0));
     after(SPIN_MS, () => {
       setPhase("settle");
       setRotation(target);
@@ -405,19 +400,21 @@ export function WheelOfFortune({
     );
   }
 
+  // No motion blur: the wedge labels ride this same element, and any filter on
+  // it left them soft to read for the whole spin. The face stays pin-sharp.
   const faceTransition =
     phase === "spin"
-      ? `transform ${SPIN_MS}ms cubic-bezier(0.15, 0.72, 0.12, 1), filter ${SPIN_MS * (1 - BLUR_LIFT_AT)}ms ease-out`
+      ? `transform ${SPIN_MS}ms cubic-bezier(0.15, 0.72, 0.12, 1)`
       : phase === "settle"
-        ? `transform ${SETTLE_MS}ms cubic-bezier(0.36, 1.32, 0.5, 1), filter 300ms ease-out`
-        : "filter 300ms ease-out";
+        ? `transform ${SETTLE_MS}ms cubic-bezier(0.36, 1.32, 0.5, 1)`
+        : "none";
 
   return (
     <div
       // The overlay is the scroller here (the wheel itself must not be cropped),
       // so it is sized in dvh: at `inset-0` its bottom ran under the phone's
       // toolbar and the last stretch of a tall result panel was unreachable.
-      className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain bg-black/85 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm"
+      className="fixed inset-x-0 top-0 z-[100] flex h-[100dvh] items-start justify-center overflow-y-auto overscroll-contain bg-black/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={onClose}
     >
       <div
@@ -527,9 +524,6 @@ export function WheelOfFortune({
               className="wheel-face"
               style={{
                 transform: `rotate(${rotation}deg)`,
-                // Always a numeric blur — `none` is not an interpolable filter
-                // value, so the motion blur would pop off instead of lifting.
-                filter: `blur(${blur}px)`,
                 transition: faceTransition,
               }}
             >

@@ -18,6 +18,7 @@ import { Icon, RESOURCE_ICON, RESOURCE_ICON_COLOR } from "@/components/ui/Icon";
 import { usePulse } from "@/components/ui/motion";
 import { StorageSilo, type SiloPulseKind } from "./StorageSilo";
 import { VipLockedAction } from "./VipLockedAction";
+import type { AvailableResources } from "./WeaponCard";
 import type { OreKind } from "./oreTint";
 import { formatNumber } from "@/lib/game/format";
 import { useT } from "@/i18n/client";
@@ -26,8 +27,11 @@ export interface StorageCardProps {
   resourceType: "GOLD" | "WOOD" | "IRON" | "STONE";
   label: string;
   level: number;
-  /** Available balance outside the warehouse. */
-  available: number;
+  /**
+   * Every unprotected balance, not just this warehouse's resource: the deposit
+   * box spends one of them, the upgrade below spends all four.
+   */
+  available: AvailableResources;
   /** Protected balance inside the warehouse. */
   stored: number;
   capacity: number;
@@ -40,6 +44,13 @@ export interface StorageCardProps {
 }
 
 type TransferKind = "deposit" | "withdraw" | "depositAll" | "withdrawAll";
+
+const RESOURCE_LABEL: Record<OreKind, string> = {
+  gold: "זהב",
+  wood: "עץ",
+  iron: "ברזל",
+  stone: "אבן",
+};
 
 const formatAmount = (value: number) => formatNumber(value);
 
@@ -56,6 +67,8 @@ export function StorageCard({
   const t = useT();
   /** The resource this warehouse holds — drives its canonical icon and tint. */
   const storedResource = resourceType.toLowerCase() as OreKind;
+  /** The unprotected balance of this warehouse's own resource. */
+  const ownAvailable = available[storedResource];
   const [upgradeState, upgradeAction] = useActionState<ActionState, FormData>(
     upgradeStorage,
     {}
@@ -81,13 +94,20 @@ export function StorageCard({
   const [clientError, setClientError] = useState<string>();
   const [lastAction, setLastAction] = useState<TransferKind>();
 
-  const availableWhole = Math.floor(available);
+  const availableWhole = Math.floor(ownAvailable);
   const storedWhole = Math.floor(stored);
   const freeSpace = Math.max(0, capacity - storedWhole);
   const fillRatio = capacity > 0 ? Math.min(1, stored / capacity) : 0;
   const fillPercent = (fillRatio * 100).toFixed(1);
   const nearFull = fillRatio >= 0.9;
   const capacityPerLevel = level > 0 ? Math.round(capacity / level) : capacity;
+
+  // The upgrade is paid out of the unprotected balances, so what is short is
+  // marked in red below and the button itself refuses the doomed submit.
+  const missingCost = (["gold", "wood", "iron", "stone"] as const).filter(
+    (key) => upgradeCost[key] > 0 && available[key] < upgradeCost[key]
+  );
+  const canAffordUpgrade = missingCost.length === 0;
 
   const validateAmount = (kind: "deposit" | "withdraw"): string | undefined => {
     if (amount.trim() === "") return t("יש להזין כמות");
@@ -210,7 +230,7 @@ export function StorageCard({
       <p className="text-sm text-zinc-300">
         {t("זמין אצלך:")}{" "}
         <span className="nums font-bold text-gold-bright" dir="ltr">
-          {formatAmount(available)}
+          {formatAmount(ownAvailable)}
         </span>
       </p>
 
@@ -297,19 +317,56 @@ export function StorageCard({
           </p>
           <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
             <span className="font-semibold text-gold-dim">{t("עלות שדרוג:")}</span>
-            {(["gold", "wood", "iron", "stone"] as const).map((key) => (
-              <span key={key} className="nums" dir="ltr">
-                <Icon
-                  name={RESOURCE_ICON[key]}
-                  size={14}
-                  className={`inline align-[-2px] ${RESOURCE_ICON_COLOR[key]}`}
-                />{" "}
-                {formatAmount(upgradeCost[key])}
-              </span>
-            ))}
+            {(["gold", "wood", "iron", "stone"] as const).map((key) => {
+              const missing = upgradeCost[key] > 0 && available[key] < upgradeCost[key];
+              return (
+                <span
+                  key={key}
+                  className={missing ? "font-semibold text-red-400" : undefined}
+                  title={
+                    missing
+                      ? t("חסר: {amount}", {
+                          amount: formatAmount(
+                            Math.ceil(upgradeCost[key] - available[key])
+                          ),
+                        })
+                      : undefined
+                  }
+                >
+                  <Icon
+                    name={RESOURCE_ICON[key]}
+                    size={14}
+                    className={`inline align-[-2px] ${
+                      missing ? "text-red-400" : RESOURCE_ICON_COLOR[key]
+                    }`}
+                  />{" "}
+                  <span className="nums" dir="ltr">
+                    {formatAmount(upgradeCost[key])}
+                  </span>
+                </span>
+              );
+            })}
           </div>
+          {!canAffordUpgrade && (
+            <p className="mt-2 font-semibold text-red-400">
+              {t("חסר לשדרוג: {resources}", {
+                resources: missingCost
+                  .map(
+                    (key) =>
+                      `${t(RESOURCE_LABEL[key])} ${formatAmount(
+                        Math.ceil(upgradeCost[key] - available[key])
+                      )}`
+                  )
+                  .join(", "),
+              })}
+            </p>
+          )}
         </div>
-        <SubmitButton className="btn btn-dark w-full" pendingText={t("משדרג...")}>
+        <SubmitButton
+          className="btn btn-dark w-full"
+          pendingText={t("משדרג...")}
+          disabled={!canAffordUpgrade}
+        >
           {t("🔧 שדרג לרמה {level}", { level: level + 1 })}
         </SubmitButton>
       </form>

@@ -10,6 +10,7 @@ import {
   getEmpireSpyPower,
 } from "@/lib/game/power";
 import { weaponsOfCategory } from "@/lib/game/weapons";
+import { newEmpireData } from "@/lib/game/createEmpire";
 
 /**
  * The denormalisation guard.
@@ -198,6 +199,37 @@ describe("syncEmpirePower", () => {
     await syncEmpirePower(prisma, empire.id);
     const repaired = await bothWays(empire.id);
     expect(repaired.stored).toEqual(repaired.computed);
+  });
+});
+
+describe("a brand-new empire", () => {
+  /**
+   * The season-opening case. Every board that ranks on these columns drops rows
+   * whose value is 0, so an empire created with the figures left at their column
+   * default is invisible on כוח כללי and הריגול הגבוה ביותר until its owner's
+   * first settle repairs them — which is exactly what emptied both boards for a
+   * freshly restarted world. The starting bundle is a small working army, and it
+   * has to rank as one from the moment it is written.
+   */
+  it("ranks from creation, without waiting for a settle", async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `born@${TAG}.test`,
+        name: "born",
+        passwordHash: "x",
+        emailVerified: new Date(),
+      },
+    });
+    const created = await prisma.empire.create({
+      data: newEmpireData(user.id, `${TAG}-born`),
+      select: { id: true },
+    });
+
+    const { stored, computed } = await bothWays(created.id);
+    expect(stored).toEqual(computed);
+    expect(stored.generalPower).toBeGreaterThan(0);
+    expect(stored.spyPower).toBeGreaterThan(0);
+    expect(stored.militaryPower).toBeGreaterThan(0);
   });
 });
 

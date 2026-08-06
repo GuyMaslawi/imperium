@@ -7,6 +7,8 @@ import {
   storageUpgradeCost,
 } from "@/lib/game/constants";
 import { formatNumber } from "@/lib/game/format";
+import { applyShopDiscount } from "@/lib/game/diamondShop";
+import { getShopDiscountPct } from "@/lib/game/diamondEffects";
 import { StorageCard } from "@/components/game/StorageCard";
 import { oreVars } from "@/components/game/oreTint";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -33,11 +35,16 @@ export default async function StoragePage() {
   const vip = isVip(empire);
 
   const available = {
-    gold: empire.gold,
-    wood: empire.wood,
-    iron: empire.iron,
-    stone: empire.stone,
-  } as const;
+    gold: Math.floor(empire.gold),
+    wood: Math.floor(empire.wood),
+    iron: Math.floor(empire.iron),
+    stone: Math.floor(empire.stone),
+  };
+
+  // The upgrade action charges the discounted price, so the card has to quote
+  // that same number — otherwise it would grey out a button the player can
+  // actually afford.
+  const discountPct = await getShopDiscountPct(empire.id);
 
   // One pass over the four warehouses: the cards below and the mini-silos in
   // the banner read the same numbers, so the drawing can never disagree with
@@ -170,10 +177,13 @@ export default async function StoragePage() {
             resourceType={warehouse.type}
             label={warehouse.meta.label}
             level={warehouse.level}
-            available={available[warehouse.meta.resourceKey]}
+            available={available}
             stored={warehouse.stored}
             capacity={warehouse.capacity}
-            upgradeCost={storageUpgradeCost(warehouse.level)}
+            upgradeCost={applyShopDiscount(
+              storageUpgradeCost(warehouse.level),
+              discountPct
+            )}
             isVip={vip}
           />
         ))}

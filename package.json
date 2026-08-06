@@ -7,7 +7,7 @@
     "assets": "node scripts/portrait-assets.mjs",
     "prebuild": "node scripts/portrait-assets.mjs",
     "build": "prisma migrate deploy && next build --turbopack",
-    "start": "next start --turbopack",
+    "start": "next start",
     "postinstall": "prisma generate",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",

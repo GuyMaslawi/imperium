@@ -1364,6 +1364,8 @@ export const EN: Record<string, string> = {
   "אחרי שדרוג:": "After upgrading:",
   "עלות שדרוג:": "Upgrade cost:",
   "אין מספיק מהמשאב הזה לשדרוג": "Not enough of this resource for the upgrade",
+  "חסר: {amount}": "Short by {amount}",
+  "חסר לשדרוג: {resources}": "Short for the upgrade: {resources}",
   "משדרג...": "Upgrading…",
   "שדרג לרמה {level}": "Upgrade to level {level}",
 
@@ -3299,6 +3301,12 @@ export const EN: Record<string, string> = {
   "לא נמצא": "Not found",
   "המשאב שחיפשת לא קיים או שאין לך גישה אליו — ייתכן שהאימפריה, הקרב או הדוח נמחקו.":
     "What you were looking for does not exist, or you have no access to it — the empire, battle or report may have been deleted.",
+  // The root 404 — a URL that matches no route at all, rather than a missing
+  // battle or empire behind one that does. See app/not-found.tsx.
+  "הדף לא נמצא": "Page not found",
+  "הדף לא נמצא | קראלדור": "Page not found | Kraldor",
+  "הכתובת שהגעת אליה לא קיימת — ייתכן שהקישור נשבר בדרך או שהדף הוסר.":
+    "That address does not exist — the link may have been broken on the way, or the page removed.",
   "לדירוג": "To the rankings",
   "משהו השתבש": "Something went wrong",
   "אירעה שגיאה בטעינת המסך. אפשר לנסות שוב או לחזור לבסיס.":
