@@ -3286,10 +3286,15 @@ export const EN: Record<string, string> = {
   "הבנק הגדול ביותר": "The biggest bank",
   "הריגול הגבוה ביותר": "The highest intelligence",
   "הגניבות הגדולות ביותר": "The biggest heists",
+  "השיעבודים הגדולים ביותר": "The biggest hauls of prisoners",
+  "מי לוקח הכי הרבה משחקנים אחרים — זהב שנשדד וחיילים שנשבו בתקיפות מנצחות.":
+    "Who is taking the most off other players — gold plundered and soldiers captured in winning attacks.",
   "היום": "Today",
   "השבוע": "This week",
   "לא נגנב זהב היום עדיין.": "No gold has been stolen today yet.",
   "לא נגנב זהב השבוע עדיין.": "No gold has been stolen this week yet.",
+  "לא שועבדו חיילים היום עדיין.": "No soldiers have been taken prisoner today yet.",
+  "לא שועבדו חיילים השבוע עדיין.": "No soldiers have been taken prisoner this week yet.",
 
   "לא נמצא": "Not found",
   "המשאב שחיפשת לא קיים או שאין לך גישה אליו — ייתכן שהאימפריה, הקרב או הדוח נמחקו.":

@@ -273,11 +273,20 @@ export interface GlobalBoards {
   names: Map<string, string>;
 }
 
-/** Rows each global board shows. */
-const BOARD_SIZE = 10;
+/**
+ * Rows each global board shows.
+ *
+ * Five, not ten. Six boards share this page and every one of them is a *global*
+ * board — the whole game competing for the same handful of lines — so a long tail
+ * says nothing a reader can use: past the top few the names are interchangeable
+ * and the page turns into five hundred pixels of scrolling. The city ladder is
+ * where a player finds their own neighbourhood, and that still pages ten at a
+ * time (PAGE_SIZE); this page is the podium.
+ */
+const BOARD_SIZE = 5;
 
 /**
- * The four cross-game boards, top ten each — four indexed `ORDER BY … LIMIT 10`
+ * The four cross-game boards, top five each — four indexed `ORDER BY … LIMIT 5`
  * queries, live.
  *
  * This was the worst query in the app: **global**, not one city bucket, it
@@ -290,7 +299,7 @@ const BOARD_SIZE = 10;
  *
  * Two of the four boards (`slaves`, `bank`) could always have been ordered in
  * SQL; the other two could not, because `spy` and `power` were computed in JS.
- * Now that those live on indexed columns all four are, forty rows come back
+ * Now that those live on indexed columns all four are, twenty rows come back
  * instead of the table, and there is nothing left to defend — so the boards move
  * the moment the game does.
  */
@@ -362,44 +371,83 @@ export async function getGlobalBoards(): Promise<GlobalBoards> {
 }
 
 /**
- * Biggest thefts since `cutoff` — total gold plundered in winning attacks.
+ * Puts names, presence and cities on rows that came back from an aggregate as
+ * bare empire ids.
  *
- * Aggregated and cut in SQL off `BattleReport(createdAt)`, so a raid shows up on
- * the board as soon as it is fought.
+ * The raid boards below are grouped off `BattleReport`, which knows only the
+ * attacker's id. Resolving them here rather than through `GlobalBoards.names` is
+ * deliberate: that map only covers empires that made one of the four standing
+ * boards, and a raider need not be on any of them.
  */
-export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
+async function nameRaidRows(
+  sums: { attackerEmpireId: string; total: number }[]
+): Promise<BoardRow[]> {
   const t = await getT();
-  const sums = await prisma.battleReport.groupBy({
-    by: ["attackerEmpireId"],
-    // Staff raids are excluded at the source rather than filtered out of the
-    // top ten afterwards: dropping a row after `take` would silently serve a
-    // nine-row board. Bots never attack anyone, so they cost this board
-    // nothing — they are in the filter only so the rule stays one rule.
-    where: {
-      createdAt: { gte: cutoff },
-      stolenGold: { gt: 0 },
-      attackerEmpire: notStaffOrBot,
-    },
-    _sum: { stolenGold: true },
-    orderBy: { _sum: { stolenGold: "desc" } },
-    take: BOARD_SIZE,
-  });
-  // Resolved directly: the boards' name map only covers empires that made a
-  // top ten, and a raider need not be on any of them.
   const named = await prisma.empire.findMany({
-    where: { id: { in: sums.map((t) => t.attackerEmpireId) } },
+    where: { id: { in: sums.map((s) => s.attackerEmpireId) } },
     select: { id: true, name: true, cities: true, lastSeenAt: true, isBot: true },
   });
   const byId = new Map(named.map((e) => [e.id, e]));
+  // One clock for the board, as everywhere else here.
   const now = new Date();
   return sums.map((row) => ({
     empireId: row.attackerEmpireId,
     name: byId.get(row.attackerEmpireId)?.name ?? t("אימפריה"),
-    value: Math.floor(row._sum.stolenGold ?? 0),
+    value: Math.floor(row.total),
     // A raider whose empire row has since been deleted reads as away, which is
     // the truthful answer for a name that is no longer anybody — and holds no
     // city at all, rather than a made-up one.
     online: isOnline(byId.get(row.attackerEmpireId), now),
     cities: byId.get(row.attackerEmpireId)?.cities ?? null,
   }));
+}
+
+/**
+ * Staff raids are excluded at the source rather than filtered out of the top
+ * five afterwards: dropping a row after `take` would silently serve a four-row
+ * board. Bots never attack anyone, so they cost these boards nothing — they are
+ * in the filter only so the rule stays one rule.
+ */
+const RAIDER_WHERE = { attackerEmpire: notStaffOrBot } as const;
+
+/**
+ * Biggest thefts since `cutoff` — total gold plundered in winning attacks.
+ *
+ * Aggregated and cut in SQL off `BattleReport(createdAt)`, so a raid shows up on
+ * the board as soon as it is fought.
+ */
+export async function getTheftBoard(cutoff: Date): Promise<BoardRow[]> {
+  const sums = await prisma.battleReport.groupBy({
+    by: ["attackerEmpireId"],
+    where: { createdAt: { gte: cutoff }, stolenGold: { gt: 0 }, ...RAIDER_WHERE },
+    _sum: { stolenGold: true },
+    orderBy: { _sum: { stolenGold: "desc" } },
+    take: BOARD_SIZE,
+  });
+  return nameRaidRows(
+    sums.map((r) => ({ attackerEmpireId: r.attackerEmpireId, total: r._sum.stolenGold ?? 0 }))
+  );
+}
+
+/**
+ * Biggest enslavements since `cutoff` — defenders' soldiers taken prisoner in
+ * winning attacks and put to work in the mines.
+ *
+ * The sibling of the theft board, and deliberately not of the `slaves` board
+ * above: that one ranks the *stock* a player is sitting on, most of which was
+ * bought, while this ranks what they took off other players in the window. Same
+ * shape, same source, same period toggle — a raid pays in gold and in bodies,
+ * and the page now says who is collecting each.
+ */
+export async function getEnslavementBoard(cutoff: Date): Promise<BoardRow[]> {
+  const sums = await prisma.battleReport.groupBy({
+    by: ["attackerEmpireId"],
+    where: { createdAt: { gte: cutoff }, enslavedSoldiers: { gt: 0 }, ...RAIDER_WHERE },
+    _sum: { enslavedSoldiers: true },
+    orderBy: { _sum: { enslavedSoldiers: "desc" } },
+    take: BOARD_SIZE,
+  });
+  return nameRaidRows(
+    sums.map((r) => ({ attackerEmpireId: r.attackerEmpireId, total: r._sum.enslavedSoldiers ?? 0 }))
+  );
 }

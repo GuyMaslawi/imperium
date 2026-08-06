@@ -120,17 +120,35 @@ export function levelGapXpFactor(ownLevel: number, foeLevel: number): number {
 /**
  * How real the fight was, as a reward factor. `foePower / ownPower` is ~0 when
  * you crush someone far weaker and approaches 1 for an even match (on a win the
- * ratio is always < 1, since the winner had the greater power). We map it to a
- * 0.3x–2x band so a stomp still pays a small floor while a nail-biter — or an
- * upset against a stronger foe — pays full and then some. This is what makes
- * the gain sensible relative to *who you picked*, and dynamic on every attack:
- * as both armies change, so does the ratio, so no two attacks pay the same.
+ * ratio is usually < 1, since the winner normally had the greater power). We map
+ * it to a 0.3x–2x band so a stomp still pays a small floor while a nail-biter —
+ * or an upset against a stronger foe — pays full and then some. This is what
+ * makes the gain sensible relative to *who you picked*, and dynamic on every
+ * attack: as both armies change, so does the ratio, so no two attacks pay the
+ * same.
+ *
+ * **The ratio is read on a cube-root scale, not linearly.** Every ladder in this
+ * game is geometric (see `upgrade-cost-curves`), so army power is spread over
+ * orders of magnitude, not over a percentage band: the median *winning* attack
+ * in a live season had a defender/attacker ratio of ~0.015, and the 90th
+ * percentile only reached ~0.26. Read linearly, that whole range collapses onto
+ * the 0.3 floor — every real fight paid the minimum, which is what players felt
+ * as "attacking pays almost no XP", and it silently cancelled the level-gap
+ * bonus for punching up (×2 of a floored number is still a floored number).
+ * The cube root makes the factor move with the *order of magnitude* of the gap
+ * instead: a foe at 1.5% of your power now reads as 0.65 rather than 0.32,
+ * while a genuinely helpless target (1e-6 of your power, i.e. a bot garrison or
+ * an empire with no army left) still sits on the floor. An even fight is
+ * deliberately unchanged at ×1.7.
  */
 export const MIN_MATCHUP_XP_FACTOR = 0.3;
 export const MAX_MATCHUP_XP_FACTOR = 2;
 export function matchupXpFactor(ownPower: number, foePower: number): number {
-  const ratio = ownPower > 0 ? foePower / ownPower : 0;
-  return Math.min(MAX_MATCHUP_XP_FACTOR, Math.max(MIN_MATCHUP_XP_FACTOR, 0.3 + ratio * 1.4));
+  const ratio = ownPower > 0 ? Math.max(0, foePower) / ownPower : 0;
+  return Math.min(
+    MAX_MATCHUP_XP_FACTOR,
+    Math.max(MIN_MATCHUP_XP_FACTOR, 0.3 + Math.cbrt(ratio) * 1.4)
+  );
 }
 
 /** Where a hero stands: his level and the resets behind him. */

@@ -8,7 +8,7 @@ import {
   citizenGrowthMaxLevel,
   citizensPerDailyUpdate,
 } from "./constants";
-import { HERO_MAX_LEVEL } from "./hero";
+import { HERO_MAX_LEVEL, effectiveHeroLevel } from "./hero";
 
 /**
  * Achievements: a one-off (never resetting) reward ladder covering the whole
@@ -178,6 +178,11 @@ export interface AchievementStats {
   spySuccesses: number;
 
   /* --- hero --- */
+  /**
+   * The hero's raw level, as the column stands right now — it drops back to 1
+   * on every prestige. Nothing that has to *stay* earned may read this; use
+   * `effectiveHeroLevel(heroLevel, heroResets)` (see the `herolvl` chain).
+   */
   heroLevel: number;
   /** Times the hero hit the cap and was reset (prestige). */
   heroResets: number;
@@ -532,7 +537,16 @@ const HERO: AchievementDefinition[] = [
     "herolvl",
     "hero",
     "hero",
-    (s) => s.heroLevel,
+    // Effective level, not the raw column. A prestige sends the hero back to
+    // level 1, and reading `heroLevel` made every rung of this ladder — up to
+    // and including the level-100 capstone and its world record — *un-reach*
+    // itself the moment the player used the reward it had just unlocked. A
+    // player who climbed to 100 and reset before the base screen next loaded
+    // lost the record outright and could never claim rungs 50/75/100 again.
+    // The effective level only ever rises (level + resets × HERO_MAX_LEVEL), so
+    // "climbed to level N" stays true once it is true — which is what a
+    // one-off ladder and a first-to-reach record both require.
+    (s) => effectiveHeroLevel(s.heroLevel, s.heroResets),
     "גיבור ברמה {goal}",
     "העלה את הגיבור שלך לרמה {goal}",
     [

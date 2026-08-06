@@ -18,7 +18,10 @@ import {
   UPGRADE_COST_AT_LEVEL_100,
   MAX_LEVEL_GAP_XP_FACTOR,
   MIN_LEVEL_GAP_XP_FACTOR,
+  MAX_MATCHUP_XP_FACTOR,
+  MIN_MATCHUP_XP_FACTOR,
   RESET_LEVEL_EQUIV,
+  matchupXpFactor,
   applyHeroXp,
   attackWinXp,
   effectiveHeroLevel,
@@ -128,6 +131,39 @@ describe("battle XP", () => {
     expect(levelGapXpFactor(50, 1)).toBeGreaterThanOrEqual(MIN_LEVEL_GAP_XP_FACTOR);
     expect(levelGapXpFactor(1, 5_000)).toBe(MAX_LEVEL_GAP_XP_FACTOR);
     expect(levelGapXpFactor(0, 50)).toBe(MIN_LEVEL_GAP_XP_FACTOR);
+  });
+
+  it("keeps the matchup factor inside its band, ×1.7 at equal power", () => {
+    expect(matchupXpFactor(100_000, 100_000)).toBeCloseTo(1.7);
+    expect(matchupXpFactor(100_000, 0)).toBe(MIN_MATCHUP_XP_FACTOR);
+    expect(matchupXpFactor(0, 100_000)).toBe(MIN_MATCHUP_XP_FACTOR);
+    expect(matchupXpFactor(100_000, 100_000_000)).toBe(MAX_MATCHUP_XP_FACTOR);
+    // Monotonic: a tougher opponent never pays less.
+    for (const r of [1e-6, 1e-3, 0.05, 0.3, 0.8]) {
+      expect(matchupXpFactor(1e9, r * 1e9)).toBeLessThan(matchupXpFactor(1e9, r * 2e9));
+    }
+  });
+
+  it("reads the power gap by orders of magnitude, not as a percentage", () => {
+    // The whole point of the cube root: power is spread geometrically, so the
+    // ratios real battles actually produce (~0.015 at the median win) used to
+    // land on the floor and every fight paid the same minimum.
+    expect(matchupXpFactor(1e9, 0.015 * 1e9)).toBeGreaterThan(2 * MIN_MATCHUP_XP_FACTOR);
+    // A genuinely helpless target — a bot garrison, or an empire with no army
+    // left — still pays close to the floor, so farming one is not a ladder.
+    expect(matchupXpFactor(1e13, 5e5)).toBeLessThan(MIN_MATCHUP_XP_FACTOR * 1.2);
+  });
+
+  it("lets a low-level attacker earn a real share of a level off a stronger foe", () => {
+    // The reported bug: level 30 beats level 70 and the XP was a rounding
+    // error. The level gap pays ×2 there — that must not be cancelled by a
+    // floored matchup term just because the win required an army advantage.
+    const me = { level: 30, resets: 0 };
+    const bigger = { level: 70, resets: 0 };
+    const gain = attackWinXp(me, bigger, 1e9, 0.015 * 1e9);
+    expect(xpToNextLevel(30) / gain).toBeLessThan(4);
+    // …and still strictly more than the same fight against your own level.
+    expect(gain).toBeGreaterThan(attackWinXp(me, me, 1e9, 0.015 * 1e9));
   });
 
   it("has no defence counterpart — repelling a raid pays nothing", () => {

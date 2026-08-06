@@ -633,9 +633,11 @@ export function HeroXpCalc() {
         ונחסם בטווח <span className="nums" dir="ltr">0.25–2.5</span>. רמה אפקטיבית = רמה + איפוסים ×{" "}
         <span className="nums">100</span>, ולכן יריב ברמה 1 אחרי איפוס אחד נחשב רמה{" "}
         <span className="nums">101</span> ומשלם בהתאם. יחס הקרב נגזר מ־
-        <span className="nums" dir="ltr">0.3 + (כוח היריב ÷ כוחך) × 1.4</span> ונחסם בטווח{" "}
+        <span className="nums" dir="ltr">0.3 + ∛(כוח היריב ÷ כוחך) × 1.4</span> ונחסם בטווח{" "}
         <span className="nums" dir="ltr">0.3–2.0</span> — לרמוס יריב חלש משתלם פחות מלנצח יריב שקול,
-        וניצחון על חזק ממך משלם הכי הרבה.
+        וניצחון על חזק ממך משלם הכי הרבה. השורש נמצא שם כי הכוח במשחק גדל בקפיצות
+        מסדרי גודל: בלעדיו כמעט כל קרב אמיתי נפל על רצפת ה־
+        <span className="nums" dir="ltr">0.3</span>.
       </p>
     </CalcShell>
   );
