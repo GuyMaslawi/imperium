@@ -58,6 +58,7 @@ import {
   bossKillFraction,
   bossPayout,
   bossSiegeMaxHp,
+  refitSiegePool,
   simulateBossSortie,
   type BossGrade,
   type BossRound,
@@ -137,10 +138,24 @@ async function currentLife(
     orderBy: { createdAt: "desc" },
   });
 
-  if (newest && newest.killedAt == null && newest.hp > 0) return { siege: newest };
+  const maxHp = bossSiegeMaxHp(cities, powerMultiplier, hpMultiplier);
+
+  if (newest && newest.killedAt == null && newest.hp > 0) {
+    // The curve may have moved under a life that is already in progress — a
+    // deploy that retunes the pool, or an admin turning `boss.hpMultiplier`. Fit
+    // it to today's pool at the share of health it has left, or the loot (which
+    // is priced against `maxHp` at every settle) and the fight stop describing
+    // the same tyrant. See `refitSiegePool` for why the fraction is what carries.
+    if (newest.maxHp !== maxHp) {
+      const refit = refitSiegePool(newest.hp, newest.maxHp, maxHp);
+      return {
+        siege: await tx.bossSiege.update({ where: { id: newest.id }, data: refit }),
+      };
+    }
+    return { siege: newest };
+  }
   if (newest?.revivesAt && newest.revivesAt > now) return { revivesAt: newest.revivesAt };
 
-  const maxHp = bossSiegeMaxHp(cities, powerMultiplier, hpMultiplier);
   return {
     siege: await tx.bossSiege.create({
       data: { empireId, cityTier: cities, bossKey: boss.key, maxHp, hp: maxHp },

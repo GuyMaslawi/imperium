@@ -32,6 +32,16 @@ import { MAX_CITIES, type StorableResource } from "./constants";
  *    a share of: pro-rata as it wears the boss down, plus the hoard on the kill
  *    (see `BOSS_CHIP_SHARE` / `BOSS_KILL_SHARE`).
  *
+ * **The tyrant is a siege, not an errand (2026-08-06).** The wall, the pool and
+ * the haul were all raised together on one instruction — the boss should be the
+ * hardest thing in the game and pay like it. Felling one now takes about three
+ * assaults from an army standing at its printed power (it used to take one), and
+ * a life is worth about six times what it was. The two curves are kept in step on
+ * purpose: `BOSS_REWARD_TIER_MULTIPLIER` now matches `BOSS_POWER_TIER_MULTIPLIER`
+ * exactly, so a tenth-city tyrant is not merely bigger in both directions but
+ * pays the *same* haul per unit of work as the first — which it did not before.
+ * The arithmetic behind "harder, and worth it" is written out on each constant.
+ *
  * Deliberately absent: diamonds. Same reasoning as the season pass — a
  * repeatable source of diamonds undercuts the real-money store (see
  * DiamondPurchase). The boss pays resources, slaves, hero XP and gear.
@@ -174,11 +184,18 @@ export function bossTurnCost(cities: number): number {
 /* ------------------------------ power ------------------------------ */
 
 /**
- * Attack power the first city's boss fields. Roughly what a player holds after
- * their first week: ~1,200 soldiers, or the same power bought as weapons (the
- * weapon table pays exactly 1 power per 10 gold at every tier).
+ * Attack power the first city's boss fields — ~2,000 soldiers, or the same power
+ * bought as weapons (the weapon table pays exactly 1 power per 10 gold at every
+ * tier).
+ *
+ * Raised from 12,000 on 2026-08-06. Twelve thousand was "what a player holds
+ * after their first week", which made the very first tyrant something you walked
+ * past on the way to the second one. The wall a boss advertises should be an
+ * army you had to *decide* to build, so it is now a good fortnight's worth — and
+ * because the health pool is a multiple of this number (`bossSiegeMaxHp`),
+ * raising it raises the length of the siege by the same factor.
  */
-export const BOSS_BASE_POWER = 12_000;
+export const BOSS_BASE_POWER = 20_000;
 
 /**
  * Power multiplier per city tier. Matches CITY_COST_TIER_MULTIPLIER, so the
@@ -192,9 +209,10 @@ export const BOSS_POWER_TIER_MULTIPLIER = 2.5;
  *
  * It is the yardstick, not the verdict: the boss's health pool is a multiple of
  * it (`bossSiegeMaxHp`) and each round's damage is a fraction of the attacker's
- * power, so an army at parity fells the tyrant in one well-played sortie, an army
- * at half parity needs two or three, and an army at triple ends it in a couple
- * of rounds. Casualties are dealt per round by the tactic matrix.
+ * power, so the printed power reads as a ladder rather than as a pass/fail line —
+ * an army *at* the wall fells the tyrant in about three assaults, one at double
+ * it in two, one at triple in one, and one under it chips away and is paid for
+ * the work. Casualties are dealt per round by the tactic matrix.
  */
 export function bossPower(cities: number, powerMultiplier = 1): number {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));
@@ -224,29 +242,55 @@ export const BOSS_REWARD_BASE: BossReward = {
 };
 
 /**
- * Scale-up applied to the whole haul when the boss became a siege.
+ * Scale-up applied to the whole haul, on top of the day-1 base.
  *
- * The old payout was sized against a single click, and it showed: players read
- * the boss as not worth the wait, which it wasn't — one win per cycle for a bit
- * more than the turns would have earned as ordinary attacks. The cycle haul is
- * now ×2.5, and a sortie that also lands the kill with an S grade takes home
- * `0.55 + 0.45 × 1.5` of it — about three times what the old single victory paid.
+ * Raised twice, and the second raise is the one that matters:
+ *
+ *  - **×2.5 (2026-07-30)**, when the boss became a siege. The payout before that
+ *    was sized against a single click and players read it as not worth the wait,
+ *    which it wasn't — one win per cycle for a bit more than the same turns would
+ *    have earned as ordinary attacks.
+ *  - **×15 (2026-08-06)**, when the tyrant was made genuinely hard. Felling one
+ *    now costs about 4.6× the turns it used to (`BOSS_BASE_POWER` ×1.67 into
+ *    `BOSS_HP_PER_POWER` ×2.77), and a fight that costs five times as much has to
+ *    pay more than five times as much or "harder" is just a nerf with a story.
+ *    Six times the haul against 4.6× the work leaves the boss ~30% better per turn
+ *    than it was, which is the intended shape: the most expensive thing you can
+ *    point banked turns at is also the best-paying one.
+ *
+ * A sortie that lands the kill with an S grade takes home `0.55 + 0.45 × 1.5` of
+ * this — so a felled first-city tyrant is worth ~900k gold on day one, and the
+ * tenth city's is worth billions.
  */
-export const BOSS_REWARD_SCALE = 2.5;
+export const BOSS_REWARD_SCALE = 15;
 
 /**
- * The one term the scale-up is held back on.
+ * The one term the scale-up is held back on — deliberately half the resource
+ * scale rather than the same number.
  *
  * Mine slaves feed uncapped production, and a slave payout compounds twice over
  * (more slaves × a higher city production multiplier) — the same reason their
- * tier curve is gentler than the resource curve. ×1.75 keeps the pens a visibly
- * bigger prize without turning one cycle's boss into a permanent economy tier.
- * If it still inflates, `boss.rewardMultiplier` is the live knob.
+ * tier curve is gentler than the resource curve. At ×6 against the resources' ×15
+ * the pens are still a visibly bigger prize per kill than they were (240 captives
+ * a life at the first city, against 70), while the *rate* — captives per turn
+ * spent — comes out slightly below today's, which is the right direction for the
+ * one reward that never gets spent. If it still inflates, `boss.rewardMultiplier`
+ * is the live knob.
  */
-export const BOSS_REWARD_SCALE_SLAVES = 1.75;
+export const BOSS_REWARD_SCALE_SLAVES = 6;
 
-/** Resource reward multiplier per city tier — the same curve as the power. */
-export const BOSS_REWARD_TIER_MULTIPLIER = 2.4;
+/**
+ * Resource reward multiplier per city tier — deliberately *identical* to
+ * `BOSS_POWER_TIER_MULTIPLIER`.
+ *
+ * It was 2.4 against the power's 2.5, and that gap compounded the wrong way: nine
+ * tiers of `(2.4 / 2.5)` left the tenth city's tyrant paying ~31% less per unit of
+ * work than the first city's, so climbing the city ladder quietly made the boss a
+ * worse deal at exactly the point it became a bigger commitment. Matching the two
+ * curves makes the haul-per-turn flat across all ten tiers: every city up is more
+ * power on the wall *and* proportionally more resources behind it.
+ */
+export const BOSS_REWARD_TIER_MULTIPLIER = 2.5;
 
 /**
  * Slaves grow on a gentler curve than resources: mine slaves feed uncapped
@@ -308,13 +352,20 @@ export const BOSS_REWARD_RESOURCES: readonly StorableResource[] = [
 /* ------------------------------ hero XP & loot ------------------------------ */
 
 /**
- * Hero XP for felling a boss. Far above an ordinary attack win (which pays
- * `40 + defenderHeroLevel × 10` before multipliers) because the run costs 30×
- * the turns — but flat per tier, so it cannot be farmed by picking a soft
- * target the way player attacks can.
+ * Hero XP for a whole life of the boss. Far above an ordinary attack win (which
+ * pays `40 + defenderHeroLevel × 10` before multipliers) because the run costs
+ * orders of magnitude more turns — but flat per tier, so it cannot be farmed by
+ * picking a soft target the way player attacks can.
+ *
+ * Paid on the same split as the loot (`bossHeroXp(cities) * fraction` in the
+ * settle), which is why it had to move with the pool: XP is pro-rata against
+ * damage dealt, so tripling the health a life carries would otherwise have cut
+ * the hero's XP per turn to a third without anybody deciding to. Scaled ×4.5
+ * against the ×4.6 the fight got longer, so a levelling hero is exactly where it
+ * was — the siege is the thing that changed, not the ladder.
  */
-export const BOSS_HERO_XP_BASE = 400;
-export const BOSS_HERO_XP_PER_TIER = 250;
+export const BOSS_HERO_XP_BASE = 1_800;
+export const BOSS_HERO_XP_PER_TIER = 1_100;
 
 export function bossHeroXp(cities: number): number {
   const tier = Math.min(MAX_CITIES, Math.max(1, Math.floor(cities)));

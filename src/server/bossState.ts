@@ -29,6 +29,7 @@ import {
   bossReadChance,
   bossSiegeMaxHp,
   bossSortiesToKill,
+  refitSiegePool,
 } from "@/lib/game/bossBattle";
 import { getLiveHappyHour, happyHourFactor } from "@/server/happyHour";
 
@@ -191,8 +192,16 @@ export async function getCityBossState(empire: FullEmpire): Promise<CityBossStat
   // Dead and still counting down: the pool shown is the *next* life's, at full.
   const dead = life?.revivesAt != null && life.revivesAt > now;
   const alive = life != null && life.killedAt == null && life.hp > 0;
-  const maxHp = alive ? life.maxHp : fullHp;
-  const hp = alive ? life.hp : fullHp;
+  // A life stamped before the curve last moved is quoted at today's pool, at the
+  // share of it the player has already taken off — the same fit the next march
+  // will write (see `refitSiegePool`). Computed rather than persisted on purpose:
+  // this runs on every rankings render, and a write on a read path that hot is
+  // exactly the finding the 2026-08-01 audit raised.
+  const pool = alive
+    ? refitSiegePool(life.hp, life.maxHp, fullHp)
+    : { hp: fullHp, maxHp: fullHp };
+  const maxHp = pool.maxHp;
+  const hp = pool.hp;
 
   const heroLevel = empire.hero?.level ?? 1;
   const heroAlive = empire.hero != null && !isHeroDead(empire.hero);

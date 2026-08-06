@@ -111,6 +111,7 @@ import {
 import {
   BOSS_BASE_POWER,
   BOSS_HERO_XP_BASE,
+  BOSS_HERO_XP_PER_TIER,
   BOSS_ITEM_RARITY_FLOOR,
   BOSS_POWER_TIER_MULTIPLIER,
   BOSS_REVIVE_MS,
@@ -2058,6 +2059,15 @@ export default async function GuidePage() {
                 <b className="nums">{Math.round(BOSS_REVIVE_MS / 60000)}</b> דקות.
               </Lead>
 
+              <Note tone="red" icon="attack" title="שליט הוא מצור, לא לחיצה">
+                אף שליט לא נופל בתקיפה אחת. צבא שעומד <b>בדיוק על הכוח המודפס שלו</b> צריך
+                בערך <b className="nums">3</b> תקיפות כדי לרוקן את מאגר החיים, צבא בכפול
+                מהכוח — <b className="nums">2</b>, ובפי שלושה — אחת. צבא מתחת לקיר פשוט מכרסם
+                לאורך יותר תקיפות, <b>ומקבל שלל על כל אחת מהן</b>: השלל משולם לפי הנזק, כך
+                שאף תקיפה לא הולכת לאיבוד. בתמורה למצור הארוך, מה שיש לשליט בכיסים גדול
+                בהתאם — הפלה אחת שווה יותר מיום שלם של תקיפות רגילות.
+              </Note>
+
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Fact
                   icon="attack"
@@ -2169,7 +2179,7 @@ export default async function GuidePage() {
                   },
                   {
                     term: "ניסיון",
-                    desc: `${BOSS_HERO_XP_BASE} + 250 לכל דרגת עיר, על אותה חלוקה כמו השלל.`,
+                    desc: `${nf(BOSS_HERO_XP_BASE)} + ${nf(BOSS_HERO_XP_PER_TIER)} לכל דרגת עיר, על אותה חלוקה כמו השלל.`,
                   },
                 ]}
               />

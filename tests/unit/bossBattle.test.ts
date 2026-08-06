@@ -29,6 +29,7 @@ import {
   bossSiegeMaxHp,
   bossSortiesToKill,
   canReleaseFury,
+  refitSiegePool,
   resolveBossRound,
   rollBossMove,
   roundRevealAt,
@@ -312,17 +313,17 @@ describe("the balance the whole fight rests on", () => {
     expect(maxHp).toBe(Math.round(power * BOSS_HP_PER_POWER));
   });
 
-  it("leaves a level-1 hero at parity agonisingly short of a one-assault kill", () => {
+  it("makes an army at the printed wall fight a siege, not press a button", () => {
+    // The 2026-08-06 rebalance, and the reason BOSS_HP_PER_POWER exists. At 6.5 a
+    // parity army took ~98% of the pool off in one march and the whole encounter
+    // was one click; three marches is the shape the fight is tuned for now.
     const dealt = bossExpectedSortieDamage(power, 1, true);
-    expect(dealt).toBeLessThan(maxHp);
-    // ...but close enough that the second assault finishes it easily, which is the
-    // difference between a wall and a grind.
-    expect(dealt / maxHp).toBeGreaterThan(0.85);
-  });
-
-  it("lets a mid-level hero at parity fell it in one", () => {
-    expect(bossExpectedSortieDamage(power, 30, true)).toBeGreaterThan(maxHp);
-    expect(bossSortiesToKill(power, maxHp, 30, true)).toBe(1);
+    expect(dealt).toBeLessThan(maxHp / 2);
+    expect(bossSortiesToKill(power, maxHp, 1, true)).toBe(3);
+    // ...and it stays a siege for a good hero too: the hero buys comfort inside
+    // the three, not a way around them.
+    expect(bossSortiesToKill(power, maxHp, 30, true)).toBe(3);
+    expect(bossSortiesToKill(power, maxHp, 60, true)).toBe(3);
   });
 
   it("makes the hero, not just the army, move the projection", () => {
@@ -333,8 +334,12 @@ describe("the balance the whole fight rests on", () => {
     expect(bossExpectedSortieDamage(power, 60, false)).toBeLessThan(weak);
   });
 
-  it("ends it in one assault for an army at triple power", () => {
+  it("reads the printed power as a ladder: triple ends it in one, double in two", () => {
+    // The wall is not a pass/fail line — it is a scale a player can locate
+    // themselves on, and every rung has to be worth climbing to.
     expect(bossSortiesToKill(power * 3, maxHp, 1, true)).toBe(1);
+    expect(bossSortiesToKill(power * 2, maxHp, 1, true)).toBe(2);
+    expect(bossSortiesToKill(power / 2, maxHp, 1, true)).toBeGreaterThan(3);
   });
 
   it("still answers 'how many assaults' for an army far below the wall", () => {
@@ -371,6 +376,47 @@ describe("the balance the whole fight rests on", () => {
       0
     );
     expect(BOSS_ROUND_LOSS_BASE * perfectPerRound * BOSS_SORTIE_ROUNDS).toBeLessThan(0.1);
+  });
+});
+
+describe("re-fitting a life when the curve moves under it", () => {
+  // `BossSiege.maxHp` is stamped at creation, so a retune (or an admin moving
+  // boss.hpMultiplier) leaves lives already in progress fighting the old pool
+  // while `bossReward` pays the new haul. On the 2026-08-06 rebalance that was
+  // worth ~6x the loot for the old effort, once per player.
+  it("keeps the share already taken off, not the raw number", () => {
+    expect(refitSiegePool(39_000, 78_000, 360_000)).toEqual({ hp: 180_000, maxHp: 360_000 });
+    expect(refitSiegePool(78_000, 78_000, 360_000)).toEqual({ hp: 360_000, maxHp: 360_000 });
+  });
+
+  it("pays exactly one haul across a life the refit happened in the middle of", () => {
+    // The property the fraction buys: chip loot is `damage / maxHp` at each
+    // settle, so the shares paid either side of the refit have to still add up to
+    // the whole. Anything else either cheapens the work already done or pays for
+    // it twice.
+    const before = 78_000;
+    const after = 360_000;
+    const dealt = 39_000;
+    const paidBefore = bossChipFraction(dealt, before);
+    const fitted = refitSiegePool(before - dealt, before, after);
+    const paidAfter = bossChipFraction(fitted.hp, fitted.maxHp);
+    expect(paidBefore + paidAfter).toBeCloseTo(BOSS_CHIP_SHARE, 6);
+  });
+
+  it("leaves a pool that is already the right size alone", () => {
+    const same = refitSiegePool(1_234, 5_000, 5_000);
+    expect(same).toEqual({ hp: 1_234, maxHp: 5_000 });
+    // ...and refuses to invent a pool out of degenerate input rather than
+    // dividing by zero into a boss with no health at all.
+    expect(refitSiegePool(10, 0, 5_000)).toEqual({ hp: 10, maxHp: 0 });
+    expect(refitSiegePool(10, 100, 0)).toEqual({ hp: 10, maxHp: 100 });
+  });
+
+  it("never refits a living tyrant into a dead one", () => {
+    // A sliver of health rounding to zero would hand the kill share — and the
+    // guaranteed gear — to whoever marched next, for nothing.
+    const slice = refitSiegePool(1, 1_000_000_000, 100);
+    expect(slice.hp).toBe(1);
   });
 });
 
@@ -767,5 +813,31 @@ describe("the reward scale-up", () => {
   it("grows the haul with the tier and with the season", () => {
     expect(bossReward(2, 1).gold).toBeGreaterThan(bossReward(1, 1).gold);
     expect(bossReward(1, 10).gold).toBeGreaterThan(bossReward(1, 1).gold);
+  });
+
+  it("pays the same haul per point of damage at every city tier", () => {
+    // The reward curve and the power curve are the same number on purpose (see
+    // BOSS_REWARD_TIER_MULTIPLIER). While they differed, nine tiers of 2.4/2.5
+    // compounded into the tenth city's tyrant paying ~31% less per unit of work
+    // than the first city's — the boss got quietly stingier the further you
+    // climbed, which is exactly backwards.
+    const rate = (tier: number) => bossReward(tier, 1).gold / bossSiegeMaxHp(tier);
+    for (let tier = 2; tier <= 10; tier++) {
+      expect(rate(tier) / rate(1)).toBeCloseTo(1, 2);
+    }
+  });
+
+  it("raises the haul by more than it raised the pool", () => {
+    // The whole bargain of the 2026-08-06 rebalance: the tyrant costs ~4.6x the
+    // turns it used to, so it has to pay more than 4.6x or "harder" is a nerf
+    // with a story attached. Chip loot is pro-rata against the pool, so this
+    // ratio *is* the loot-per-turn any army earns, whatever its size.
+    const before = { power: 12_000, hpPerPower: 6.5, scale: 2.5 };
+    const harder = (bossPower(1) * BOSS_HP_PER_POWER) / (before.power * before.hpPerPower);
+    const richer = bossReward(1, 1).gold / (50_000 * before.scale);
+    expect(harder).toBeGreaterThan(4);
+    expect(richer).toBeGreaterThan(harder);
+    // ...and not so much richer that the boss becomes the only thing worth doing.
+    expect(richer / harder).toBeLessThan(1.5);
   });
 });

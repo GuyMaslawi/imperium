@@ -90,24 +90,37 @@ export function bossAssaultDuration(rounds: number): number {
 }
 
 /**
- * The boss's cycle health pool, as a multiple of its printed battle power.
+ * The boss's health pool for one life, as a multiple of its printed battle power.
  *
- * Tuned so that at power parity (attack power ≈ boss power) the assault is close
- * — the hero decides it, not the margin:
+ * **This is the difficulty knob, and it was 6.5 until 2026-08-06.** At 6.5 an
+ * army standing at the printed wall dealt ~98% of the pool in a single assault,
+ * which meant the entire encounter was: bank one day of turns, press the button
+ * once, collect. A tyrant that a parity army removes in one click is not a wall,
+ * it is a vending machine — and it made the printed power a pass/fail line rather
+ * than something to grow past.
  *
- *  - a level-1 hero's officers read the tyrant right 45% of the time, which comes
- *    to ~98% of the pool over six rounds including the fury: agonisingly short,
- *    and finished by a second assault.
- *  - a mid-level hero (~30) reads it 60% of the time and fells it in one.
+ * At 18 an assault takes roughly a third of the pool at parity, so the shape of
+ * the fight is a *siege*, and the printed power reads as a ladder:
+ *
+ *  - a level-1 hero's officers read the tyrant right 45% of the time — ~6.3× the
+ *    army's power per assault, so three marches at the wall, four under it.
+ *  - a mid-level hero (~30) reads it 60% of the time, worth ~7.2×: still three,
+ *    and the hero is what makes the third one comfortable rather than a coin flip.
+ *  - an army at double the wall ends it in two, at triple in one.
  *  - an unlucky assault underperforms and nothing more: since
  *    {@link BOSS_ROUND_LOSS_BASE} went to zero it cannot break the formation, so
  *    what a bad run costs is the turns and another march.
  *
+ * Nobody is paid less for the longer siege: chip loot is pro-rata against this
+ * pool, and `BOSS_REWARD_SCALE` went up by more than this did, so every army —
+ * including one far under the wall, which now simply chips for longer — earns
+ * about 30% more per turn than it did before the boss got hard.
+ *
  * These figures are asserted in tests/unit/bossBattle.test.ts, because every
- * multiplier below moves them and "can an army at the printed power fell this
- * thing" is the promise the printed power makes.
+ * multiplier below moves them and "how many marches does the printed power cost
+ * me" is the promise the printed power makes.
  */
-export const BOSS_HP_PER_POWER = 6.5;
+export const BOSS_HP_PER_POWER = 18;
 
 /**
  * The health pool one life of the boss of `cities` carries.
@@ -125,6 +138,40 @@ export function bossSiegeMaxHp(
   return Math.round(
     bossPower(cities, powerMultiplier) * BOSS_HP_PER_POWER * Math.max(0.01, hpMultiplier)
   );
+}
+
+/**
+ * Re-fit a *live* boss's pool to what its tier is worth right now, keeping the
+ * share of it the player has already taken off.
+ *
+ * `BossSiege.maxHp` is stamped when a life is created, so any change to the curve
+ * — a deploy that retunes {@link BOSS_HP_PER_POWER}, or an admin moving
+ * `boss.hpMultiplier` — leaves every life already in progress fighting the old
+ * pool while `bossReward` pays the new haul. On the 2026-08-06 rebalance that gap
+ * was worth roughly six times the loot for the old effort, once per player: every
+ * wounded tyrant in the world would have been a windfall waiting to be collected.
+ *
+ * Scaling by the *remaining fraction* rather than by the raw number is what makes
+ * this fair in both directions. Chip loot is `damage ÷ maxHp` at the moment of
+ * each settle, so a life that was 50% gone stays 50% gone: the loot already paid
+ * against the old pool plus the loot still to be paid against the new one comes to
+ * exactly the one haul the life is worth, and no assault is retroactively
+ * cheapened or double-paid.
+ *
+ * Only ever applied between assaults (see `currentLife`), never to a life with a
+ * battle running against it — that plan was rolled against the health it read at
+ * launch.
+ */
+export function refitSiegePool(
+  hp: number,
+  maxHp: number,
+  target: number
+): { hp: number; maxHp: number } {
+  if (!(target > 0) || !(maxHp > 0) || target === maxHp) return { hp, maxHp };
+  const remaining = Math.min(1, Math.max(0, hp / maxHp));
+  // Never refit a living tyrant into a dead one: rounding a sliver of health down
+  // to zero would hand out the kill share for free on the next settle.
+  return { hp: Math.max(1, Math.round(target * remaining)), maxHp: target };
 }
 
 /**

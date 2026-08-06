@@ -94,8 +94,9 @@ export function CityBossBanner({ state, cities }: { state: CityBossState; cities
   // marching to yet.
   const bitePct = hp > 0 ? Math.min(100, (expectedSortieDamage / hp) * 100) : 0;
   const lossPct = soldiers > 0 ? (expectedSortieLosses / soldiers) * 100 : 0;
-  // Four or more assaults is a fortnight of banked turns for the tyrant of your
-  // own city: past that the honest advice is to grow first, and say why.
+  // Three assaults is what an army standing at the printed wall pays (see
+  // BOSS_HP_PER_POWER), so this fires exactly for the armies that are *under* it:
+  // past that the honest advice is to grow first, and say why.
   const outmatched = soldiers > 0 && sortiesToKill > 3;
 
   const bossName = t(boss.name);
