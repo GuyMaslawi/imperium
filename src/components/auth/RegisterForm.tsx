@@ -9,6 +9,7 @@ import { FormMessage } from "@/components/ui/FormMessage";
 import { Icon } from "@/components/ui/Icon";
 import { GoogleSignInButton, AuthDivider } from "@/components/auth/GoogleSignInButton";
 import { HeroClassPicker } from "@/components/auth/HeroClassPicker";
+import { SupportPrompt } from "@/components/support/SupportPrompt";
 import { useT } from "@/i18n/client";
 
 export function RegisterForm() {
@@ -71,6 +72,10 @@ export function RegisterForm() {
           {t("התחבר")}
         </Link>
       </p>
+      {/* A registration that will not go through is a player lost before they
+          ever saw the game — and the taken-name / rejected-address refusals are
+          the ones that are worth a human's five seconds. */}
+      <SupportPrompt error={state.error} where={t("מסך ההרשמה")} />
     </div>
   );
 }

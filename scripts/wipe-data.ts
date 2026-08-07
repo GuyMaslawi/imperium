@@ -13,6 +13,12 @@
  *    --purge-purchases only if you are certain every row is a mock/test charge.
  *  - GameConfig, the balance tunables singleton. It is configuration, not
  *    player data; reset it from /admin/balance if you want defaults back.
+ *  - support conversations (see server/actions/support.ts). They are not the
+ *    game world: half of them were written by people who never had an account,
+ *    and the ones that were are the correspondence *about* the purchases the
+ *    line above keeps — a refund argued in the chat and a receipt in the
+ *    purchases table are one record between them. Pass --purge-support to drop
+ *    them anyway (a dev database full of test tickets is the case for it).
  *
  * SAFETY
  *  - dry run by default: prints what WOULD be deleted and exits;
@@ -50,6 +56,7 @@ async function main(): Promise<void> {
   const email = arg("email")?.trim().toLowerCase();
   const confirm = has("confirm");
   const purgePurchases = has("purge-purchases");
+  const purgeSupport = has("purge-support");
 
   if (!email) {
     console.error("Missing --email <admin address to keep>");
@@ -59,6 +66,7 @@ async function main(): Promise<void> {
   console.log(`Database host : ${dbHost()}`);
   console.log(`Keeping admin : ${email}`);
   console.log(`Purchases     : ${purgePurchases ? "PURGE ALL" : "keep settled real-money rows"}`);
+  console.log(`Support chats : ${purgeSupport ? "PURGE ALL" : "keep every conversation"}`);
   console.log(`Mode          : ${confirm ? "EXECUTE" : "DRY RUN"}\n`);
 
   const keeper = await prisma.user.findUnique({
@@ -88,6 +96,7 @@ async function main(): Promise<void> {
     prisma.diamondPurchase.count(),
     prisma.diamondPurchase.count({ where: keptPurchaseFilter }),
   ]);
+  const supportThreads = await prisma.supportThread.count();
 
   console.log("Will delete:");
   console.log(`  users (other than the keeper) : ${users}`);
@@ -99,6 +108,10 @@ async function main(): Promise<void> {
   console.log(
     `  diamond purchases             : ${purgePurchases ? purchases : purchases - keptPurchases}` +
       (purgePurchases ? "  (ALL)" : `  (keeping ${keptPurchases} settled real-money rows)`)
+  );
+  console.log(
+    `  support conversations         : ${purgeSupport ? supportThreads : 0}` +
+      (purgeSupport ? "  (ALL)" : `  (keeping ${supportThreads})`)
   );
   console.log(
     "\nEverything owned by a deleted user or empire (army, buildings, hero, items,\n" +
@@ -136,6 +149,12 @@ async function main(): Promise<void> {
         where: { NOT: keptPurchaseFilter },
       });
   console.log(`  deleted purchases        : ${delPurchases.count}`);
+
+  if (purgeSupport) {
+    // Messages go with the thread — SupportMessage cascades on threadId.
+    const delSupport = await prisma.supportThread.deleteMany({});
+    console.log(`  deleted support chats    : ${delSupport.count}`);
+  }
 
   // The keeper must not be locked out by the new email-verification gate: they
   // demonstrably control this address (it is the configured admin), and there

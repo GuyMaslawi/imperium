@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const LINKS = [
   { href: "/admin", label: "לוח בקרה", icon: "📊", exact: true },
   { href: "/admin/monitor", label: "ניטור", icon: "📡" },
+  { href: "/admin/support", label: "תמיכה", icon: "🛟" },
   { href: "/admin/users", label: "שחקנים", icon: "👥" },
   { href: "/admin/bots", label: "בוטים", icon: "🤖" },
   { href: "/admin/broadcast", label: "שידור ומתנות", icon: "📣" },
@@ -19,7 +20,17 @@ const LINKS = [
   { href: "/admin/audit", label: "יומן פעולות", icon: "📜" },
 ];
 
-export function AdminNav() {
+export function AdminNav({
+  /**
+   * Tickets whose newest line is the player's — the only number in the control
+   * centre that means "somebody is waiting on you right now", so it is the only
+   * one the nav carries. Counted once per admin page load; it does not poll,
+   * because the support screen itself does.
+   */
+  waitingSupport = 0,
+}: {
+  waitingSupport?: number;
+}) {
   const pathname = usePathname();
   return (
     <nav className="-mx-1 flex flex-row gap-1 overflow-x-auto px-1 pb-1 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
@@ -37,7 +48,14 @@ export function AdminNav() {
                 : "text-zinc-300 hover:bg-white/5 hover:text-zinc-100"
             }`}
           >
-            <span className="whitespace-nowrap">{link.label}</span>
+            <span className="flex items-center gap-1.5 whitespace-nowrap">
+              {link.label}
+              {link.href === "/admin/support" && waitingSupport > 0 && (
+                <span className="min-w-5 rounded-full bg-red-600 px-1.5 py-px text-center text-[10px] font-black text-white">
+                  {waitingSupport > 99 ? "99+" : waitingSupport}
+                </span>
+              )}
+            </span>
             <span aria-hidden className="text-base opacity-90">
               {link.icon}
             </span>

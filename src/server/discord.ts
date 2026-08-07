@@ -13,6 +13,7 @@ import { appBaseUrl } from "@/server/mailer";
  *   DISCORD_URL                   the public invite — https://discord.gg/xxxxxxx
  *   DISCORD_WEBHOOK_URL_EVENTS    webhook for what happens *in* the game
  *   DISCORD_WEBHOOK_URL_UPDATES   webhook for news *about* the game
+ *   DISCORD_WEBHOOK_URL_SUPPORT   webhook for somebody waiting at the door
  *
  * All are optional and all fail closed. With none set the site simply has no
  * community channel: every link is hidden, nothing is posted anywhere, and no
@@ -41,15 +42,23 @@ export function discordInviteUrl(): string | null {
  *   "updates" — news *about* the game: what was built, what changed, what is
  *               coming. Nothing in it expires.
  *
- * Two rooms rather than one because they are read differently. Someone who
+ *   "support" — somebody is stuck in front of the login screen and has written
+ *               to us (see server/actions/support.ts). Not news at all: it is a
+ *               work queue, read by whoever is on duty, and it is the only one
+ *               of the three that should be *noisy* — an unanswered ticket is a
+ *               player who never got into the game.
+ *
+ * Separate rooms rather than one because they are read differently. Someone who
  * muted a channel that fires every Happy Hour must still hear that the game got
- * a new feature, and vice versa; a single feed forces one decision on both.
+ * a new feature, and neither of those should bury a person asking for help; a
+ * single feed forces one decision on all three.
  */
-export type DiscordChannel = "events" | "updates";
+export type DiscordChannel = "events" | "updates" | "support";
 
 const CHANNEL_ENV: Record<DiscordChannel, string> = {
   events: "DISCORD_WEBHOOK_URL_EVENTS",
   updates: "DISCORD_WEBHOOK_URL_UPDATES",
+  support: "DISCORD_WEBHOOK_URL_SUPPORT",
 };
 
 /**
@@ -104,6 +113,8 @@ const COLORS = {
   war: 0xb02a37,
   /** A season closing — the rarest post the channel will ever get. */
   season: 0x8a5cd6,
+  /** Somebody needs help. Cool blue: it is a queue, not a celebration. */
+  support: 0x2d7ff9,
 } as const;
 
 export type AnnouncementKind = keyof typeof COLORS;

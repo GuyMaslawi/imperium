@@ -80,6 +80,19 @@ const PAID_STATUS_CODES = new Set(["000"]);
 const CALLBACK_USER_AGENT = "PayPlus";
 
 /**
+ * What `Invoice/GetDocuments` answers when a transaction has no document.
+ *
+ * Observed live on staging 2026-08-06, against a transaction that had genuinely
+ * been charged: HTTP 200, `content-type: text/html`, body exactly this sentence
+ * and nothing else — no JSON, no `results` envelope, no `invoices` key. It is
+ * the *normal* answer for "nothing issued for this one", and the empty
+ * `{"invoices":[]}` the docs show only comes back when no `transaction_uid` is
+ * sent at all. Undocumented, and the difference between "no receipt yet" and a
+ * gateway error the operator has to go chase.
+ */
+const NO_INVOICE_BODY = "cannot-find-invoice-for-this-transaction";
+
+/**
  * `vat_type` on an invoice line: 0 = VAT included, 1 = VAT not included,
  * 2 = **exempt from VAT** — which is what an עוסק פטור sells under.
  */
@@ -194,7 +207,15 @@ interface PayPlusEnvelope {
   data?: unknown;
 }
 
-type PayPlusCall = { ok: true; data: unknown } | { ok: false; reason: string };
+/**
+ * `body` carries the raw text of an answer that was not JSON at all.
+ *
+ * Not decoration: `Invoice/GetDocuments` reports "this transaction has no
+ * document" as a bare `text/html` sentence rather than as JSON, and that is a
+ * normal state — see {@link NO_INVOICE_BODY}. Without the text there is no way
+ * to tell it apart from a gateway shouting an error page.
+ */
+type PayPlusCall = { ok: true; data: unknown } | { ok: false; reason: string; body?: string };
 
 function baseUrl(env: PayPlusEnv): string {
   return env === "production" ? PRODUCTION_BASE : STAGING_BASE;
@@ -235,11 +256,26 @@ async function payplusFetch(
     return { ok: false, reason: `${endpoint}: הבקשה לספק נכשלה (${str(err)})` };
   }
 
+  // Read as text first and parse here, rather than `res.json()`: a non-JSON
+  // answer is a *meaningful* answer from at least one endpoint, and `json()`
+  // consumes the body before anyone can look at it.
+  let text: string;
   try {
-    return { ok: true, data: await res.json() };
-  } catch {
+    text = await res.text();
+  } catch (err) {
     // i18n-exempt: an operator-side `reason` — see above.
-    return { ok: false, reason: `${endpoint}: תשובה לא תקינה מהספק (HTTP ${res.status})` };
+    return { ok: false, reason: `${endpoint}: קריאת התשובה נכשלה (${str(err)})` };
+  }
+
+  try {
+    return { ok: true, data: JSON.parse(text) };
+  } catch {
+    return {
+      ok: false,
+      // i18n-exempt: an operator-side `reason` — see above.
+      reason: `${endpoint}: תשובה לא תקינה מהספק (HTTP ${res.status})`,
+      body: text,
+    };
   }
 }
 
@@ -515,7 +551,13 @@ export class PayPlusProvider implements OrderPaymentProvider {
         untilDate: payplusDate(new Date(paidAt.getTime() + DOC_WINDOW_AFTER_MS)),
       },
     });
-    if (!call.ok) return call;
+    if (!call.ok) {
+      // The one non-JSON answer that is not a fault: this transaction simply
+      // has no document. Same meaning as an empty list, so it gets the same
+      // answer — a receipt that has not been issued is not an error to report.
+      if (call.body?.trim() === NO_INVOICE_BODY) return { ok: true, documents: [] };
+      return call;
+    }
 
     const payload = (call.data ?? {}) as { invoices?: unknown; results?: PayPlusEnvelope["results"] };
 

@@ -3,6 +3,10 @@ import Link from "next/link";
 import { LogoMark } from "@/components/ui/Logo";
 import { formatLegalDate, getLegalOperator } from "@/lib/legal";
 import { OperatorCredit } from "@/components/ui/OperatorCredit";
+import { PublicNav } from "@/components/public/PublicNav";
+import { SupportChat } from "@/components/support/SupportChat";
+import { hasSupportThread } from "@/server/actions/support";
+import { discordInviteUrl } from "@/server/discord";
 
 /**
  * Shared furniture for the three public policy pages (/terms, /refund,
@@ -22,7 +26,7 @@ const PAGES = [
   { href: "/privacy", label: "פרטיות" },
 ] as const;
 
-export function LegalShell({
+export async function LegalShell({
   title,
   lead,
   updated,
@@ -39,9 +43,15 @@ export function LegalShell({
   children: ReactNode;
 }) {
   const operator = getLegalOperator();
+  const hasThread = await hasSupportThread();
 
   return (
     <main className="min-h-screen flex-1 px-4 py-10 sm:py-14">
+      {/* The same bar as the login screen. A policy page is often the *first*
+          page a stranger sees — a refund clause reached from a receipt, terms
+          reached from a payment form — and from here there was previously no way
+          to the manual, the hall, or a human. */}
+      <PublicNav className="mb-8" />
       <div className="mx-auto w-full max-w-3xl">
         <header className="mb-8 flex flex-col items-center text-center">
           <Link href="/" aria-label="חזרה לקראלדור">
@@ -143,6 +153,10 @@ export function LegalShell({
 
         <OperatorCredit className="mt-5" />
       </div>
+
+      {/* The refund page in particular is read by somebody with a charge they
+          want to argue, and the operator's mailbox is a slow way to argue it. */}
+      <SupportChat hasThread={hasThread} discordUrl={discordInviteUrl()} />
     </main>
   );
 }

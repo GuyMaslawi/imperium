@@ -1,6 +1,5 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { requireEmpire } from "@/lib/auth";
 import { getTunables } from "@/lib/game/config";
 import {
   BANK_DAILY_INTEREST_MAX_LEVEL,
@@ -215,7 +214,6 @@ import {
   type GuideSectionMeta,
 } from "@/components/game/guide/GuideUi";
 
-export const metadata = { title: "מדריך המשחק | KRALDOR" };
 
 /* ------------------------------------------------------------------ *
  * The manual's spine. The order here drives the numerals, the table
@@ -309,12 +307,38 @@ function upgradeLadderTotal(
   return total;
 }
 
-export default async function GuidePage() {
+/**
+ * The manual itself, rendered in two places.
+ *
+ * `/game/guide` puts it inside the game shell for a player who is already in;
+ * `/guide` puts it in the public shell for somebody deciding whether to sign up.
+ * The words and every number in them are identical — a manual that says
+ * something different to a visitor than to a player is a brochure, and the point
+ * of publishing it is that a stranger can read exactly what they are about to
+ * join.
+ *
+ * The gate lives on the two routes, never here: this component reads nothing
+ * about the caller, only the live tunables.
+ */
+export async function GuideContent({
+  /**
+   * Rendered for a logged-out reader.
+   *
+   * The only thing it changes is where the "go and do it" buttons point. Every
+   * `/game/*` route redirects a stranger to `/login` and then, once they sign
+   * in, to wherever the redirect chain drops them — so on the public copy those
+   * buttons go to registration, which is the step that actually stands between
+   * the reader and the screen the button names.
+   */
+  publicView = false,
+}: {
+  publicView?: boolean;
+} = {}) {
   const t = await getT();
-  // The guide quotes live balance, not the historical defaults: an admin who
-  // softens the boss or doubles mine output changes this page with it.
-  await requireEmpire();
   const tunables = await getTunables();
+
+  /** Where an in-game link goes for this reader. See `publicView`. */
+  const gameHref = (path: string) => (publicView ? "/register" : path);
 
   const dailyTimes = DAILY_UPDATE_TIMES.map(
     (t) => `${String(t.hour).padStart(2, "0")}:${String(t.minute).padStart(2, "0")}`
@@ -1803,10 +1827,10 @@ export default async function GuidePage() {
               <ItemUpgradeCalc />
 
               <div className="flex flex-wrap justify-center gap-3">
-                <Link href="/game/hero/items" className="btn btn-ghost px-4 py-2 text-sm">
+                <Link href={gameHref("/game/hero/items")} className="btn btn-ghost px-4 py-2 text-sm">
                   <Icon name="spark" size={16} className="inline align-[-2px]" /> קטלוג החפצים המלא
                 </Link>
-                <Link href="/game/hero" className="btn btn-gold px-4 py-2 text-sm">
+                <Link href={gameHref("/game/hero")} className="btn btn-gold px-4 py-2 text-sm">
                   <Icon name="hero" size={16} className="inline align-[-2px]" /> לגיבור שלי
                 </Link>
               </div>
@@ -2192,7 +2216,7 @@ export default async function GuidePage() {
 
               <Note tone="gold" icon="rankings">
                 כל {CITY_BOSSES.length} השליטים מוצגים בדף{" "}
-                <Link href="/game/rankings" className="text-gold underline">
+                <Link href={gameHref("/game/rankings")} className="text-gold underline">
                   הדירוג
                 </Link>{" "}
                 עם הכוח המדויק שלהם — אפשר לתכנן מולם מראש. מד הזעם של הגיבור נטען בכל סבב,
@@ -2459,7 +2483,7 @@ export default async function GuidePage() {
               </Note>
 
               <div className="flex justify-center">
-                <Link href="/game/community" className="btn btn-gold px-5 py-2 text-sm">
+                <Link href={gameHref("/game/community")} className="btn btn-gold px-5 py-2 text-sm">
                   <Icon name="discord" size={16} className="inline align-[-2px]" /> לעמוד הקהילה
                 </Link>
               </div>
@@ -2550,7 +2574,7 @@ export default async function GuidePage() {
                 <Note tone="gold" icon="achievements" title="הישגים">
                   ציוני דרך שנפתחים מעצמם תוך כדי משחק ומחכים לאיסוף. תג זהוב בסרגל
                   העליון אומר שיש פרס שממתין —{" "}
-                  <Link href="/game/achievements" className="text-gold underline">
+                  <Link href={gameHref("/game/achievements")} className="text-gold underline">
                     לדף ההישגים
                   </Link>
                   .
@@ -2657,7 +2681,7 @@ export default async function GuidePage() {
               </Note>
 
               <div className="flex justify-center">
-                <Link href="/game/diamonds" className="btn btn-gold px-5 py-2 text-sm">
+                <Link href={gameHref("/game/diamonds")} className="btn btn-gold px-5 py-2 text-sm">
                   <Icon name="diamond" size={16} className="inline align-[-2px]" /> לחנות היהלומים
                 </Link>
               </div>
@@ -2719,10 +2743,10 @@ export default async function GuidePage() {
               </ol>
 
               <div className="flex flex-wrap justify-center gap-3 pt-2">
-                <Link href="/game/base" className="btn btn-gold px-5 py-2 text-sm">
+                <Link href={gameHref("/game/base")} className="btn btn-gold px-5 py-2 text-sm">
                   <Icon name="base" size={16} className="inline align-[-2px]" /> חזרה לבסיס
                 </Link>
-                <Link href="/game/rankings" className="btn btn-ghost px-5 py-2 text-sm">
+                <Link href={gameHref("/game/rankings")} className="btn btn-ghost px-5 py-2 text-sm">
                   <Icon name="rankings" size={16} className="inline align-[-2px]" /> למצוא יעד
                 </Link>
               </div>

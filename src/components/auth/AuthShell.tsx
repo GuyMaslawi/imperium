@@ -3,7 +3,9 @@ import Link from "next/link";
 import { LogoMark } from "@/components/ui/Logo";
 import { DiscordLink } from "@/components/ui/DiscordLink";
 import { OperatorCredit } from "@/components/ui/OperatorCredit";
-import { LanguageSwitch } from "@/components/ui/LanguageSwitch";
+import { PublicNav } from "@/components/public/PublicNav";
+import { SupportChat } from "@/components/support/SupportChat";
+import { hasSupportThread } from "@/server/actions/support";
 import { discordInviteUrl } from "@/server/discord";
 import { getT } from "@/i18n/server";
 
@@ -17,17 +19,19 @@ export async function AuthShell({
 }) {
   const discord = discordInviteUrl();
   const t = await getT();
+  // Resolved here, from the cookie, so the support dock knows at first paint
+  // whether it has a conversation to poll for — see SupportChat.
+  const hasThread = await hasSupportThread();
   return (
-    <main className="flex min-h-screen flex-1 items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(224,35,51,0.10),transparent_60%)] px-4 py-12">
+    <main className="flex min-h-screen flex-1 flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,rgba(224,35,51,0.10),transparent_60%)] px-4 py-12">
+      {/* Above the crest, on every screen in front of the login: the manual,
+          last season's champions, the policies, the community, and the language
+          switch. The switch is the one control here that genuinely cannot be
+          skipped — a visitor who does not read Hebrew has no account yet, so
+          there is no setting of theirs to carry a preference, and every other
+          word on the page is one they cannot read. */}
+      <PublicNav className="mb-8" />
       <div className={`w-full ${wide ? "max-w-2xl" : "max-w-md"}`}>
-        {/* The switch rides above the crest, on every screen in front of the
-            login. This is the one place it genuinely cannot be skipped: a
-            visitor who does not read Hebrew has no account yet, so there is no
-            setting of theirs to carry a preference, and every other control on
-            the page is a word they cannot read. */}
-        <div className="mb-6 flex justify-center">
-          <LanguageSwitch />
-        </div>
         <div className="mb-8 flex flex-col items-center text-center">
           <LogoMark size={72} className="mb-3 drop-shadow-[0_6px_20px_rgba(224,35,51,0.35)]" />
           {/* Spelled out rather than reusing <Logo> so the wordmark can stack
@@ -83,6 +87,13 @@ export async function AuthShell({
 
         <OperatorCredit className="mt-3" />
       </div>
+
+      {/* The dock, on every screen in front of the game. This is the only place
+          in the app where somebody can be completely stuck — the mail never
+          arrived, the Google button loops, a payment went through on an account
+          that will not open — and none of those people can reach the in-game
+          chat, which is addressed by empire id. */}
+      <SupportChat hasThread={hasThread} discordUrl={discord} />
     </main>
   );
 }

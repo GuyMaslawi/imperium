@@ -1,7 +1,7 @@
 # The community channel (Discord)
 
 The site is wired for a Discord server that lives outside the repo. Everything
-is driven by **three optional environment variables**, and every surface degrades
+is driven by **four optional environment variables**, and every surface degrades
 gracefully while they are unset — which is the state the game shipped in, on
 purpose, so the site could be ready before the channel was.
 
@@ -9,19 +9,22 @@ purpose, so the site could be ready before the channel was.
 DISCORD_URL                  the public invite   https://discord.gg/xxxxxxx
 DISCORD_WEBHOOK_URL_EVENTS   events room         https://discord.com/api/webhooks/…/…
 DISCORD_WEBHOOK_URL_UPDATES  updates room        https://discord.com/api/webhooks/…/…
+DISCORD_WEBHOOK_URL_SUPPORT  support room        https://discord.com/api/webhooks/…/…
 ```
 
-The announcer posts into **two rooms**, and which one a post lands in is stated
+The announcer posts into **three rooms**, and which one a post lands in is stated
 at every call site rather than inferred from its colour:
 
 | Room | What it carries |
 |---|---|
 | **events** | What happens inside the game, on the clock — a Happy Hour, a mini-game, guild-war results, a season opening or closing, a game-wide gift. Read late is read too late. |
 | **updates** | News about the game — what was built, what changed, what is coming. Nothing in it expires. |
+| **support** | Somebody is stuck in front of the login screen and has written to us. Not news at all: a work queue, and the only one of the three that should be noisy — an unanswered ticket is a player who never got into the game. |
 
-Two rooms rather than one because they are read differently: someone who mutes
-the channel that fires on every Happy Hour must still hear that the game got a
-new feature. A single feed forces one decision on both.
+Separate rooms rather than one because they are read differently: someone who
+mutes the channel that fires on every Happy Hour must still hear that the game
+got a new feature, and neither of those should bury a person asking for help. A
+single feed forces one decision on all three.
 
 The earlier single `DISCORD_WEBHOOK_URL` (one `#הכרזות` room for everything) is
 **retired**, and nothing falls back to it — a room whose own variable is unset is
@@ -78,6 +81,7 @@ committed and none of them able to fail the thing that triggered them:
 | Guild-war results (top 3) | events | `settleWar`, by whichever reader won the settlement race, so exactly one post per war. |
 | **A season opening** | events | `announceSeasonStart`, from both paths that can flip a season live: the lazy `getSeasonGate` activation (only the request that wins the guard posts) and the admin's `activateSeason`. |
 | A season closing (podium) | events | `closeSeason`, read back from היכל התהילה after it is written. |
+| **A support ticket** | support | `sendSupportMessage` — the first message of a new conversation always posts; later ones are held to one post per thread per ten minutes, so a person writing three short lines produces one notification rather than three. The embed links straight at `/admin/support?thread=…`. |
 
 A broadcast is the only free-text post, so it is the only one that gets to
 choose: `/admin/broadcast` carries a "ערוץ דיסקורד" select, defaulting to
@@ -97,9 +101,12 @@ entire Discord server from a game form.
 
 Failures — an outage, a revoked webhook, a five-second timeout — are swallowed
 into the error log (visible on `/admin/monitor`) and nothing else. The log key
-carries the room (`discord.announce.events` / `discord.announce.updates`): with
-two webhooks live, "the announcer is broken" is not actionable until you know
-which one went silent. `/admin/broadcast` says which rooms are configured.
+carries the room (`discord.announce.events` / `discord.announce.updates` /
+`discord.announce.support`): with three webhooks live, "the announcer is broken"
+is not actionable until you know which one went silent. `/admin/broadcast` says
+which of the two announcement rooms are configured, and `/admin/support` says so
+for its own — the support screen is emphatic about it, because without that
+webhook nobody learns a ticket exists until an admin happens to open the page.
 
 ## Creating the webhooks
 

@@ -1942,3 +1942,101 @@ model ErrorLog {
   /// Dedupe lookups.
   @@index([source, message])
 }
+
+enum SupportStatus {
+  /// Waiting on somebody — either the visitor or the staff.
+  OPEN
+  /// Settled. Still readable by both sides; reopens the moment the visitor
+  /// writes again, because a "closed" ticket is our opinion, not theirs.
+  CLOSED
+}
+
+/// One conversation with somebody who is *not* in the game yet — the support
+/// chat that sits on the login and registration screens.
+///
+/// It exists because the players who most need to reach a human are exactly the
+/// ones the rest of the app cannot see: an unverified address, a forgotten
+/// password, a Google account that will not link, a ban to argue, a payment made
+/// from an account that cannot log in. All of those happen *in front of* the
+/// session, so none of them can use the in-game chat (see ChatMessage), which
+/// is addressed by empire id and refuses everyone without one.
+///
+/// **Nothing here has a foreign key, on purpose.** A ticket has to outlive the
+/// account it is about: the visitor may have no account at all, may delete the
+/// one they have, and a season reset wipes every empire in the game. A support
+/// record that vanished with the empire would take the evidence of a payment
+/// dispute with it.
+model SupportThread {
+  id String @id @default(cuid())
+
+  /// SHA-256 of the token in the visitor's cookie — never the token itself, so
+  /// a dump of this table does not hand anybody else's conversation to the
+  /// reader. The raw value exists only in the visitor's browser and in the
+  /// request that presents it. Same shape as EmailVerificationToken.
+  tokenHash String @unique
+
+  /// Where to reach them if they close the tab. Optional, and asked for rather
+  /// than required: a visitor who is already frustrated must be able to say
+  /// what is wrong in one action.
+  email String?
+
+  /// The account behind the visit, when there is one. No FK — see the note
+  /// above. Written on every message, because a visitor who signs in mid-chat
+  /// (or whose session is what is broken) is worth knowing about.
+  userId    String?
+  /// Their empire's name at the time of writing, when they have one. Purely so
+  /// staff can recognise a player without a lookup.
+  empireName String?
+
+  /// The screen they were on when the conversation started, and the browser
+  /// they were using. Both are context for "it does not work" — which is what
+  /// most first messages say.
+  path      String?
+  userAgent String?
+  /// For rate-limit forensics and to spot one person opening ten tickets.
+  ip        String?
+
+  status SupportStatus @default(OPEN)
+
+  /// Last line either side wrote — the inbox sorts on it.
+  lastMessageAt DateTime @default(now())
+  /// When staff last read the thread, and when the visitor last did. Each side's
+  /// unread badge is "messages from the other side, newer than this".
+  staffReadAt   DateTime?
+  visitorReadAt DateTime?
+  /// When Discord was last pinged about this thread — the cooldown that keeps a
+  /// visitor typing six short lines from posting six notifications.
+  notifiedAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  messages SupportMessage[]
+
+  /// The admin inbox: open threads, newest activity first.
+  @@index([status, lastMessageAt])
+  /// The same read without the status filter, for the "all" tab.
+  @@index([lastMessageAt])
+}
+
+model SupportMessage {
+  id       String @id @default(cuid())
+  threadId String
+
+  /// Which side wrote it. A boolean rather than an author id because that is
+  /// the only distinction either reader cares about: "us" or "them".
+  fromStaff Boolean @default(false)
+  /// Which admin answered, for the audit trail. No FK, same reason as above.
+  staffId   String?
+  /// The name shown on the line — the admin's, or the visitor's if they gave
+  /// one. Denormalised like ChatMessage.senderName, and for the same reason.
+  authorName String
+
+  body String
+
+  createdAt DateTime @default(now())
+
+  thread SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  /// The transcript, and the poll cursor over it.
+  @@index([threadId, createdAt])
+}

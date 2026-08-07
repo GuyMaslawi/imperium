@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/Input";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { FormMessage } from "@/components/ui/FormMessage";
 import { GoogleSignInButton, AuthDivider } from "@/components/auth/GoogleSignInButton";
+import { SupportPrompt } from "@/components/support/SupportPrompt";
 import { useT } from "@/i18n/client";
 
 export function LoginForm({
@@ -60,6 +61,10 @@ export function LoginForm({
           </Link>
         </p>
       )}
+      {/* Carries the refusal into the ticket. A login that will not work is the
+          single most common reason somebody needs a human, and the moment the
+          error appears is when they decide whether to try again or to leave. */}
+      <SupportPrompt error={state.error} where={t("מסך ההתחברות")} />
     </div>
   );
 }

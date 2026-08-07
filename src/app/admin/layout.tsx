@@ -3,11 +3,16 @@ import Link from "next/link";
 import { requireAdmin } from "@/lib/admin";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { OrnateFrame } from "@/components/ui/OrnateFrame";
+import { countWaitingSupport } from "@/server/actions/support";
 
 export const metadata = { title: "ניהול | קראלדור" };
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const admin = await requireAdmin();
+  // One count, on every admin screen: a player waiting at the door is the one
+  // thing in here that goes stale by the minute, and the admin who is on some
+  // other page is exactly who needs telling.
+  const waitingSupport = await countWaitingSupport();
 
   return (
     <div dir="rtl" className="min-h-screen">
@@ -29,7 +34,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
             ← חזרה למשחק
           </Link>
 
-          <AdminNav />
+          <AdminNav waitingSupport={waitingSupport} />
         </aside>
 
         <main className="min-w-0 flex-1">

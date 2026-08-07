@@ -2223,6 +2223,66 @@ export const EN: Record<string, string> = {
   "יאללה, בחזרה לקרב": "Right — back to the fight",
 
   /* ------------------------------------------------------------------ */
+  /* the support chat — the one conversation held in front of the login  */
+  /* ------------------------------------------------------------------ */
+  "תמיכה": "Support",
+  "פתיחת צ׳אט התמיכה": "Open the support chat",
+  "סגירת צ׳אט התמיכה": "Close the support chat",
+  "צוות קראלדור": "The Kraldor team",
+  "צוות קראלדור — נשיב כאן, בדרך כלל תוך כמה שעות":
+    "The Kraldor team — we answer here, usually within a few hours",
+  "אפשר גם בדיסקורד — יש שם מי שעונה":
+    "Discord works too — somebody is answering there",
+  "נתקעת? ספר לנו מה קרה.": "Stuck? Tell us what happened.",
+  "לא הגיע מייל אימות, ההרשמה נתקעת, ההתחברות עם גוגל לא עובדת, שילמת ולא קיבלת — כתוב כאן ונטפל בזה. אם תשאיר אימייל נוכל לחזור אליך גם אם תסגור את החלון.":
+    "No verification mail, registration that will not go through, Google sign-in that loops, a payment that never arrived — write it here and we will sort it out. Leave an email and we can get back to you even if you close this window.",
+  "אימייל לחזרה (לא חובה)": "Email to reply to (optional)",
+  "מה קרה? כתוב כאן…": "What happened? Write here…",
+  "הפנייה סומנה כטופלה. אם זה עדיין לא נפתר — כתוב שוב כאן.":
+    "This ticket was marked as handled. If it is still not fixed — write here again.",
+  "אורח": "Guest",
+  /* the "stuck?" line under a form that just refused something */
+  "משהו לא עובד?": "Something not working?",
+  "דבר איתנו בצ׳אט": "Talk to us in chat",
+  'נתקעתי ב{where}. ההודעה שקיבלתי: "{error}"':
+    'I am stuck on {where}. The message I got: "{error}"',
+  "נתקעתי ב{where} ואני צריך עזרה.": "I am stuck on {where} and need help.",
+  "מסך ההתחברות": "the sign-in screen",
+  "מסך ההרשמה": "the registration screen",
+  /* its refusals */
+  "נשלחו יותר מדי הודעות מהכתובת הזו. נסה שוב בעוד שעה.":
+    "Too many messages from this address. Try again in an hour.",
+  "נפתחו יותר מדי פניות מהכתובת הזו. נסה שוב מאוחר יותר.":
+    "Too many tickets opened from this address. Try again later.",
+  "שלחת יותר מדי הודעות — המתן כמה דקות":
+    "You have sent too many messages — wait a few minutes",
+  "הפנייה לא נמצאה": "Ticket not found",
+  "הפנייה כבר במצב הזה": "The ticket is already in that state",
+
+  /* ------------------------------------------------------------------ */
+  /* the public pages in front of the game — the manual and the hall     */
+  /* ------------------------------------------------------------------ */
+  "מדריך המשחק": "Game guide",
+  "מדריך המשחק | קראלדור": "Game guide | Kraldor",
+  "כל מה שצריך לדעת על קראלדור: כלכלה, קרבות, ריגול, גיבור, בריתות ועונות — המדריך המלא, פתוח לכולם.":
+    "Everything there is to know about Kraldor: economy, battle, espionage, your hero, alliances and seasons — the full manual, open to everyone.",
+  "המדריך המלא — אותו אחד שנמצא בתוך המשחק, עם המספרים החיים של העונה הנוכחית.":
+    "The full manual — the same one inside the game, with this season's live numbers.",
+  "היכל התהילה | קראלדור": "Hall of Fame | Kraldor",
+  "האלופים של העונות שהסתיימו בקראלדור — פודיום ושלושת לוחות התהילה.":
+    "The champions of Kraldor's finished seasons — the podium and the three halls.",
+  "כך הסתיימה {season}, ב־{date}. הלוחות נחרתו ברגע שהעונה ננעלה ואינם משתנים עוד.":
+    "This is how {season} ended, on {date}. The boards were carved the moment the season locked and never change again.",
+  "כאן ייחרתו האלופים ברגע שהעונה הראשונה תסתיים.":
+    "The champions will be carved here the moment the first season ends.",
+  "הצטרף לעונה הראשונה": "Join the first season",
+  "פודיום העונה": "The season's podium",
+  "כוח": "Power",
+  "הקם אימפריה — חינם": "Found an empire — free",
+  "חזרה למשחק": "Back to the game",
+  "לתוצאות העונה ולספירה לאחור": "To the season results and the countdown",
+
+  /* ------------------------------------------------------------------ */
   /* the mini-games: the pill, the board and the winners' rail           */
   /* ------------------------------------------------------------------ */
   "(אתה)": "(you)",

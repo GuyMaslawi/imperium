@@ -81,6 +81,16 @@ function stubPayPlus(envelope: unknown, status = 200) {
   return calls;
 }
 
+/** Stub `fetch` with a body that is not JSON at all — as PayPlus sometimes answers. */
+function stubText(body: string, status = 200) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () => new Response(body, { status, headers: { "content-type": "text/html" } })
+    )
+  );
+}
+
 const sign = (body: string, key = SECRET) =>
   createHmac("sha256", key).update(body, "utf8").digest("base64");
 
@@ -428,6 +438,23 @@ describe("fetchDocuments", () => {
     stubPayPlus({ invoices: [] });
     const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
     expect(result).toEqual({ ok: true, documents: [] });
+  });
+
+  it("reads the plain-text 'cannot-find-invoice' answer as 'none issued yet' too", async () => {
+    // Observed live on staging against a genuinely charged transaction: HTTP
+    // 200, text/html, this sentence and nothing else. Parsed as JSON it is a
+    // gateway fault; it actually means the same as an empty list.
+    configure();
+    stubText("cannot-find-invoice-for-this-transaction");
+    const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
+    expect(result).toEqual({ ok: true, documents: [] });
+  });
+
+  it("still fails on a non-JSON answer that is not that sentence", async () => {
+    configure();
+    stubText("<html><body>502 Bad Gateway</body></html>");
+    const result = await payplusProvider()!.fetchDocuments!({ captureId: "tx-1" });
+    expect(result.ok).toBe(false);
   });
 
   it("drops rows with no usable link rather than offering a dead button", async () => {
