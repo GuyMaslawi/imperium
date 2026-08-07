@@ -27,6 +27,10 @@ export const EN: Record<string, string> = {
   "קראלדור | Kraldor": "Kraldor",
   "בנה אימפריה. צור ברית. כבוש את הדירוג.":
     "Build an empire. Forge an alliance. Conquer the ladder.",
+  /* the other two lines of the rotating tagline on the login screen */
+  "האויב לא ישן. גם החומות שלך לא צריכות.":
+    "The enemy never sleeps. Neither should your walls.",
+  "עונה חדשה, עולם חדש, מלך אחד.": "A new season, a new world, one king.",
 
   /* resources — the six balances in the command bar */
   "זהב": "Gold",

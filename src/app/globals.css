@@ -9506,3 +9506,659 @@ body {
     animation: prize-amount-sweep 5s linear infinite;
   }
 }
+
+/* ============================================================================
+   שער קראלדור — the front door (prefix: gate-)
+   Markup: src/components/auth/GateScene.tsx + src/components/auth/AuthShell.tsx
+
+   The login screen is the only page on this site a stranger sees before they
+   have any reason to care, so it is the one place where the decoration is the
+   argument. A besieged capital at night: battlements under a warglow, windows
+   burning, embers on the updraught, a distant engine flashing on the horizon.
+
+   Three rules it shares with every other scene here:
+     - Nothing that moves carries information. Kill the whole block and the form
+       still works, still reads, and still submits.
+     - Positions and delays come from fixed tables in the component, never from
+       Math.random(), so SSR and hydration agree.
+     - transform/opacity only, so none of it costs a layout on a phone.
+
+   The backdrop is fixed, not absolute: the tall screens (registration with the
+   class picker, the 404) scroll their panel over a still horizon instead of
+   dragging a skyline up the page with them.
+   ========================================================================== */
+
+.gate-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* The scene paints over the body's own warscape gradient rather than
+     replacing it — the base colour still shows through every layer's alpha.
+     Containment keeps a repaint of a drifting cloud off the rest of the page. */
+  contain: layout paint;
+}
+
+/* --- the night ----------------------------------------------------------- */
+
+.gate-sky {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(90% 60% at 50% 100%, rgba(120, 62, 18, 0.30), transparent 62%),
+    radial-gradient(60% 40% at 78% 10%, rgba(196, 160, 50, 0.10), transparent 66%),
+    linear-gradient(180deg, #05050a 0%, #0a0810 40%, #140f10 74%, #1c1210 100%);
+}
+
+/* The fires beyond the wall. Breathing, and slightly off the centre line so it
+   never reads as a lamp behind the form. */
+.gate-warglow {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  background:
+    radial-gradient(50% 100% at 42% 100%, rgba(224, 108, 34, 0.26), transparent 70%),
+    radial-gradient(40% 90% at 74% 100%, rgba(196, 160, 50, 0.18), transparent 72%);
+  animation: gate-warglow-breathe 11s ease-in-out infinite;
+}
+@keyframes gate-warglow-breathe {
+  0%, 100% { opacity: 0.75; transform: scaleY(1); }
+  50% { opacity: 1; transform: scaleY(1.06); }
+}
+
+.gate-stars {
+  position: absolute;
+  inset: 0 0 45% 0;
+}
+.gate-stars > span {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: var(--s);
+  height: var(--s);
+  border-radius: 999px;
+  background: #efe6ce;
+  box-shadow: 0 0 6px rgba(239, 230, 206, 0.7);
+  animation: gate-twinkle 4.2s ease-in-out var(--d) infinite;
+}
+@keyframes gate-twinkle {
+  0%, 100% { opacity: 0.15; }
+  50% { opacity: 0.95; }
+}
+
+.gate-moon {
+  position: absolute;
+  top: 9%;
+  right: 12%;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 36% 32%, #f6f0dc 0%, #d8cfae 52%, #8e846a 100%);
+  box-shadow:
+    0 0 60px -6px rgba(240, 234, 210, 0.45),
+    0 0 160px 24px rgba(196, 160, 50, 0.14);
+  animation: gate-moon-drift 26s ease-in-out infinite;
+  /* The shadow bite below is a second circle overlapping this one, so it MUST
+     be clipped: unclipped it paints its own black disc out over the sky and the
+     moon reads as an eclipse sitting on a hole. `overflow` on a round element
+     clips to the border-radius, which is exactly the crescent edge wanted. */
+  overflow: hidden;
+}
+/* The bite. A gibbous moon reads as drawn; a full circle reads as a bug in the
+   gradient. */
+.gate-moon::after {
+  content: "";
+  position: absolute;
+  inset: -12% -40% -12% 34%;
+  border-radius: 999px;
+  background: #06060c;
+  opacity: 0.94;
+}
+@keyframes gate-moon-drift {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(-10px, 8px, 0); }
+}
+
+/* Ravens. Two wing strokes on one span: a chevron that flaps as it crosses. */
+.gate-birds {
+  position: absolute;
+  inset: 0 0 55% 0;
+}
+.gate-birds > span {
+  position: absolute;
+  top: var(--y);
+  left: 100%;
+  width: 14px;
+  height: 8px;
+  transform: scale(var(--s));
+  animation: gate-bird-cross var(--dur) linear var(--d) infinite;
+}
+.gate-birds > span::before,
+.gate-birds > span::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 7px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: rgba(12, 10, 14, 0.85);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  animation: gate-bird-flap 0.55s ease-in-out infinite;
+}
+.gate-birds > span::before { left: 0; transform-origin: right center; }
+.gate-birds > span::after { right: 0; transform-origin: left center; }
+@keyframes gate-bird-cross {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(var(--s)); }
+  6% { opacity: 0.75; }
+  90% { opacity: 0.75; }
+  100% { opacity: 0; transform: translate3d(-115vw, -4vh, 0) scale(var(--s)); }
+}
+@keyframes gate-bird-flap {
+  0%, 100% { transform: rotate(18deg); }
+  50% { transform: rotate(-14deg); }
+}
+
+/* Cloud bands. Two of the four are hidden on a phone — see the media query at
+   the end of the block. */
+.gate-clouds {
+  position: absolute;
+  inset: 0 0 40% 0;
+}
+.gate-clouds > span {
+  position: absolute;
+  top: var(--y);
+  left: -60%;
+  width: 60%;
+  height: var(--h);
+  border-radius: 999px;
+  filter: blur(22px);
+  opacity: var(--o);
+  background: linear-gradient(90deg, transparent, #6a5f52 30%, #7d7062 60%, transparent);
+  animation: gate-cloud-drift var(--dur) linear var(--d) infinite;
+}
+@keyframes gate-cloud-drift {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(280vw, 0, 0); }
+}
+
+/* --- the land ------------------------------------------------------------ */
+
+.gate-ridge {
+  position: absolute;
+  inset: auto 0 0 0;
+  pointer-events: none;
+}
+/* Far ridge: hazier and warmer, because the warglow is behind it. */
+.gate-ridge-far {
+  height: 30%;
+  background: #1a1114;
+  opacity: 0.75;
+  clip-path: polygon(
+    0% 100%, 0% 62%, 7% 48%, 14% 60%, 22% 38%, 31% 55%, 39% 34%,
+    48% 52%, 56% 30%, 65% 50%, 73% 36%, 82% 56%, 91% 42%, 100% 58%, 100% 100%
+  );
+}
+/* Near ridge: near-black, so the city's own silhouette still separates. */
+.gate-ridge-near {
+  height: 20%;
+  background: #0b090c;
+  clip-path: polygon(
+    0% 100%, 0% 70%, 11% 54%, 20% 72%, 30% 50%, 42% 68%, 53% 46%,
+    64% 66%, 74% 52%, 85% 70%, 94% 56%, 100% 68%, 100% 100%
+  );
+}
+
+/* --- the capital --------------------------------------------------------- */
+
+.gate-skyline {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: min(34vh, 20rem);
+}
+
+.gate-tower {
+  position: absolute;
+  bottom: 0;
+  left: var(--x);
+  width: var(--w);
+  height: var(--h);
+  background: linear-gradient(180deg, #14111a 0%, #0d0b11 55%, #060509 100%);
+  /* A gold rim on the side the fires are on, so the stone is lit rather than
+     cut out of paper. */
+  box-shadow:
+    inset 3px 0 0 -1px rgba(196, 160, 50, 0.16),
+    inset 0 -40px 60px -50px rgba(224, 108, 34, 0.9);
+  /* The city builds itself as the page opens, left to right. backwards, not
+     both: a transform left applied after the animation would turn every tower
+     into a containing block for nothing. */
+  animation: gate-tower-rise 1.1s cubic-bezier(0.22, 0.9, 0.3, 1) backwards;
+  animation-delay: calc(var(--i) * 55ms);
+  transform-origin: bottom center;
+}
+@keyframes gate-tower-rise {
+  0% { transform: scaleY(0.25); opacity: 0; }
+  100% { transform: scaleY(1); opacity: 1; }
+}
+
+/* Battlements: the merlons are a repeating gradient across a strip sitting on
+   the roofline, which is cheaper and sharper than thirteen more elements. */
+.gate-wall::before,
+.gate-keep::before {
+  content: "";
+  position: absolute;
+  inset: -0.55rem 0 auto 0;
+  height: 0.6rem;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #14111a 0 0.5rem,
+      transparent 0.5rem 0.95rem
+    );
+}
+/* A spire's roof is a triangle, and it flies a pennant. Clip-path rather than
+   the border trick, so the roof scales with the tower's own width instead of
+   being a fixed number of rem that overhangs the narrow ones. */
+.gate-spire::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: -14%;
+  width: 128%;
+  height: 2.6rem;
+  background: linear-gradient(180deg, #16121c, #0c0a11);
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+.gate-pennant {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  width: 1px;
+  height: 4.6rem;
+  background: rgba(196, 160, 50, 0.4);
+}
+.gate-pennant::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 1px;
+  width: 1.5rem;
+  height: 0.85rem;
+  background: linear-gradient(90deg, var(--gold), rgba(196, 160, 50, 0.35));
+  clip-path: polygon(0 0, 100% 0, 72% 50%, 100% 100%, 0 100%);
+  transform-origin: left center;
+  animation: gate-pennant-wave 2.8s ease-in-out infinite;
+}
+@keyframes gate-pennant-wave {
+  0%, 100% { transform: skewY(-5deg) scaleX(1); }
+  50% { transform: skewY(6deg) scaleX(0.86); }
+}
+
+/* Lit windows: a grid of warm squares, flickering as one tower rather than as
+   individual lamps — one animated element instead of forty. */
+.gate-keep::after,
+.gate-spire::after {
+  content: "";
+  position: absolute;
+  inset: 12% 20% 6% 20%;
+  /* One tiled radial is the whole grid — a second gradient blended into it
+     turns the transparent gaps into mud. */
+  background-image: radial-gradient(
+    ellipse 1.6px 2.6px at 50% 50%,
+    rgba(255, 176, 74, 0.95) 0 60%,
+    transparent 62%
+  );
+  background-size: 9px 15px;
+  filter: drop-shadow(0 0 4px rgba(255, 150, 40, 0.55));
+  opacity: 0.5;
+  animation: gate-windows 5.5s ease-in-out infinite;
+  animation-delay: var(--lit);
+}
+@keyframes gate-windows {
+  0%, 100% { opacity: 0.34; }
+  35% { opacity: 0.62; }
+  62% { opacity: 0.28; }
+}
+
+/* The distant engine. Twenty-two seconds of nothing, then two fast blinks —
+   long enough apart that it is a surprise every time.
+
+   It sits OUTSIDE .gate-skyline, over the whole lower half of the sky. Inside
+   the strip the towers painted on top of it and all it lit was its own
+   foundations, which is the wrong way round: what a siege engine firing beyond
+   the wall actually does is throw the silhouette into relief. */
+.gate-flash {
+  position: absolute;
+  inset: 28% 0 0 0;
+  background: radial-gradient(
+    46% 78% at 24% 100%,
+    rgba(255, 206, 140, 0.60),
+    rgba(255, 150, 60, 0.22) 42%,
+    transparent 72%
+  );
+  opacity: 0;
+  animation: gate-flash-fire 22s linear infinite;
+}
+@keyframes gate-flash-fire {
+  0%, 1.4% { opacity: 0; }
+  1.8% { opacity: 1; }
+  2.6% { opacity: 0.15; }
+  3.1% { opacity: 0.8; }
+  6% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+/* --- the air in front of it ---------------------------------------------- */
+
+.gate-embers {
+  position: absolute;
+  inset: 0;
+}
+.gate-embers > span {
+  position: absolute;
+  bottom: 4%;
+  left: var(--x);
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: #ffb04a;
+  box-shadow: 0 0 8px 1px rgba(255, 140, 40, 0.75);
+  opacity: 0;
+  animation: gate-ember-rise var(--dur) linear var(--d) infinite;
+}
+@keyframes gate-ember-rise {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(var(--s)); }
+  10% { opacity: 0.9; }
+  45% { transform: translate3d(2.5rem, -40vh, 0) scale(var(--s)); }
+  70% { opacity: 0.5; }
+  100% { opacity: 0; transform: translate3d(-1.5rem, -85vh, 0) scale(calc(var(--s) * 0.4)); }
+}
+
+.gate-fog {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 26%;
+  background: linear-gradient(180deg, transparent, rgba(30, 22, 20, 0.55) 55%, rgba(18, 13, 13, 0.85));
+  filter: blur(2px);
+  animation: gate-fog-roll 18s ease-in-out infinite;
+}
+@keyframes gate-fog-roll {
+  0%, 100% { transform: translate3d(-2%, 0, 0); opacity: 0.85; }
+  50% { transform: translate3d(2%, -4%, 0); opacity: 1; }
+}
+
+/* Pulls the eye back to the panel. Static on purpose — a vignette that moves
+   is a headache, not an atmosphere. */
+.gate-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(58% 48% at 50% 40%, transparent 40%, rgba(4, 4, 8, 0.62) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.55), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.55));
+}
+
+/* --- the crest, the wordmark and the panel ------------------------------- */
+
+/* Everything the shell renders rides above the backdrop. */
+.gate-content {
+  position: relative;
+  z-index: 1;
+}
+
+.gate-crest-wrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 7.5rem;
+  height: 7.5rem;
+}
+/* Light behind the shield. */
+.gate-halo {
+  position: absolute;
+  inset: -35%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(196, 160, 50, 0.30), rgba(224, 108, 34, 0.10) 45%, transparent 70%);
+  animation: gate-halo-pulse 6s ease-in-out infinite;
+}
+@keyframes gate-halo-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.94); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+/* Two rings turning against each other — the seal being read. */
+.gate-ring {
+  position: absolute;
+  border-radius: 999px;
+  border: 1px dashed rgba(196, 160, 50, 0.35);
+}
+.gate-ring-outer {
+  inset: 0;
+  animation: gate-spin 34s linear infinite;
+}
+.gate-ring-inner {
+  inset: 12%;
+  border-style: dotted;
+  border-color: rgba(214, 201, 173, 0.22);
+  animation: gate-spin 22s linear infinite reverse;
+}
+@keyframes gate-spin {
+  to { transform: rotate(360deg); }
+}
+.gate-crest {
+  position: relative;
+  animation: gate-crest-bob 5s ease-in-out infinite;
+  filter: drop-shadow(0 6px 22px rgba(196, 160, 50, 0.45));
+}
+@keyframes gate-crest-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* The wordmark falls into place letter by letter, then a gold sweep runs over
+   it every few seconds. The sweep is a ::after duplicate clipped to the text,
+   so the crimson L underneath keeps its colour. */
+.gate-word {
+  position: relative;
+}
+.gate-word > span {
+  display: inline-block;
+  animation: gate-letter 0.7s cubic-bezier(0.22, 0.9, 0.3, 1) backwards;
+  animation-delay: calc(var(--i) * 65ms + 120ms);
+}
+@keyframes gate-letter {
+  0% { opacity: 0; transform: translateY(0.5em) rotateX(-70deg); filter: blur(4px); }
+  100% { opacity: 1; transform: translateY(0) rotateX(0); filter: blur(0); }
+}
+.gate-word::after {
+  content: "KRALDOR";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 240, 200, 0.85) 50%,
+    transparent 58%
+  );
+  background-size: 260% 100%;
+  background-position: 200% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  pointer-events: none;
+  animation: gate-word-sweep 6.5s ease-in-out 1.4s infinite;
+}
+@keyframes gate-word-sweep {
+  0% { background-position: 200% 0; }
+  38%, 100% { background-position: -120% 0; }
+}
+
+/* The three-line tagline. All three stack in one box and cross-fade on a 16.5s
+   cycle; the box is sized by the first line, which is the longest. */
+.gate-tagline {
+  position: relative;
+  display: grid;
+}
+.gate-tagline > span {
+  grid-area: 1 / 1;
+  opacity: 0;
+  animation: gate-tag 16.5s ease-in-out infinite;
+  animation-delay: calc(var(--i) * 5.5s);
+}
+@keyframes gate-tag {
+  0% { opacity: 0; transform: translateY(6px); }
+  4%, 30% { opacity: 1; transform: translateY(0); }
+  34%, 100% { opacity: 0; transform: translateY(-6px); }
+}
+
+/* The panel arrives last, from below, and a light runs across it now and then
+   so the frame never sits completely dead. */
+.gate-panel {
+  animation: gate-panel-in 0.7s cubic-bezier(0.22, 0.9, 0.3, 1) 0.08s backwards;
+}
+@keyframes gate-panel-in {
+  0% { opacity: 0; transform: translateY(22px) scale(0.985); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* A clipping box of its own rather than overflow:hidden on the panel, which
+   would cut the ornate frame's outer glow. */
+.gate-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.gate-sheen::before {
+  content: "";
+  position: absolute;
+  top: -60%;
+  bottom: -60%;
+  left: 0;
+  width: 40%;
+  /* Soft on purpose: a hard-edged band reads as a rendering seam across the
+     form rather than as light. */
+  filter: blur(9px);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(228, 195, 90, 0.05) 40%,
+    rgba(255, 245, 215, 0.10) 50%,
+    rgba(228, 195, 90, 0.05) 60%,
+    transparent
+  );
+  transform: translate3d(-250%, 0, 0) rotate(9deg);
+  animation: gate-sheen-run 9s ease-in-out 1.2s infinite;
+}
+@keyframes gate-sheen-run {
+  0% { transform: translate3d(-250%, 0, 0) rotate(9deg); }
+  45%, 100% { transform: translate3d(420%, 0, 0) rotate(9deg); }
+}
+
+/* The form's own rows come in behind the panel, top to bottom. The selector is
+   deliberately one level deep: both auth forms root at a single wrapper div,
+   and the other AuthShell screens (verify-email, 404) simply stagger whatever
+   they put there. `backwards` again — nothing is left transformed.
+
+   The whole ladder is over by ~0.75s and the steps are small. This is a login
+   form, not a title card: a returning player is reaching for the email field
+   before the city behind them has finished being built, and a stagger they can
+   outrun is a stagger that gets in the way. */
+.gate-panel > div > * {
+  animation: gate-row-in 0.42s cubic-bezier(0.22, 0.9, 0.3, 1) backwards;
+}
+.gate-panel > div > *:nth-child(1) { animation-delay: 0.22s; }
+.gate-panel > div > *:nth-child(2) { animation-delay: 0.27s; }
+.gate-panel > div > *:nth-child(3) { animation-delay: 0.32s; }
+.gate-panel > div > *:nth-child(4) { animation-delay: 0.37s; }
+.gate-panel > div > *:nth-child(5) { animation-delay: 0.42s; }
+.gate-panel > div > *:nth-child(6) { animation-delay: 0.47s; }
+.gate-panel > div > *:nth-child(n + 7) { animation-delay: 0.52s; }
+@keyframes gate-row-in {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* The one control on the screen that everything else is pointing at. A slow
+   breathing ring, so the eye lands on it without anything blinking. */
+.gate-panel button[type="submit"] {
+  position: relative;
+  animation: gate-cta-glow 3.4s ease-in-out infinite;
+}
+@keyframes gate-cta-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(228, 195, 90, 0); }
+  50% { box-shadow: 0 0 22px -4px rgba(228, 195, 90, 0.55); }
+}
+/* A pending button has already been pressed; the invitation is over. */
+.gate-panel button[type="submit"]:disabled {
+  animation: none;
+}
+
+/* The chrome around the panel fades up after it, in reading order. */
+.gate-fade {
+  animation: gate-row-in 0.6s ease-out backwards;
+  /* The fallback matters: <PublicNav> takes a className but no style prop, so
+     it wears this class without an --i of its own and leads the sequence. */
+  animation-delay: calc(var(--i, 0) * 110ms + 0.35s);
+}
+
+/* --- small screens ------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  /* Fewer moving parts where the GPU budget is smallest, and a shorter skyline
+     so the towers do not reach the form. */
+  .gate-skyline { height: min(26vh, 12rem); }
+  /* The nav wraps to three rows on a phone and swallows the top-right sky, so
+     the moon moves to the one patch that stays clear — left of the crest,
+     below the pills. Half a moon behind a row of buttons reads as a rendering
+     artefact, not as a sky. */
+  .gate-moon {
+    width: 3rem;
+    height: 3rem;
+    top: 26%;
+    right: auto;
+    left: 6%;
+  }
+  .gate-clouds > span:nth-child(n + 3) { display: none; }
+  .gate-embers > span:nth-child(2n) { display: none; }
+  .gate-birds { display: none; }
+  .gate-crest-wrap { width: 6rem; height: 6rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gate-warglow,
+  .gate-stars > span,
+  .gate-moon,
+  .gate-tower,
+  .gate-keep::after,
+  .gate-spire::after,
+  .gate-pennant::after,
+  .gate-fog,
+  .gate-halo,
+  .gate-ring-outer,
+  .gate-ring-inner,
+  .gate-crest,
+  .gate-word > span,
+  .gate-panel,
+  .gate-panel > div > *,
+  .gate-panel button[type="submit"],
+  .gate-fade {
+    animation: none;
+  }
+  /* These exist only as motion: parked, they are dots and a smear. */
+  .gate-birds,
+  .gate-embers,
+  .gate-clouds,
+  .gate-flash,
+  .gate-sheen,
+  .gate-word::after {
+    display: none;
+  }
+  /* The tagline cycles; standing still it shows the first line and only that. */
+  .gate-tagline > span {
+    animation: none;
+    opacity: 0;
+  }
+  .gate-tagline > span:first-child {
+    opacity: 1;
+  }
+}
